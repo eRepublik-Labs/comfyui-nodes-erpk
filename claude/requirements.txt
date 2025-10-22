@@ -1,0 +1,13 @@
+# Claude API Integration Requirements
+
+# Core API client (includes token counting API)
+anthropic>=0.40.0
+
+# Data validation and serialization
+pydantic>=2.0.0
+
+# Image processing
+Pillow>=10.0.0
+
+# HTTP requests and utilities
+requests>=2.31.0

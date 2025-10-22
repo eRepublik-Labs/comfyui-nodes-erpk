@@ -1,0 +1,32 @@
+{
+  "_comment": "Claude API Pricing - Update from https://www.anthropic.com/pricing",
+  "_last_updated": "2025-10-22",
+  "_version": "1.0",
+
+  "models": {
+    "claude-sonnet-4-5-20250929": {
+      "name": "Claude Sonnet 4.5",
+      "input_price_per_mtok": 3.0,
+      "output_price_per_mtok": 15.0,
+      "cache_read_price_per_mtok": 0.3
+    },
+    "claude-opus-4": {
+      "name": "Claude Opus 4",
+      "input_price_per_mtok": 15.0,
+      "output_price_per_mtok": 75.0,
+      "cache_read_price_per_mtok": 1.5
+    },
+    "claude-haiku-4-5": {
+      "name": "Claude Haiku 4.5",
+      "input_price_per_mtok": 1.0,
+      "output_price_per_mtok": 5.0,
+      "cache_read_price_per_mtok": 0.1
+    }
+  },
+
+  "notes": {
+    "cache_multiplier": "Cache read prices are 0.1x of input prices",
+    "pricing_page": "https://www.anthropic.com/pricing",
+    "currency": "USD"
+  }
+}

@@ -4,3 +4,4 @@ _docs
 ref
 erpk/__pycache__
 CLAUDE.md
+claude/config.ini
