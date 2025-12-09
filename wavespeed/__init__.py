@@ -125,8 +125,5 @@ print(f"[WaveSpeed] Loaded {len(NODE_CLASS_MAPPINGS)} nodes:")
 for node_name in NODE_CLASS_MAPPINGS.keys():
     print(f"  - {node_name}")
 
-# Web directory for frontend extensions (if any)
-WEB_DIRECTORY = "./web"
-
 # Export for ComfyUI
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
