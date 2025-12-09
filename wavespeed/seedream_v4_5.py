@@ -1,25 +1,7 @@
-from math import gcd
-
 from .wavespeed_api.utils import imageurl2tensor
+from .seedream_v4 import calculate_aspect_ratio
 from .wavespeed_api.client import WaveSpeedClient
 from .wavespeed_api.requests.seedream_v4_5 import SeedreamV4_5
-
-
-def calculate_aspect_ratio(width, height):
-    """Calculate and format aspect ratio from dimensions."""
-    divisor = gcd(width, height)
-    w_ratio = width // divisor
-    h_ratio = height // divisor
-
-    # Keep reducing if numbers are too large for readability
-    while w_ratio > 100 or h_ratio > 100:
-        if w_ratio % 2 == 0 and h_ratio % 2 == 0:
-            w_ratio //= 2
-            h_ratio //= 2
-        else:
-            break
-
-    return f"{w_ratio}:{h_ratio}"
 
 
 # Recommended resolutions from WaveSpeed API docs for V4.5
@@ -87,18 +69,18 @@ class SeedreamV4_5Node:
                         "tooltip": "Custom height (only used when size_preset is 'Custom')",
                     },
                 ),
-                "aspect_ratio": (
-                    "STRING",
+                "show_aspect_ratio": (
+                    "BOOLEAN",
                     {
-                        "default": "",
-                        "tooltip": "Calculated aspect ratio (display only)",
+                        "default": True,
+                        "tooltip": "Show aspect ratio in node title",
                     },
                 ),
             },
         }
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("image", "aspect_ratio")
 
     CATEGORY = "ERPK/WaveSpeedAI"
     FUNCTION = "execute"
@@ -114,7 +96,6 @@ class SeedreamV4_5Node:
         size_preset,
         width=2048,
         height=2048,
-        aspect_ratio="",
     ):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
@@ -139,7 +120,8 @@ class SeedreamV4_5Node:
             raise ValueError("No image URLs in the generated result")
 
         images = imageurl2tensor(image_urls)
-        return (images,)
+        aspect_ratio = calculate_aspect_ratio(width, height)
+        return (images, aspect_ratio)
 
 
 NODE_CLASS_MAPPINGS = {"WaveSpeed Custom SeedreamV4_5": SeedreamV4_5Node}

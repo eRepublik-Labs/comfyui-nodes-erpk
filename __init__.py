@@ -8,19 +8,19 @@ A collection of custom ComfyUI nodes from ERPK, including WaveSpeed AI, Claude A
 NODE_CLASS_MAPPINGS = {}
 NODE_DISPLAY_NAME_MAPPINGS = {}
 
+# Web directory for frontend extensions
+WEB_DIRECTORY = "./web"
+
 # Import and register WaveSpeed nodes
 try:
     from .wavespeed import (
         NODE_CLASS_MAPPINGS as WAVESPEED_NODE_CLASS_MAPPINGS,
         NODE_DISPLAY_NAME_MAPPINGS as WAVESPEED_NODE_DISPLAY_NAME_MAPPINGS,
-        WEB_DIRECTORY as WAVESPEED_WEB_DIRECTORY
     )
     NODE_CLASS_MAPPINGS.update(WAVESPEED_NODE_CLASS_MAPPINGS)
     NODE_DISPLAY_NAME_MAPPINGS.update(WAVESPEED_NODE_DISPLAY_NAME_MAPPINGS)
-    WEB_DIRECTORY = WAVESPEED_WEB_DIRECTORY
 except ImportError as e:
     print(f"[ERPK] Warning: Could not load WaveSpeed nodes: {e}")
-    WEB_DIRECTORY = "./web"
 
 # Import and register Claude nodes
 try:

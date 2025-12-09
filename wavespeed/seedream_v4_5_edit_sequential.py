@@ -2,6 +2,7 @@ from .wavespeed_api.utils import imageurl2tensor
 from .wavespeed_api.client import WaveSpeedClient
 from .wavespeed_api.requests.seedream_v4_5_edit_sequential import SeedreamV4_5EditSequential
 from .seedream_v4_5 import SEEDREAM_V4_5_SIZE_PRESETS
+from .seedream_v4 import calculate_aspect_ratio
 
 
 class SeedreamV4_5EditSequentialNode:
@@ -72,11 +73,11 @@ class SeedreamV4_5EditSequentialNode:
                         "tooltip": "Custom height (only used when size_preset is 'Custom')",
                     },
                 ),
-                "aspect_ratio": (
-                    "STRING",
+                "show_aspect_ratio": (
+                    "BOOLEAN",
                     {
-                        "default": "",
-                        "tooltip": "Calculated aspect ratio (display only)",
+                        "default": True,
+                        "tooltip": "Show aspect ratio in node title",
                     },
                 ),
                 "enable_sync_mode": (
@@ -96,8 +97,8 @@ class SeedreamV4_5EditSequentialNode:
             },
         }
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("images",)
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("images", "aspect_ratio")
 
     CATEGORY = "ERPK/WaveSpeedAI"
     FUNCTION = "execute"
@@ -115,7 +116,6 @@ class SeedreamV4_5EditSequentialNode:
         images=None,
         width=2048,
         height=2048,
-        aspect_ratio="",
         enable_sync_mode=False,
         enable_base64_output=False,
     ):
@@ -155,7 +155,8 @@ class SeedreamV4_5EditSequentialNode:
             raise ValueError("No image URLs in the generated result")
 
         images = imageurl2tensor(image_urls)
-        return (images,)
+        aspect_ratio = calculate_aspect_ratio(width, height)
+        return (images, aspect_ratio)
 
 
 NODE_CLASS_MAPPINGS = {

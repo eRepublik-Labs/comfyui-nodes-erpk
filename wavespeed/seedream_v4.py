@@ -97,18 +97,18 @@ class SeedreamV4Node:
                         "tooltip": "Custom height (only used when size_preset is 'Custom')",
                     },
                 ),
-                "aspect_ratio": (
-                    "STRING",
+                "show_aspect_ratio": (
+                    "BOOLEAN",
                     {
-                        "default": "",
-                        "tooltip": "Calculated aspect ratio (display only)",
+                        "default": True,
+                        "tooltip": "Show aspect ratio in node title",
                     },
                 ),
             },
         }
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("image", "aspect_ratio")
 
     CATEGORY = "ERPK/WaveSpeedAI"
     FUNCTION = "execute"
@@ -124,7 +124,6 @@ class SeedreamV4Node:
         size_preset,
         width=1408,
         height=1408,
-        aspect_ratio="",
     ):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
@@ -149,7 +148,8 @@ class SeedreamV4Node:
             raise ValueError("No image URLs in the generated result")
 
         images = imageurl2tensor(image_urls)
-        return (images,)
+        aspect_ratio = calculate_aspect_ratio(width, height)
+        return (images, aspect_ratio)
 
 
 NODE_CLASS_MAPPINGS = {"WaveSpeed Custom SeedreamV4": SeedreamV4Node}
