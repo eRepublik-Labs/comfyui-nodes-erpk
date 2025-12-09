@@ -1,0 +1,14 @@
+# ABOUTME: Consolidated requirements for all ERPK ComfyUI nodes
+# ABOUTME: Install with: pip install -r requirements.txt
+
+# Core dependencies (all packages)
+requests>=2.31.0
+Pillow>=10.0.0
+pydantic>=2.0.0
+urllib3>=1.26.0
+
+# Claude API integration
+anthropic>=0.40.0
+
+# Google Gemini API integration
+google-genai>=0.2.0
