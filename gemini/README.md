@@ -150,16 +150,17 @@ Generate images from text descriptions using Gemini's image generation models.
 
 **Inputs:**
 - `prompt`: Text description of the image to generate
-- `api_key`: Optional API key (uses env/config if empty)
+- `client`: Optional Gemini API client (from Gemini API Config node)
 - `model`: gemini-2.5-flash-image (fast, recommended) or gemini-3-pro-image-preview (best quality)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
 - `aspect_ratio`: Image dimensions - "default", "1:1" (square), "9:16" (portrait), "16:9" (landscape), "4:3", "3:4"
+- `api_key`: Optional API key (only needed if not using client input)
 
 **Outputs:**
 - `image`: Generated image (ComfyUI IMAGE tensor)
 
 **Features:**
-- Standalone node (doesn't need Gemini API Config)
+- Works with Gemini API Config node or standalone with API key
 - Direct image output compatible with all ComfyUI image nodes
 - Model selector for different image generation models
 - Configurable creativity with temperature
@@ -180,16 +181,17 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 **Inputs:**
 - `image`: Input image(s) to edit (ComfyUI IMAGE tensor, supports 1-3 images)
 - `prompt`: Text description of how to modify the image(s)
-- `api_key`: Optional API key (uses env/config if empty)
+- `client`: Optional Gemini API client (from Gemini API Config node)
 - `model`: gemini-2.5-flash-image (fast, recommended) or gemini-3-pro-image-preview (best quality)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
 - `aspect_ratio`: Image dimensions - "default", "1:1" (square), "9:16" (portrait), "16:9" (landscape), "4:3", "3:4"
+- `api_key`: Optional API key (only needed if not using client input)
 
 **Outputs:**
 - `image`: Edited image (ComfyUI IMAGE tensor)
 
 **Features:**
-- Standalone node (doesn't need Gemini API Config)
+- Works with Gemini API Config node or standalone with API key
 - Supports 1-3 input images for best results (API optimized for this range)
 - Image-to-image editing with natural language instructions
 - Compatible with all ComfyUI image nodes

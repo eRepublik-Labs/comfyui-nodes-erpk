@@ -586,17 +586,17 @@ class GeminiImageGeneration:
     Gemini Image Generation Node
 
     Generates images using Gemini's image generation models.
-    Uses dedicated image generation models like gemini-2.5-flash-image.
+    Can use a client from GeminiAPIConfig or work standalone with an API key.
     """
+
+    # Image generation models
+    IMAGE_MODELS = [
+        "gemini-3-pro-image-preview",
+        "gemini-2.5-flash-image",
+    ]
 
     @classmethod
     def INPUT_TYPES(cls):
-        # Only include image generation models
-        image_models = {
-            "gemini-3-pro-image-preview": "Gemini 3 Pro Image Preview (Best quality)",
-            "gemini-2.5-flash-image": "Gemini 2.5 Flash Image (Fast, recommended)",
-        }
-
         return {
             "required": {
                 "prompt": (
@@ -609,18 +609,15 @@ class GeminiImageGeneration:
                 ),
             },
             "optional": {
-                "api_key": (
-                    "STRING",
-                    {
-                        "default": "",
-                        "tooltip": "Google API key (uses env/config if empty)"
-                    }
+                "client": (
+                    "GEMINI_API_CLIENT",
+                    {"tooltip": "Gemini API client from Gemini API Config node (uses API key from config)"}
                 ),
                 "model": (
-                    list(image_models.keys()),
+                    cls.IMAGE_MODELS,
                     {
                         "default": "gemini-2.5-flash-image",
-                        "tooltip": "Image generation model"
+                        "tooltip": "Image generation model (overrides client model)"
                     }
                 ),
                 "temperature": (
@@ -640,6 +637,13 @@ class GeminiImageGeneration:
                         "tooltip": "Image aspect ratio (default uses model's default)"
                     }
                 ),
+                "api_key": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "tooltip": "Google API key (only needed if not using client input)"
+                    }
+                ),
             }
         }
 
@@ -651,20 +655,22 @@ class GeminiImageGeneration:
     def generate_image(
         self,
         prompt: str,
-        api_key: str = "",
+        client: GeminiClient = None,
         model: str = "gemini-2.5-flash-image",
         temperature: float = 1.0,
-        aspect_ratio: str = "default"
+        aspect_ratio: str = "default",
+        api_key: str = "",
     ):
         """
         Generate an image using Gemini's image generation models.
 
         Args:
             prompt: Text description of image to generate
-            api_key: Optional API key
+            client: Optional Gemini API client from GeminiAPIConfig
             model: Image generation model to use
             temperature: Creativity level
-            aspect_ratio: Image aspect ratio (1:1, 9:16, 16:9, 4:3, 3:4, or default)
+            aspect_ratio: Image aspect ratio
+            api_key: Optional API key (fallback if no client)
 
         Returns:
             Tuple containing generated image tensor
@@ -673,11 +679,19 @@ class GeminiImageGeneration:
             raise ValueError("Prompt cannot be empty")
 
         try:
-            # Create a temporary client for image generation
-            client = GeminiClient(
-                api_key=api_key if api_key.strip() else None,
-                model=model
-            )
+            # Use provided client's API key, or create new client
+            if client is not None:
+                # Create new client with image model but same API key
+                image_client = GeminiClient(
+                    api_key=client.api_key,
+                    model=model
+                )
+            else:
+                # Standalone mode - use provided API key or env/config
+                image_client = GeminiClient(
+                    api_key=api_key if api_key.strip() else None,
+                    model=model
+                )
 
             print(f"[Gemini] Generating image with model: {model}")
             print(f"[Gemini] Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
@@ -696,8 +710,8 @@ class GeminiImageGeneration:
                 config.image_config = types.ImageConfig(aspect_ratio=aspect_ratio)
 
             # Generate content using NEW SDK
-            response = client.client.models.generate_content(
-                model=client.model_name,
+            response = image_client.client.models.generate_content(
+                model=image_client.model_name,
                 contents=[prompt.strip()],
                 config=config
             )
@@ -761,13 +775,14 @@ class GeminiImageEdit:
 
     Uses Gemini's image generation models to edit/modify existing images based on text prompts.
     Supports 1-3 input images for best results.
+    Can use a client from GeminiAPIConfig or work standalone with an API key.
     """
 
     # Same image generation models as GeminiImageGeneration
-    image_models = {
-        "gemini-3-pro-image-preview": "Gemini 3 Pro Image Preview (Best quality)",
-        "gemini-2.5-flash-image": "Gemini 2.5 Flash Image (Fast, recommended)",
-    }
+    IMAGE_MODELS = [
+        "gemini-3-pro-image-preview",
+        "gemini-2.5-flash-image",
+    ]
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -787,18 +802,15 @@ class GeminiImageEdit:
                 ),
             },
             "optional": {
-                "api_key": (
-                    "STRING",
-                    {
-                        "default": "",
-                        "tooltip": "Google API key (uses env/config if empty)"
-                    }
+                "client": (
+                    "GEMINI_API_CLIENT",
+                    {"tooltip": "Gemini API client from Gemini API Config node (uses API key from config)"}
                 ),
                 "model": (
-                    list(cls.image_models.keys()),
+                    cls.IMAGE_MODELS,
                     {
                         "default": "gemini-2.5-flash-image",
-                        "tooltip": "Image generation model"
+                        "tooltip": "Image generation model (overrides client model)"
                     }
                 ),
                 "temperature": (
@@ -818,6 +830,13 @@ class GeminiImageEdit:
                         "tooltip": "Image aspect ratio (default uses model's default)"
                     }
                 ),
+                "api_key": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "tooltip": "Google API key (only needed if not using client input)"
+                    }
+                ),
             }
         }
 
@@ -830,10 +849,11 @@ class GeminiImageEdit:
         self,
         image,
         prompt: str,
-        api_key: str = "",
+        client: GeminiClient = None,
         model: str = "gemini-2.5-flash-image",
         temperature: float = 1.0,
-        aspect_ratio: str = "default"
+        aspect_ratio: str = "default",
+        api_key: str = "",
     ):
         """
         Edit an image using Gemini's image generation models.
@@ -841,10 +861,11 @@ class GeminiImageEdit:
         Args:
             image: Input image(s) as ComfyUI tensor
             prompt: Text description of how to modify the image
-            api_key: Optional API key
+            client: Optional Gemini API client from GeminiAPIConfig
             model: Image generation model to use
             temperature: Creativity level
-            aspect_ratio: Image aspect ratio (1:1, 9:16, 16:9, 4:3, 3:4, or default)
+            aspect_ratio: Image aspect ratio
+            api_key: Optional API key (fallback if no client)
 
         Returns:
             Tuple containing edited image tensor
@@ -853,11 +874,19 @@ class GeminiImageEdit:
             raise ValueError("Prompt cannot be empty")
 
         try:
-            # Create a temporary client for image editing
-            client = GeminiClient(
-                api_key=api_key if api_key.strip() else None,
-                model=model
-            )
+            # Use provided client's API key, or create new client
+            if client is not None:
+                # Create new client with image model but same API key
+                image_client = GeminiClient(
+                    api_key=client.api_key,
+                    model=model
+                )
+            else:
+                # Standalone mode - use provided API key or env/config
+                image_client = GeminiClient(
+                    api_key=api_key if api_key.strip() else None,
+                    model=model
+                )
 
             # Convert ComfyUI tensors to PIL images
             pil_images = ImageConverter.tensors_to_pil_list(image)
@@ -888,8 +917,8 @@ class GeminiImageEdit:
             contents = pil_images + [prompt.strip()]
 
             # Generate content using NEW SDK
-            response = client.client.models.generate_content(
-                model=client.model_name,
+            response = image_client.client.models.generate_content(
+                model=image_client.model_name,
                 contents=contents,
                 config=config
             )

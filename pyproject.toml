@@ -4,7 +4,7 @@
 [project]
 name = "comfyui-nodes-erpk"
 description = "ERPK custom nodes for ComfyUI: WaveSpeed AI (Seedream V4/V4.5, Qwen Image), Claude API, and Google Gemini API integrations for image generation, editing, text generation, and vision analysis."
-version = "2025.12.7"
+version = "2025.12.8"
 license = { file = "LICENSE" }
 dependencies = [
     "requests>=2.31.0",
