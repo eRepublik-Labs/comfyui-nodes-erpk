@@ -62,6 +62,39 @@ try:
 except ImportError as e:
     print(f"[WaveSpeed] Warning: Could not load Seedream V4 Edit Sequential node: {e}")
 
+# Seedream V4.5 nodes
+try:
+    from .seedream_v4_5 import NODE_CLASS_MAPPINGS as SEEDREAM_V4_5_MAPPINGS
+    from .seedream_v4_5 import NODE_DISPLAY_NAME_MAPPINGS as SEEDREAM_V4_5_DISPLAY_MAPPINGS
+    NODE_CLASS_MAPPINGS.update(SEEDREAM_V4_5_MAPPINGS)
+    NODE_DISPLAY_NAME_MAPPINGS.update(SEEDREAM_V4_5_DISPLAY_MAPPINGS)
+except ImportError as e:
+    print(f"[WaveSpeed] Warning: Could not load Seedream V4.5 node: {e}")
+
+try:
+    from .seedream_v4_5_edit import NODE_CLASS_MAPPINGS as SEEDREAM_V4_5_EDIT_MAPPINGS
+    from .seedream_v4_5_edit import NODE_DISPLAY_NAME_MAPPINGS as SEEDREAM_V4_5_EDIT_DISPLAY_MAPPINGS
+    NODE_CLASS_MAPPINGS.update(SEEDREAM_V4_5_EDIT_MAPPINGS)
+    NODE_DISPLAY_NAME_MAPPINGS.update(SEEDREAM_V4_5_EDIT_DISPLAY_MAPPINGS)
+except ImportError as e:
+    print(f"[WaveSpeed] Warning: Could not load Seedream V4.5 Edit node: {e}")
+
+try:
+    from .seedream_v4_5_sequential import NODE_CLASS_MAPPINGS as SEEDREAM_V4_5_SEQ_MAPPINGS
+    from .seedream_v4_5_sequential import NODE_DISPLAY_NAME_MAPPINGS as SEEDREAM_V4_5_SEQ_DISPLAY_MAPPINGS
+    NODE_CLASS_MAPPINGS.update(SEEDREAM_V4_5_SEQ_MAPPINGS)
+    NODE_DISPLAY_NAME_MAPPINGS.update(SEEDREAM_V4_5_SEQ_DISPLAY_MAPPINGS)
+except ImportError as e:
+    print(f"[WaveSpeed] Warning: Could not load Seedream V4.5 Sequential node: {e}")
+
+try:
+    from .seedream_v4_5_edit_sequential import NODE_CLASS_MAPPINGS as SEEDREAM_V4_5_EDIT_SEQ_MAPPINGS
+    from .seedream_v4_5_edit_sequential import NODE_DISPLAY_NAME_MAPPINGS as SEEDREAM_V4_5_EDIT_SEQ_DISPLAY_MAPPINGS
+    NODE_CLASS_MAPPINGS.update(SEEDREAM_V4_5_EDIT_SEQ_MAPPINGS)
+    NODE_DISPLAY_NAME_MAPPINGS.update(SEEDREAM_V4_5_EDIT_SEQ_DISPLAY_MAPPINGS)
+except ImportError as e:
+    print(f"[WaveSpeed] Warning: Could not load Seedream V4.5 Edit Sequential node: {e}")
+
 # Qwen Image nodes
 try:
     from .qwen_image_text_to_image import NODE_CLASS_MAPPINGS as QWEN_T2I_MAPPINGS

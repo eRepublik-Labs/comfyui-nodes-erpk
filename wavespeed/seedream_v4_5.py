@@ -1,14 +1,46 @@
+from math import gcd
+
 from .wavespeed_api.utils import imageurl2tensor
 from .wavespeed_api.client import WaveSpeedClient
-from .wavespeed_api.requests.seedream_v4_edit import SeedreamV4Edit
-from .seedream_v4 import SEEDREAM_V4_SIZE_PRESETS
+from .wavespeed_api.requests.seedream_v4_5 import SeedreamV4_5
 
 
-class SeedreamV4EditNode:
+def calculate_aspect_ratio(width, height):
+    """Calculate and format aspect ratio from dimensions."""
+    divisor = gcd(width, height)
+    w_ratio = width // divisor
+    h_ratio = height // divisor
+
+    # Keep reducing if numbers are too large for readability
+    while w_ratio > 100 or h_ratio > 100:
+        if w_ratio % 2 == 0 and h_ratio % 2 == 0:
+            w_ratio //= 2
+            h_ratio //= 2
+        else:
+            break
+
+    return f"{w_ratio}:{h_ratio}"
+
+
+# Recommended resolutions from WaveSpeed API docs for V4.5
+SEEDREAM_V4_5_SIZE_PRESETS = {
+    "Custom": None,
+    "1:1 (2048x2048)": (2048, 2048),
+    "1:1 4K (4096x4096)": (4096, 4096),
+    "4:3 (2688x2016)": (2688, 2016),
+    "3:4 (2016x2688)": (2016, 2688),
+    "3:2 (2688x1792)": (2688, 1792),
+    "2:3 (1792x2688)": (1792, 2688),
+    "16:9 (2560x1440)": (2560, 1440),
+    "9:16 (1440x2560)": (1440, 2560),
+}
+
+
+class SeedreamV4_5Node:
     """
-    ByteDance Seedream V4 Edit Image Editor Node
+    ByteDance Seedream-V4.5 Image Generator Node
 
-    This node uses ByteDance's Seedream V4 Edit model to edit images based on text prompts.
+    Enhanced typography and text rendering for posters, logos, UI, and marketing layouts.
     """
 
     @classmethod
@@ -21,17 +53,11 @@ class SeedreamV4EditNode:
                     {
                         "multiline": True,
                         "default": "",
-                        "tooltip": "Text description of the desired image modifications",
-                    },
-                ),
-                "images": (
-                    "STRING",
-                    {
-                        "tooltip": "The images to edit. A maximum of 10 reference images can be uploaded.",
+                        "tooltip": "Text description of the image to generate",
                     },
                 ),
                 "size_preset": (
-                    list(SEEDREAM_V4_SIZE_PRESETS.keys()),
+                    list(SEEDREAM_V4_5_SIZE_PRESETS.keys()),
                     {
                         "default": "Custom",
                         "tooltip": "Recommended resolution presets. Select 'Custom' to use manual width/height.",
@@ -42,8 +68,8 @@ class SeedreamV4EditNode:
                 "width": (
                     "INT",
                     {
-                        "default": 1408,
-                        "min": 320,
+                        "default": 2048,
+                        "min": 1024,
                         "max": 4096,
                         "step": 8,
                         "display": "number",
@@ -53,8 +79,8 @@ class SeedreamV4EditNode:
                 "height": (
                     "INT",
                     {
-                        "default": 1408,
-                        "min": 320,
+                        "default": 2048,
+                        "min": 1024,
                         "max": 4096,
                         "step": 8,
                         "display": "number",
@@ -66,20 +92,6 @@ class SeedreamV4EditNode:
                     {
                         "default": "",
                         "tooltip": "Calculated aspect ratio (display only)",
-                    },
-                ),
-                "enable_sync_mode": (
-                    "BOOLEAN",
-                    {
-                        "default": False,
-                        "tooltip": "If set to true, the function will wait for the result to be generated and uploaded before returning the response. It allows you to get the result directly in the response. This property is only available through the API.",
-                    },
-                ),
-                "enable_base64_output": (
-                    "BOOLEAN",
-                    {
-                        "default": False,
-                        "tooltip": "If enabled, the output will be encoded into a BASE64 string instead of a URL. This property is only available through the API.",
                     },
                 ),
             },
@@ -99,34 +111,23 @@ class SeedreamV4EditNode:
         self,
         client,
         prompt,
-        images,
         size_preset,
-        width=1408,
-        height=1408,
+        width=2048,
+        height=2048,
         aspect_ratio="",
-        enable_sync_mode=False,
-        enable_base64_output=False,
     ):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        if images is None or images == "":
-            raise ValueError("Images must be provided")
-
-        # Ensure we have at most 10 image URLs
-        images_param = images[:10]
-
         # Get dimensions from preset or use custom values
-        preset_dims = SEEDREAM_V4_SIZE_PRESETS.get(size_preset)
+        preset_dims = SEEDREAM_V4_5_SIZE_PRESETS.get(size_preset)
         if preset_dims:
             width, height = preset_dims
 
-        request = SeedreamV4Edit(
+        request = SeedreamV4_5(
             prompt=prompt,
-            images=images_param,
-            size=f"{width}*{height}",
-            enable_sync_mode=enable_sync_mode,
-            enable_base64_output=enable_base64_output,
+            width=width,
+            height=height,
         )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
@@ -141,8 +142,8 @@ class SeedreamV4EditNode:
         return (images,)
 
 
-NODE_CLASS_MAPPINGS = {"WaveSpeed Custom SeedreamV4Edit": SeedreamV4EditNode}
+NODE_CLASS_MAPPINGS = {"WaveSpeed Custom SeedreamV4_5": SeedreamV4_5Node}
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "WaveSpeed Custom SeedreamV4Edit": "Bytedance Seedream V4 Edit (Custom)"
+    "WaveSpeed Custom SeedreamV4_5": "Bytedance Seedream V4.5 (Custom)"
 }

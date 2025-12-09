@@ -1,15 +1,14 @@
 from .wavespeed_api.utils import imageurl2tensor
 from .wavespeed_api.client import WaveSpeedClient
-from .wavespeed_api.requests.seedream_v4_edit_sequential import SeedreamV4EditSequential
-from .seedream_v4 import SEEDREAM_V4_SIZE_PRESETS
+from .wavespeed_api.requests.seedream_v4_5_edit import SeedreamV4_5Edit
+from .seedream_v4_5 import SEEDREAM_V4_5_SIZE_PRESETS
 
 
-class SeedreamV4EditSequentialNode:
+class SeedreamV4_5EditNode:
     """
-    ByteDance Seedream V4 Edit Sequential Image Editor Node
+    ByteDance Seedream V4.5 Edit Image Editor Node
 
-    This node uses ByteDance's Seedream V4 Edit Sequential model to edit images
-    with sequential generation for multiple coherent results.
+    Enhanced typography and text rendering for editing images with text overlays.
     """
 
     @classmethod
@@ -22,22 +21,17 @@ class SeedreamV4EditSequentialNode:
                     {
                         "multiline": True,
                         "default": "",
-                        "tooltip": "Text description of desired modifications. The node automatically appends the image count to your prompt.",
+                        "tooltip": "Text description of the desired image modifications",
                     },
                 ),
-                "max_images": (
-                    "INT",
+                "images": (
+                    "STRING",
                     {
-                        "default": 4,
-                        "min": 1,
-                        "max": 15,
-                        "step": 1,
-                        "display": "number",
-                        "tooltip": "Number of images to generate (1-15). Automatically added to prompt for API compliance.",
+                        "tooltip": "The images to edit. A maximum of 10 reference images can be uploaded.",
                     },
                 ),
                 "size_preset": (
-                    list(SEEDREAM_V4_SIZE_PRESETS.keys()),
+                    list(SEEDREAM_V4_5_SIZE_PRESETS.keys()),
                     {
                         "default": "Custom",
                         "tooltip": "Recommended resolution presets. Select 'Custom' to use manual width/height.",
@@ -45,17 +39,11 @@ class SeedreamV4EditSequentialNode:
                 ),
             },
             "optional": {
-                "images": (
-                    "STRING",
-                    {
-                        "tooltip": "Reference images to edit (optional). Maximum of 10 images.",
-                    },
-                ),
                 "width": (
                     "INT",
                     {
-                        "default": 1408,
-                        "min": 320,
+                        "default": 2048,
+                        "min": 1024,
                         "max": 4096,
                         "step": 8,
                         "display": "number",
@@ -65,8 +53,8 @@ class SeedreamV4EditSequentialNode:
                 "height": (
                     "INT",
                     {
-                        "default": 1408,
-                        "min": 320,
+                        "default": 2048,
+                        "min": 1024,
                         "max": 4096,
                         "step": 8,
                         "display": "number",
@@ -98,7 +86,7 @@ class SeedreamV4EditSequentialNode:
         }
 
     RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("images",)
+    RETURN_NAMES = ("image",)
 
     CATEGORY = "ERPK/WaveSpeedAI"
     FUNCTION = "execute"
@@ -111,11 +99,10 @@ class SeedreamV4EditSequentialNode:
         self,
         client,
         prompt,
-        max_images,
+        images,
         size_preset,
-        images=None,
-        width=1408,
-        height=1408,
+        width=2048,
+        height=2048,
         aspect_ratio="",
         enable_sync_mode=False,
         enable_base64_output=False,
@@ -123,24 +110,19 @@ class SeedreamV4EditSequentialNode:
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        if max_images < 1 or max_images > 15:
-            raise ValueError("max_images must be between 1 and 15")
+        if images is None or images == "":
+            raise ValueError("Images must be provided")
 
-        # Prepare images parameter (limit to 10 if provided)
-        images_param = None
-        if images is not None and images != "":
-            images_param = images[:10] if isinstance(images, list) else images
+        # Ensure we have at most 10 image URLs
+        images_param = images[:10]
 
         # Get dimensions from preset or use custom values
-        preset_dims = SEEDREAM_V4_SIZE_PRESETS.get(size_preset)
+        preset_dims = SEEDREAM_V4_5_SIZE_PRESETS.get(size_preset)
         if preset_dims:
             width, height = preset_dims
 
-        generatePrompt = f"{prompt}. Generate a set of {max_images} consecutive."
-
-        request = SeedreamV4EditSequential(
-            prompt=generatePrompt,
-            max_images=max_images,
+        request = SeedreamV4_5Edit(
+            prompt=prompt,
             images=images_param,
             size=f"{width}*{height}",
             enable_sync_mode=enable_sync_mode,
@@ -159,10 +141,8 @@ class SeedreamV4EditSequentialNode:
         return (images,)
 
 
-NODE_CLASS_MAPPINGS = {
-    "WaveSpeed Custom SeedreamV4EditSequential": SeedreamV4EditSequentialNode
-}
+NODE_CLASS_MAPPINGS = {"WaveSpeed Custom SeedreamV4_5Edit": SeedreamV4_5EditNode}
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "WaveSpeed Custom SeedreamV4EditSequential": "Bytedance Seedream V4 Edit Sequential (Custom)"
+    "WaveSpeed Custom SeedreamV4_5Edit": "Bytedance Seedream V4.5 Edit (Custom)"
 }

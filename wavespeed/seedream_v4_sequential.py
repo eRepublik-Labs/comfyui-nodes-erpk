@@ -1,7 +1,7 @@
 from .wavespeed_api.utils import imageurl2tensor
 from .wavespeed_api.client import WaveSpeedClient
 from .wavespeed_api.requests.seedream_v4_sequential import SeedreamV4Sequential
-from .seedream_v4 import SEEDREAM_V4_SIZE_PRESETS, calculate_aspect_ratio
+from .seedream_v4 import SEEDREAM_V4_SIZE_PRESETS
 
 
 class SeedreamV4SequentialNode:
@@ -39,7 +39,7 @@ class SeedreamV4SequentialNode:
                 "size_preset": (
                     list(SEEDREAM_V4_SIZE_PRESETS.keys()),
                     {
-                        "default": "1:1 2K (1408x1408)",
+                        "default": "Custom",
                         "tooltip": "Recommended resolution presets. Select 'Custom' to use manual width/height.",
                     },
                 ),
@@ -67,6 +67,13 @@ class SeedreamV4SequentialNode:
                         "tooltip": "Custom height (only used when size_preset is 'Custom')",
                     },
                 ),
+                "aspect_ratio": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "tooltip": "Calculated aspect ratio (display only)",
+                    },
+                ),
                 "enable_sync_mode": (
                     "BOOLEAN",
                     {
@@ -84,8 +91,8 @@ class SeedreamV4SequentialNode:
             },
         }
 
-    RETURN_TYPES = ("IMAGE", "STRING")
-    RETURN_NAMES = ("images", "aspect_ratio")
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("images",)
 
     CATEGORY = "ERPK/WaveSpeedAI"
     FUNCTION = "execute"
@@ -102,6 +109,7 @@ class SeedreamV4SequentialNode:
         size_preset,
         width=1408,
         height=1408,
+        aspect_ratio="",
         enable_sync_mode=False,
         enable_base64_output=False,
     ):
@@ -115,8 +123,6 @@ class SeedreamV4SequentialNode:
         preset_dims = SEEDREAM_V4_SIZE_PRESETS.get(size_preset)
         if preset_dims:
             width, height = preset_dims
-
-        aspect_ratio = calculate_aspect_ratio(width, height)
 
         generatePrompt = f"{prompt}. Generate a set of {max_images} consecutive."
 
@@ -137,7 +143,7 @@ class SeedreamV4SequentialNode:
             raise ValueError("No image URLs in the generated result")
 
         images = imageurl2tensor(image_urls)
-        return (images, aspect_ratio)
+        return (images,)
 
 
 NODE_CLASS_MAPPINGS = {"WaveSpeed Custom SeedreamV4Sequential": SeedreamV4SequentialNode}

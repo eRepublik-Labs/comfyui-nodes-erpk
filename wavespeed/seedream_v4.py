@@ -69,7 +69,7 @@ class SeedreamV4Node:
                 "size_preset": (
                     list(SEEDREAM_V4_SIZE_PRESETS.keys()),
                     {
-                        "default": "1:1 2K (1408x1408)",
+                        "default": "Custom",
                         "tooltip": "Recommended resolution presets. Select 'Custom' to use manual width/height.",
                     },
                 ),
@@ -97,11 +97,18 @@ class SeedreamV4Node:
                         "tooltip": "Custom height (only used when size_preset is 'Custom')",
                     },
                 ),
+                "aspect_ratio": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "tooltip": "Calculated aspect ratio (display only)",
+                    },
+                ),
             },
         }
 
-    RETURN_TYPES = ("IMAGE", "STRING")
-    RETURN_NAMES = ("image", "aspect_ratio")
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
 
     CATEGORY = "ERPK/WaveSpeedAI"
     FUNCTION = "execute"
@@ -117,6 +124,7 @@ class SeedreamV4Node:
         size_preset,
         width=1408,
         height=1408,
+        aspect_ratio="",
     ):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
@@ -125,8 +133,6 @@ class SeedreamV4Node:
         preset_dims = SEEDREAM_V4_SIZE_PRESETS.get(size_preset)
         if preset_dims:
             width, height = preset_dims
-
-        aspect_ratio = calculate_aspect_ratio(width, height)
 
         request = SeedreamV4(
             prompt=prompt,
@@ -143,7 +149,7 @@ class SeedreamV4Node:
             raise ValueError("No image URLs in the generated result")
 
         images = imageurl2tensor(image_urls)
-        return (images, aspect_ratio)
+        return (images,)
 
 
 NODE_CLASS_MAPPINGS = {"WaveSpeed Custom SeedreamV4": SeedreamV4Node}
