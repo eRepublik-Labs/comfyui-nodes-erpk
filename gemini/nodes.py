@@ -593,8 +593,8 @@ class GeminiImageGeneration:
     def INPUT_TYPES(cls):
         # Only include image generation models
         image_models = {
-            "gemini-2.5-flash-image": "Gemini 2.5 Flash Image (Recommended)",
-            "gemini-2.5-flash-image-preview": "Gemini 2.5 Flash Image Preview (Experimental)",
+            "gemini-3-pro-image-preview": "Gemini 3 Pro Image Preview (Best quality)",
+            "gemini-2.5-flash-image": "Gemini 2.5 Flash Image (Fast, recommended)",
         }
 
         return {
@@ -765,8 +765,8 @@ class GeminiImageEdit:
 
     # Same image generation models as GeminiImageGeneration
     image_models = {
-        "gemini-2.5-flash-image": "Gemini 2.5 Flash Image (Recommended)",
-        "gemini-2.5-flash-image-preview": "Gemini 2.5 Flash Image Preview (Experimental)",
+        "gemini-3-pro-image-preview": "Gemini 3 Pro Image Preview (Best quality)",
+        "gemini-2.5-flash-image": "Gemini 2.5 Flash Image (Fast, recommended)",
     }
 
     @classmethod

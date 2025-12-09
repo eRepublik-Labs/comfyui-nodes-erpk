@@ -22,16 +22,10 @@ class GeminiClient:
 
     # Available models
     MODELS = {
-        "gemini-2.5-pro-latest": "Gemini 2.5 Pro Latest (Always newest stable)",
-        "gemini-2.5-pro": "Gemini 2.5 Pro (State-of-the-art thinking model)",
-        "gemini-2.5-flash-latest": "Gemini 2.5 Flash Latest (Always newest stable)",
+        "gemini-3-pro-preview": "Gemini 3 Pro Preview (Most intelligent, best reasoning)",
+        "gemini-2.5-pro": "Gemini 2.5 Pro (Complex reasoning, 1M context)",
         "gemini-2.5-flash": "Gemini 2.5 Flash (Best price-performance)",
-        "gemini-2.5-flash-preview": "Gemini 2.5 Flash Preview (Experimental features)",
-        "gemini-2.5-flash-image": "Gemini 2.5 Flash Image (Image generation)",
-        "gemini-2.5-flash-image-preview": "Gemini 2.5 Flash Image Preview (Experimental image gen)",
         "gemini-2.5-flash-lite": "Gemini 2.5 Flash-Lite (Fastest, most cost-efficient)",
-        "gemini-2.5-flash-lite-preview": "Gemini 2.5 Flash-Lite Preview (Experimental)",
-        "gemini-2.0-flash-exp": "Gemini 2.0 Flash Experimental (Cutting edge)",
     }
 
     # Default configuration

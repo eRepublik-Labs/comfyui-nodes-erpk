@@ -73,7 +73,7 @@ Complete Google Gemini API integration providing text generation, vision analysi
 Initializes the Gemini API client. Required for all other nodes.
 
 **Inputs:**
-- `model`: gemini-2.5-flash (default), gemini-2.5-pro-latest, gemini-2.5-pro, gemini-2.5-flash-latest, gemini-2.5-flash-preview, gemini-2.5-flash-lite, gemini-2.5-flash-lite-preview, gemini-2.0-flash-exp
+- `model`: gemini-2.5-flash (default), gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash-lite
 - `api_key`: Optional API key (uses env/config if empty)
 
 **Outputs:**
@@ -151,7 +151,7 @@ Generate images from text descriptions using Gemini's image generation models.
 **Inputs:**
 - `prompt`: Text description of the image to generate
 - `api_key`: Optional API key (uses env/config if empty)
-- `model`: gemini-2.5-flash-image (recommended) or gemini-2.5-flash-image-preview
+- `model`: gemini-2.5-flash-image (fast, recommended) or gemini-3-pro-image-preview (best quality)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
 - `aspect_ratio`: Image dimensions - "default", "1:1" (square), "9:16" (portrait), "16:9" (landscape), "4:3", "3:4"
 
@@ -181,7 +181,7 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 - `image`: Input image(s) to edit (ComfyUI IMAGE tensor, supports 1-3 images)
 - `prompt`: Text description of how to modify the image(s)
 - `api_key`: Optional API key (uses env/config if empty)
-- `model`: gemini-2.5-flash-image (recommended) or gemini-2.5-flash-image-preview
+- `model`: gemini-2.5-flash-image (fast, recommended) or gemini-3-pro-image-preview (best quality)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
 - `aspect_ratio`: Image dimensions - "default", "1:1" (square), "9:16" (portrait), "16:9" (landscape), "4:3", "3:4"
 
@@ -254,20 +254,23 @@ Configure content safety filters.
 
 ## Model Comparison
 
+### Text Generation Models
+
 | Model | Best For | Context Window | Notes |
 |-------|----------|----------------|-------|
-| **gemini-2.5-pro-latest** | Always newest stable Pro | 1M tokens | Auto-updates to latest |
+| **gemini-3-pro-preview** | Most intelligent, best reasoning | 1M tokens | Latest flagship model |
 | **gemini-2.5-pro** | Complex reasoning, thinking | 1M tokens | State-of-the-art |
-| **gemini-2.5-flash-latest** | Always newest stable Flash | 1M tokens | Auto-updates to latest |
 | **gemini-2.5-flash** | Best price-performance | 1M tokens | Recommended default |
-| **gemini-2.5-flash-preview** | Latest experimental features | 1M tokens | Preview/experimental |
-| **gemini-2.5-flash-image** | Image generation | 1M tokens | ⚠️ Generates images |
-| **gemini-2.5-flash-image-preview** | Experimental image gen | 1M tokens | ⚠️ Generates images (preview) |
 | **gemini-2.5-flash-lite** | High-speed, cost-efficient | 1M tokens | Fastest, lowest cost |
-| **gemini-2.5-flash-lite-preview** | Experimental lite version | 1M tokens | Preview/experimental |
-| **gemini-2.0-flash-exp** | Cutting edge 2.0 features | 1M tokens | Experimental |
 
-**Note:** Models marked with ⚠️ generate images instead of text. These require special handling for image output.
+### Image Generation Models
+
+| Model | Best For | Notes |
+|-------|----------|-------|
+| **gemini-3-pro-image-preview** | Highest quality images | Best quality, character consistency |
+| **gemini-2.5-flash-image** | Fast image generation | Fast, recommended for most uses |
+
+**Note:** Image generation models output images instead of text.
 
 ## Example Workflows
 
@@ -323,8 +326,8 @@ https://ai.google.dev/pricing
 - Restart ComfyUI after installing dependencies
 
 ### Model not available
-- Some models (like gemini-2.0-flash-exp) are experimental and may have limited availability
-- Try using gemini-1.5-flash or gemini-1.5-pro instead
+- Preview models (like gemini-3-pro-preview) may have limited availability
+- Try using gemini-2.5-flash or gemini-2.5-pro as stable alternatives
 
 ## Support
 
