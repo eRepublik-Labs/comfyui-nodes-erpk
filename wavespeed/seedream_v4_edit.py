@@ -103,6 +103,7 @@ class SeedreamV4EditNode:
         size_preset,
         width=1408,
         height=1408,
+        show_aspect_ratio=True,
         enable_sync_mode=False,
         enable_base64_output=False,
     ):

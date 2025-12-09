@@ -115,6 +115,7 @@ class SeedreamV4_5EditSequentialNode:
         images=None,
         width=2048,
         height=2048,
+        show_aspect_ratio=True,
         enable_sync_mode=False,
         enable_base64_output=False,
     ):

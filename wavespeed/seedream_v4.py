@@ -105,6 +105,7 @@ class SeedreamV4Node:
         size_preset,
         width=1408,
         height=1408,
+        show_aspect_ratio=True,
     ):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
