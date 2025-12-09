@@ -87,21 +87,33 @@ function updateNodeTitle(node) {
 function updateDimensionsFromPreset(node, presetValue, widthWidget, heightWidget) {
     const dims = parseDimensionsFromPreset(presetValue);
     if (dims) {
+        // Update internal values directly to avoid recursion
         widthWidget.value = dims.width;
         heightWidget.value = dims.height;
+        // Force UI refresh
+        node.setDirtyCanvas?.(true, true);
+        app.graph?.setDirtyCanvas?.(true, true);
     }
 }
 
 function hookWidget(widget, node, onChange) {
     if (hookedWidgets.has(widget)) return;
 
+    // Hook the callback for combo/dropdown widgets
+    const originalCallback = widget.callback;
+    widget.callback = function(v) {
+        if (onChange) onChange(v);
+        updateNodeTitle(node);
+        if (originalCallback) originalCallback.call(this, v);
+    };
+
+    // Also hook value property for programmatic changes
     let currentValue = widget.value;
     Object.defineProperty(widget, 'value', {
         get() { return currentValue; },
         set(v) {
-            const oldValue = currentValue;
             currentValue = v;
-            if (onChange) onChange(v, oldValue);
+            if (onChange) onChange(v);
             updateNodeTitle(node);
         },
         configurable: true,
