@@ -461,9 +461,9 @@ Guidelines:
 
 # Node registration
 NODE_CLASS_MAPPINGS = {
-    "ClaudePromptEnhancer": ClaudePromptEnhancer,
+    "ERPKClaudePromptEnhancer": ClaudePromptEnhancer,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ClaudePromptEnhancer": "Claude Prompt Enhancer",
+    "ERPKClaudePromptEnhancer": "Claude Prompt Enhancer",
 }

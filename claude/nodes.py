@@ -177,11 +177,11 @@ Cost (USD):
 
 # Node registration
 NODE_CLASS_MAPPINGS = {
-    "ClaudeAPIClient": ClaudeAPIClient,
-    "ClaudeUsageStats": ClaudeUsageStats,
+    "ERPKClaudeAPIClient": ClaudeAPIClient,
+    "ERPKClaudeUsageStats": ClaudeUsageStats,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ClaudeAPIClient": "Claude API Client",
-    "ClaudeUsageStats": "Claude Usage Stats",
+    "ERPKClaudeAPIClient": "Claude API Client",
+    "ERPKClaudeUsageStats": "Claude Usage Stats",
 }

@@ -272,11 +272,11 @@ Context Usage:
 
 # Node registration
 NODE_CLASS_MAPPINGS = {
-    "ClaudeConversation": ClaudeConversation,
-    "ClaudeConversationInfo": ClaudeConversationInfo,
+    "ERPKClaudeConversation": ClaudeConversation,
+    "ERPKClaudeConversationInfo": ClaudeConversationInfo,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ClaudeConversation": "Claude Conversation",
-    "ClaudeConversationInfo": "Claude Conversation Info",
+    "ERPKClaudeConversation": "Claude Conversation",
+    "ERPKClaudeConversationInfo": "Claude Conversation Info",
 }

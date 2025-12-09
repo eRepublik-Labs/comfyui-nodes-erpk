@@ -174,9 +174,9 @@ class ClaudeTextGeneration:
 
 # Node registration
 NODE_CLASS_MAPPINGS = {
-    "ClaudeTextGeneration": ClaudeTextGeneration,
+    "ERPKClaudeTextGeneration": ClaudeTextGeneration,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ClaudeTextGeneration": "Claude Text Generation",
+    "ERPKClaudeTextGeneration": "Claude Text Generation",
 }
