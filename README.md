@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2025.12.2 (CalVer)
+**Current Version:** 2025.12.3 (CalVer)
 
 ## Repository Structure
 
@@ -39,7 +39,7 @@ ComfyUI-Custom-Nodes/
 Custom nodes for WaveSpeed AI's image generation and editing APIs.
 
 **Category in ComfyUI:** `ERPK/WaveSpeedAI`
-**Version:** 2025.10.0
+**Version:** 2025.12.3
 
 #### ByteDance Seedream V4 Models
 
@@ -70,7 +70,7 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 Claude API integration for text generation, prompt enhancement, vision analysis, and conversational AI.
 
 **Category in ComfyUI:** `ERPK/Claude`
-**Version:** 2025.10.0
+**Version:** 2025.12.3
 
 #### Nodes
 
@@ -97,7 +97,7 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 Google Gemini API integration for text generation, vision analysis, multi-turn conversations, image generation, and image editing.
 
 **Category in ComfyUI:** `ERPK/Gemini`
-**Version:** 2025.10.0
+**Version:** 2025.12.3
 
 #### Nodes
 
@@ -125,13 +125,25 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 
 ## Installation
 
-Each node package has its own installation instructions. See the individual package README files for details:
+### Method 1: ComfyUI Registry (Recommended)
 
-**ERPK/WaveSpeedAI:** [Installation Guide](wavespeed/README.md#installation)
-**ERPK/Claude:** [Installation Guide](claude/README.md#installation)
-**ERPK/Gemini:** [Installation Guide](gemini/README.md#installation)
+Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishers/erpk/nodes/comfyui-nodes-erpk):
 
-### Quick Start
+1. Open ComfyUI
+2. Go to **Manager** → **Install Custom Nodes** → **Registry**
+3. Search for `comfyui-nodes-erpk`
+4. Click **Install**
+5. Restart ComfyUI
+
+### Method 2: ComfyUI Manager
+
+1. Open ComfyUI Manager
+2. Click **Install Custom Nodes**
+3. Search for `ERPK Custom Nodes`
+4. Click **Install**
+5. Restart ComfyUI
+
+### Method 3: Manual Installation
 
 1. Navigate to your ComfyUI custom_nodes directory:
    ```bash
@@ -143,19 +155,22 @@ Each node package has its own installation instructions. See the individual pack
    git clone https://github.com/eRepublik-Labs/comfyui-nodes-erpk.git erpk
    ```
 
-3. Install dependencies for each package:
+3. Install dependencies:
    ```bash
    cd erpk
-   pip install -r wavespeed/requirements.txt
-   pip install -r claude/requirements.txt
-   pip install -r gemini/requirements.txt
+   pip install -r requirements.txt
    ```
 
-4. Configure API keys (see individual package READMEs)
+4. Restart ComfyUI
 
-5. Restart ComfyUI
+### Post-Installation
 
-6. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, and `ERPK/Gemini`
+1. Configure API keys for the services you want to use:
+   - **WaveSpeed:** See [wavespeed/README.md](wavespeed/README.md#installation)
+   - **Claude:** See [claude/README.md](claude/README.md#installation)
+   - **Gemini:** See [gemini/README.md](gemini/README.md#installation)
+
+2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, and `ERPK/Gemini`
 
 ## License
 
