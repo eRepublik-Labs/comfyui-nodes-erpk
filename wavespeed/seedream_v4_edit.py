@@ -1,6 +1,7 @@
 from .wavespeed_api.utils import imageurl2tensor
 from .wavespeed_api.client import WaveSpeedClient
 from .wavespeed_api.requests.seedream_v4_edit import SeedreamV4Edit
+from .seedream_v4 import SEEDREAM_V4_SIZE_PRESETS, calculate_aspect_ratio
 
 
 class SeedreamV4EditNode:
@@ -29,28 +30,35 @@ class SeedreamV4EditNode:
                         "tooltip": "The images to edit. A maximum of 10 reference images can be uploaded.",
                     },
                 ),
+                "size_preset": (
+                    list(SEEDREAM_V4_SIZE_PRESETS.keys()),
+                    {
+                        "default": "1:1 2K (1408x1408)",
+                        "tooltip": "Recommended resolution presets. Select 'Custom' to use manual width/height.",
+                    },
+                ),
             },
             "optional": {
                 "width": (
                     "INT",
                     {
-                        "default": 2048,
-                        "min": 0,
+                        "default": 1408,
+                        "min": 320,
                         "max": 4096,
                         "step": 8,
                         "display": "number",
-                        "tooltip": "Image width (1024 to 4096)",
+                        "tooltip": "Custom width (only used when size_preset is 'Custom')",
                     },
                 ),
                 "height": (
                     "INT",
                     {
-                        "default": 2048,
-                        "min": 0,
+                        "default": 1408,
+                        "min": 320,
                         "max": 4096,
                         "step": 8,
                         "display": "number",
-                        "tooltip": "Image height (1024 to 4096)",
+                        "tooltip": "Custom height (only used when size_preset is 'Custom')",
                     },
                 ),
                 "enable_sync_mode": (
@@ -70,8 +78,8 @@ class SeedreamV4EditNode:
             },
         }
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("image", "aspect_ratio")
 
     CATEGORY = "ERPK/WaveSpeedAI"
     FUNCTION = "execute"
@@ -85,8 +93,9 @@ class SeedreamV4EditNode:
         client,
         prompt,
         images,
-        width=2048,
-        height=2048,
+        size_preset,
+        width=1408,
+        height=1408,
         enable_sync_mode=False,
         enable_base64_output=False,
     ):
@@ -96,8 +105,15 @@ class SeedreamV4EditNode:
         if images is None or images == "":
             raise ValueError("Images must be provided")
 
-        # Ensure we have at most 5 image URLs
+        # Ensure we have at most 10 image URLs
         images_param = images[:10]
+
+        # Get dimensions from preset or use custom values
+        preset_dims = SEEDREAM_V4_SIZE_PRESETS.get(size_preset)
+        if preset_dims:
+            width, height = preset_dims
+
+        aspect_ratio = calculate_aspect_ratio(width, height)
 
         request = SeedreamV4Edit(
             prompt=prompt,
@@ -116,7 +132,7 @@ class SeedreamV4EditNode:
             raise ValueError("No image URLs in the generated result")
 
         images = imageurl2tensor(image_urls)
-        return (images,)
+        return (images, aspect_ratio)
 
 
 NODE_CLASS_MAPPINGS = {"WaveSpeed Custom SeedreamV4Edit": SeedreamV4EditNode}

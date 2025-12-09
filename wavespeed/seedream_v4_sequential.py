@@ -1,6 +1,7 @@
 from .wavespeed_api.utils import imageurl2tensor
 from .wavespeed_api.client import WaveSpeedClient
 from .wavespeed_api.requests.seedream_v4_sequential import SeedreamV4Sequential
+from .seedream_v4 import SEEDREAM_V4_SIZE_PRESETS, calculate_aspect_ratio
 
 
 class SeedreamV4SequentialNode:
@@ -35,28 +36,35 @@ class SeedreamV4SequentialNode:
                         "tooltip": "Number of images to generate (1-15). Automatically added to prompt for API compliance.",
                     },
                 ),
+                "size_preset": (
+                    list(SEEDREAM_V4_SIZE_PRESETS.keys()),
+                    {
+                        "default": "1:1 2K (1408x1408)",
+                        "tooltip": "Recommended resolution presets. Select 'Custom' to use manual width/height.",
+                    },
+                ),
             },
             "optional": {
                 "width": (
                     "INT",
                     {
-                        "default": 2048,
-                        "min": 1024,
+                        "default": 1408,
+                        "min": 320,
                         "max": 4096,
                         "step": 8,
                         "display": "number",
-                        "tooltip": "Image width (1024 to 4096)",
+                        "tooltip": "Custom width (only used when size_preset is 'Custom')",
                     },
                 ),
                 "height": (
                     "INT",
                     {
-                        "default": 2048,
-                        "min": 1024,
+                        "default": 1408,
+                        "min": 320,
                         "max": 4096,
                         "step": 8,
                         "display": "number",
-                        "tooltip": "Image height (1024 to 4096)",
+                        "tooltip": "Custom height (only used when size_preset is 'Custom')",
                     },
                 ),
                 "enable_sync_mode": (
@@ -76,8 +84,8 @@ class SeedreamV4SequentialNode:
             },
         }
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("images",)
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("images", "aspect_ratio")
 
     CATEGORY = "ERPK/WaveSpeedAI"
     FUNCTION = "execute"
@@ -91,8 +99,9 @@ class SeedreamV4SequentialNode:
         client,
         prompt,
         max_images,
-        width=2048,
-        height=2048,
+        size_preset,
+        width=1408,
+        height=1408,
         enable_sync_mode=False,
         enable_base64_output=False,
     ):
@@ -101,6 +110,13 @@ class SeedreamV4SequentialNode:
 
         if max_images < 1 or max_images > 15:
             raise ValueError("max_images must be between 1 and 15")
+
+        # Get dimensions from preset or use custom values
+        preset_dims = SEEDREAM_V4_SIZE_PRESETS.get(size_preset)
+        if preset_dims:
+            width, height = preset_dims
+
+        aspect_ratio = calculate_aspect_ratio(width, height)
 
         generatePrompt = f"{prompt}. Generate a set of {max_images} consecutive."
 
@@ -121,7 +137,7 @@ class SeedreamV4SequentialNode:
             raise ValueError("No image URLs in the generated result")
 
         images = imageurl2tensor(image_urls)
-        return (images,)
+        return (images, aspect_ratio)
 
 
 NODE_CLASS_MAPPINGS = {"WaveSpeed Custom SeedreamV4Sequential": SeedreamV4SequentialNode}
