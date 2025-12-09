@@ -121,7 +121,7 @@ Each node package has its own installation instructions. See the individual pack
 ### Quick Start
 
 1. Navigate to your ComfyUI custom_nodes directory
-2. Clone this repository: `git clone https://github.com/YOUR_USERNAME/ComfyUI-Custom-Nodes ERPK` (or any folder name)
+2. Clone this repository
 3. Install dependencies for each package:
    - WaveSpeed: `cd ERPK/wavespeed && pip install -r requirements.txt`
    - Claude: `cd ERPK/claude && pip install -r requirements.txt`
