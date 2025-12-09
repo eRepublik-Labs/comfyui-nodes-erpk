@@ -1,8 +1,11 @@
 # ComfyUI Custom Nodes - ERPK Collection
 
+[![Publish to Comfy Registry](https://github.com/eRepublik-Labs/comfyui-nodes-erpk/actions/workflows/publish.yml/badge.svg)](https://github.com/eRepublik-Labs/comfyui-nodes-erpk/actions/workflows/publish.yml)
+[![Registry](https://img.shields.io/badge/ComfyUI-Registry-blue)](https://registry.comfy.org/publishers/erpk/nodes/comfyui-nodes-erpk)
+
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2025.10.0 (CalVer)
+**Current Version:** 2025.12.2 (CalVer)
 
 ## Repository Structure
 
