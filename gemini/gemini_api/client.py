@@ -127,6 +127,7 @@ class GeminiClient:
         images: Optional[List[Any]] = None,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        model: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -137,6 +138,7 @@ class GeminiClient:
             images: Optional list of PIL Images for vision tasks
             max_tokens: Maximum tokens to generate
             temperature: Sampling temperature (0.0-2.0)
+            model: Optional model override (uses client default if not specified)
             **kwargs: Additional parameters
 
         Returns:
@@ -144,6 +146,7 @@ class GeminiClient:
         """
         max_tokens = max_tokens or self.DEFAULT_MAX_TOKENS
         temperature = temperature if temperature is not None else self.DEFAULT_TEMPERATURE
+        model_to_use = model or self.model_name
 
         # Build generation config
         config = types.GenerateContentConfig(
@@ -167,7 +170,7 @@ class GeminiClient:
 
         # Generate content
         response = self.client.models.generate_content(
-            model=self.model_name,
+            model=model_to_use,
             contents=contents,
             config=config
         )
@@ -189,16 +192,19 @@ class GeminiClient:
                 "error": str(e)
             }
 
-    def start_chat(self, history: Optional[List[Dict[str, str]]] = None):
+    def start_chat(self, model: Optional[str] = None, history: Optional[List[Dict[str, str]]] = None):
         """
         Start a chat session for multi-turn conversations.
 
         Args:
+            model: Optional model to use (uses client default if not specified)
             history: Optional chat history
 
         Returns:
             Chat session object
         """
+        model_to_use = model or self.model_name
+
         # Build config
         config = types.GenerateContentConfig()
         if self.system_instruction:
@@ -208,6 +214,6 @@ class GeminiClient:
 
         # Create chat
         return self.client.chats.create(
-            model=self.model_name,
+            model=model_to_use,
             config=config
         )

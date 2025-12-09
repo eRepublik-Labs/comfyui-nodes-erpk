@@ -73,7 +73,6 @@ Complete Google Gemini API integration providing text generation, vision analysi
 Initializes the Gemini API client. Required for all other nodes.
 
 **Inputs:**
-- `model`: gemini-2.5-flash (default), gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash-lite
 - `api_key`: Optional API key (uses env/config if empty)
 
 **Outputs:**
@@ -87,6 +86,7 @@ General-purpose text generation and completion.
 **Inputs:**
 - `client`: Gemini API client
 - `prompt`: Text prompt
+- `model`: gemini-2.5-flash (default), gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash-lite
 - `temperature`: 0.0-2.0 (creativity level, default: 0.7)
 - `max_tokens`: 256-8192 (output length, default: 8192)
 
@@ -107,6 +107,7 @@ Multi-turn conversation with message history preservation.
 **Inputs:**
 - `client`: Gemini API client
 - `prompt`: Your message
+- `model`: gemini-2.5-flash (default), gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash-lite
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
 - `temperature`: 0.0-2.0 (default: 0.7)
@@ -130,6 +131,7 @@ Analyze images with questions or instructions.
 - `client`: Gemini API client
 - `image`: ComfyUI image tensor (supports batches)
 - `prompt`: Question or instruction about the image(s)
+- `model`: gemini-2.5-flash (default), gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash-lite
 - `max_tokens`: 256-8192 (default: 8192)
 - `temperature`: 0.0-2.0 (default: 0.4, lower for more factual)
 

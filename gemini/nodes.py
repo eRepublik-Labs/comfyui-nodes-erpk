@@ -10,22 +10,13 @@ class GeminiAPIConfig:
     Gemini API Configuration Node
 
     Initializes and provides a Gemini API client for use by other nodes.
-    Handles API key configuration and model selection.
+    Handles API key configuration. Each node selects its own model.
     """
 
     @classmethod
     def INPUT_TYPES(cls):
-        model_descriptions = "\n".join([f"{k}: {v}" for k, v in GeminiClient.MODELS.items()])
         return {
-            "required": {
-                "model": (
-                    list(GeminiClient.MODELS.keys()),
-                    {
-                        "default": GeminiClient.DEFAULT_MODEL,
-                        "tooltip": f"Gemini model to use:\n{model_descriptions}"
-                    }
-                ),
-            },
+            "required": {},
             "optional": {
                 "api_key": (
                     "STRING",
@@ -42,12 +33,11 @@ class GeminiAPIConfig:
     FUNCTION = "create_client"
     CATEGORY = "ERPK/Gemini"
 
-    def create_client(self, model: str, api_key: str = ""):
+    def create_client(self, api_key: str = ""):
         """
         Create and return a Gemini API client.
 
         Args:
-            model: Gemini model to use
             api_key: Optional API key
 
         Returns:
@@ -55,11 +45,10 @@ class GeminiAPIConfig:
         """
         try:
             client = GeminiClient(
-                api_key=api_key if api_key.strip() else None,
-                model=model
+                api_key=api_key if api_key.strip() else None
             )
 
-            print(f"[Gemini] Client initialized with model: {model}")
+            print(f"[Gemini] Client initialized")
 
             return (client,)
 
@@ -80,6 +69,9 @@ class GeminiTextGeneration:
     - Content generation
     """
 
+    # Text generation models
+    TEXT_MODELS = list(GeminiClient.MODELS.keys())
+
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -98,6 +90,13 @@ class GeminiTextGeneration:
                 ),
             },
             "optional": {
+                "model": (
+                    cls.TEXT_MODELS,
+                    {
+                        "default": GeminiClient.DEFAULT_MODEL,
+                        "tooltip": "Gemini model to use for generation"
+                    }
+                ),
                 "temperature": (
                     "FLOAT",
                     {
@@ -130,6 +129,7 @@ class GeminiTextGeneration:
         self,
         client: GeminiClient,
         prompt: str,
+        model: str = None,
         temperature: float = 0.7,
         max_tokens: int = 8192
     ):
@@ -139,6 +139,7 @@ class GeminiTextGeneration:
         Args:
             client: Gemini API client
             prompt: User prompt
+            model: Gemini model to use
             temperature: Creativity level
             max_tokens: Max output tokens
 
@@ -148,11 +149,16 @@ class GeminiTextGeneration:
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 
+        # Use specified model or default
+        if model is None:
+            model = GeminiClient.DEFAULT_MODEL
+
         try:
             response = client.generate_content(
                 prompt=prompt.strip(),
                 max_tokens=max_tokens,
-                temperature=temperature
+                temperature=temperature,
+                model=model
             )
 
             if response.get("blocked", False):
@@ -179,6 +185,9 @@ class GeminiChat:
     across multiple node executions.
     """
 
+    # Text generation models
+    TEXT_MODELS = list(GeminiClient.MODELS.keys())
+
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -197,6 +206,13 @@ class GeminiChat:
                 ),
             },
             "optional": {
+                "model": (
+                    cls.TEXT_MODELS,
+                    {
+                        "default": GeminiClient.DEFAULT_MODEL,
+                        "tooltip": "Gemini model to use for chat"
+                    }
+                ),
                 "chat_session": (
                     "GEMINI_CHAT_SESSION",
                     {"tooltip": "Previous chat session (connect from previous chat node)"}
@@ -240,6 +256,7 @@ class GeminiChat:
         self,
         client: GeminiClient,
         prompt: str,
+        model: str = None,
         chat_session=None,
         reset_conversation: bool = False,
         temperature: float = 0.7,
@@ -251,6 +268,7 @@ class GeminiChat:
         Args:
             client: Gemini API client
             prompt: User message
+            model: Gemini model to use
             chat_session: Previous chat session
             reset_conversation: Start new conversation
             temperature: Creativity level
@@ -262,19 +280,15 @@ class GeminiChat:
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 
+        # Use specified model or default
+        if model is None:
+            model = GeminiClient.DEFAULT_MODEL
+
         try:
             # Start new session or use existing
             if reset_conversation or chat_session is None:
-                # Update client config with temperature/max_tokens before starting chat
-                from google.genai import types
-                config = types.GenerateContentConfig(
-                    max_output_tokens=max_tokens,
-                    temperature=temperature
-                )
-                # Temporarily store config and start chat
-                original_config = (client.system_instruction, client.safety_settings)
-                chat_session = client.start_chat()
-                print("[Gemini] Started new conversation")
+                chat_session = client.start_chat(model=model)
+                print(f"[Gemini] Started new conversation with {model}")
             else:
                 print(f"[Gemini] Continuing conversation")
 
@@ -308,6 +322,9 @@ class GeminiVision:
     Supports single or multiple images.
     """
 
+    # Text generation models (vision works with all)
+    TEXT_MODELS = list(GeminiClient.MODELS.keys())
+
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -330,6 +347,13 @@ class GeminiVision:
                 ),
             },
             "optional": {
+                "model": (
+                    cls.TEXT_MODELS,
+                    {
+                        "default": GeminiClient.DEFAULT_MODEL,
+                        "tooltip": "Gemini model to use for vision analysis"
+                    }
+                ),
                 "max_tokens": (
                     "INT",
                     {
@@ -363,6 +387,7 @@ class GeminiVision:
         client: GeminiClient,
         image,
         prompt: str,
+        model: str = None,
         max_tokens: int = 8192,
         temperature: float = 0.4
     ):
@@ -373,12 +398,16 @@ class GeminiVision:
             client: Gemini API client
             image: Image tensor(s)
             prompt: Question or instruction about images
+            model: Gemini model to use
             max_tokens: Max output tokens
             temperature: Creativity level
 
         Returns:
             Tuple containing analysis text
         """
+        # Use specified model or default
+        if model is None:
+            model = GeminiClient.DEFAULT_MODEL
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 
@@ -392,7 +421,8 @@ class GeminiVision:
                 prompt=prompt.strip(),
                 images=pil_images,
                 max_tokens=max_tokens,
-                temperature=temperature
+                temperature=temperature,
+                model=model
             )
 
             if response.get("blocked", False):
