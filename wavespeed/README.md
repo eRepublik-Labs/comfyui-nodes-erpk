@@ -22,10 +22,21 @@ ComfyUI custom nodes for WaveSpeed AI integration, featuring ByteDance's Seedrea
 
 | Node | Description | Dimensions | Input Images | Output | Pricing | API Docs |
 |------|-------------|------------|--------------|--------|---------|----------|
-| **Seedream V4** | Text-to-image generation | 0-4096px (step 8)<br>Default: 2048×2048 | N/A | Single image | Standard | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4) |
-| **Seedream V4 Sequential** | Multi-image generation with cross-image consistency | 1024-4096px (step 8)<br>Default: 2048×2048 | N/A | 1-15 images | $0.027/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-sequential) |
-| **Seedream V4 Edit** | Image-to-image editing | 0-4096px (step 8) | Up to 10 | Single image | Standard | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-edit) |
-| **Seedream V4 Edit Sequential** | Multi-image editing with coherent results | 1024-4096px (step 8) | Up to 10 (optional) | 1-15 images | $0.027/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-edit-sequential) |
+| **Seedream V4** | Text-to-image generation | 320-4096px (step 8)<br>Default: 1408×1408 | N/A | Single image | Standard | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4) |
+| **Seedream V4 Sequential** | Multi-image generation with cross-image consistency | 320-4096px (step 8)<br>Default: 1408×1408 | N/A | 1-15 images | $0.027/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-sequential) |
+| **Seedream V4 Edit** | Image-to-image editing | 320-4096px (step 8) | Up to 10 | Single image | Standard | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-edit) |
+| **Seedream V4 Edit Sequential** | Multi-image editing with coherent results | 320-4096px (step 8) | Up to 10 (optional) | 1-15 images | $0.027/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-edit-sequential) |
+
+### ByteDance Seedream V4.5 Models
+
+Enhanced typography and text rendering for posters, logos, UI, and marketing layouts.
+
+| Node | Description | Dimensions | Input Images | Output | Pricing | API Docs |
+|------|-------------|------------|--------------|--------|---------|----------|
+| **Seedream V4.5** | Text-to-image with enhanced typography | 1024-4096px (step 8)<br>Default: 2048×2048 | N/A | Single image | Standard | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-5) |
+| **Seedream V4.5 Sequential** | Multi-image generation with typography | 1024-4096px (step 8)<br>Default: 2048×2048 | N/A | 1-15 images | $0.027/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-5-sequential) |
+| **Seedream V4.5 Edit** | Image editing with enhanced typography | 1024-4096px (step 8) | Up to 10 | Single image | Standard | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-5-edit) |
+| **Seedream V4.5 Edit Sequential** | Multi-image editing with typography | 1024-4096px (step 8) | Up to 10 (optional) | 1-15 images | $0.027/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-5-edit-sequential) |
 
 ### Qwen Image Models
 
@@ -35,7 +46,14 @@ ComfyUI custom nodes for WaveSpeed AI integration, featuring ByteDance's Seedrea
 | **Qwen Image Edit** | Low-level & high-level semantic editing | 256-1536px (step 8) | 1 required | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit) |
 | **Qwen Image Edit Plus** | Advanced multi-image context editing | 256-1536px (step 8) | Up to 3 required | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-plus) |
 
-**Common Features (All Nodes):**
+**Common Features (All Seedream Nodes):**
+- Size preset dropdown with recommended resolutions
+- Custom width/height with auto-sync from presets
+- Aspect ratio display in node title (toggleable)
+- Sync mode (wait for completion)
+- Base64 output option
+
+**Common Features (All Qwen Nodes):**
 - Seed control for reproducibility
 - Multiple output formats (jpeg, png, webp)
 - Sync mode (wait for completion)
@@ -87,6 +105,10 @@ ComfyUI/
         seedream_v4_sequential.py
         seedream_v4_edit.py
         seedream_v4_edit_sequential.py
+        seedream_v4_5.py
+        seedream_v4_5_sequential.py
+        seedream_v4_5_edit.py
+        seedream_v4_5_edit_sequential.py
         qwen_image_text_to_image.py
         qwen_image_edit.py
         qwen_image_edit_plus.py
@@ -99,9 +121,15 @@ ComfyUI/
             seedream_v4_sequential.py
             seedream_v4_edit.py
             seedream_v4_edit_sequential.py
+            seedream_v4_5.py
+            seedream_v4_5_sequential.py
+            seedream_v4_5_edit.py
+            seedream_v4_5_edit_sequential.py
             qwen_image_text_to_image.py
             qwen_image_edit.py
             qwen_image_edit_plus.py
+      web/
+        aspect_ratio.js
 ```
 
 ### Requirements
@@ -262,7 +290,7 @@ pip install -r requirements.txt
 python -c "import sys; sys.path.insert(0, 'custom_nodes'); from erpk import wavespeed; print('Loaded', len(wavespeed.NODE_CLASS_MAPPINGS), 'nodes')"
 ```
 
-You should see: `Loaded 11 nodes`
+You should see: `Loaded 15 nodes`
 
 ### Common Issues
 
@@ -279,7 +307,7 @@ All WaveSpeed nodes are located under the **ERPK/WaveSpeedAI** category:
 3. Navigate to: **ERPK → WaveSpeedAI**
 4. Select your desired node
 
-**Available nodes:**
+**Available nodes (15 total):**
 - WaveSpeed Client (Custom)
 - WaveSpeed Preview Video (Custom)
 - WaveSpeed Save Audio (Custom)
@@ -288,6 +316,10 @@ All WaveSpeed nodes are located under the **ERPK/WaveSpeedAI** category:
 - Bytedance Seedream V4 Sequential (Custom)
 - Bytedance Seedream V4 Edit (Custom)
 - Bytedance Seedream V4 Edit Sequential (Custom)
+- Bytedance Seedream V4.5 (Custom)
+- Bytedance Seedream V4.5 Sequential (Custom)
+- Bytedance Seedream V4.5 Edit (Custom)
+- Bytedance Seedream V4.5 Edit Sequential (Custom)
 - Qwen Image Text-to-Image (Custom)
 - Qwen Image Edit (Custom)
 - Qwen Image Edit Plus (Custom)

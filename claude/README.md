@@ -65,7 +65,7 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 
 6. **Verify installation:**
    - Look for `ERPK/Claude` category in ComfyUI node menu
-   - Should see 10 nodes available
+   - Should see 8 nodes available
 
 ## Available Nodes
 

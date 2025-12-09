@@ -11,8 +11,9 @@ ComfyUI-Custom-Nodes/
 ├── wavespeed/                     # WaveSpeed AI integration
 │   ├── README.md                  # Package documentation
 │   ├── nodes.py                   # Core nodes
-│   ├── seedream_v4.py             # Text-to-image node
-│   ├── seedream_v4_edit.py        # Image editing node
+│   ├── seedream_v4*.py            # Seedream V4 nodes (4 variants)
+│   ├── seedream_v4_5*.py          # Seedream V4.5 nodes (4 variants)
+│   ├── qwen_image_*.py            # Qwen Image nodes
 │   └── wavespeed_api/             # API integration layer
 ├── claude/                        # Claude API integration
 │   ├── README.md                  # Package documentation
@@ -20,10 +21,12 @@ ComfyUI-Custom-Nodes/
 │   ├── prompt_enhancer.py         # Prompt enhancement node
 │   ├── vision_analysis.py         # Image analysis node
 │   └── claude_api/                # API integration layer
-└── gemini/                        # Google Gemini API integration
-    ├── README.md                  # Package documentation
-    ├── nodes.py                   # All Gemini nodes
-    └── gemini_api/                # API integration layer
+├── gemini/                        # Google Gemini API integration
+│   ├── README.md                  # Package documentation
+│   ├── nodes.py                   # All Gemini nodes
+│   └── gemini_api/                # API integration layer
+└── web/                           # Frontend extensions
+    └── aspect_ratio.js            # Aspect ratio display in node titles
 ```
 
 ## Available Node Packages
@@ -37,10 +40,17 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 
 #### ByteDance Seedream V4 Models
 
-- **Seedream V4** - Text-to-image generation with configurable dimensions up to 4K (0-4096px)
+- **Seedream V4** - Text-to-image generation with configurable dimensions (320-4096px)
 - **Seedream V4 Sequential** - Multi-image generation with cross-image consistency (1-15 images, $0.027/image)
 - **Seedream V4 Edit** - AI-powered image editing with text prompts (up to 10 reference images)
 - **Seedream V4 Edit Sequential** - Multi-image editing with coherent results (1-15 images, $0.027/image)
+
+#### ByteDance Seedream V4.5 Models
+
+- **Seedream V4.5** - Enhanced typography and text rendering for posters, logos, UI (1024-4096px)
+- **Seedream V4.5 Sequential** - Multi-image generation with typography support (1-15 images, $0.027/image)
+- **Seedream V4.5 Edit** - Image editing with enhanced text rendering (up to 10 reference images)
+- **Seedream V4.5 Edit Sequential** - Multi-image editing with typography (1-15 images, $0.027/image)
 
 #### Qwen Image Models
 
