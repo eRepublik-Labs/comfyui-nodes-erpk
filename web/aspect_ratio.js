@@ -15,6 +15,8 @@ const SEEDREAM_NODES = new Set([
 ]);
 
 const originalTitles = new WeakMap();
+const setupNodes = new WeakSet();
+const hookedWidgets = new WeakSet();
 
 function gcd(a, b) {
     a = Math.abs(Math.round(a));
@@ -85,63 +87,53 @@ function updateDimensionsFromPreset(node, presetValue, widthWidget, heightWidget
     }
 }
 
+function hookWidget(widget, node, onChange) {
+    if (hookedWidgets.has(widget)) return;
+
+    let currentValue = widget.value;
+    Object.defineProperty(widget, 'value', {
+        get() { return currentValue; },
+        set(v) {
+            const oldValue = currentValue;
+            currentValue = v;
+            if (onChange) onChange(v, oldValue);
+            updateNodeTitle(node);
+        },
+        configurable: true,
+        enumerable: true
+    });
+    hookedWidgets.add(widget);
+}
+
 function setupNode(node) {
     if (!node?.widgets) return;
-
-    console.log("[WaveSpeed] Setting up node:", node.title, node.type);
+    if (setupNodes.has(node)) return;
+    setupNodes.add(node);
 
     const widthWidget = node.widgets.find(w => w.name === "width");
     const heightWidget = node.widgets.find(w => w.name === "height");
     const presetWidget = node.widgets.find(w => w.name === "size_preset");
     const showRatioWidget = node.widgets.find(w => w.name === "show_aspect_ratio");
 
-    if (!widthWidget || !heightWidget) {
-        console.log("[WaveSpeed] Missing width/height widgets");
-        return;
-    }
+    if (!widthWidget || !heightWidget) return;
 
-    // Store original title
     if (!originalTitles.has(node)) {
         originalTitles.set(node, node.title);
     }
 
-    // Track hooked widgets
-    const hookedWidgets = new WeakSet();
-
-    // Hook into value changes using property descriptor
-    const hookWidget = (widget, name, onChange) => {
-        if (hookedWidgets.has(widget)) return;
-
-        let currentValue = widget.value;
-        Object.defineProperty(widget, 'value', {
-            get() { return currentValue; },
-            set(v) {
-                const oldValue = currentValue;
-                currentValue = v;
-                if (onChange) onChange(v, oldValue);
-                updateNodeTitle(node);
-            },
-            configurable: true,
-            enumerable: true
-        });
-        hookedWidgets.add(widget);
-        console.log("[WaveSpeed] Hooked widget:", name);
-    };
-
-    hookWidget(widthWidget, "width");
-    hookWidget(heightWidget, "height");
+    hookWidget(widthWidget, node);
+    hookWidget(heightWidget, node);
 
     if (presetWidget) {
-        hookWidget(presetWidget, "size_preset", (newValue) => {
+        hookWidget(presetWidget, node, (newValue) => {
             updateDimensionsFromPreset(node, newValue, widthWidget, heightWidget);
         });
     }
 
     if (showRatioWidget) {
-        hookWidget(showRatioWidget, "show_aspect_ratio");
+        hookWidget(showRatioWidget, node);
     }
 
-    // Initial update
     updateNodeTitle(node);
 }
 
@@ -164,5 +156,3 @@ app.registerExtension({
         setTimeout(() => setupNode(node), 200);
     }
 });
-
-console.log("[WaveSpeed] Aspect ratio title extension loaded");
