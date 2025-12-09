@@ -4,7 +4,7 @@
 [project]
 name = "comfyui-nodes-erpk"
 description = "ERPK custom nodes for ComfyUI: WaveSpeed AI (Seedream V4/V4.5, Qwen Image), Claude API, and Google Gemini API integrations for image generation, editing, text generation, and vision analysis."
-version = "2025.12.0"
+version = "2025.12.1"
 license = { file = "LICENSE" }
 dependencies = [
     "requests>=2.31.0",
@@ -14,22 +14,9 @@ dependencies = [
     "google-genai>=0.2.0",
     "urllib3>=1.26.0",
 ]
-# classifiers = [
-#     # For OS-independent nodes (works on all operating systems)
-#     "Operating System :: OS Independent",
-#
-#     # OR for OS-specific nodes, specify the supported systems:
-#     # "Operating System :: Microsoft :: Windows",
-#     # "Operating System :: POSIX :: Linux",
-#     # "Operating System :: MacOS",
-#
-#     # GPU Accelerator support:
-#     # "Environment :: GPU :: NVIDIA CUDA",
-#     # "Environment :: GPU :: AMD ROCm",
-#     # "Environment :: GPU :: Intel Arc",
-#     # "Environment :: NPU :: Huawei Ascend",
-#     # "Environment :: GPU :: Apple Metal",
-# ]
+classifiers = [
+    "Operating System :: OS Independent",
+]
 
 [project.urls]
 Repository = "https://github.com/eRepublik-Labs/comfyui-nodes-erpk"
@@ -39,5 +26,5 @@ Documentation = "https://github.com/eRepublik-Labs/comfyui-nodes-erpk/wiki"
 [tool.comfy]
 PublisherId = "erpk"
 DisplayName = "ERPK Custom Nodes"
-Icon = ""
+Icon = "icon.png"
 # requires-comfyui = ">=1.0.0"
