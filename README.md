@@ -130,14 +130,28 @@ Each node package has its own installation instructions. See the individual pack
 
 ### Quick Start
 
-1. Navigate to your ComfyUI custom_nodes directory
-2. Clone this repository
+1. Navigate to your ComfyUI custom_nodes directory:
+   ```bash
+   cd /path/to/ComfyUI/custom_nodes/
+   ```
+
+2. Clone this repository as `erpk`:
+   ```bash
+   git clone https://github.com/eRepublik-Labs/comfyui-nodes-erpk.git erpk
+   ```
+
 3. Install dependencies for each package:
-   - WaveSpeed: `cd ERPK/wavespeed && pip install -r requirements.txt`
-   - Claude: `cd ERPK/claude && pip install -r requirements.txt`
-   - Gemini: `cd ERPK/gemini && pip install -r requirements.txt`
+   ```bash
+   cd erpk
+   pip install -r wavespeed/requirements.txt
+   pip install -r claude/requirements.txt
+   pip install -r gemini/requirements.txt
+   ```
+
 4. Configure API keys (see individual package READMEs)
+
 5. Restart ComfyUI
+
 6. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, and `ERPK/Gemini`
 
 ## License

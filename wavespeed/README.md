@@ -69,14 +69,14 @@ Enhanced typography and text rendering for posters, logos, UI, and marketing lay
 
 ### Manual Installation
 
-1. Copy the entire `erpk` folder to your ComfyUI custom nodes directory:
+1. Clone the repository to your ComfyUI custom nodes directory:
 
 ```bash
 # Navigate to your ComfyUI custom_nodes directory
 cd /path/to/ComfyUI/custom_nodes/
 
-# Copy the erpk folder (or clone if using git)
-cp -r /path/to/this/repo/erpk ./
+# Clone the repository as 'erpk'
+git clone https://github.com/eRepublik-Labs/comfyui-nodes-erpk.git erpk
 ```
 
 **Example installation path:**
@@ -87,8 +87,8 @@ cp -r /path/to/this/repo/erpk ./
 2. Install the required dependencies:
 
 ```bash
-cd erpk/wavespeed
-pip install -r requirements.txt
+cd erpk
+pip install -r wavespeed/requirements.txt
 ```
 
 The directory structure should look like:

@@ -27,21 +27,18 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 
 1. **Navigate to ComfyUI custom_nodes directory:**
    ```bash
-   cd ComfyUI/custom_nodes
+   cd /path/to/ComfyUI/custom_nodes/
    ```
 
-2. **Clone or copy this repository:**
+2. **Clone the repository as 'erpk':**
    ```bash
-   # If cloning the full repository
-   git clone https://github.com/YOUR_USERNAME/ComfyUI-Custom-Nodes ERPK
-
-   # Or just copy the claude/ folder into custom_nodes/
+   git clone https://github.com/eRepublik-Labs/comfyui-nodes-erpk.git erpk
    ```
 
 3. **Install dependencies:**
    ```bash
-   cd ERPK/claude  # or claude/ if copied directly
-   pip install -r requirements.txt
+   cd erpk
+   pip install -r claude/requirements.txt
    ```
 
 4. **Configure API key** (choose one method):

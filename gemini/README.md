@@ -28,21 +28,18 @@ Complete Google Gemini API integration providing text generation, vision analysi
 
 1. **Navigate to ComfyUI custom_nodes directory:**
    ```bash
-   cd ComfyUI/custom_nodes
+   cd /path/to/ComfyUI/custom_nodes/
    ```
 
-2. **Clone or copy this repository:**
+2. **Clone the repository as 'erpk':**
    ```bash
-   # If cloning the full repository
-   git clone https://github.com/YOUR_USERNAME/ComfyUI-Custom-Nodes ERPK
-
-   # Or just copy the gemini/ folder into custom_nodes/
+   git clone https://github.com/eRepublik-Labs/comfyui-nodes-erpk.git erpk
    ```
 
 3. **Install dependencies:**
    ```bash
-   cd ERPK/gemini  # or gemini/ if copied directly
-   pip install -r requirements.txt
+   cd erpk
+   pip install -r gemini/requirements.txt
    ```
 
 4. **Configure API key** (choose one method):
