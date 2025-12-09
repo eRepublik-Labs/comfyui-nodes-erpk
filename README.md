@@ -125,23 +125,17 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 
 ## Installation
 
-### Method 1: ComfyUI Registry (Recommended)
-
-Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishers/erpk/nodes/comfyui-nodes-erpk):
-
-1. Open ComfyUI
-2. Go to **Manager** → **Install Custom Nodes** → **Registry**
-3. Search for `comfyui-nodes-erpk`
-4. Click **Install**
-5. Restart ComfyUI
-
-### Method 2: ComfyUI Manager
+### Method 1: ComfyUI Manager (Recommended)
 
 1. Open ComfyUI Manager
 2. Click **Install Custom Nodes**
-3. Search for `ERPK Custom Nodes`
-4. Click **Install**
+3. Search for `erpk`
+4. Find **ERPK Custom Nodes** and click **Install**
 5. Restart ComfyUI
+
+### Method 2: ComfyUI Registry
+
+Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishers/erpk/nodes/comfyui-nodes-erpk) web interface.
 
 ### Method 3: Manual Installation
 
