@@ -18,6 +18,11 @@ const originalTitles = new WeakMap();
 const setupNodes = new WeakSet();
 const hookedWidgets = new WeakSet();
 
+function cleanTitle(title) {
+    // Remove any existing [ratio] patterns from the title
+    return title.replace(/\s*\[\d+:\d+\]/g, '').trim();
+}
+
 function gcd(a, b) {
     a = Math.abs(Math.round(a));
     b = Math.abs(Math.round(b));
@@ -64,7 +69,7 @@ function updateNodeTitle(node) {
     if (!widthWidget || !heightWidget) return;
 
     if (!originalTitles.has(node)) {
-        originalTitles.set(node, node.title);
+        originalTitles.set(node, cleanTitle(node.title));
     }
 
     const originalTitle = originalTitles.get(node);
@@ -118,7 +123,7 @@ function setupNode(node) {
     if (!widthWidget || !heightWidget) return;
 
     if (!originalTitles.has(node)) {
-        originalTitles.set(node, node.title);
+        originalTitles.set(node, cleanTitle(node.title));
     }
 
     hookWidget(widthWidget, node);
