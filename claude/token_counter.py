@@ -173,9 +173,9 @@ Source: anthropic.com/pricing
 
 # Node registration
 NODE_CLASS_MAPPINGS = {
-    "ERPKClaudeTokenCounter": ClaudeTokenCounter,
+    "ClaudeTokenCounter": ClaudeTokenCounter,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ERPKClaudeTokenCounter": "Claude Token Counter",
+    "ClaudeTokenCounter": "Claude Token Counter",
 }

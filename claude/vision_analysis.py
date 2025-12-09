@@ -268,9 +268,9 @@ class ClaudeVisionAnalysis:
 
 # Node registration
 NODE_CLASS_MAPPINGS = {
-    "ERPKClaudeVisionAnalysis": ClaudeVisionAnalysis,
+    "ClaudeVisionAnalysis": ClaudeVisionAnalysis,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ERPKClaudeVisionAnalysis": "Claude Vision Analysis",
+    "ClaudeVisionAnalysis": "Claude Vision Analysis",
 }

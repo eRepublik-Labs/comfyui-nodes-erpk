@@ -949,23 +949,23 @@ class GeminiImageEdit:
 
 # Node registration
 NODE_CLASS_MAPPINGS = {
-    "ERPKGeminiAPIConfig": GeminiAPIConfig,
-    "ERPKGeminiTextGeneration": GeminiTextGeneration,
-    "ERPKGeminiChat": GeminiChat,
-    "ERPKGeminiVision": GeminiVision,
-    "ERPKGeminiSystemInstruction": GeminiSystemInstruction,
-    "ERPKGeminiSafetySettings": GeminiSafetySettings,
-    "ERPKGeminiImageGeneration": GeminiImageGeneration,
-    "ERPKGeminiImageEdit": GeminiImageEdit,
+    "GeminiAPIConfig": GeminiAPIConfig,
+    "GeminiTextGeneration": GeminiTextGeneration,
+    "GeminiChat": GeminiChat,
+    "GeminiVision": GeminiVision,
+    "GeminiSystemInstruction": GeminiSystemInstruction,
+    "GeminiSafetySettings": GeminiSafetySettings,
+    "GeminiImageGeneration": GeminiImageGeneration,
+    "GeminiImageEdit": GeminiImageEdit,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "ERPKGeminiAPIConfig": "Gemini API Config",
-    "ERPKGeminiTextGeneration": "Gemini Text Generation",
-    "ERPKGeminiChat": "Gemini Chat",
-    "ERPKGeminiVision": "Gemini Vision",
-    "ERPKGeminiSystemInstruction": "Gemini System Instruction",
-    "ERPKGeminiSafetySettings": "Gemini Safety Settings",
-    "ERPKGeminiImageGeneration": "Gemini Image Generation",
-    "ERPKGeminiImageEdit": "Gemini Image Edit",
+    "GeminiAPIConfig": "Gemini API Config",
+    "GeminiTextGeneration": "Gemini Text Generation",
+    "GeminiChat": "Gemini Chat",
+    "GeminiVision": "Gemini Vision",
+    "GeminiSystemInstruction": "Gemini System Instruction",
+    "GeminiSafetySettings": "Gemini Safety Settings",
+    "GeminiImageGeneration": "Gemini Image Generation",
+    "GeminiImageEdit": "Gemini Image Edit",
 }
