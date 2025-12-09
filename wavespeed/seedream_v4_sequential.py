@@ -82,6 +82,10 @@ class SeedreamV4SequentialNode:
     CATEGORY = "ERPK/WaveSpeedAI"
     FUNCTION = "execute"
 
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        return float("nan")
+
     def execute(
         self,
         client,
