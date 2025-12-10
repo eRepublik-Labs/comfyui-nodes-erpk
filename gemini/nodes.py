@@ -682,6 +682,11 @@ class GeminiImageGeneration:
     FUNCTION = "generate_image"
     CATEGORY = "ERPK/Gemini"
 
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        # Always regenerate - disable caching for image generation
+        return float("nan")
+
     def generate_image(
         self,
         prompt: str,
@@ -874,6 +879,11 @@ class GeminiImageEdit:
     RETURN_NAMES = ("image",)
     FUNCTION = "edit_image"
     CATEGORY = "ERPK/Gemini"
+
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        # Always regenerate - disable caching for image editing
+        return float("nan")
 
     def edit_image(
         self,
