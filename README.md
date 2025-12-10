@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2025.12.9 (CalVer)
+**Current Version:** 2025.12.13 (CalVer)
 
 ## Repository Structure
 
@@ -27,6 +27,7 @@ ComfyUI-Custom-Nodes/
 ├── gemini/                        # Google Gemini API integration
 │   ├── README.md                  # Package documentation
 │   ├── nodes.py                   # All Gemini nodes
+│   ├── veo_nodes.py               # Veo video generation nodes
 │   └── gemini_api/                # API integration layer
 └── web/                           # Frontend extensions
     └── aspect_ratio.js            # Aspect ratio display in node titles
@@ -39,7 +40,7 @@ ComfyUI-Custom-Nodes/
 Custom nodes for WaveSpeed AI's image generation and editing APIs.
 
 **Category in ComfyUI:** `ERPK/WaveSpeedAI`
-**Version:** 2025.12.9
+**Version:** 2025.12.13
 
 #### ByteDance Seedream V4 Models
 
@@ -70,7 +71,7 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 Claude API integration for text generation, prompt enhancement, vision analysis, and conversational AI.
 
 **Category in ComfyUI:** `ERPK/Claude`
-**Version:** 2025.12.9
+**Version:** 2025.12.13
 
 #### Nodes
 
@@ -94,10 +95,10 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 
 ### ERPK/Gemini
 
-Google Gemini API integration for text generation, vision analysis, multi-turn conversations, image generation, and image editing.
+Google Gemini API integration for text generation, vision analysis, multi-turn conversations, image generation, image editing, and **Veo video generation**.
 
-**Category in ComfyUI:** `ERPK/Gemini`
-**Version:** 2025.12.9
+**Category in ComfyUI:** `ERPK/Gemini` and `ERPK/Gemini/Veo`
+**Version:** 2025.12.13
 
 #### Nodes
 
@@ -110,8 +111,14 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Gemini System Instruction** - Set persistent system-level instructions to guide model behavior
 - **Gemini Safety Settings** - Configure content safety filters (strict/balanced/permissive presets or custom)
 
+#### Veo Video Generation Nodes
+
+- **Veo Text to Video** - Generate videos from text prompts using Google's Veo models (Veo 3 includes synchronized audio)
+- **Veo Image to Video** - Generate videos from an input image and optional text prompt
+
 **Key Benefits:**
 - Support for Gemini 3 Pro Preview and Gemini 2.5 models
+- **Veo video generation** with text-to-video and image-to-video (Veo 3 includes audio)
 - Each node selects its own model for maximum flexibility
 - State-of-the-art reasoning with Gemini 3 Pro and 2.5 Pro
 - Image generation with Gemini 2.5 Flash Image models

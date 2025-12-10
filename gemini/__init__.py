@@ -24,6 +24,17 @@ try:
 except ImportError as e:
     print(f"[Gemini] Warning: Could not load nodes: {e}")
 
+# Import Veo video generation nodes
+try:
+    from .veo_nodes import (
+        NODE_CLASS_MAPPINGS as VEO_NODE_CLASS_MAPPINGS,
+        NODE_DISPLAY_NAME_MAPPINGS as VEO_NODE_DISPLAY_NAME_MAPPINGS
+    )
+    NODE_CLASS_MAPPINGS.update(VEO_NODE_CLASS_MAPPINGS)
+    NODE_DISPLAY_NAME_MAPPINGS.update(VEO_NODE_DISPLAY_NAME_MAPPINGS)
+except ImportError as e:
+    print(f"[Gemini] Warning: Could not load Veo nodes: {e}")
+
 # Print loaded nodes for debugging
 print(f"[Gemini] Loaded {len(NODE_CLASS_MAPPINGS)} nodes:")
 for node_name in sorted(NODE_CLASS_MAPPINGS.keys()):
