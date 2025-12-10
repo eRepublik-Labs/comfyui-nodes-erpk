@@ -19,7 +19,10 @@ class VeoTextToVideo:
     """
 
     VEO_MODELS = [
-        "veo-3.0-generate-preview",
+        "veo-3.1-generate-preview",
+        "veo-3.1-fast-generate-preview",
+        "veo-3.0-generate-001",
+        "veo-3.0-fast-generate-001",
         "veo-2.0-generate-001",
     ]
 
@@ -48,8 +51,8 @@ class VeoTextToVideo:
                 "model": (
                     cls.VEO_MODELS,
                     {
-                        "default": "veo-3.0-generate-preview",
-                        "tooltip": "Veo model to use. Veo 3 generates video with audio."
+                        "default": "veo-3.1-generate-preview",
+                        "tooltip": "Veo model to use. Veo 3+ generates video with audio."
                     }
                 ),
                 "aspect_ratio": (
@@ -121,7 +124,7 @@ class VeoTextToVideo:
         self,
         client: GeminiClient,
         prompt: str,
-        model: str = "veo-3.0-generate-preview",
+        model: str = "veo-3.1-generate-preview",
         aspect_ratio: str = "16:9",
         duration_seconds: int = 8,
         person_generation: str = "allow_adult",
@@ -267,7 +270,10 @@ class VeoImageToVideo:
     """
 
     VEO_MODELS = [
-        "veo-3.0-generate-preview",
+        "veo-3.1-generate-preview",
+        "veo-3.1-fast-generate-preview",
+        "veo-3.0-generate-001",
+        "veo-3.0-fast-generate-001",
         "veo-2.0-generate-001",
     ]
 
@@ -300,8 +306,8 @@ class VeoImageToVideo:
                 "model": (
                     cls.VEO_MODELS,
                     {
-                        "default": "veo-3.0-generate-preview",
-                        "tooltip": "Veo model to use. Veo 3 generates video with audio."
+                        "default": "veo-3.1-generate-preview",
+                        "tooltip": "Veo model to use. Veo 3+ generates video with audio."
                     }
                 ),
                 "aspect_ratio": (
@@ -374,7 +380,7 @@ class VeoImageToVideo:
         client: GeminiClient,
         image,
         prompt: str = "",
-        model: str = "veo-3.0-generate-preview",
+        model: str = "veo-3.1-generate-preview",
         aspect_ratio: str = "16:9",
         duration_seconds: int = 8,
         person_generation: str = "allow_adult",

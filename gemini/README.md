@@ -265,9 +265,9 @@ Generate videos from text prompts using Google's Veo models.
 **Inputs:**
 - `client`: Gemini API client (from Gemini API Config node)
 - `prompt`: Text description of the video to generate (max 2500 characters)
-- `model`: veo-3.0-generate-preview (default, includes audio) or veo-2.0-generate-001
+- `model`: veo-3.1-generate-preview (default, includes audio), veo-3.0-generate-001, or veo-2.0-generate-001
 - `aspect_ratio`: 16:9 (landscape) or 9:16 (portrait)
-- `duration_seconds`: 5, 6, 7, or 8 seconds (Veo 3 defaults to 8)
+- `duration_seconds`: 5, 6, 7, or 8 seconds (Veo 3+ defaults to 8)
 - `person_generation`: Safety setting - allow_adult (default), dont_allow, or allow_all
 - `enhance_prompt`: Let the model enhance your prompt (default: true)
 - `negative_prompt`: Elements to exclude from the video
@@ -297,9 +297,9 @@ Generate videos from an input image and optional text prompt.
 - `client`: Gemini API client (from Gemini API Config node)
 - `image`: Input image (ComfyUI IMAGE tensor) - used as first frame or style reference
 - `prompt`: Optional text description to guide the video generation
-- `model`: veo-3.0-generate-preview (default, includes audio) or veo-2.0-generate-001
+- `model`: veo-3.1-generate-preview (default, includes audio), veo-3.0-generate-001, or veo-2.0-generate-001
 - `aspect_ratio`: 16:9 (landscape) or 9:16 (portrait)
-- `duration_seconds`: 5, 6, 7, or 8 seconds
+- `duration_seconds`: 5, 6, 7, or 8 seconds (Veo 3+ defaults to 8)
 - `person_generation`: Safety setting - allow_adult (default), dont_allow, or allow_all
 - `enhance_prompt`: Let the model enhance your prompt (default: true)
 - `negative_prompt`: Elements to exclude from the video
@@ -341,10 +341,13 @@ Generate videos from an input image and optional text prompt.
 
 | Model | Best For | Notes |
 |-------|----------|-------|
-| **veo-3.0-generate-preview** | Highest quality, includes audio | Default, generates synchronized audio |
-| **veo-2.0-generate-001** | Fast video generation | Faster, no audio |
+| **veo-3.1-generate-preview** | Highest quality, latest features | Default, generates synchronized audio |
+| **veo-3.1-fast-generate-preview** | Fast generation with audio | Faster variant of Veo 3.1 |
+| **veo-3.0-generate-001** | Stable Veo 3 | Generates synchronized audio |
+| **veo-3.0-fast-generate-001** | Fast Veo 3 | Faster variant of Veo 3 |
+| **veo-2.0-generate-001** | Legacy video generation | No audio support |
 
-**Pricing:** Veo 3 is priced at $0.75 per second of video output.
+**Pricing:** Veo 3+ is priced at $0.75 per second of video output.
 
 **Note:** Video generation is asynchronous and may take several minutes. Videos are saved as .mp4 files.
 
