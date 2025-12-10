@@ -80,6 +80,11 @@ class ClaudeTextGeneration:
     FUNCTION = "generate"
     CATEGORY = "ERPK/Claude"
 
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        # Always regenerate - disable caching for text generation
+        return float("nan")
+
     def generate(
         self,
         client: ClaudeClient,

@@ -72,6 +72,11 @@ class ClaudeVisionAnalysis:
     FUNCTION = "analyze"
     CATEGORY = "ERPK/Claude"
 
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        # Always regenerate - disable caching for vision analysis
+        return float("nan")
+
     def analyze(
         self,
         client: ClaudeClient,

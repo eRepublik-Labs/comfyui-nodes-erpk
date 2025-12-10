@@ -94,6 +94,11 @@ class ClaudeConversation:
     FUNCTION = "chat"
     CATEGORY = "ERPK/Claude"
 
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        # Always regenerate - disable caching for conversation
+        return float("nan")
+
     def chat(
         self,
         client: ClaudeClient,

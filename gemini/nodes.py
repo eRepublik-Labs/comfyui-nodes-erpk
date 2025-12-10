@@ -125,6 +125,11 @@ class GeminiTextGeneration:
     FUNCTION = "generate"
     CATEGORY = "ERPK/Gemini"
 
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        # Always regenerate - disable caching for text generation
+        return float("nan")
+
     def generate(
         self,
         client: GeminiClient,
@@ -251,6 +256,11 @@ class GeminiChat:
     RETURN_NAMES = ("response", "chat_session")
     FUNCTION = "chat"
     CATEGORY = "ERPK/Gemini"
+
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        # Always regenerate - disable caching for chat
+        return float("nan")
 
     def chat(
         self,
@@ -381,6 +391,11 @@ class GeminiVision:
     RETURN_NAMES = ("analysis",)
     FUNCTION = "analyze"
     CATEGORY = "ERPK/Gemini"
+
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        # Always regenerate - disable caching for vision analysis
+        return float("nan")
 
     def analyze(
         self,

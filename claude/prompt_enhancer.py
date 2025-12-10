@@ -296,6 +296,11 @@ Emphasize architectural beauty and structural design."""
     FUNCTION = "enhance_prompt"
     CATEGORY = "ERPK/Claude"
 
+    @classmethod
+    def IS_CHANGED(cls, **kwargs):
+        # Always regenerate - disable caching for prompt enhancement
+        return float("nan")
+
     def enhance_prompt(
         self,
         client: ClaudeClient,
