@@ -736,6 +736,11 @@ class GeminiImageGeneration:
                     api_key=client.api_key,
                     model=model
                 )
+                # Inherit safety settings and system instruction from passed client
+                if client.safety_settings:
+                    image_client.safety_settings = client.safety_settings
+                if client.system_instruction:
+                    image_client.system_instruction = client.system_instruction
             else:
                 # Standalone mode - use provided API key or env/config
                 image_client = GeminiClient(
@@ -936,6 +941,11 @@ class GeminiImageEdit:
                     api_key=client.api_key,
                     model=model
                 )
+                # Inherit safety settings and system instruction from passed client
+                if client.safety_settings:
+                    image_client.safety_settings = client.safety_settings
+                if client.system_instruction:
+                    image_client.system_instruction = client.system_instruction
             else:
                 # Standalone mode - use provided API key or env/config
                 image_client = GeminiClient(
