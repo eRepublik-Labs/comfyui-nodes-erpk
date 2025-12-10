@@ -1,16 +1,17 @@
 # Gemini API Integration for ComfyUI
 
-Complete Google Gemini API integration providing text generation, vision analysis, multi-turn conversations, image generation, image editing, and safety controls for ComfyUI workflows.
+Complete Google Gemini API integration providing text generation, vision analysis, multi-turn conversations, image generation, image editing, **video generation (Veo)**, and safety controls for ComfyUI workflows.
 
-**Version:** 2025.10.0
-**Category in ComfyUI:** `ERPK/Gemini`
+**Version:** 2025.12.13
+**Category in ComfyUI:** `ERPK/Gemini` and `ERPK/Gemini/Veo`
 
 ## Features
 
-- **Text Generation** - Use all Gemini models (2.5 Pro, 2.5 Flash, 2.0 Flash Experimental)
+- **Text Generation** - Use all Gemini models (3 Pro, 2.5 Pro, 2.5 Flash)
 - **Vision Analysis** - Analyze images with Gemini's multimodal capabilities
 - **Image Generation** - Generate images from text descriptions
 - **Image Editing** - Edit and modify images with natural language prompts (1-3 images)
+- **Video Generation (Veo)** - Generate videos from text or images using Google's Veo models
 - **Multi-turn Conversations** - Maintain chat history across requests
 - **System Instructions** - Set persistent instructions to guide model behavior
 - **Safety Settings** - Configure content safety filters with presets or custom thresholds
@@ -62,8 +63,8 @@ Complete Google Gemini API integration providing text generation, vision analysi
 5. **Restart ComfyUI**
 
 6. **Verify installation:**
-   - Look for `ERPK/Gemini` category in ComfyUI node menu
-   - Should see 8 nodes available
+   - Look for `ERPK/Gemini` and `ERPK/Gemini/Veo` categories in ComfyUI node menu
+   - Should see 10 nodes available (8 Gemini + 2 Veo)
 
 ## Available Nodes
 
@@ -256,6 +257,66 @@ Configure content safety filters.
 
 ---
 
+### Veo Video Generation Nodes
+
+#### Veo Text to Video
+Generate videos from text prompts using Google's Veo models.
+
+**Inputs:**
+- `client`: Gemini API client (from Gemini API Config node)
+- `prompt`: Text description of the video to generate (max 2500 characters)
+- `model`: veo-3.0-generate-preview (default, includes audio) or veo-2.0-generate-001
+- `aspect_ratio`: 16:9 (landscape) or 9:16 (portrait)
+- `duration_seconds`: 5, 6, 7, or 8 seconds (Veo 3 defaults to 8)
+- `person_generation`: Safety setting - allow_adult (default), dont_allow, or allow_all
+- `enhance_prompt`: Let the model enhance your prompt (default: true)
+- `negative_prompt`: Elements to exclude from the video
+- `seed`: Random seed for reproducibility (-1 for random)
+- `output_directory`: Where to save the video (default: ComfyUI output folder)
+
+**Outputs:**
+- `video_path`: Path to the generated video file (.mp4)
+
+**Features:**
+- Veo 3 generates videos with synchronized audio
+- Async generation with automatic polling (may take several minutes)
+- Videos saved directly to disk
+- Configurable aspect ratio and duration
+
+**Example Prompts:**
+- "A cat playing piano in a jazz club, cinematic lighting"
+- "Drone footage of a futuristic city at sunset"
+- "Time-lapse of flowers blooming in a garden"
+
+---
+
+#### Veo Image to Video
+Generate videos from an input image and optional text prompt.
+
+**Inputs:**
+- `client`: Gemini API client (from Gemini API Config node)
+- `image`: Input image (ComfyUI IMAGE tensor) - used as first frame or style reference
+- `prompt`: Optional text description to guide the video generation
+- `model`: veo-3.0-generate-preview (default, includes audio) or veo-2.0-generate-001
+- `aspect_ratio`: 16:9 (landscape) or 9:16 (portrait)
+- `duration_seconds`: 5, 6, 7, or 8 seconds
+- `person_generation`: Safety setting - allow_adult (default), dont_allow, or allow_all
+- `enhance_prompt`: Let the model enhance your prompt (default: true)
+- `negative_prompt`: Elements to exclude from the video
+- `seed`: Random seed for reproducibility (-1 for random)
+- `output_directory`: Where to save the video (default: ComfyUI output folder)
+
+**Outputs:**
+- `video_path`: Path to the generated video file (.mp4)
+
+**Example Use Cases:**
+- Animate a still photograph
+- Create video from AI-generated images
+- Turn product shots into video ads
+- Animate artwork or illustrations
+
+---
+
 ## Model Comparison
 
 ### Text Generation Models
@@ -275,6 +336,17 @@ Configure content safety filters.
 | **gemini-2.5-flash-image** | Fast image generation | Fast, recommended for most uses |
 
 **Note:** Image generation models output images instead of text.
+
+### Video Generation Models (Veo)
+
+| Model | Best For | Notes |
+|-------|----------|-------|
+| **veo-3.0-generate-preview** | Highest quality, includes audio | Default, generates synchronized audio |
+| **veo-2.0-generate-001** | Fast video generation | Faster, no audio |
+
+**Pricing:** Veo 3 is priced at $0.75 per second of video output.
+
+**Note:** Video generation is asynchronous and may take several minutes. Videos are saved as .mp4 files.
 
 ## Example Workflows
 
@@ -298,6 +370,21 @@ Load Image → Gemini API Config → Gemini Vision → Output
 ### Guided Generation with Safety
 ```
 Gemini API Config → Gemini System Instruction → Gemini Safety Settings → Gemini Text Generation
+```
+
+### Text to Video
+```
+Gemini API Config → Veo Text to Video → [video_path output]
+```
+
+### Image to Video
+```
+Load Image → Gemini API Config → Veo Image to Video → [video_path output]
+```
+
+### Generate Image then Animate
+```
+Gemini API Config → Gemini Image Generation → Veo Image to Video → [video_path output]
 ```
 
 ## API Keys and Pricing
@@ -332,6 +419,21 @@ https://ai.google.dev/pricing
 ### Model not available
 - Preview models (like gemini-3-pro-preview) may have limited availability
 - Try using gemini-2.5-flash or gemini-2.5-pro as stable alternatives
+
+### Veo video generation timeout
+- Video generation can take 2-10 minutes depending on duration and model
+- The node polls every 20 seconds and times out after 40 minutes
+- If you consistently get timeouts, try shorter durations or check your API quota
+
+### Veo "person generation not approved" error
+- Some Google Cloud projects need approval for generating videos with people
+- Contact your Google account representative for approval
+- Try setting `person_generation` to "dont_allow" as a workaround
+
+### Cannot save video file
+- Ensure the output directory exists and is writable
+- Check disk space
+- Try specifying a custom `output_directory` path
 
 ## Support
 
