@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2025.12.3 (CalVer)
+**Current Version:** 2025.12.9 (CalVer)
 
 ## Repository Structure
 
@@ -39,7 +39,7 @@ ComfyUI-Custom-Nodes/
 Custom nodes for WaveSpeed AI's image generation and editing APIs.
 
 **Category in ComfyUI:** `ERPK/WaveSpeedAI`
-**Version:** 2025.12.3
+**Version:** 2025.12.9
 
 #### ByteDance Seedream V4 Models
 
@@ -70,7 +70,7 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 Claude API integration for text generation, prompt enhancement, vision analysis, and conversational AI.
 
 **Category in ComfyUI:** `ERPK/Claude`
-**Version:** 2025.12.3
+**Version:** 2025.12.9
 
 #### Nodes
 
@@ -97,12 +97,12 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 Google Gemini API integration for text generation, vision analysis, multi-turn conversations, image generation, and image editing.
 
 **Category in ComfyUI:** `ERPK/Gemini`
-**Version:** 2025.12.3
+**Version:** 2025.12.9
 
 #### Nodes
 
-- **Gemini API Config** - Initialize Gemini API connection with model selection including 2.5 Pro, 2.5 Flash (latest/preview), 2.5 Flash-Lite (latest/preview), and 2.0 Flash Experimental
-- **Gemini Text Generation** - General-purpose text generation with all Gemini models
+- **Gemini API Config** - Initialize Gemini API connection (API key configuration)
+- **Gemini Text Generation** - General-purpose text generation with model selection (Gemini 3 Pro, 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite)
 - **Gemini Chat** - Multi-turn conversations with automatic context preservation
 - **Gemini Vision** - Analyze images with multimodal capabilities
 - **Gemini Image Generation** - Generate images from text descriptions (standalone node with dedicated image gen models)
@@ -111,9 +111,9 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Gemini Safety Settings** - Configure content safety filters (strict/balanced/permissive presets or custom)
 
 **Key Benefits:**
-- Support for latest Gemini 2.5 models with "latest" auto-updating aliases
-- Preview/experimental models for cutting-edge features
-- State-of-the-art thinking model (Gemini 2.5 Pro) with advanced reasoning
+- Support for Gemini 3 Pro Preview and Gemini 2.5 models
+- Each node selects its own model for maximum flexibility
+- State-of-the-art reasoning with Gemini 3 Pro and 2.5 Pro
 - Image generation with Gemini 2.5 Flash Image models
 - Image editing with natural language instructions (1-3 images)
 - Simple, straightforward API integration
@@ -165,6 +165,71 @@ Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishe
    - **Gemini:** See [gemini/README.md](gemini/README.md#installation)
 
 2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, and `ERPK/Gemini`
+
+## ComfyUI API Integration
+
+ComfyUI provides a REST API that allows programmatic workflow creation and execution. This is useful for automation, testing, and integration with external tools.
+
+### Available Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/system_stats` | GET | System information (OS, RAM, GPU, versions) |
+| `/object_info` | GET | List all available nodes and their input/output types |
+| `/prompt` | POST | Queue a workflow for execution |
+| `/queue` | GET | View pending and running jobs |
+| `/history` | GET | View execution history and results |
+| `/history/{prompt_id}` | GET | Get results for a specific execution |
+
+### Submitting a Workflow via API
+
+```bash
+curl -X POST http://localhost:8188/prompt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": {
+      "1": {
+        "class_type": "GeminiAPIConfig",
+        "inputs": {
+          "api_key": ""
+        }
+      },
+      "2": {
+        "class_type": "GeminiTextGeneration",
+        "inputs": {
+          "client": ["1", 0],
+          "prompt": "Write a haiku about ComfyUI",
+          "model": "gemini-2.5-flash",
+          "temperature": 0.7,
+          "max_tokens": 256
+        }
+      },
+      "3": {
+        "class_type": "PreviewAny",
+        "inputs": {
+          "source": ["2", 0]
+        }
+      }
+    }
+  }'
+```
+
+**Note:** The port may vary (8000 for desktop app, 8188 for standard installation).
+
+### Workflow JSON Format
+
+Workflows can be saved as JSON files in your ComfyUI workflows directory. The format includes:
+
+- `nodes`: Array of node definitions with `id`, `type`, `pos`, `inputs`, `outputs`, and `widgets_values`
+- `links`: Array of connections in format `[link_id, source_node, source_slot, target_node, target_slot, type]`
+- `last_node_id` / `last_link_id`: Tracking for ID generation
+
+### Checking Available Nodes
+
+```bash
+# List all ERPK nodes
+curl -s http://localhost:8188/object_info | jq 'keys' | grep -i -E "(gemini|claude)"
+```
 
 ## License
 
