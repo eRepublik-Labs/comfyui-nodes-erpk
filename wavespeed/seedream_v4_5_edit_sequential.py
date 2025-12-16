@@ -44,10 +44,10 @@ class SeedreamV4_5EditSequentialNode:
                 ),
             },
             "optional": {
-                "images": (
+                "image_url": (
                     "STRING",
                     {
-                        "tooltip": "Reference images to edit (optional). Maximum of 10 images.",
+                        "tooltip": "Image URL(s) to edit (optional). Accepts single URL (string) or multiple URLs (array). Max 10 images.",
                     },
                 ),
                 "width": (
@@ -112,7 +112,7 @@ class SeedreamV4_5EditSequentialNode:
         prompt,
         max_images,
         size_preset,
-        images=None,
+        image_url=None,
         width=2048,
         height=2048,
         show_aspect_ratio=True,
@@ -125,10 +125,13 @@ class SeedreamV4_5EditSequentialNode:
         if max_images < 1 or max_images > 15:
             raise ValueError("max_images must be between 1 and 15")
 
-        # Prepare images parameter (limit to 10 if provided)
+        # Handle both single URL (string) and multiple URLs (list), max 10
         images_param = None
-        if images is not None and images != "":
-            images_param = images[:10] if isinstance(images, list) else images
+        if image_url is not None and image_url != "":
+            if isinstance(image_url, list):
+                images_param = image_url[:10]
+            else:
+                images_param = [image_url]
 
         # Get dimensions from preset or use custom values
         preset_dims = SEEDREAM_V4_5_SIZE_PRESETS.get(size_preset)

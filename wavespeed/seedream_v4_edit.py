@@ -24,10 +24,10 @@ class SeedreamV4EditNode:
                         "tooltip": "Text description of the desired image modifications",
                     },
                 ),
-                "images": (
+                "image_url": (
                     "STRING",
                     {
-                        "tooltip": "The images to edit. A maximum of 10 reference images can be uploaded.",
+                        "tooltip": "Image URL(s) to edit. Accepts single URL (string) or multiple URLs (array). Max 10 images.",
                     },
                 ),
                 "size_preset": (
@@ -99,7 +99,7 @@ class SeedreamV4EditNode:
         self,
         client,
         prompt,
-        images,
+        image_url,
         size_preset,
         width=1408,
         height=1408,
@@ -110,11 +110,14 @@ class SeedreamV4EditNode:
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        if images is None or images == "":
-            raise ValueError("Images must be provided")
+        if image_url is None or image_url == "":
+            raise ValueError("Image URL must be provided")
 
-        # Ensure we have at most 10 image URLs
-        images_param = images[:10]
+        # Handle both single URL (string) and multiple URLs (list), max 10
+        if isinstance(image_url, list):
+            images_param = image_url[:10]
+        else:
+            images_param = [image_url]
 
         # Get dimensions from preset or use custom values
         preset_dims = SEEDREAM_V4_SIZE_PRESETS.get(size_preset)
