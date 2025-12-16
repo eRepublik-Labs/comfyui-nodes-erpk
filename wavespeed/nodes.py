@@ -342,7 +342,7 @@ class UploadImage:
 
     DESCRIPTION = "Upload image(s) to WaveSpeed AI API. The URL expires after a short time. Use 'single_image_url' for nodes expecting one image, 'all_image_urls' for batch processing."
     RETURN_TYPES = ("STRING", "STRING",)
-    RETURN_NAMES = ("single_image_url", "all_image_urls",)
+    RETURN_NAMES = ("single_image_url (string)", "all_image_urls (array)",)
     CATEGORY = "ERPK/WaveSpeedAI"
     FUNCTION = "upload_file"
 
