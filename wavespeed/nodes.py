@@ -340,9 +340,9 @@ class UploadImage:
             }
         }
 
-    DESCRIPTION = "Upload an image to WaveSpeed AI API. The URL expires after a short time."
+    DESCRIPTION = "Upload image(s) to WaveSpeed AI API. The URL expires after a short time. Use 'single_image_url' for nodes expecting one image, 'all_image_urls' for batch processing."
     RETURN_TYPES = ("STRING", "STRING",)
-    RETURN_NAMES = ("first_image_url", "image_urls",)
+    RETURN_NAMES = ("single_image_url", "all_image_urls",)
     CATEGORY = "ERPK/WaveSpeedAI"
     FUNCTION = "upload_file"
 
@@ -352,10 +352,12 @@ class UploadImage:
 
         Args:
             client: API client configuration
-            image: ComfyUI image tensor
+            image: ComfyUI image tensor (can be single or batch)
 
         Returns:
-            Tuple of (first_image_url, list_of_image_urls)
+            Tuple of (single_image_url, all_image_urls):
+            - single_image_url: First image URL, for nodes expecting a single image
+            - all_image_urls: List of all uploaded image URLs, for batch processing
         """
         # Convert tensor to PIL images
         images = tensor2images(image)
@@ -368,7 +370,7 @@ class UploadImage:
             image_urls.append(image_url)
             print(f"[WaveSpeed] Image uploaded: {image_url}")
 
-        # Return first URL and list of all URLs
+        # Return single URL (first) and list of all URLs
         return (
             image_urls[0] if image_urls else "",
             image_urls
