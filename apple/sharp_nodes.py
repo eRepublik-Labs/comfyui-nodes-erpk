@@ -403,6 +403,22 @@ class SHARPRenderViews:
                 "pip install git+https://github.com/apple/ml-sharp.git"
             )
 
+        # Verify gsplat CUDA extension is properly loaded
+        try:
+            import gsplat.cuda as _gsplat_cuda
+            if _gsplat_cuda._C is None:
+                raise RuntimeError(
+                    "gsplat CUDA extension not loaded. This usually means:\n"
+                    "1. CUDA toolkit not found or incompatible version\n"
+                    "2. gsplat JIT compilation failed\n"
+                    "Try: pip uninstall gsplat && pip install gsplat --no-cache-dir"
+                )
+        except (ImportError, AttributeError) as e:
+            raise RuntimeError(
+                f"gsplat CUDA extension error: {e}\n"
+                "Ensure CUDA toolkit is installed and compatible with your GPU."
+            )
+
         # Load Gaussian splat
         gaussians, f_px, (height, width) = load_ply_fixed(ply_path)
         gaussians = gaussians.to(torch.device("cuda"))
@@ -578,6 +594,22 @@ class SHARPRenderVideo:
             raise ImportError(
                 "SHARP is not installed. Install with:\n"
                 "pip install git+https://github.com/apple/ml-sharp.git"
+            )
+
+        # Verify gsplat CUDA extension is properly loaded
+        try:
+            import gsplat.cuda as _gsplat_cuda
+            if _gsplat_cuda._C is None:
+                raise RuntimeError(
+                    "gsplat CUDA extension not loaded. This usually means:\n"
+                    "1. CUDA toolkit not found or incompatible version\n"
+                    "2. gsplat JIT compilation failed\n"
+                    "Try: pip uninstall gsplat && pip install gsplat --no-cache-dir"
+                )
+        except (ImportError, AttributeError) as e:
+            raise RuntimeError(
+                f"gsplat CUDA extension error: {e}\n"
+                "Ensure CUDA toolkit is installed and compatible with your GPU."
             )
 
         # Load Gaussian splat
