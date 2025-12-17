@@ -29,6 +29,70 @@ SHARP_MODEL_URL = "https://ml-site.cdn-apple.com/models/sharp/sharp_2572gikvuh.p
 SHARP_INTERNAL_RESOLUTION = 1536
 
 
+def load_ply_fixed(path):
+    """Load PLY with fix for SHARP's numpy/tensor bug in color conversion.
+
+    SHARP's load_ply has a bug where it calls sRGB2linearRGB on numpy arrays
+    but the function expects tensors. This wrapper fixes that.
+    """
+    from pathlib import Path
+    from plyfile import PlyData
+    from sharp.utils.gaussians import Gaussians3D
+    from sharp.utils import color_space as cs_utils
+
+    ply_data = PlyData.read(Path(path))
+    vertex_data = ply_data["vertex"]
+
+    # Extract Gaussian parameters
+    mean_vectors = np.stack([vertex_data["x"], vertex_data["y"], vertex_data["z"]], axis=-1)
+    quaternions = np.stack(
+        [vertex_data["rot_0"], vertex_data["rot_1"], vertex_data["rot_2"], vertex_data["rot_3"]],
+        axis=-1,
+    )
+    scale_logits = np.stack(
+        [vertex_data["scale_0"], vertex_data["scale_1"], vertex_data["scale_2"]], axis=-1
+    )
+    opacity_logits = vertex_data["opacity"]
+    colors = np.stack([vertex_data["f_dc_0"], vertex_data["f_dc_1"], vertex_data["f_dc_2"]], axis=-1)
+
+    # Parse supplement data
+    supplement_data = {}
+    if "supplement" in ply_data:
+        for prop in ply_data["supplement"].data.dtype.names:
+            supplement_data[prop] = ply_data["supplement"][prop][0]
+
+    # Get image dimensions
+    height = int(supplement_data.get("height", 512))
+    width = int(supplement_data.get("width", 512))
+    focal_length_px = supplement_data.get("focal_length_px", np.array([width], dtype=np.float32))
+    if isinstance(focal_length_px, np.ndarray):
+        focal_length_px = focal_length_px.astype(np.float32)
+
+    # Convert to tensors BEFORE color conversion (this is the fix)
+    mean_vectors = torch.from_numpy(mean_vectors).view(1, -1, 3).float()
+    quaternions = torch.from_numpy(quaternions).view(1, -1, 4).float()
+    singular_values = torch.exp(torch.from_numpy(scale_logits).view(1, -1, 3)).float()
+    opacities = torch.sigmoid(torch.from_numpy(opacity_logits).view(1, -1)).float()
+    colors = torch.from_numpy(colors).view(1, -1, 3).float()
+
+    # Now do color space conversion (with tensor, not numpy)
+    color_space_index = supplement_data.get("color_space", 1)
+    color_space = cs_utils.decode_color_space(color_space_index)
+    if color_space == "sRGB":
+        colors = cs_utils.sRGB2linearRGB(colors)
+
+    gaussians = Gaussians3D(
+        mean_vectors=mean_vectors,
+        quaternions=quaternions,
+        singular_values=singular_values,
+        opacities=opacities,
+        colors=colors,
+    )
+
+    f_px = float(focal_length_px[0]) if hasattr(focal_length_px, '__getitem__') else float(focal_length_px)
+    return gaussians, f_px, (height, width)
+
+
 class SHARPModelLoader:
     """Load and cache SHARP model."""
 
@@ -327,7 +391,6 @@ class SHARPRenderViews:
             )
 
         try:
-            from sharp.utils.gaussians import load_ply
             from sharp.utils.camera import create_eye_trajectory, TrajectoryParams
             from sharp.cli.render import render_gaussians
         except ImportError:
@@ -337,7 +400,7 @@ class SHARPRenderViews:
             )
 
         # Load Gaussian splat
-        gaussians, f_px, (height, width) = load_ply(ply_path)
+        gaussians, f_px, (height, width) = load_ply_fixed(ply_path)
         gaussians = gaussians.cuda()
 
         # Create camera trajectory
@@ -466,7 +529,6 @@ class SHARPRenderVideo:
             )
 
         try:
-            from sharp.utils.gaussians import load_ply
             from sharp.utils.camera import create_eye_trajectory, TrajectoryParams
             from sharp.cli.render import render_gaussians
             import imageio
@@ -477,7 +539,7 @@ class SHARPRenderVideo:
             )
 
         # Load Gaussian splat
-        gaussians, f_px, (height, width) = load_ply(ply_path)
+        gaussians, f_px, (height, width) = load_ply_fixed(ply_path)
         gaussians = gaussians.cuda()
 
         # Create camera trajectory
