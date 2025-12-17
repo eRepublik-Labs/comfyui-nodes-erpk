@@ -391,8 +391,12 @@ class SHARPRenderViews:
             )
 
         try:
-            from sharp.utils.camera import create_eye_trajectory, TrajectoryParams
-            from sharp.cli.render import render_gaussians
+            from sharp.utils.camera import (
+                create_eye_trajectory,
+                create_camera_model,
+                TrajectoryParams,
+            )
+            from sharp.utils.gsplat import GSplatRenderer
         except ImportError:
             raise ImportError(
                 "SHARP is not installed. Install with:\n"
@@ -403,30 +407,57 @@ class SHARPRenderViews:
         gaussians, f_px, (height, width) = load_ply_fixed(ply_path)
         gaussians = gaussians.to(torch.device("cuda"))
 
+        # Build 4x4 intrinsics matrix
+        cx, cy = resolution / 2, resolution / 2
+        intrinsics = torch.tensor(
+            [
+                [f_px, 0, cx, 0],
+                [0, f_px, cy, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1],
+            ],
+            dtype=torch.float32,
+            device="cuda",
+        )
+
+        # Create camera model
+        camera_model = create_camera_model(
+            gaussians,
+            intrinsics,
+            (resolution, resolution),
+        )
+
         # Create camera trajectory
         trajectory_params = TrajectoryParams(
             max_disparity=max_disparity,
             num_steps=num_views,
         )
-        trajectory = create_eye_trajectory(
+        eye_positions = create_eye_trajectory(
             gaussians,
             trajectory_params,
             (resolution, resolution),
             f_px,
         )
 
+        # Create renderer
+        renderer = GSplatRenderer()
+
         # Render each view
         rendered_images = []
-        for i, camera_pose in enumerate(trajectory):
+        for eye_pos in eye_positions:
+            # Compute camera parameters for this viewpoint
+            camera_info = camera_model.compute(eye_pos)
+
             # Render frame
-            result = render_gaussians(
+            result = renderer.forward(
                 gaussians,
-                camera_pose,
-                f_px,
-                (resolution, resolution),
+                camera_info.extrinsics,
+                camera_info.intrinsics,
+                resolution,
+                resolution,
             )
-            # result["color"] is (H, W, 3) tensor
-            rendered_images.append(result["color"].cpu())
+            # result.color is (1, H, W, 3) tensor
+            rendered_images.append(result.color[0].cpu())
 
         # Stack into batch tensor (B, H, W, C)
         images_tensor = torch.stack(rendered_images, dim=0)
@@ -534,8 +565,12 @@ class SHARPRenderVideo:
             )
 
         try:
-            from sharp.utils.camera import create_eye_trajectory, TrajectoryParams
-            from sharp.cli.render import render_gaussians
+            from sharp.utils.camera import (
+                create_eye_trajectory,
+                create_camera_model,
+                TrajectoryParams,
+            )
+            from sharp.utils.gsplat import GSplatRenderer
             import imageio
         except ImportError:
             raise ImportError(
@@ -547,12 +582,32 @@ class SHARPRenderVideo:
         gaussians, f_px, (height, width) = load_ply_fixed(ply_path)
         gaussians = gaussians.to(torch.device("cuda"))
 
+        # Build 4x4 intrinsics matrix
+        cx, cy = resolution / 2, resolution / 2
+        intrinsics = torch.tensor(
+            [
+                [f_px, 0, cx, 0],
+                [0, f_px, cy, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1],
+            ],
+            dtype=torch.float32,
+            device="cuda",
+        )
+
+        # Create camera model
+        camera_model = create_camera_model(
+            gaussians,
+            intrinsics,
+            (resolution, resolution),
+        )
+
         # Create camera trajectory
         trajectory_params = TrajectoryParams(
             max_disparity=max_disparity,
             num_steps=num_frames,
         )
-        trajectory = create_eye_trajectory(
+        eye_positions = create_eye_trajectory(
             gaussians,
             trajectory_params,
             (resolution, resolution),
@@ -574,19 +629,26 @@ class SHARPRenderVideo:
                 break
             counter += 1
 
+        # Create renderer
+        renderer = GSplatRenderer()
+
         # Render and write video
         writer = imageio.get_writer(video_path, fps=fps)
 
-        for i, camera_pose in enumerate(trajectory):
+        for i, eye_pos in enumerate(eye_positions):
+            # Compute camera parameters for this viewpoint
+            camera_info = camera_model.compute(eye_pos)
+
             # Render frame
-            result = render_gaussians(
+            result = renderer.forward(
                 gaussians,
-                camera_pose,
-                f_px,
-                (resolution, resolution),
+                camera_info.extrinsics,
+                camera_info.intrinsics,
+                resolution,
+                resolution,
             )
             # Convert to uint8
-            frame = (result["color"].cpu().numpy() * 255).astype(np.uint8)
+            frame = (result.color[0].cpu().numpy() * 255).astype(np.uint8)
             writer.append_data(frame)
 
             if (i + 1) % 10 == 0:
