@@ -2,7 +2,7 @@
 ERPK ComfyUI Custom Nodes
 
 A collection of custom ComfyUI nodes from ERPK, including WaveSpeed AI, Claude API,
-Gemini API integrations, and background removal utilities.
+Gemini API integrations, background removal utilities, and Apple ML models.
 """
 
 # Initialize combined mappings
@@ -55,6 +55,17 @@ try:
     NODE_DISPLAY_NAME_MAPPINGS.update(BGREMOVAL_NODE_DISPLAY_NAME_MAPPINGS)
 except ImportError as e:
     print(f"[ERPK] Warning: Could not load Background Removal nodes: {e}")
+
+# Import and register Apple ML nodes
+try:
+    from .apple import (
+        NODE_CLASS_MAPPINGS as APPLE_NODE_CLASS_MAPPINGS,
+        NODE_DISPLAY_NAME_MAPPINGS as APPLE_NODE_DISPLAY_NAME_MAPPINGS
+    )
+    NODE_CLASS_MAPPINGS.update(APPLE_NODE_CLASS_MAPPINGS)
+    NODE_DISPLAY_NAME_MAPPINGS.update(APPLE_NODE_DISPLAY_NAME_MAPPINGS)
+except ImportError as e:
+    print(f"[ERPK] Warning: Could not load Apple ML nodes: {e}")
 
 # Print loaded nodes summary
 print(f"[ERPK] Loaded {len(NODE_CLASS_MAPPINGS)} total nodes")

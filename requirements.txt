@@ -27,3 +27,6 @@ transparent-background>=1.2.0
 # Background Removal - BiRefNet backend (HuggingFace transformers)
 transformers>=4.36.0
 torchvision>=0.16.0
+
+# Apple SHARP - Single-image to 3D Gaussian view synthesis
+sharp @ git+https://github.com/apple/ml-sharp.git

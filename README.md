@@ -34,6 +34,9 @@ ComfyUI-Custom-Nodes/
 │   ├── rembg_node.py              # rembg backend (14+ ONNX models)
 │   ├── inspyrenet_node.py         # InSPyReNet backend (PyTorch)
 │   └── birefnet_node.py           # BiRefNet backend (HuggingFace)
+├── apple/                         # Apple ML models integration
+│   ├── README.md                  # Package documentation
+│   └── sharp_nodes.py             # SHARP view synthesis nodes
 └── web/                           # Frontend extensions
     └── aspect_ratio.js            # Aspect ratio display in node titles
 ```
@@ -192,6 +195,29 @@ All nodes output:
 
 **Installation & Documentation:** See [bgremoval/README.md](bgremoval/README.md)
 
+### ERPK/Apple
+
+Apple ML models integration, currently featuring SHARP for single-image 3D view synthesis.
+
+**Category in ComfyUI:** `ERPK/Apple/SHARP`
+**Version:** 2025.12.18
+
+#### SHARP Nodes
+
+SHARP converts a single photograph into a 3D Gaussian splat representation that can be rendered from novel viewpoints.
+
+- **SHARP Predict** - Convert image to 3D Gaussian splat (.ply file)
+- **SHARP Render Views** - Render novel views from .ply (CUDA required)
+- **SHARP Render Video** - Render orbit video from .ply (CUDA required)
+
+**Key Features:**
+- Single-image to 3D in under 1 second on GPU
+- Outputs standard .ply Gaussian splat format
+- Novel view rendering with customizable camera paths
+- Video generation with orbit trajectories
+
+**Installation & Documentation:** See [apple/README.md](apple/README.md)
+
 ## Installation
 
 ### Method 1: ComfyUI Manager (Recommended)
@@ -233,8 +259,9 @@ Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishe
    - **Claude:** See [claude/README.md](claude/README.md#installation)
    - **Gemini:** See [gemini/README.md](gemini/README.md#installation)
    - **Background Removal:** No API keys required, models download automatically on first use
+   - **Apple/SHARP:** No API keys required. Install with: `pip install git+https://github.com/apple/ml-sharp.git`
 
-2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, `ERPK/Gemini`, and `ERPK/Background Removal`
+2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, `ERPK/Gemini`, `ERPK/Background Removal`, and `ERPK/Apple/SHARP`
 
 ## ComfyUI API Integration
 
