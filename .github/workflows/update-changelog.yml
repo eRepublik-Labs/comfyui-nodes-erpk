@@ -1,0 +1,98 @@
+# ABOUTME: GitHub Actions workflow for manually updating registry changelog
+# ABOUTME: Fetches release notes from GitHub release and pushes to ComfyUI Registry
+
+name: Update Registry Changelog
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to update (e.g., 2025.12.18). Leave empty to use pyproject.toml version.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  update-changelog:
+    name: Update Changelog on Registry
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'eRepublik-Labs' }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION=$(grep -E '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version: $VERSION"
+
+      - name: Fetch release notes from GitHub
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="v$VERSION"
+
+          echo "Fetching release notes for tag: $TAG"
+
+          # Get release body using gh CLI
+          RELEASE_BODY=$(gh release view "$TAG" --json body -q .body 2>/dev/null || echo "")
+
+          if [ -z "$RELEASE_BODY" ]; then
+            echo "No release found for $TAG"
+            echo "found=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Release notes found (${#RELEASE_BODY} chars)"
+          echo "found=true" >> $GITHUB_OUTPUT
+
+          # Save to file to preserve formatting
+          echo "$RELEASE_BODY" > release_notes.txt
+
+      - name: Update registry changelog
+        if: steps.release.outputs.found == 'true'
+        env:
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Read and escape release notes
+          ESCAPED_BODY=$(cat release_notes.txt | jq -Rs .)
+
+          echo "Updating changelog for version $VERSION..."
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X PUT "https://api.comfy.org/publishers/erpk/nodes/comfyui-nodes-erpk/versions/$VERSION" \
+            -H "Authorization: Bearer $REGISTRY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"changelog\": $ESCAPED_BODY}")
+
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP Status: $HTTP_STATUS"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "Changelog updated successfully!"
+          else
+            echo "Error updating changelog"
+            exit 1
+          fi
+
+      - name: No release found
+        if: steps.release.outputs.found != 'true'
+        run: |
+          echo "No GitHub release found for v${{ steps.version.outputs.version }}"
+          echo "Please create a release first: gh release create v${{ steps.version.outputs.version }}"
+          exit 1
