@@ -1,5 +1,5 @@
 # ABOUTME: GitHub Actions workflow for publishing to ComfyUI Registry
-# ABOUTME: Triggers on pyproject.toml changes or manual dispatch
+# ABOUTME: Triggers on pyproject.toml changes, releases, or manual dispatch
 
 name: Publish to Comfy Registry
 
@@ -10,9 +10,12 @@ on:
       - main
     paths:
       - "pyproject.toml"
+  release:
+    types: [published]
 
 permissions:
   issues: write
+  contents: read
 
 jobs:
   publish-node:
@@ -29,3 +32,45 @@ jobs:
         uses: Comfy-Org/publish-node-action@v1
         with:
           personal_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
+
+      - name: Update Registry Changelog
+        if: github.event_name == 'release'
+        env:
+          REGISTRY_TOKEN: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Extract version from pyproject.toml
+          VERSION=$(grep -E '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "Version: $VERSION"
+
+          # Get release notes from GitHub release
+          RELEASE_TAG="${{ github.event.release.tag_name }}"
+          RELEASE_BODY="${{ github.event.release.body }}"
+
+          echo "Release tag: $RELEASE_TAG"
+          echo "Release body length: ${#RELEASE_BODY}"
+
+          # Skip if no release body
+          if [ -z "$RELEASE_BODY" ]; then
+            echo "No release notes found, skipping changelog update"
+            exit 0
+          fi
+
+          # Escape JSON special characters
+          ESCAPED_BODY=$(echo "$RELEASE_BODY" | jq -Rs .)
+
+          # Update changelog via registry API
+          echo "Updating changelog for version $VERSION..."
+
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X PUT "https://api.comfy.org/publishers/erpk/nodes/comfyui-nodes-erpk/versions/$VERSION" \
+            -H "Authorization: Bearer $REGISTRY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"changelog\": $ESCAPED_BODY}")
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "Changelog updated successfully (HTTP $HTTP_STATUS)"
+          else
+            echo "Warning: Changelog update returned HTTP $HTTP_STATUS"
+            # Don't fail the workflow - publishing succeeded
+          fi
