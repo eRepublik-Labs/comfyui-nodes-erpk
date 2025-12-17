@@ -407,14 +407,16 @@ class SHARPRenderViews:
         gaussians, f_px, (height, width) = load_ply_fixed(ply_path)
         gaussians = gaussians.to(torch.device("cuda"))
 
-        # Build 4x4 intrinsics matrix
+        # Build 4x4 intrinsics matrix with batch dimension (1, 4, 4)
         cx, cy = resolution / 2, resolution / 2
         intrinsics = torch.tensor(
             [
-                [f_px, 0, cx, 0],
-                [0, f_px, cy, 0],
-                [0, 0, 1, 0],
-                [0, 0, 0, 1],
+                [
+                    [f_px, 0, cx, 0],
+                    [0, f_px, cy, 0],
+                    [0, 0, 1, 0],
+                    [0, 0, 0, 1],
+                ]
             ],
             dtype=torch.float32,
             device="cuda",
@@ -582,14 +584,16 @@ class SHARPRenderVideo:
         gaussians, f_px, (height, width) = load_ply_fixed(ply_path)
         gaussians = gaussians.to(torch.device("cuda"))
 
-        # Build 4x4 intrinsics matrix
+        # Build 4x4 intrinsics matrix with batch dimension (1, 4, 4)
         cx, cy = resolution / 2, resolution / 2
         intrinsics = torch.tensor(
             [
-                [f_px, 0, cx, 0],
-                [0, f_px, cy, 0],
-                [0, 0, 1, 0],
-                [0, 0, 0, 1],
+                [
+                    [f_px, 0, cx, 0],
+                    [0, f_px, cy, 0],
+                    [0, 0, 1, 0],
+                    [0, 0, 0, 1],
+                ]
             ],
             dtype=torch.float32,
             device="cuda",
