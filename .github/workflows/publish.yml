@@ -29,6 +29,8 @@ jobs:
           submodules: true
 
       - name: Publish Custom Node
+        # Skip on release trigger - push already published the version
+        if: github.event_name != 'release'
         uses: Comfy-Org/publish-node-action@v1
         with:
           personal_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
