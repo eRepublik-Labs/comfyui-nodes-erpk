@@ -407,20 +407,20 @@ class SHARPRenderViews:
         gaussians, f_px, (height, width) = load_ply_fixed(ply_path)
         gaussians = gaussians.to(torch.device("cuda"))
 
-        # Build 4x4 intrinsics matrix (no batch dim for create_camera_model)
+        # Build 3x3 intrinsics matrix (standard pinhole camera format)
+        # GSplatRenderer expects [B, 3, 3], CameraInfo returns (3, 3)
         cx, cy = resolution / 2, resolution / 2
         intrinsics = torch.tensor(
             [
-                [f_px, 0, cx, 0],
-                [0, f_px, cy, 0],
-                [0, 0, 1, 0],
-                [0, 0, 0, 1],
+                [f_px, 0, cx],
+                [0, f_px, cy],
+                [0, 0, 1],
             ],
             dtype=torch.float32,
             device="cuda",
         )
 
-        # Create camera model
+        # Create camera model (expects 3x3 intrinsics)
         camera_model = create_camera_model(
             gaussians,
             intrinsics,
@@ -446,9 +446,11 @@ class SHARPRenderViews:
         rendered_images = []
         for eye_pos in eye_positions:
             # Compute camera parameters for this viewpoint
+            # CameraInfo contains: intrinsics (3,3), extrinsics (4,4), width, height
             camera_info = camera_model.compute(eye_pos)
 
-            # Render frame (add batch dimension for renderer)
+            # Render frame
+            # GSplatRenderer.forward expects: extrinsics [B, 4, 4], intrinsics [B, 3, 3]
             result = renderer.forward(
                 gaussians,
                 camera_info.extrinsics.unsqueeze(0),
@@ -582,20 +584,20 @@ class SHARPRenderVideo:
         gaussians, f_px, (height, width) = load_ply_fixed(ply_path)
         gaussians = gaussians.to(torch.device("cuda"))
 
-        # Build 4x4 intrinsics matrix (no batch dim for create_camera_model)
+        # Build 3x3 intrinsics matrix (standard pinhole camera format)
+        # GSplatRenderer expects [B, 3, 3], CameraInfo returns (3, 3)
         cx, cy = resolution / 2, resolution / 2
         intrinsics = torch.tensor(
             [
-                [f_px, 0, cx, 0],
-                [0, f_px, cy, 0],
-                [0, 0, 1, 0],
-                [0, 0, 0, 1],
+                [f_px, 0, cx],
+                [0, f_px, cy],
+                [0, 0, 1],
             ],
             dtype=torch.float32,
             device="cuda",
         )
 
-        # Create camera model
+        # Create camera model (expects 3x3 intrinsics)
         camera_model = create_camera_model(
             gaussians,
             intrinsics,
@@ -637,9 +639,11 @@ class SHARPRenderVideo:
 
         for i, eye_pos in enumerate(eye_positions):
             # Compute camera parameters for this viewpoint
+            # CameraInfo contains: intrinsics (3,3), extrinsics (4,4), width, height
             camera_info = camera_model.compute(eye_pos)
 
-            # Render frame (add batch dimension for renderer)
+            # Render frame
+            # GSplatRenderer.forward expects: extrinsics [B, 4, 4], intrinsics [B, 3, 3]
             result = renderer.forward(
                 gaussians,
                 camera_info.extrinsics.unsqueeze(0),
