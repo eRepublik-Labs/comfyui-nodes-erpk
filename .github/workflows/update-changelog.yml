@@ -71,11 +71,11 @@ jobs:
 
           echo "Updating changelog for version $VERSION..."
 
+          # Token goes in request body, not header (per comfy-cli implementation)
           RESPONSE=$(curl -s -w "\n%{http_code}" \
             -X PUT "https://api.comfy.org/publishers/erpk/nodes/comfyui-nodes-erpk/versions/$VERSION" \
-            -H "Authorization: Bearer $REGISTRY_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"changelog\": $ESCAPED_BODY}")
+            -d "{\"personal_access_token\": \"$REGISTRY_TOKEN\", \"changelog\": $ESCAPED_BODY}")
 
           HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
