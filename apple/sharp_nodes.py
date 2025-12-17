@@ -401,7 +401,7 @@ class SHARPRenderViews:
 
         # Load Gaussian splat
         gaussians, f_px, (height, width) = load_ply_fixed(ply_path)
-        gaussians = gaussians.cuda()
+        gaussians = gaussians.to(torch.device("cuda"))
 
         # Create camera trajectory
         trajectory_params = TrajectoryParams(
@@ -540,7 +540,7 @@ class SHARPRenderVideo:
 
         # Load Gaussian splat
         gaussians, f_px, (height, width) = load_ply_fixed(ply_path)
-        gaussians = gaussians.cuda()
+        gaussians = gaussians.to(torch.device("cuda"))
 
         # Create camera trajectory
         trajectory_params = TrajectoryParams(
