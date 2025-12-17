@@ -29,6 +29,11 @@ ComfyUI-Custom-Nodes/
 │   ├── nodes.py                   # All Gemini nodes
 │   ├── veo_nodes.py               # Veo video generation nodes
 │   └── gemini_api/                # API integration layer
+├── bgremoval/                     # Background removal utilities
+│   ├── utils.py                   # Shared tensor/PIL conversion utilities
+│   ├── rembg_node.py              # rembg backend (14+ ONNX models)
+│   ├── inspyrenet_node.py         # InSPyReNet backend (PyTorch)
+│   └── birefnet_node.py           # BiRefNet backend (HuggingFace)
 └── web/                           # Frontend extensions
     └── aspect_ratio.js            # Aspect ratio display in node titles
 ```
@@ -130,6 +135,61 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 
 **Installation & Documentation:** See [gemini/README.md](gemini/README.md)
 
+### ERPK/Background Removal
+
+Background removal utilities with multiple backend options for different quality/speed/memory tradeoffs.
+
+**Category in ComfyUI:** `ERPK/Background Removal`
+
+#### Nodes
+
+- **Remove Background (rembg)** - ONNX-based with 14+ models including u2net, isnet, birefnet variants. Best for versatility and CPU support.
+- **Remove Background (InSPyReNet)** - PyTorch-based via transparent-background. Supports TorchScript JIT for faster inference.
+- **Remove Background (BiRefNet)** - HuggingFace transformers integration. Highest quality, supports HR images (2048x2048).
+
+#### Backend Comparison
+
+| Backend | Runtime | Speed | Quality | Memory | License |
+|---------|---------|-------|---------|--------|---------|
+| **rembg** | ONNX | Fast | Good | Low-Med | MIT |
+| **InSPyReNet** | PyTorch | Medium | Very Good | Medium | MIT |
+| **BiRefNet** | PyTorch/HF | Slower | Excellent | High | MIT |
+
+#### Available Models
+
+**rembg (14+ models):**
+- `u2net` - General purpose (default)
+- `u2netp` - Lightweight, faster
+- `u2net_human_seg` - Human segmentation
+- `u2net_cloth_seg` - Clothing parsing
+- `silueta` - Compact u2net (43MB)
+- `isnet-general-use` - General purpose ISNet
+- `isnet-anime` - Anime characters
+- `sam` - Segment Anything Model
+- `birefnet-general`, `birefnet-general-lite`, `birefnet-portrait`, `birefnet-dis`, `birefnet-hrsod`, `birefnet-cod`, `birefnet-massive`
+
+**BiRefNet variants:**
+- `ZhengPeng7/BiRefNet` - Default
+- `ZhengPeng7/BiRefNet_HR` - High resolution (2048x2048)
+- `ZhengPeng7/BiRefNet-matting` - Alpha matting
+- `ZhengPeng7/BiRefNet_HR-matting` - HR alpha matting
+- `ZhengPeng7/BiRefNet-COD` - Camouflaged object detection
+- `ZhengPeng7/BiRefNet_512x512` - Fast (lower resolution)
+
+#### Node Outputs
+
+All nodes output:
+- `IMAGE` - RGB image (background removed, composited on black)
+- `MASK` - Alpha mask for further compositing
+
+#### Features
+
+- Batch processing with progress display
+- Alpha matting refinement (rembg only)
+- Model caching to avoid reloading
+- GPU acceleration where available
+- Graceful fallback when dependencies missing
+
 ## Installation
 
 ### Method 1: ComfyUI Manager (Recommended)
@@ -170,8 +230,9 @@ Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishe
    - **WaveSpeed:** See [wavespeed/README.md](wavespeed/README.md#installation)
    - **Claude:** See [claude/README.md](claude/README.md#installation)
    - **Gemini:** See [gemini/README.md](gemini/README.md#installation)
+   - **Background Removal:** No API keys required, models download automatically on first use
 
-2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, and `ERPK/Gemini`
+2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, `ERPK/Gemini`, and `ERPK/Background Removal`
 
 ## ComfyUI API Integration
 
