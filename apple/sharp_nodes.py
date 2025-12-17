@@ -408,7 +408,12 @@ class SHARPRenderViews:
             max_disparity=max_disparity,
             num_steps=num_views,
         )
-        trajectory = create_eye_trajectory(trajectory_params)
+        trajectory = create_eye_trajectory(
+            gaussians,
+            trajectory_params,
+            (resolution, resolution),
+            f_px,
+        )
 
         # Render each view
         rendered_images = []
@@ -547,7 +552,12 @@ class SHARPRenderVideo:
             max_disparity=max_disparity,
             num_steps=num_frames,
         )
-        trajectory = create_eye_trajectory(trajectory_params)
+        trajectory = create_eye_trajectory(
+            gaussians,
+            trajectory_params,
+            (resolution, resolution),
+            f_px,
+        )
 
         # Determine output path
         if not output_dir:
