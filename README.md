@@ -190,6 +190,8 @@ All nodes output:
 - GPU acceleration where available
 - Graceful fallback when dependencies missing
 
+**Installation & Documentation:** See [bgremoval/README.md](bgremoval/README.md)
+
 ## Installation
 
 ### Method 1: ComfyUI Manager (Recommended)
