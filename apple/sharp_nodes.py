@@ -357,14 +357,14 @@ class SHARPRenderViews:
                         "tooltip": "Output image resolution.",
                     },
                 ),
-                "orbit_radius": (
+                "max_disparity": (
                     "FLOAT",
                     {
-                        "default": 0.3,
-                        "min": 0.05,
-                        "max": 2.0,
-                        "step": 0.05,
-                        "tooltip": "Camera orbit radius (distance from center).",
+                        "default": 0.08,
+                        "min": 0.01,
+                        "max": 0.5,
+                        "step": 0.01,
+                        "tooltip": "Maximum camera disparity for view synthesis.",
                     },
                 ),
             },
@@ -381,7 +381,7 @@ class SHARPRenderViews:
         ply_path: str,
         num_views: int = 8,
         resolution: int = 512,
-        orbit_radius: float = 0.3,
+        max_disparity: float = 0.08,
     ) -> Tuple[torch.Tensor]:
         """Render multiple views from Gaussian splat."""
         if not torch.cuda.is_available():
@@ -405,8 +405,8 @@ class SHARPRenderViews:
 
         # Create camera trajectory
         trajectory_params = TrajectoryParams(
-            radius=orbit_radius,
-            num_frames=num_views,
+            max_disparity=max_disparity,
+            num_steps=num_views,
         )
         trajectory = create_eye_trajectory(trajectory_params)
 
@@ -478,14 +478,14 @@ class SHARPRenderVideo:
                         "tooltip": "Frames per second.",
                     },
                 ),
-                "orbit_radius": (
+                "max_disparity": (
                     "FLOAT",
                     {
-                        "default": 0.3,
-                        "min": 0.05,
-                        "max": 2.0,
-                        "step": 0.05,
-                        "tooltip": "Camera orbit radius.",
+                        "default": 0.08,
+                        "min": 0.01,
+                        "max": 0.5,
+                        "step": 0.01,
+                        "tooltip": "Maximum camera disparity for view synthesis.",
                     },
                 ),
                 "output_dir": (
@@ -517,7 +517,7 @@ class SHARPRenderVideo:
         num_frames: int = 60,
         resolution: int = 512,
         fps: int = 30,
-        orbit_radius: float = 0.3,
+        max_disparity: float = 0.08,
         output_dir: str = "",
         filename_prefix: str = "sharp_video",
     ) -> Tuple[str]:
@@ -544,8 +544,8 @@ class SHARPRenderVideo:
 
         # Create camera trajectory
         trajectory_params = TrajectoryParams(
-            radius=orbit_radius,
-            num_frames=num_frames,
+            max_disparity=max_disparity,
+            num_steps=num_frames,
         )
         trajectory = create_eye_trajectory(trajectory_params)
 
