@@ -407,16 +407,14 @@ class SHARPRenderViews:
         gaussians, f_px, (height, width) = load_ply_fixed(ply_path)
         gaussians = gaussians.to(torch.device("cuda"))
 
-        # Build 4x4 intrinsics matrix with batch dimension (1, 4, 4)
+        # Build 4x4 intrinsics matrix (no batch dim for create_camera_model)
         cx, cy = resolution / 2, resolution / 2
         intrinsics = torch.tensor(
             [
-                [
-                    [f_px, 0, cx, 0],
-                    [0, f_px, cy, 0],
-                    [0, 0, 1, 0],
-                    [0, 0, 0, 1],
-                ]
+                [f_px, 0, cx, 0],
+                [0, f_px, cy, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1],
             ],
             dtype=torch.float32,
             device="cuda",
@@ -450,11 +448,11 @@ class SHARPRenderViews:
             # Compute camera parameters for this viewpoint
             camera_info = camera_model.compute(eye_pos)
 
-            # Render frame
+            # Render frame (add batch dimension for renderer)
             result = renderer.forward(
                 gaussians,
-                camera_info.extrinsics,
-                camera_info.intrinsics,
+                camera_info.extrinsics.unsqueeze(0),
+                camera_info.intrinsics.unsqueeze(0),
                 resolution,
                 resolution,
             )
@@ -584,16 +582,14 @@ class SHARPRenderVideo:
         gaussians, f_px, (height, width) = load_ply_fixed(ply_path)
         gaussians = gaussians.to(torch.device("cuda"))
 
-        # Build 4x4 intrinsics matrix with batch dimension (1, 4, 4)
+        # Build 4x4 intrinsics matrix (no batch dim for create_camera_model)
         cx, cy = resolution / 2, resolution / 2
         intrinsics = torch.tensor(
             [
-                [
-                    [f_px, 0, cx, 0],
-                    [0, f_px, cy, 0],
-                    [0, 0, 1, 0],
-                    [0, 0, 0, 1],
-                ]
+                [f_px, 0, cx, 0],
+                [0, f_px, cy, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1],
             ],
             dtype=torch.float32,
             device="cuda",
@@ -643,11 +639,11 @@ class SHARPRenderVideo:
             # Compute camera parameters for this viewpoint
             camera_info = camera_model.compute(eye_pos)
 
-            # Render frame
+            # Render frame (add batch dimension for renderer)
             result = renderer.forward(
                 gaussians,
-                camera_info.extrinsics,
-                camera_info.intrinsics,
+                camera_info.extrinsics.unsqueeze(0),
+                camera_info.intrinsics.unsqueeze(0),
                 resolution,
                 resolution,
             )
