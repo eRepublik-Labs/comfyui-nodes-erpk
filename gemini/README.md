@@ -90,6 +90,11 @@ General-purpose text generation and completion.
 - `model`: gemini-2.5-flash (default), gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash-lite
 - `temperature`: 0.0-2.0 (creativity level, default: 0.7)
 - `max_tokens`: 256-8192 (output length, default: 8192)
+- `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
+- `top_k`: 0-100 (top-k sampling, default: 40, set 0 to disable)
+- `stop_sequences`: Newline-separated sequences where generation stops
+- `response_mime_type`: Output format - "default", "text/plain", or "application/json"
+- `response_schema`: JSON schema for structured output (used with application/json)
 
 **Outputs:**
 - `response`: Generated text
@@ -99,6 +104,7 @@ General-purpose text generation and completion.
 - Creative writing
 - Content generation
 - Text transformation
+- **JSON mode**: Set response_mime_type to "application/json" for structured data extraction
 
 ---
 
@@ -113,6 +119,11 @@ Multi-turn conversation with message history preservation.
 - `reset_conversation`: Start new conversation (default: false)
 - `temperature`: 0.0-2.0 (default: 0.7)
 - `max_tokens`: 256-8192 (default: 8192)
+- `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
+- `top_k`: 0-100 (top-k sampling, default: 40, set 0 to disable)
+- `stop_sequences`: Newline-separated sequences where generation stops
+- `response_mime_type`: Output format - "default", "text/plain", or "application/json"
+- `response_schema`: JSON schema for structured output (used with application/json)
 
 **Outputs:**
 - `response`: Chat response
@@ -122,6 +133,7 @@ Multi-turn conversation with message history preservation.
 - Maintains conversation context automatically
 - Connect multiple chat nodes to continue conversations
 - Reset conversation to start fresh
+- Supports JSON mode for structured responses in conversations
 
 ---
 
@@ -135,6 +147,11 @@ Analyze images with questions or instructions.
 - `model`: gemini-2.5-flash (default), gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash-lite
 - `max_tokens`: 256-8192 (default: 8192)
 - `temperature`: 0.0-2.0 (default: 0.4, lower for more factual)
+- `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
+- `top_k`: 0-100 (top-k sampling, default: 40, set 0 to disable)
+- `stop_sequences`: Newline-separated sequences where generation stops
+- `response_mime_type`: Output format - "default", "text/plain", or "application/json"
+- `response_schema`: JSON schema for structured output (used with application/json)
 
 **Outputs:**
 - `analysis`: Text analysis of the image(s)
@@ -145,6 +162,7 @@ Analyze images with questions or instructions.
 - Object detection and counting
 - Scene analysis
 - Text extraction from images
+- **Structured extraction**: Use JSON mode to extract structured data from images (e.g., product info, receipts, forms)
 
 ---
 
@@ -156,18 +174,24 @@ Generate images from text descriptions using Gemini's image generation models.
 - `client`: Optional Gemini API client (from Gemini API Config node)
 - `model`: gemini-2.5-flash-image (fast, recommended) or gemini-3-pro-image-preview (best quality)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
-- `aspect_ratio`: Image dimensions - "default", "1:1" (square), "9:16" (portrait), "16:9" (landscape), "4:3", "3:4"
+- `aspect_ratio`: Image dimensions - "default", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"
+- `image_size`: Resolution - "default", "1K", "2K", "4K" (only for gemini-3-pro-image-preview, 2.5-flash always 1024px)
+- `response_modalities`: "IMAGE" (image only) or "TEXT+IMAGE" (image + text description)
+- `enable_google_search`: Enable Google Search grounding (only for gemini-3-pro-image-preview)
 - `api_key`: Optional API key (only needed if not using client input)
 
 **Outputs:**
 - `image`: Generated image (ComfyUI IMAGE tensor)
+- `description`: Text description (only when response_modalities is TEXT+IMAGE)
 
 **Features:**
 - Works with Gemini API Config node or standalone with API key
 - Direct image output compatible with all ComfyUI image nodes
 - Model selector for different image generation models
 - Configurable creativity with temperature
-- Aspect ratio control for specific dimensions
+- Full aspect ratio support (10 options)
+- Resolution control with gemini-3-pro (1K/2K/4K)
+- Google Search grounding for factually accurate images
 
 **Example Prompts:**
 - "A futuristic cityscape at sunset with flying cars"
@@ -187,18 +211,24 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 - `client`: Optional Gemini API client (from Gemini API Config node)
 - `model`: gemini-2.5-flash-image (fast, recommended) or gemini-3-pro-image-preview (best quality)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
-- `aspect_ratio`: Image dimensions - "default", "1:1" (square), "9:16" (portrait), "16:9" (landscape), "4:3", "3:4"
+- `aspect_ratio`: Image dimensions - "default", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"
+- `image_size`: Resolution - "default", "1K", "2K", "4K" (only for gemini-3-pro-image-preview, 2.5-flash always 1024px)
+- `response_modalities`: "IMAGE" (image only) or "TEXT+IMAGE" (image + text description)
+- `enable_google_search`: Enable Google Search grounding (only for gemini-3-pro-image-preview)
 - `api_key`: Optional API key (only needed if not using client input)
 
 **Outputs:**
 - `image`: Edited image (ComfyUI IMAGE tensor)
+- `description`: Text description (only when response_modalities is TEXT+IMAGE)
 
 **Features:**
 - Works with Gemini API Config node or standalone with API key
 - Supports 1-3 input images for best results (API optimized for this range)
 - Image-to-image editing with natural language instructions
 - Compatible with all ComfyUI image nodes
-- Aspect ratio control for specific output dimensions
+- Full aspect ratio support (10 options)
+- Resolution control with gemini-3-pro (1K/2K/4K)
+- Google Search grounding for factual accuracy in edits
 
 **Example Use Cases:**
 - "Add a wizard hat to this cat"
