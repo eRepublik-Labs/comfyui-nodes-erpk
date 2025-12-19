@@ -117,6 +117,49 @@ class GeminiTextGeneration:
                         "tooltip": "Maximum length of response"
                     }
                 ),
+                "top_p": (
+                    "FLOAT",
+                    {
+                        "default": 0.95,
+                        "min": 0.0,
+                        "max": 1.0,
+                        "step": 0.05,
+                        "tooltip": "Nucleus sampling - cumulative probability threshold (0.0=disabled)"
+                    }
+                ),
+                "top_k": (
+                    "INT",
+                    {
+                        "default": 40,
+                        "min": 0,
+                        "max": 100,
+                        "step": 1,
+                        "tooltip": "Top-k sampling - limit token selection (0=disabled)"
+                    }
+                ),
+                "stop_sequences": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "multiline": True,
+                        "tooltip": "Stop generation at these sequences (one per line, leave empty to disable)"
+                    }
+                ),
+                "response_mime_type": (
+                    ["default", "text/plain", "application/json"],
+                    {
+                        "default": "default",
+                        "tooltip": "Output format (use application/json for JSON mode)"
+                    }
+                ),
+                "response_schema": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "multiline": True,
+                        "tooltip": "JSON schema for structured output (only used with application/json, leave empty for free-form JSON)"
+                    }
+                ),
             }
         }
 
@@ -136,7 +179,12 @@ class GeminiTextGeneration:
         prompt: str,
         model: str = None,
         temperature: float = 0.7,
-        max_tokens: int = 8192
+        max_tokens: int = 8192,
+        top_p: float = 0.95,
+        top_k: int = 40,
+        stop_sequences: str = "",
+        response_mime_type: str = "default",
+        response_schema: str = ""
     ):
         """
         Generate text using Gemini.
@@ -147,6 +195,11 @@ class GeminiTextGeneration:
             model: Gemini model to use
             temperature: Creativity level
             max_tokens: Max output tokens
+            top_p: Nucleus sampling threshold (0.0 to disable)
+            top_k: Top-k sampling limit (0 to disable)
+            stop_sequences: Newline-separated stop sequences
+            response_mime_type: Output format (default/text/plain/application/json)
+            response_schema: JSON schema for structured output
 
         Returns:
             Tuple containing generated text
@@ -158,12 +211,31 @@ class GeminiTextGeneration:
         if model is None:
             model = GeminiClient.DEFAULT_MODEL
 
+        # Parse stop sequences (one per line)
+        stop_seq_list = None
+        if stop_sequences and stop_sequences.strip():
+            stop_seq_list = [s.strip() for s in stop_sequences.strip().split('\n') if s.strip()]
+
+        # Parse response schema if provided
+        schema_obj = None
+        if response_schema and response_schema.strip():
+            import json
+            try:
+                schema_obj = json.loads(response_schema.strip())
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON schema: {str(e)}")
+
         try:
             response = client.generate_content(
                 prompt=prompt.strip(),
                 max_tokens=max_tokens,
                 temperature=temperature,
-                model=model
+                model=model,
+                top_p=top_p if top_p > 0.0 else None,
+                top_k=top_k if top_k > 0 else None,
+                stop_sequences=stop_seq_list,
+                response_mime_type=response_mime_type if response_mime_type != "default" else None,
+                response_schema=schema_obj
             )
 
             if response.get("blocked", False):
@@ -249,6 +321,49 @@ class GeminiChat:
                         "tooltip": "Maximum length of response"
                     }
                 ),
+                "top_p": (
+                    "FLOAT",
+                    {
+                        "default": 0.95,
+                        "min": 0.0,
+                        "max": 1.0,
+                        "step": 0.05,
+                        "tooltip": "Nucleus sampling - cumulative probability threshold (0.0=disabled)"
+                    }
+                ),
+                "top_k": (
+                    "INT",
+                    {
+                        "default": 40,
+                        "min": 0,
+                        "max": 100,
+                        "step": 1,
+                        "tooltip": "Top-k sampling - limit token selection (0=disabled)"
+                    }
+                ),
+                "stop_sequences": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "multiline": True,
+                        "tooltip": "Stop generation at these sequences (one per line, leave empty to disable)"
+                    }
+                ),
+                "response_mime_type": (
+                    ["default", "text/plain", "application/json"],
+                    {
+                        "default": "default",
+                        "tooltip": "Output format (use application/json for JSON mode)"
+                    }
+                ),
+                "response_schema": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "multiline": True,
+                        "tooltip": "JSON schema for structured output (only used with application/json, leave empty for free-form JSON)"
+                    }
+                ),
             }
         }
 
@@ -270,7 +385,12 @@ class GeminiChat:
         chat_session=None,
         reset_conversation: bool = False,
         temperature: float = 0.7,
-        max_tokens: int = 8192
+        max_tokens: int = 8192,
+        top_p: float = 0.95,
+        top_k: int = 40,
+        stop_sequences: str = "",
+        response_mime_type: str = "default",
+        response_schema: str = ""
     ):
         """
         Continue or start a conversation with Gemini.
@@ -283,6 +403,11 @@ class GeminiChat:
             reset_conversation: Start new conversation
             temperature: Creativity level
             max_tokens: Max output tokens
+            top_p: Nucleus sampling threshold (0.0 to disable)
+            top_k: Top-k sampling limit (0 to disable)
+            stop_sequences: Newline-separated stop sequences
+            response_mime_type: Output format (default/text/plain/application/json)
+            response_schema: JSON schema for structured output
 
         Returns:
             Tuple containing (response text, chat session)
@@ -304,10 +429,38 @@ class GeminiChat:
 
             # Send message and get response
             from google.genai import types
-            config = types.GenerateContentConfig(
-                max_output_tokens=max_tokens,
-                temperature=temperature
-            )
+            import json
+
+            # Parse stop sequences (one per line)
+            stop_seq_list = None
+            if stop_sequences and stop_sequences.strip():
+                stop_seq_list = [s.strip() for s in stop_sequences.strip().split('\n') if s.strip()]
+
+            # Parse response schema if provided
+            schema_obj = None
+            if response_schema and response_schema.strip():
+                try:
+                    schema_obj = json.loads(response_schema.strip())
+                except json.JSONDecodeError as e:
+                    raise ValueError(f"Invalid JSON schema: {str(e)}")
+
+            # Build config with optional sampling parameters
+            config_params = {
+                "max_output_tokens": max_tokens,
+                "temperature": temperature,
+            }
+            if top_p > 0.0:
+                config_params["top_p"] = top_p
+            if top_k > 0:
+                config_params["top_k"] = top_k
+            if stop_seq_list:
+                config_params["stop_sequences"] = stop_seq_list
+            if response_mime_type != "default":
+                config_params["response_mime_type"] = response_mime_type
+            if schema_obj:
+                config_params["response_schema"] = schema_obj
+
+            config = types.GenerateContentConfig(**config_params)
             response = chat_session.send_message(
                 prompt.strip(),
                 config=config
@@ -384,6 +537,49 @@ class GeminiVision:
                         "tooltip": "Creativity level (lower=more factual)"
                     }
                 ),
+                "top_p": (
+                    "FLOAT",
+                    {
+                        "default": 0.95,
+                        "min": 0.0,
+                        "max": 1.0,
+                        "step": 0.05,
+                        "tooltip": "Nucleus sampling - cumulative probability threshold (0.0=disabled)"
+                    }
+                ),
+                "top_k": (
+                    "INT",
+                    {
+                        "default": 40,
+                        "min": 0,
+                        "max": 100,
+                        "step": 1,
+                        "tooltip": "Top-k sampling - limit token selection (0=disabled)"
+                    }
+                ),
+                "stop_sequences": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "multiline": True,
+                        "tooltip": "Stop generation at these sequences (one per line, leave empty to disable)"
+                    }
+                ),
+                "response_mime_type": (
+                    ["default", "text/plain", "application/json"],
+                    {
+                        "default": "default",
+                        "tooltip": "Output format (use application/json for JSON mode)"
+                    }
+                ),
+                "response_schema": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "multiline": True,
+                        "tooltip": "JSON schema for structured output (only used with application/json, leave empty for free-form JSON)"
+                    }
+                ),
             }
         }
 
@@ -404,7 +600,12 @@ class GeminiVision:
         prompt: str,
         model: str = None,
         max_tokens: int = 8192,
-        temperature: float = 0.4
+        temperature: float = 0.4,
+        top_p: float = 0.95,
+        top_k: int = 40,
+        stop_sequences: str = "",
+        response_mime_type: str = "default",
+        response_schema: str = ""
     ):
         """
         Analyze image(s) using Gemini's vision capabilities.
@@ -416,6 +617,11 @@ class GeminiVision:
             model: Gemini model to use
             max_tokens: Max output tokens
             temperature: Creativity level
+            top_p: Nucleus sampling threshold (0.0 to disable)
+            top_k: Top-k sampling limit (0 to disable)
+            stop_sequences: Newline-separated stop sequences
+            response_mime_type: Output format (default/text/plain/application/json)
+            response_schema: JSON schema for structured output
 
         Returns:
             Tuple containing analysis text
@@ -431,13 +637,32 @@ class GeminiVision:
             pil_images = ImageConverter.tensors_to_pil_list(image)
             print(f"[Gemini] Analyzing {len(pil_images)} image(s)")
 
+            # Parse stop sequences (one per line)
+            stop_seq_list = None
+            if stop_sequences and stop_sequences.strip():
+                stop_seq_list = [s.strip() for s in stop_sequences.strip().split('\n') if s.strip()]
+
+            # Parse response schema if provided
+            schema_obj = None
+            if response_schema and response_schema.strip():
+                import json
+                try:
+                    schema_obj = json.loads(response_schema.strip())
+                except json.JSONDecodeError as e:
+                    raise ValueError(f"Invalid JSON schema: {str(e)}")
+
             # Generate content with images
             response = client.generate_content(
                 prompt=prompt.strip(),
                 images=pil_images,
                 max_tokens=max_tokens,
                 temperature=temperature,
-                model=model
+                model=model,
+                top_p=top_p if top_p > 0.0 else None,
+                top_k=top_k if top_k > 0 else None,
+                stop_sequences=stop_seq_list,
+                response_mime_type=response_mime_type if response_mime_type != "default" else None,
+                response_schema=schema_obj
             )
 
             if response.get("blocked", False):
@@ -689,6 +914,20 @@ class GeminiImageGeneration:
                         "tooltip": "Image resolution (only for gemini-3-pro-image-preview; 2.5-flash always uses 1024px)"
                     }
                 ),
+                "response_modalities": (
+                    ["IMAGE", "TEXT+IMAGE"],
+                    {
+                        "default": "IMAGE",
+                        "tooltip": "What to return - image only or both text description and image"
+                    }
+                ),
+                "enable_google_search": (
+                    "BOOLEAN",
+                    {
+                        "default": False,
+                        "tooltip": "Enable Google Search grounding (only for gemini-3-pro-image-preview)"
+                    }
+                ),
                 "api_key": (
                     "STRING",
                     {
@@ -699,8 +938,8 @@ class GeminiImageGeneration:
             }
         }
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("image", "description")
     FUNCTION = "generate_image"
     CATEGORY = "ERPK/Gemini"
 
@@ -717,6 +956,8 @@ class GeminiImageGeneration:
         temperature: float = 1.0,
         aspect_ratio: str = "default",
         image_size: str = "default",
+        response_modalities: str = "IMAGE",
+        enable_google_search: bool = False,
         api_key: str = "",
     ):
         """
@@ -729,10 +970,12 @@ class GeminiImageGeneration:
             temperature: Creativity level
             aspect_ratio: Image aspect ratio
             image_size: Image resolution (1K/2K/4K, only for gemini-3-pro-image-preview)
+            response_modalities: Return image only or image+text description
+            enable_google_search: Enable Google Search grounding (gemini-3-pro only)
             api_key: Optional API key (fallback if no client)
 
         Returns:
-            Tuple containing generated image tensor
+            Tuple containing (image tensor, description text)
         """
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -771,6 +1014,17 @@ class GeminiImageGeneration:
                 temperature=temperature,
             )
 
+            # Set response modalities
+            if response_modalities == "TEXT+IMAGE":
+                config.response_modalities = ["TEXT", "IMAGE"]
+            else:
+                config.response_modalities = ["IMAGE"]
+
+            # Enable Google Search if requested (only for gemini-3-pro)
+            if enable_google_search and model == "gemini-3-pro-image-preview":
+                config.tools = [{"google_search": {}}]
+                print(f"[Gemini] Google Search grounding enabled")
+
             # Build image config if needed
             image_config_params = {}
             if aspect_ratio != "default":
@@ -788,9 +1042,16 @@ class GeminiImageGeneration:
                 config=config
             )
 
-            # Extract image from response
+            # Extract image and text from response
             image_tensor = None
+            description_text = ""
+
             for part in response.candidates[0].content.parts:
+                # Extract text if present
+                if hasattr(part, 'text') and part.text:
+                    description_text = part.text
+
+                # Extract image
                 if hasattr(part, 'inline_data') and part.inline_data is not None:
                     image_data = part.inline_data.data
 
@@ -802,7 +1063,6 @@ class GeminiImageGeneration:
                     if isinstance(image_data, bytes):
                         image_tensor = ImageConverter.bytes_to_tensor(image_data)
                         print(f"[Gemini] Image generated successfully: {image_tensor.shape}")
-                        break
                     elif isinstance(image_data, str):
                         # Handle base64 string if needed
                         import base64
@@ -810,7 +1070,6 @@ class GeminiImageGeneration:
                         if len(decoded_data) > 0:
                             image_tensor = ImageConverter.bytes_to_tensor(decoded_data)
                             print(f"[Gemini] Image generated successfully: {image_tensor.shape}")
-                            break
 
             if image_tensor is None:
                 # Provide helpful error message based on what we found
@@ -833,7 +1092,10 @@ class GeminiImageGeneration:
 
                 raise ValueError(" ".join(error_parts))
 
-            return (image_tensor,)
+            if description_text:
+                print(f"[Gemini] Also got description: {description_text[:100]}...")
+
+            return (image_tensor, description_text)
 
         except Exception as e:
             error_msg = f"Failed to generate image: {str(e)}"
@@ -909,6 +1171,20 @@ class GeminiImageEdit:
                         "tooltip": "Image resolution (only for gemini-3-pro-image-preview; 2.5-flash always uses 1024px)"
                     }
                 ),
+                "response_modalities": (
+                    ["IMAGE", "TEXT+IMAGE"],
+                    {
+                        "default": "IMAGE",
+                        "tooltip": "What to return - image only or both text description and image"
+                    }
+                ),
+                "enable_google_search": (
+                    "BOOLEAN",
+                    {
+                        "default": False,
+                        "tooltip": "Enable Google Search grounding (only for gemini-3-pro-image-preview)"
+                    }
+                ),
                 "api_key": (
                     "STRING",
                     {
@@ -919,8 +1195,8 @@ class GeminiImageEdit:
             }
         }
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
+    RETURN_TYPES = ("IMAGE", "STRING")
+    RETURN_NAMES = ("image", "description")
     FUNCTION = "edit_image"
     CATEGORY = "ERPK/Gemini"
 
@@ -938,6 +1214,8 @@ class GeminiImageEdit:
         temperature: float = 1.0,
         aspect_ratio: str = "default",
         image_size: str = "default",
+        response_modalities: str = "IMAGE",
+        enable_google_search: bool = False,
         api_key: str = "",
     ):
         """
@@ -951,10 +1229,12 @@ class GeminiImageEdit:
             temperature: Creativity level
             aspect_ratio: Image aspect ratio
             image_size: Image resolution (1K/2K/4K, only for gemini-3-pro-image-preview)
+            response_modalities: Return image only or image+text description
+            enable_google_search: Enable Google Search grounding (gemini-3-pro only)
             api_key: Optional API key (fallback if no client)
 
         Returns:
-            Tuple containing edited image tensor
+            Tuple containing (edited image tensor, description text)
         """
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -1002,6 +1282,17 @@ class GeminiImageEdit:
                 temperature=temperature,
             )
 
+            # Set response modalities
+            if response_modalities == "TEXT+IMAGE":
+                config.response_modalities = ["TEXT", "IMAGE"]
+            else:
+                config.response_modalities = ["IMAGE"]
+
+            # Enable Google Search if requested (only for gemini-3-pro)
+            if enable_google_search and model == "gemini-3-pro-image-preview":
+                config.tools = [{"google_search": {}}]
+                print(f"[Gemini] Google Search grounding enabled")
+
             # Build image config if needed
             image_config_params = {}
             if aspect_ratio != "default":
@@ -1022,9 +1313,16 @@ class GeminiImageEdit:
                 config=config
             )
 
-            # Extract image from response
+            # Extract image and text from response
             image_tensor = None
+            description_text = ""
+
             for part in response.candidates[0].content.parts:
+                # Extract text if present
+                if hasattr(part, 'text') and part.text:
+                    description_text = part.text
+
+                # Extract image
                 if hasattr(part, 'inline_data') and part.inline_data is not None:
                     image_data = part.inline_data.data
 
@@ -1036,7 +1334,6 @@ class GeminiImageEdit:
                     if isinstance(image_data, bytes):
                         image_tensor = ImageConverter.bytes_to_tensor(image_data)
                         print(f"[Gemini] Image edited successfully: {image_tensor.shape}")
-                        break
                     elif isinstance(image_data, str):
                         # Handle base64 string if needed
                         import base64
@@ -1044,7 +1341,6 @@ class GeminiImageEdit:
                         if len(decoded_data) > 0:
                             image_tensor = ImageConverter.bytes_to_tensor(decoded_data)
                             print(f"[Gemini] Image edited successfully: {image_tensor.shape}")
-                            break
 
             if image_tensor is None:
                 # Provide helpful error message
@@ -1067,7 +1363,10 @@ class GeminiImageEdit:
 
                 raise ValueError(" ".join(error_parts))
 
-            return (image_tensor,)
+            if description_text:
+                print(f"[Gemini] Also got description: {description_text[:100]}...")
+
+            return (image_tensor, description_text)
 
         except Exception as e:
             error_msg = f"Failed to edit image: {str(e)}"

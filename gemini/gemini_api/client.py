@@ -128,6 +128,11 @@ class GeminiClient:
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         model: Optional[str] = None,
+        top_p: Optional[float] = None,
+        top_k: Optional[int] = None,
+        stop_sequences: Optional[List[str]] = None,
+        response_mime_type: Optional[str] = None,
+        response_schema: Optional[Dict] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -139,6 +144,11 @@ class GeminiClient:
             max_tokens: Maximum tokens to generate
             temperature: Sampling temperature (0.0-2.0)
             model: Optional model override (uses client default if not specified)
+            top_p: Nucleus sampling threshold (None to disable)
+            top_k: Top-k sampling limit (None to disable)
+            stop_sequences: List of sequences where generation stops
+            response_mime_type: Output format (e.g., "application/json")
+            response_schema: JSON schema dict for structured output
             **kwargs: Additional parameters
 
         Returns:
@@ -149,10 +159,26 @@ class GeminiClient:
         model_to_use = model or self.model_name
 
         # Build generation config
-        config = types.GenerateContentConfig(
-            max_output_tokens=max_tokens,
-            temperature=temperature,
-        )
+        config_params = {
+            "max_output_tokens": max_tokens,
+            "temperature": temperature,
+        }
+
+        # Add optional sampling parameters
+        if top_p is not None:
+            config_params["top_p"] = top_p
+        if top_k is not None:
+            config_params["top_k"] = top_k
+        if stop_sequences is not None:
+            config_params["stop_sequences"] = stop_sequences
+
+        # Add JSON mode parameters
+        if response_mime_type is not None:
+            config_params["response_mime_type"] = response_mime_type
+        if response_schema is not None:
+            config_params["response_schema"] = response_schema
+
+        config = types.GenerateContentConfig(**config_params)
 
         # Add system instruction if set
         if self.system_instruction:
