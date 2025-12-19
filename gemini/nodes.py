@@ -676,10 +676,17 @@ class GeminiImageGeneration:
                     }
                 ),
                 "aspect_ratio": (
-                    ["default", "1:1", "9:16", "16:9", "4:3", "3:4"],
+                    ["default", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"],
                     {
                         "default": "default",
                         "tooltip": "Image aspect ratio (default uses model's default)"
+                    }
+                ),
+                "image_size": (
+                    ["default", "1K", "2K", "4K"],
+                    {
+                        "default": "default",
+                        "tooltip": "Image resolution (only for gemini-3-pro-image-preview; 2.5-flash always uses 1024px)"
                     }
                 ),
                 "api_key": (
@@ -709,6 +716,7 @@ class GeminiImageGeneration:
         model: str = "gemini-2.5-flash-image",
         temperature: float = 1.0,
         aspect_ratio: str = "default",
+        image_size: str = "default",
         api_key: str = "",
     ):
         """
@@ -720,6 +728,7 @@ class GeminiImageGeneration:
             model: Image generation model to use
             temperature: Creativity level
             aspect_ratio: Image aspect ratio
+            image_size: Image resolution (1K/2K/4K, only for gemini-3-pro-image-preview)
             api_key: Optional API key (fallback if no client)
 
         Returns:
@@ -752,6 +761,8 @@ class GeminiImageGeneration:
             print(f"[Gemini] Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
             if aspect_ratio != "default":
                 print(f"[Gemini] Aspect ratio: {aspect_ratio}")
+            if image_size != "default":
+                print(f"[Gemini] Image size: {image_size}")
 
             # Build generation config
             from google.genai import types
@@ -760,9 +771,15 @@ class GeminiImageGeneration:
                 temperature=temperature,
             )
 
-            # Add aspect ratio if specified
+            # Build image config if needed
+            image_config_params = {}
             if aspect_ratio != "default":
-                config.image_config = types.ImageConfig(aspect_ratio=aspect_ratio)
+                image_config_params["aspect_ratio"] = aspect_ratio
+            if image_size != "default" and model == "gemini-3-pro-image-preview":
+                image_config_params["image_size"] = image_size
+
+            if image_config_params:
+                config.image_config = types.ImageConfig(**image_config_params)
 
             # Generate content using NEW SDK
             response = image_client.client.models.generate_content(
@@ -879,10 +896,17 @@ class GeminiImageEdit:
                     }
                 ),
                 "aspect_ratio": (
-                    ["default", "1:1", "9:16", "16:9", "4:3", "3:4"],
+                    ["default", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"],
                     {
                         "default": "default",
                         "tooltip": "Image aspect ratio (default uses model's default)"
+                    }
+                ),
+                "image_size": (
+                    ["default", "1K", "2K", "4K"],
+                    {
+                        "default": "default",
+                        "tooltip": "Image resolution (only for gemini-3-pro-image-preview; 2.5-flash always uses 1024px)"
                     }
                 ),
                 "api_key": (
@@ -913,6 +937,7 @@ class GeminiImageEdit:
         model: str = "gemini-2.5-flash-image",
         temperature: float = 1.0,
         aspect_ratio: str = "default",
+        image_size: str = "default",
         api_key: str = "",
     ):
         """
@@ -925,6 +950,7 @@ class GeminiImageEdit:
             model: Image generation model to use
             temperature: Creativity level
             aspect_ratio: Image aspect ratio
+            image_size: Image resolution (1K/2K/4K, only for gemini-3-pro-image-preview)
             api_key: Optional API key (fallback if no client)
 
         Returns:
@@ -962,6 +988,8 @@ class GeminiImageEdit:
             print(f"[Gemini] Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
             if aspect_ratio != "default":
                 print(f"[Gemini] Aspect ratio: {aspect_ratio}")
+            if image_size != "default":
+                print(f"[Gemini] Image size: {image_size}")
 
             # Warn if using more than 3 images (API works best with 1-3)
             if num_images > 3:
@@ -974,9 +1002,15 @@ class GeminiImageEdit:
                 temperature=temperature,
             )
 
-            # Add aspect ratio if specified
+            # Build image config if needed
+            image_config_params = {}
             if aspect_ratio != "default":
-                config.image_config = types.ImageConfig(aspect_ratio=aspect_ratio)
+                image_config_params["aspect_ratio"] = aspect_ratio
+            if image_size != "default" and model == "gemini-3-pro-image-preview":
+                image_config_params["image_size"] = image_size
+
+            if image_config_params:
+                config.image_config = types.ImageConfig(**image_config_params)
 
             # Build content list: images first, then prompt
             contents = pil_images + [prompt.strip()]
