@@ -53,7 +53,10 @@ def load_ply_fixed(path):
         [vertex_data["scale_0"], vertex_data["scale_1"], vertex_data["scale_2"]], axis=-1
     )
     opacity_logits = vertex_data["opacity"]
-    colors = np.stack([vertex_data["f_dc_0"], vertex_data["f_dc_1"], vertex_data["f_dc_2"]], axis=-1)
+    # f_dc values are degree-0 spherical harmonics, need conversion to RGB
+    sh0 = np.stack([vertex_data["f_dc_0"], vertex_data["f_dc_1"], vertex_data["f_dc_2"]], axis=-1)
+    coeff_degree0 = np.sqrt(1.0 / (4.0 * np.pi))
+    colors = sh0 * coeff_degree0 + 0.5
 
     # Parse supplement data
     supplement_data = {}
