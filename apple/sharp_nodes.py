@@ -464,10 +464,12 @@ class SHARPRenderViews:
 
             # Render frame
             # GSplatRenderer.forward expects: extrinsics [B, 4, 4], intrinsics [B, 3, 3]
+            # Note: SHARP's camera.compute() may return CPU tensors due to internal
+            # torch.tensor() calls without device= arg, so we explicitly move to CUDA
             result = renderer.forward(
                 gaussians,
-                camera_info.extrinsics.unsqueeze(0),
-                camera_info.intrinsics.unsqueeze(0),
+                camera_info.extrinsics.unsqueeze(0).cuda(),
+                camera_info.intrinsics.unsqueeze(0).cuda(),
                 resolution,
                 resolution,
             )
@@ -670,10 +672,12 @@ class SHARPRenderVideo:
 
             # Render frame
             # GSplatRenderer.forward expects: extrinsics [B, 4, 4], intrinsics [B, 3, 3]
+            # Note: SHARP's camera.compute() may return CPU tensors due to internal
+            # torch.tensor() calls without device= arg, so we explicitly move to CUDA
             result = renderer.forward(
                 gaussians,
-                camera_info.extrinsics.unsqueeze(0),
-                camera_info.intrinsics.unsqueeze(0),
+                camera_info.extrinsics.unsqueeze(0).cuda(),
+                camera_info.intrinsics.unsqueeze(0).cuda(),
                 resolution,
                 resolution,
             )
