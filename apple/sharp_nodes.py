@@ -403,20 +403,17 @@ class SHARPRenderViews:
                 "pip install git+https://github.com/apple/ml-sharp.git"
             )
 
-        # Verify gsplat CUDA extension is properly loaded
+        # Verify gsplat and CUDA are available
         try:
-            import gsplat.cuda as _gsplat_cuda
-            if _gsplat_cuda._C is None:
+            import gsplat
+            if not torch.cuda.is_available():
                 raise RuntimeError(
-                    "gsplat CUDA extension not loaded. This usually means:\n"
-                    "1. CUDA toolkit not found or incompatible version\n"
-                    "2. gsplat JIT compilation failed\n"
-                    "Try: pip uninstall gsplat && pip install gsplat --no-cache-dir"
+                    "CUDA is not available. SHARP requires a CUDA-capable GPU."
                 )
-        except (ImportError, AttributeError) as e:
+        except ImportError as e:
             raise RuntimeError(
-                f"gsplat CUDA extension error: {e}\n"
-                "Ensure CUDA toolkit is installed and compatible with your GPU."
+                f"gsplat import error: {e}\n"
+                "Install gsplat with: pip install gsplat"
             )
 
         # Load Gaussian splat
@@ -596,20 +593,17 @@ class SHARPRenderVideo:
                 "pip install git+https://github.com/apple/ml-sharp.git"
             )
 
-        # Verify gsplat CUDA extension is properly loaded
+        # Verify gsplat and CUDA are available
         try:
-            import gsplat.cuda as _gsplat_cuda
-            if _gsplat_cuda._C is None:
+            import gsplat
+            if not torch.cuda.is_available():
                 raise RuntimeError(
-                    "gsplat CUDA extension not loaded. This usually means:\n"
-                    "1. CUDA toolkit not found or incompatible version\n"
-                    "2. gsplat JIT compilation failed\n"
-                    "Try: pip uninstall gsplat && pip install gsplat --no-cache-dir"
+                    "CUDA is not available. SHARP requires a CUDA-capable GPU."
                 )
-        except (ImportError, AttributeError) as e:
+        except ImportError as e:
             raise RuntimeError(
-                f"gsplat CUDA extension error: {e}\n"
-                "Ensure CUDA toolkit is installed and compatible with your GPU."
+                f"gsplat import error: {e}\n"
+                "Install gsplat with: pip install gsplat"
             )
 
         # Load Gaussian splat
