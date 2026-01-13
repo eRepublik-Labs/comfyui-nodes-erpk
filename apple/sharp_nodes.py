@@ -559,8 +559,8 @@ class SHARPRenderVideo:
             },
         }
 
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("video_path",)
+    RETURN_TYPES = ("STRING", "IMAGE")
+    RETURN_NAMES = ("video_path", "frames")
     FUNCTION = "render_video"
     CATEGORY = "ERPK/Apple/SHARP"
     DESCRIPTION = "Render orbit video from SHARP Gaussian splat (requires CUDA)"
@@ -574,7 +574,7 @@ class SHARPRenderVideo:
         max_disparity: float = 0.08,
         output_dir: str = "",
         filename_prefix: str = "sharp_video",
-    ) -> Tuple[str]:
+    ) -> Tuple[str, torch.Tensor]:
         """Render orbit video from Gaussian splat."""
         if not torch.cuda.is_available():
             raise RuntimeError(
@@ -665,6 +665,7 @@ class SHARPRenderVideo:
 
         # Render and write video
         writer = imageio.get_writer(video_path, fps=fps)
+        rendered_frames = []
 
         for i, eye_pos in enumerate(eye_positions):
             # Compute camera parameters for this viewpoint
@@ -682,9 +683,13 @@ class SHARPRenderVideo:
                 resolution,
                 resolution,
             )
-            # Convert from (C, H, W) to (H, W, C) and to uint8 for video
-            frame = (result.color[0].permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
-            writer.append_data(frame)
+            # Convert from (C, H, W) to (H, W, C) for ComfyUI IMAGE format
+            frame_tensor = result.color[0].permute(1, 2, 0).cpu()
+            rendered_frames.append(frame_tensor)
+
+            # Convert to uint8 for video file
+            frame_uint8 = (frame_tensor.numpy() * 255).astype(np.uint8)
+            writer.append_data(frame_uint8)
 
             if (i + 1) % 10 == 0:
                 print(f"[SHARP] Rendered frame {i + 1}/{num_frames}")
@@ -692,7 +697,10 @@ class SHARPRenderVideo:
         writer.close()
         print(f"[SHARP] Saved video: {video_path}")
 
-        return (video_path,)
+        # Stack frames into batch tensor (B, H, W, C) for ComfyUI IMAGE format
+        frames_tensor = torch.stack(rendered_frames, dim=0)
+
+        return (video_path, frames_tensor)
 
 
 # Node registration
