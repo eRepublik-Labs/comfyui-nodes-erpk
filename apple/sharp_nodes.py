@@ -473,10 +473,11 @@ class SHARPRenderViews:
                 resolution,
                 resolution,
             )
-            # result.color is (1, H, W, 3) tensor
-            rendered_images.append(result.color[0].cpu())
+            # result.color is (1, C, H, W) tensor (PyTorch format)
+            # Convert to (H, W, C) for ComfyUI
+            rendered_images.append(result.color[0].permute(1, 2, 0).cpu())
 
-        # Stack into batch tensor (B, H, W, C)
+        # Stack into batch tensor (B, H, W, C) for ComfyUI IMAGE format
         images_tensor = torch.stack(rendered_images, dim=0)
 
         return (images_tensor,)
@@ -681,8 +682,8 @@ class SHARPRenderVideo:
                 resolution,
                 resolution,
             )
-            # Convert to uint8
-            frame = (result.color[0].cpu().numpy() * 255).astype(np.uint8)
+            # Convert from (C, H, W) to (H, W, C) and to uint8 for video
+            frame = (result.color[0].permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
             writer.append_data(frame)
 
             if (i + 1) % 10 == 0:
