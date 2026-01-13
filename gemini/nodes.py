@@ -1030,7 +1030,11 @@ class GeminiImageGeneration:
             if aspect_ratio != "default":
                 image_config_params["aspect_ratio"] = aspect_ratio
             if image_size != "default" and model == "gemini-3-pro-image-preview":
-                image_config_params["image_size"] = image_size
+                # Check SDK support - older versions don't have image_size field
+                if "image_size" in types.ImageConfig.model_fields:
+                    image_config_params["image_size"] = image_size
+                else:
+                    print(f"[Gemini] Warning: image_size not supported by SDK, ignoring")
 
             if image_config_params:
                 config.image_config = types.ImageConfig(**image_config_params)
@@ -1298,7 +1302,11 @@ class GeminiImageEdit:
             if aspect_ratio != "default":
                 image_config_params["aspect_ratio"] = aspect_ratio
             if image_size != "default" and model == "gemini-3-pro-image-preview":
-                image_config_params["image_size"] = image_size
+                # Check SDK support - older versions don't have image_size field
+                if "image_size" in types.ImageConfig.model_fields:
+                    image_config_params["image_size"] = image_size
+                else:
+                    print(f"[Gemini] Warning: image_size not supported by SDK, ignoring")
 
             if image_config_params:
                 config.image_config = types.ImageConfig(**image_config_params)
