@@ -3,7 +3,7 @@
 
 # Apple ML Models - ComfyUI Custom Nodes
 
-**Version:** 2025.12.18 (CalVer)
+**Version:** 2026.1.6 (CalVer)
 **Category:** ERPK/Apple
 **Namespace:** ERPK Organization Custom Nodes
 
@@ -67,12 +67,13 @@ Renders an orbit video from a 3D Gaussian splat.
 - `num_frames` - Number of frames (10-300)
 - `resolution` - Video resolution (256-2048)
 - `fps` - Frames per second (15-60)
-- `orbit_radius` - Camera orbit radius
+- `max_disparity` - Camera orbit radius / disparity
 - `output_dir` - Output directory
 - `filename_prefix` - Prefix for video filename
 
 **Outputs:**
 - `video_path` - Path to saved .mp4 file
+- `frames` - All rendered frames as IMAGE batch (for preview)
 
 ## Installation
 
@@ -101,6 +102,38 @@ The SHARP package will install its dependencies automatically:
 | Render Video | N/A | N/A | Required |
 
 **Note:** Rendering requires CUDA due to the gsplat library dependency.
+
+### CUDA Toolkit Requirement
+
+The render nodes use gsplat which performs JIT (Just-In-Time) compilation of CUDA kernels. This requires the **CUDA Toolkit** (specifically `nvcc` compiler) to be installed on your system.
+
+**Check if CUDA Toolkit is installed:**
+```bash
+nvcc --version
+```
+
+**Install CUDA Toolkit (Debian/Ubuntu):**
+```bash
+# Add NVIDIA repository (example for Debian 13)
+wget https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/cuda-keyring_1.1-1_all.deb
+sudo dpkg -i cuda-keyring_1.1-1_all.deb
+sudo apt-get update
+sudo apt-get install cuda-toolkit-12-8
+```
+
+**Configure environment (add to ~/.bashrc or ~/.zshrc):**
+```bash
+export PATH=/usr/local/cuda-12.8/bin:$PATH
+export CUDA_HOME=/usr/local/cuda-12.8
+export LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH
+```
+
+**For systemd services**, add these to the service file's `[Service]` section:
+```ini
+Environment="PATH=/usr/local/cuda-12.8/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin"
+Environment="CUDA_HOME=/usr/local/cuda-12.8"
+Environment="LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64"
+```
 
 ## Usage
 
@@ -145,11 +178,29 @@ The render nodes use gsplat which only supports CUDA. For non-CUDA systems:
 - Use only SHARP Predict to generate .ply files
 - Render the .ply files on a CUDA-capable machine or viewer
 
+### "gsplat: No CUDA toolkit found. gsplat will be disabled"
+
+gsplat requires the CUDA Toolkit for JIT compilation. See [CUDA Toolkit Requirement](#cuda-toolkit-requirement) above.
+
+**Common symptoms:**
+- PyTorch CUDA works (`torch.cuda.is_available()` returns True)
+- But gsplat fails with "No CUDA toolkit found"
+
+This happens because PyTorch ships pre-compiled CUDA binaries, but gsplat needs `nvcc` to compile kernels at runtime.
+
+### "viewmats must be a CUDA tensor"
+
+This error occurs when camera tensors are on CPU instead of GPU. The SHARP library's internal camera computations can sometimes return CPU tensors. This is handled automatically in version 2026.1.3+.
+
 ### Model download fails
 
 The model downloads from Apple's CDN. If it fails:
 1. Check your internet connection
 2. Try downloading manually and place in torch hub cache
+
+### Psychedelic / wrong colors in rendered output
+
+If colors look extremely saturated or wrong, ensure you're using version 2026.1.6+ which properly converts spherical harmonics coefficients to RGB values.
 
 ## License
 
