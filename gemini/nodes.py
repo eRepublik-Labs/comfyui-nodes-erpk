@@ -1050,7 +1050,14 @@ class GeminiImageGeneration:
             image_tensor = None
             description_text = ""
 
-            for part in response.candidates[0].content.parts:
+            # Defensive check: Gemini can return 200 OK with empty content
+            parts = None
+            if response.candidates and len(response.candidates) > 0:
+                candidate = response.candidates[0]
+                if candidate.content and candidate.content.parts:
+                    parts = candidate.content.parts
+
+            for part in (parts or []):
                 # Extract text if present
                 if hasattr(part, 'text') and part.text:
                     description_text = part.text
@@ -1325,7 +1332,14 @@ class GeminiImageEdit:
             image_tensor = None
             description_text = ""
 
-            for part in response.candidates[0].content.parts:
+            # Defensive check: Gemini can return 200 OK with empty content
+            parts = None
+            if response.candidates and len(response.candidates) > 0:
+                candidate = response.candidates[0]
+                if candidate.content and candidate.content.parts:
+                    parts = candidate.content.parts
+
+            for part in (parts or []):
                 # Extract text if present
                 if hasattr(part, 'text') and part.text:
                     description_text = part.text
