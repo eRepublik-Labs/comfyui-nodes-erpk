@@ -7,6 +7,27 @@ from typing import Dict, Any, List, Optional
 from google import genai
 from google.genai import types
 
+# Minimum recommended SDK version
+MIN_SDK_VERSION = "1.49.0"
+_sdk_version_checked = False
+
+
+def _check_sdk_version():
+    """Warn once if google-genai SDK is outdated."""
+    global _sdk_version_checked
+    if _sdk_version_checked:
+        return
+    _sdk_version_checked = True
+
+    try:
+        from packaging import version
+        current = getattr(genai, "__version__", "0.0.0")
+        if version.parse(current) < version.parse(MIN_SDK_VERSION):
+            print(f"[Gemini] Warning: google-genai {current} is outdated. "
+                  f"Recommended: >={MIN_SDK_VERSION}. Run: pip install --upgrade google-genai")
+    except ImportError:
+        pass  # packaging not available, skip check
+
 
 class GeminiClient:
     """
@@ -48,6 +69,9 @@ class GeminiClient:
             model: Gemini model to use
             config_path: Path to config.ini file
         """
+        # Check SDK version on first client creation
+        _check_sdk_version()
+
         self.model_name = model
 
         # Resolve API key from multiple sources
