@@ -23,6 +23,7 @@ class GeminiClient:
     # Available models
     MODELS = {
         "gemini-3-pro-preview": "Gemini 3 Pro Preview (Most intelligent, best reasoning)",
+        "gemini-3-flash-preview": "Gemini 3 Flash Preview (Balanced speed and intelligence)",
         "gemini-2.5-pro": "Gemini 2.5 Pro (Complex reasoning, 1M context)",
         "gemini-2.5-flash": "Gemini 2.5 Flash (Best price-performance)",
         "gemini-2.5-flash-lite": "Gemini 2.5 Flash-Lite (Fastest, most cost-efficient)",
