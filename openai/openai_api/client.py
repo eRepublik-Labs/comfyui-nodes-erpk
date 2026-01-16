@@ -45,6 +45,9 @@ class OpenAIClient:
     MAX_RETRIES = 3
     INITIAL_RETRY_DELAY = 1.0
 
+    # Models that use max_completion_tokens instead of max_tokens
+    NEW_TOKEN_PARAM_MODELS = {"gpt-5.2", "gpt-5-mini", "gpt-5-nano", "o3", "o4-mini"}
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -194,9 +197,14 @@ class OpenAIClient:
         params = {
             "model": model_to_use,
             "messages": messages,
-            "max_tokens": max_tokens,
             "temperature": temperature,
         }
+
+        # Use correct token parameter based on model
+        if model_to_use in self.NEW_TOKEN_PARAM_MODELS:
+            params["max_completion_tokens"] = max_tokens
+        else:
+            params["max_tokens"] = max_tokens
 
         # Add optional parameters
         if top_p is not None:
@@ -303,9 +311,14 @@ class OpenAIClient:
         params = {
             "model": model_to_use,
             "messages": full_messages,
-            "max_tokens": max_tokens,
             "temperature": temperature,
         }
+
+        # Use correct token parameter based on model
+        if model_to_use in self.NEW_TOKEN_PARAM_MODELS:
+            params["max_completion_tokens"] = max_tokens
+        else:
+            params["max_tokens"] = max_tokens
 
         if top_p is not None:
             params["top_p"] = top_p
