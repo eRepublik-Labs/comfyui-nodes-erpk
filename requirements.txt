@@ -13,6 +13,9 @@ anthropic>=0.40.0
 # Google Gemini API integration
 google-genai>=1.49.0
 
+# OpenAI API integration
+openai>=1.0.0
+
 # Background Removal - Core (required for progress bars)
 tqdm>=4.65.0
 

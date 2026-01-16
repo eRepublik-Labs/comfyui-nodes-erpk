@@ -45,6 +45,17 @@ try:
 except ImportError as e:
     print(f"[ERPK] Warning: Could not load Gemini nodes: {e}")
 
+# Import and register OpenAI nodes
+try:
+    from .openai import (
+        NODE_CLASS_MAPPINGS as OPENAI_NODE_CLASS_MAPPINGS,
+        NODE_DISPLAY_NAME_MAPPINGS as OPENAI_NODE_DISPLAY_NAME_MAPPINGS
+    )
+    NODE_CLASS_MAPPINGS.update(OPENAI_NODE_CLASS_MAPPINGS)
+    NODE_DISPLAY_NAME_MAPPINGS.update(OPENAI_NODE_DISPLAY_NAME_MAPPINGS)
+except ImportError as e:
+    print(f"[ERPK] Warning: Could not load OpenAI nodes: {e}")
+
 # Import and register Background Removal nodes
 try:
     from .bgremoval import (
