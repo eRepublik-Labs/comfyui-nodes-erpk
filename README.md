@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2026.1.17 (CalVer)
+**Current Version:** 2026.1.18 (CalVer)
 
 ## Repository Structure
 
@@ -53,7 +53,7 @@ ComfyUI-Custom-Nodes/
 Custom nodes for WaveSpeed AI's image generation and editing APIs.
 
 **Category in ComfyUI:** `ERPK/WaveSpeedAI`
-**Version:** 2026.1.17
+**Version:** 2026.1.18
 
 #### ByteDance Seedream V4 Models
 
@@ -84,7 +84,7 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 Claude API integration for text generation, prompt enhancement, vision analysis, and conversational AI.
 
 **Category in ComfyUI:** `ERPK/Claude`
-**Version:** 2026.1.17
+**Version:** 2026.1.18
 
 #### Nodes
 
@@ -111,7 +111,7 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 Google Gemini API integration for text generation, vision analysis, multi-turn conversations, image generation, image editing, and **Veo video generation**.
 
 **Category in ComfyUI:** `ERPK/Gemini` and `ERPK/Gemini/Veo`
-**Version:** 2026.1.17
+**Version:** 2026.1.18
 
 #### Nodes
 
@@ -148,7 +148,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 OpenAI API integration for text generation, vision analysis, multi-turn conversations, image generation, and image editing.
 
 **Category in ComfyUI:** `ERPK/OpenAI`
-**Version:** 2026.1.17
+**Version:** 2026.1.18
 
 #### Nodes
 
@@ -232,7 +232,7 @@ All nodes output:
 Apple ML models integration, currently featuring SHARP for single-image 3D view synthesis.
 
 **Category in ComfyUI:** `ERPK/Apple/SHARP`
-**Version:** 2026.1.17
+**Version:** 2026.1.18
 
 #### SHARP Nodes
 

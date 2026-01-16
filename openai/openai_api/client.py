@@ -48,6 +48,9 @@ class OpenAIClient:
     # Models that use max_completion_tokens instead of max_tokens
     NEW_TOKEN_PARAM_MODELS = {"gpt-5.2", "gpt-5-mini", "gpt-5-nano", "o3", "o4-mini"}
 
+    # Reasoning models that don't support temperature, top_p, or stop
+    REASONING_MODELS = {"o3", "o4-mini"}
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -197,7 +200,6 @@ class OpenAIClient:
         params = {
             "model": model_to_use,
             "messages": messages,
-            "temperature": temperature,
         }
 
         # Use correct token parameter based on model
@@ -206,11 +208,16 @@ class OpenAIClient:
         else:
             params["max_tokens"] = max_tokens
 
-        # Add optional parameters
-        if top_p is not None:
-            params["top_p"] = top_p
-        if stop_sequences:
-            params["stop"] = stop_sequences
+        # Reasoning models don't support temperature, top_p, or stop
+        is_reasoning = model_to_use in self.REASONING_MODELS
+
+        if not is_reasoning:
+            params["temperature"] = temperature
+            if top_p is not None:
+                params["top_p"] = top_p
+            if stop_sequences:
+                params["stop"] = stop_sequences
+
         if response_format:
             params["response_format"] = response_format
 
@@ -311,7 +318,6 @@ class OpenAIClient:
         params = {
             "model": model_to_use,
             "messages": full_messages,
-            "temperature": temperature,
         }
 
         # Use correct token parameter based on model
@@ -320,10 +326,16 @@ class OpenAIClient:
         else:
             params["max_tokens"] = max_tokens
 
-        if top_p is not None:
-            params["top_p"] = top_p
-        if stop_sequences:
-            params["stop"] = stop_sequences
+        # Reasoning models don't support temperature, top_p, or stop
+        is_reasoning = model_to_use in self.REASONING_MODELS
+
+        if not is_reasoning:
+            params["temperature"] = temperature
+            if top_p is not None:
+                params["top_p"] = top_p
+            if stop_sequences:
+                params["stop"] = stop_sequences
+
         if response_format:
             params["response_format"] = response_format
 
