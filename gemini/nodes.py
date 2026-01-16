@@ -886,7 +886,7 @@ class GeminiImageGeneration:
                 "model": (
                     cls.IMAGE_MODELS,
                     {
-                        "default": "gemini-2.5-flash-image",
+                        "default": "gemini-3-pro-image-preview",
                         "tooltip": "Image generation model (overrides client model)"
                     }
                 ),
@@ -1154,7 +1154,7 @@ class GeminiImageEdit:
                 "model": (
                     cls.IMAGE_MODELS,
                     {
-                        "default": "gemini-2.5-flash-image",
+                        "default": "gemini-3-pro-image-preview",
                         "tooltip": "Image generation model (overrides client model)"
                     }
                 ),
