@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2025.12.18 (CalVer)
+**Current Version:** 2026.1.17 (CalVer)
 
 ## Repository Structure
 
@@ -29,6 +29,11 @@ ComfyUI-Custom-Nodes/
 │   ├── nodes.py                   # All Gemini nodes
 │   ├── veo_nodes.py               # Veo video generation nodes
 │   └── gemini_api/                # API integration layer
+├── openai/                        # OpenAI API integration
+│   ├── README.md                  # Package documentation
+│   ├── nodes.py                   # Core nodes (Config, Text, Vision, Chat)
+│   ├── image_nodes.py             # Image generation/editing nodes
+│   └── openai_api/                # API integration layer
 ├── bgremoval/                     # Background removal utilities
 │   ├── utils.py                   # Shared tensor/PIL conversion utilities
 │   ├── rembg_node.py              # rembg backend (14+ ONNX models)
@@ -48,7 +53,7 @@ ComfyUI-Custom-Nodes/
 Custom nodes for WaveSpeed AI's image generation and editing APIs.
 
 **Category in ComfyUI:** `ERPK/WaveSpeedAI`
-**Version:** 2025.12.18
+**Version:** 2026.1.17
 
 #### ByteDance Seedream V4 Models
 
@@ -79,7 +84,7 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 Claude API integration for text generation, prompt enhancement, vision analysis, and conversational AI.
 
 **Category in ComfyUI:** `ERPK/Claude`
-**Version:** 2025.12.18
+**Version:** 2026.1.17
 
 #### Nodes
 
@@ -106,7 +111,7 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 Google Gemini API integration for text generation, vision analysis, multi-turn conversations, image generation, image editing, and **Veo video generation**.
 
 **Category in ComfyUI:** `ERPK/Gemini` and `ERPK/Gemini/Veo`
-**Version:** 2025.12.18
+**Version:** 2026.1.17
 
 #### Nodes
 
@@ -137,6 +142,33 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - Native multi-turn conversation support
 
 **Installation & Documentation:** See [gemini/README.md](gemini/README.md)
+
+### ERPK/OpenAI
+
+OpenAI API integration for text generation, vision analysis, multi-turn conversations, image generation, and image editing.
+
+**Category in ComfyUI:** `ERPK/OpenAI`
+**Version:** 2026.1.17
+
+#### Nodes
+
+- **OpenAI API Config** - Initialize OpenAI API connection (API key configuration)
+- **OpenAI Text Generation** - General-purpose text generation with model selection (GPT-5.2, GPT-4o, GPT-4.1, o3)
+- **OpenAI Chat** - Multi-turn conversations with automatic context preservation
+- **OpenAI Vision** - Analyze images with GPT-4 vision capabilities
+- **OpenAI System Instruction** - Set persistent system-level instructions to guide model behavior
+- **OpenAI Image Generation** - Generate images with GPT-Image-1.5 and DALL-E models
+- **OpenAI Image Edit** - Edit and inpaint images with natural language prompts
+
+**Key Benefits:**
+- Support for latest GPT-5.2, GPT-4.1, and GPT-4o models
+- Image generation with GPT-Image-1.5 (best quality) and DALL-E 3
+- Image editing with optional mask support for inpainting
+- Multi-turn conversation with session management
+- Automatic retry with exponential backoff
+- JSON response format support
+
+**Installation & Documentation:** See [openai/README.md](openai/README.md)
 
 ### ERPK/Background Removal
 
@@ -200,7 +232,7 @@ All nodes output:
 Apple ML models integration, currently featuring SHARP for single-image 3D view synthesis.
 
 **Category in ComfyUI:** `ERPK/Apple/SHARP`
-**Version:** 2025.12.18
+**Version:** 2026.1.17
 
 #### SHARP Nodes
 
@@ -258,10 +290,11 @@ Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishe
    - **WaveSpeed:** See [wavespeed/README.md](wavespeed/README.md#installation)
    - **Claude:** See [claude/README.md](claude/README.md#installation)
    - **Gemini:** See [gemini/README.md](gemini/README.md#installation)
+   - **OpenAI:** See [openai/README.md](openai/README.md#installation)
    - **Background Removal:** No API keys required, models download automatically on first use
    - **Apple/SHARP:** No API keys required. Install with: `pip install git+https://github.com/apple/ml-sharp.git`
 
-2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, `ERPK/Gemini`, `ERPK/Background Removal`, and `ERPK/Apple/SHARP`
+2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, `ERPK/Gemini`, `ERPK/OpenAI`, `ERPK/Background Removal`, and `ERPK/Apple/SHARP`
 
 ## ComfyUI API Integration
 
@@ -325,7 +358,7 @@ Workflows can be saved as JSON files in your ComfyUI workflows directory. The fo
 
 ```bash
 # List all ERPK nodes
-curl -s http://localhost:8188/object_info | jq 'keys' | grep -i -E "(gemini|claude)"
+curl -s http://localhost:8188/object_info | jq 'keys' | grep -i -E "(gemini|claude|openai)"
 ```
 
 ## License
