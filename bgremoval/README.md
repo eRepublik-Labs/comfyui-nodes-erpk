@@ -3,7 +3,7 @@
 
 # Background Removal - ComfyUI Custom Nodes
 
-**Version:** 2026.1.20 (CalVer)
+**Version:** 2026.1.27 (CalVer)
 **Category:** ERPK/Background Removal
 **Namespace:** ERPK Organization Custom Nodes
 
@@ -22,6 +22,8 @@ Background removal nodes with multiple backend options for different quality/spe
 | **Remove Background (rembg)** | ONNX | CPU/GPU | Fast | Good | Low-Med |
 | **Remove Background (InSPyReNet)** | PyTorch | GPU | Medium | Very Good | Medium |
 | **Remove Background (BiRefNet)** | PyTorch/HF | GPU | Slower | Excellent | High |
+| **Get Mask (BiRefNet)** | PyTorch/HF | GPU | Slower | Excellent | High |
+| **Foreground Refinement (BlurFusion)** | OpenCV | CPU | Fast | - | Low |
 
 ## Node Details
 
@@ -69,7 +71,7 @@ Two-step "intermediate supervision" approach: first suppresses background, then 
 #### SAM (Segment Anything)
 Meta's versatile segmentation model. Designed for interactive use with prompts/input points. Not recommended for automatic background removal - produces lower accuracy on unprompted tasks.
 
-#### BiRefNet Family
+#### BiRefNet Family (via rembg)
 Bilateral Reference Network with bidirectional refinement. Achieves highest accuracy (IoU 0.87, Dice 0.92) by validating fine details against global context. Best for professional results.
 
 - **birefnet-general**: Best overall quality for diverse subjects. Handles fine details like hair, fur, bicycle spokes.
@@ -95,25 +97,71 @@ PyTorch-based via transparent-background package. Good balance of quality and sp
 
 ### Remove Background (BiRefNet)
 
-HuggingFace transformers-based. Highest quality dichotomous image segmentation.
+HuggingFace transformers-based. Highest quality dichotomous image segmentation with 15 model variants.
 
-**Variants:**
-| Variant | Description |
-|---------|-------------|
-| `ZhengPeng7/BiRefNet` | Default model |
-| `ZhengPeng7/BiRefNet_HR` | High resolution (2048x2048) |
-| `ZhengPeng7/BiRefNet-matting` | Alpha matting |
-| `ZhengPeng7/BiRefNet_HR-matting` | HR alpha matting |
-| `ZhengPeng7/BiRefNet-COD` | Camouflaged object detection |
-| `ZhengPeng7/BiRefNet_512x512` | Fast (lower resolution) |
+**Model Variants:**
+
+| Variant | Description | Best For |
+|---------|-------------|----------|
+| `ZhengPeng7/BiRefNet` | General (default) | Most use cases |
+| `ZhengPeng7/BiRefNet_HR` | High resolution (2048x2048) | Large images |
+| `ZhengPeng7/BiRefNet_T` | General Lite (fast) | Speed-critical workflows |
+| `ZhengPeng7/BiRefNet_lite-2K` | Lite 2K resolution | Fast + high-res |
+| `ZhengPeng7/BiRefNet_dynamic` | Dynamic resolution | Variable input sizes |
+| `ZhengPeng7/BiRefNet_512x512` | 512x512 (fastest) | Maximum speed |
+| `ZhengPeng7/BiRefNet-legacy` | Legacy training | Compatibility |
+| `ZhengPeng7/BiRefNet-portrait` | Portrait optimized | People, faces |
+| `ZhengPeng7/BiRefNet-matting` | Alpha matting | Soft edges, hair |
+| `ZhengPeng7/BiRefNet_HR-matting` | HR matting | High-res soft edges |
+| `ZhengPeng7/BiRefNet_lite-matting` | Lite matting | Fast soft edges |
+| `ZhengPeng7/BiRefNet-DIS5K` | DIS (dichotomous) | Binary segmentation |
+| `ZhengPeng7/BiRefNet-HRSOD` | HRSOD (salient object) | Object detection |
+| `ZhengPeng7/BiRefNet-COD` | COD (camouflaged) | Hidden objects |
+| `ZhengPeng7/BiRefNet-DIS5K-TR_TEs` | DIS Massive | Maximum accuracy |
 
 **Options:**
-- `resolution`: Processing resolution (256-2048, HR variant can use 2048)
+- `resolution`: Processing resolution (256-2048). HR variants work best at 2048, Lite variants at 512-1024.
+- `device`: Processing device selection (`auto`, `cuda`, `cpu`, `mps`). Auto selects best available.
+- `dtype`: Data type (`float32`, `float16`). float16 uses ~50% less VRAM.
+- `background`: Background color (26 options including `transparent`, `white`, `black`, `chroma_green`, `chroma_blue`).
+- `mask_threshold`: Threshold for mask binarization (0.0-1.0). 0 = soft mask, higher = sharper edges.
+
+**Local Model Loading:**
+Place `.safetensors` or `.pth` model files in `ComfyUI/models/BiRefNet/`. They will appear in the variant dropdown as `local:ModelName`.
+
+### Get Mask (BiRefNet)
+
+Mask-only output node using BiRefNet. Useful when you only need the segmentation mask for compositing or other operations.
+
+**Options:** Same as Remove Background (BiRefNet) except no background color option.
+
+**Output:** MASK only (no image output).
+
+### Foreground Refinement (BlurFusion)
+
+Refines foreground edges using blur-based color estimation. Reduces color bleeding from background at semi-transparent edges.
+
+Based on the [fast-foreground-estimation](https://github.com/Photoroom/fast-foreground-estimation) method.
+
+**Inputs:**
+- `image`: Input image (typically from a background removal node)
+- `mask`: Segmentation mask
+
+**Options:**
+- `blur_radius`: Primary blur radius (1-255, default 90). Larger = more aggressive estimation.
+- `blur_radius_secondary`: Secondary blur for edge refinement (1-255, default 6).
+- `fill_background`: Fill background with solid color instead of transparent.
+- `background_color`: Hex color for background fill (e.g., `#00FF00` for green).
+
+**Use Case:** Chain after any background removal node to clean up edge artifacts, especially useful for:
+- Hair and fur details
+- Semi-transparent materials
+- Complex edges with color fringing
 
 ## Outputs
 
-All nodes output:
-- `IMAGE`: RGBA image with transparent background
+All background removal nodes output:
+- `IMAGE`: RGBA image with transparent background (or RGB with solid background if selected)
 - `MASK`: Alpha mask for further compositing
 
 ## Installation
@@ -159,7 +207,7 @@ pip install transformers>=4.36.0 torchvision>=0.16.0
 
 - **rembg**: The `[gpu]` extra installs `onnxruntime-gpu` for CUDA acceleration on Windows/Linux. macOS users get CPU-only `onnxruntime` automatically.
 - **InSPyReNet**: Automatically uses CUDA if available
-- **BiRefNet**: Automatically uses CUDA or MPS (Apple Silicon) if available
+- **BiRefNet**: Automatically uses CUDA or MPS (Apple Silicon) if available. Use `device` option to override.
 
 ## Usage
 
@@ -187,6 +235,15 @@ pip install transformers>=4.36.0 torchvision>=0.16.0
 - You need the highest quality
 - You're working with high-resolution images (use HR variant)
 - You need specialized detection (camouflaged objects, matting)
+- You want VRAM efficiency (use float16 dtype)
+
+### Advanced Workflow: Clean Edges
+
+For best results with complex subjects (hair, fur, transparent materials):
+
+1. **Remove Background (BiRefNet)** with `ZhengPeng7/BiRefNet-matting` variant
+2. **Foreground Refinement (BlurFusion)** to clean up edge colors
+3. Composite onto final background
 
 ## Troubleshooting
 
@@ -211,9 +268,17 @@ python -c "from transformers import AutoModelForImageSegmentation; print('BiRefN
 
 ### Memory Issues
 
-- Use `u2netp` or `silueta` models for lower memory usage
-- Use `ZhengPeng7/BiRefNet_512x512` for faster/smaller BiRefNet
+- Use `u2netp` or `silueta` models for lower memory usage with rembg
+- Use `ZhengPeng7/BiRefNet_512x512` or `ZhengPeng7/BiRefNet_T` for faster/smaller BiRefNet
+- Set `dtype` to `float16` to reduce VRAM usage by ~50%
 - Process images one at a time instead of batches
+
+### CUDA Out of Memory
+
+1. Try `float16` dtype (halves VRAM usage)
+2. Use a Lite variant (`BiRefNet_T`, `BiRefNet_lite-2K`)
+3. Reduce `resolution` parameter
+4. Force CPU with `device: cpu` if GPU memory is too limited
 
 ## License
 
@@ -224,3 +289,4 @@ MIT License - All backends (rembg, transparent-background, BiRefNet) are MIT lic
 - [rembg](https://github.com/danielgatis/rembg) - ONNX-based background removal
 - [transparent-background](https://github.com/plemeri/transparent-background) - InSPyReNet wrapper
 - [BiRefNet](https://github.com/ZhengPeng7/BiRefNet) - Bilateral Reference Network
+- [fast-foreground-estimation](https://github.com/Photoroom/fast-foreground-estimation) - BlurFusion method

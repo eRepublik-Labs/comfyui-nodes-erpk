@@ -4,7 +4,7 @@
 [project]
 name = "comfyui-nodes-erpk"
 description = "ERPK custom nodes for ComfyUI: WaveSpeed AI, Claude API, Google Gemini API, OpenAI API, Background Removal, and Apple SHARP 3D view synthesis."
-version = "2026.1.26"
+version = "2026.1.27"
 license = { file = "LICENSE" }
 dependencies = [
     "requests>=2.31.0",
@@ -22,6 +22,7 @@ dependencies = [
     "transparent-background>=1.2.0",
     "transformers>=4.36.0",
     "torchvision>=0.16.0",
+    "safetensors>=0.4.0",
 ]
 classifiers = [
     "Operating System :: OS Independent",
