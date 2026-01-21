@@ -113,7 +113,7 @@ HuggingFace transformers-based. Highest quality dichotomous image segmentation.
 ## Outputs
 
 All nodes output:
-- `IMAGE`: RGB image with background removed (composited on black)
+- `IMAGE`: RGBA image with transparent background
 - `MASK`: Alpha mask for further compositing
 
 ## Installation
