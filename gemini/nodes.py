@@ -1135,7 +1135,7 @@ class GeminiImageEdit:
             "required": {
                 "image": (
                     "IMAGE",
-                    {"tooltip": "Reference image(s) to edit (Gemini 3 Pro supports up to 14 images)"}
+                    {"tooltip": "Reference image(s) to edit. Use Batch Images node to combine multiple images (up to 14). Reference in prompt by order, content, or role."}
                 ),
                 "prompt": (
                     "STRING",
@@ -1147,10 +1147,6 @@ class GeminiImageEdit:
                 ),
             },
             "optional": {
-                "additional_images": (
-                    "IMAGE",
-                    {"tooltip": "Additional reference image(s) to combine with main image input"}
-                ),
                 "client": (
                     "GEMINI_API_CLIENT",
                     {"tooltip": "Gemini API client from Gemini API Config node (uses API key from config)"}
@@ -1224,7 +1220,6 @@ class GeminiImageEdit:
         self,
         image,
         prompt: str,
-        additional_images=None,
         client: GeminiClient = None,
         model: str = "gemini-2.5-flash-image",
         temperature: float = 1.0,
@@ -1275,10 +1270,8 @@ class GeminiImageEdit:
                     model=model
                 )
 
-            # Convert ComfyUI tensors to PIL images, combining all inputs
+            # Convert ComfyUI tensors to PIL images (handles batched images)
             pil_images = ImageConverter.tensors_to_pil_list(image)
-            if additional_images is not None:
-                pil_images.extend(ImageConverter.tensors_to_pil_list(additional_images))
             num_images = len(pil_images)
 
             print(f"[Gemini] Editing image with model: {model}")

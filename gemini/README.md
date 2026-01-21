@@ -206,7 +206,7 @@ Generate images from text descriptions using Gemini's image generation models.
 Edit and modify existing images using text prompts with Gemini's image generation models.
 
 **Inputs:**
-- `image`: Input image(s) to edit (ComfyUI IMAGE tensor, up to 14 reference images)
+- `image`: Input image(s) to edit (up to 14 reference images). Use ComfyUI's **Batch Images** node to combine multiple images.
 - `prompt`: Text description of how to modify the image(s)
 - `client`: Optional Gemini API client (from Gemini API Config node)
 - `model`: gemini-2.5-flash-image (fast, recommended) or gemini-3-pro-image-preview (best quality)
