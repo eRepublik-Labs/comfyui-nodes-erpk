@@ -22,7 +22,7 @@ tqdm>=4.65.0
 # Background Removal - rembg backend (ONNX-based, 14+ models)
 # The [gpu] extra installs onnxruntime-gpu for CUDA acceleration
 # macOS fallback: onnxruntime-gpu doesn't support darwin, so we add CPU runtime
-rembg[gpu]>=2.0.50
+rembg[gpu]>=2.0.70
 onnxruntime>=1.16.0; sys_platform == "darwin"
 
 # Background Removal - InSPyReNet backend (PyTorch-based)

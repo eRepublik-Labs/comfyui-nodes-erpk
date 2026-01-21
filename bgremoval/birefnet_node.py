@@ -1,5 +1,5 @@
 # ABOUTME: ComfyUI nodes for background removal using BiRefNet via HuggingFace transformers.
-# ABOUTME: Supports 18 model variants, dtype/device selection, local loading, and foreground refinement.
+# ABOUTME: Supports 15 model variants, dtype/device selection, local loading, and foreground refinement.
 
 """
 BiRefNet Backend Nodes for ComfyUI
@@ -21,7 +21,7 @@ from PIL import Image
 
 from .utils import tensor_to_pil, pil_rgba_to_tensor, pil_to_tensor, extract_mask_from_rgba
 
-# All available BiRefNet variants on HuggingFace (18 models)
+# All available BiRefNet variants on HuggingFace (15 models)
 BIREFNET_VARIANTS = [
     # General purpose
     ("ZhengPeng7/BiRefNet", "General (default)"),
@@ -135,7 +135,7 @@ class BiRefNetRemoveBackground:
     Remove background using BiRefNet via HuggingFace transformers.
 
     Features:
-    - 18 model variants for different use cases
+    - 15 model variants for different use cases
     - dtype selection (float16 for VRAM efficiency)
     - Device selection (auto/cuda/cpu/mps)
     - Background color options (26 colors)
@@ -208,7 +208,7 @@ class BiRefNetRemoveBackground:
     RETURN_NAMES = ("image", "mask")
     FUNCTION = "remove_background"
     CATEGORY = "ERPK/Background Removal"
-    DESCRIPTION = "Remove background using BiRefNet. 18 model variants, dtype/device selection. MIT licensed."
+    DESCRIPTION = "Remove background using BiRefNet. 15 model variants, dtype/device selection. MIT licensed."
 
     @classmethod
     def _get_model(cls, variant: str, device: str, dtype):
