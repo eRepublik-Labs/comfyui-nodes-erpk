@@ -10,7 +10,7 @@ Uses the rembg library (ONNX Runtime) for background removal with 14+ model opti
 from typing import Dict, Any, Tuple, List
 from tqdm import tqdm
 
-from .utils import tensor_to_pil, pil_to_tensor, extract_mask_from_rgba
+from .utils import tensor_to_pil, pil_rgba_to_tensor, extract_mask_from_rgba
 
 # Available rembg models with descriptions
 REMBG_MODELS = [
@@ -155,9 +155,8 @@ class RembgRemoveBackground:
             )
             result_images.append(result)
 
-        # Convert back to tensors
-        # For IMAGE output, we return RGB (drop alpha but keep the cutout)
-        image_tensor = pil_to_tensor(result_images)
+        # Convert back to tensors (RGBA for transparency support)
+        image_tensor = pil_rgba_to_tensor(result_images)
         mask_tensor = extract_mask_from_rgba(result_images)
 
         return (image_tensor, mask_tensor)

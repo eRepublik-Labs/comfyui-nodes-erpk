@@ -11,7 +11,7 @@ PyTorch-based, runs on GPU, MIT licensed for commercial use.
 from typing import Dict, Any, Tuple, List
 from tqdm import tqdm
 
-from .utils import tensor_to_pil, pil_to_tensor, extract_mask_from_rgba
+from .utils import tensor_to_pil, pil_rgba_to_tensor, extract_mask_from_rgba
 
 
 class InSPyReNetRemoveBackground:
@@ -100,8 +100,8 @@ class InSPyReNetRemoveBackground:
             result = remover.process(pil_img, type="rgba")
             result_images.append(result)
 
-        # Convert back to tensors
-        image_tensor = pil_to_tensor(result_images)
+        # Convert back to tensors (RGBA for transparency support)
+        image_tensor = pil_rgba_to_tensor(result_images)
         mask_tensor = extract_mask_from_rgba(result_images)
 
         return (image_tensor, mask_tensor)

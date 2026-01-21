@@ -13,7 +13,7 @@ from tqdm import tqdm
 import numpy as np
 from PIL import Image
 
-from .utils import tensor_to_pil, pil_to_tensor, extract_mask_from_rgba, apply_mask_to_image
+from .utils import tensor_to_pil, pil_rgba_to_tensor, extract_mask_from_rgba, apply_mask_to_image
 
 # Available BiRefNet variants on HuggingFace
 BIREFNET_VARIANTS = [
@@ -175,8 +175,8 @@ class BiRefNetRemoveBackground:
             rgba.putalpha(mask_pil)
             result_images.append(rgba)
 
-        # Convert back to tensors
-        image_tensor = pil_to_tensor(result_images)
+        # Convert back to tensors (RGBA for transparency support)
+        image_tensor = pil_rgba_to_tensor(result_images)
         mask_tensor = extract_mask_from_rgba(result_images)
 
         return (image_tensor, mask_tensor)
