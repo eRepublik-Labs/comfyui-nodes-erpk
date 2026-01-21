@@ -54,7 +54,7 @@ DEVICE_OPTIONS = ["auto", "cuda", "cpu", "mps"]
 DTYPE_OPTIONS = ["float32", "float16"]
 
 # Upscale methods for resizing
-UPSCALE_METHODS = ["bilinear", "bicubic", "lanczos", "nearest", "area"]
+UPSCALE_METHODS = ["bilinear", "bicubic", "lanczos", "nearest", "nearest-exact", "area"]
 
 # Map upscale method names to PIL resampling constants
 UPSCALE_TO_PIL = {
@@ -62,6 +62,7 @@ UPSCALE_TO_PIL = {
     "bicubic": Image.Resampling.BICUBIC,
     "lanczos": Image.Resampling.LANCZOS,
     "nearest": Image.Resampling.NEAREST,
+    "nearest-exact": Image.Resampling.NEAREST,  # PIL uses NEAREST for both
     "area": Image.Resampling.BOX,  # PIL doesn't have AREA, BOX is closest
 }
 
@@ -157,9 +158,9 @@ class BiRefNetRemoveBackground:
                     {
                         "default": 1024,
                         "min": 256,
-                        "max": 2048,
+                        "max": 2560,
                         "step": 64,
-                        "tooltip": "Processing width. HR variants can use 2048, Lite variants work well at 512-1024.",
+                        "tooltip": "Processing width. HR variants work best at 2048+, Lite variants at 512-1024.",
                     },
                 ),
                 "height": (
@@ -167,9 +168,9 @@ class BiRefNetRemoveBackground:
                     {
                         "default": 1024,
                         "min": 256,
-                        "max": 2048,
+                        "max": 2560,
                         "step": 64,
-                        "tooltip": "Processing height. HR variants can use 2048, Lite variants work well at 512-1024.",
+                        "tooltip": "Processing height. HR variants work best at 2048+, Lite variants at 512-1024.",
                     },
                 ),
                 "upscale_method": (
@@ -399,9 +400,9 @@ class BiRefNetGetMask:
                     {
                         "default": 1024,
                         "min": 256,
-                        "max": 2048,
+                        "max": 2560,
                         "step": 64,
-                        "tooltip": "Processing width.",
+                        "tooltip": "Processing width. HR variants work best at 2048+, Lite variants at 512-1024.",
                     },
                 ),
                 "height": (
@@ -409,9 +410,9 @@ class BiRefNetGetMask:
                     {
                         "default": 1024,
                         "min": 256,
-                        "max": 2048,
+                        "max": 2560,
                         "step": 64,
-                        "tooltip": "Processing height.",
+                        "tooltip": "Processing height. HR variants work best at 2048+, Lite variants at 512-1024.",
                     },
                 ),
                 "upscale_method": (

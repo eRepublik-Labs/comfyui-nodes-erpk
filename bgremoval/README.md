@@ -120,9 +120,9 @@ HuggingFace transformers-based. Highest quality dichotomous image segmentation w
 | `ZhengPeng7/BiRefNet-DIS5K-TR_TEs` | DIS Massive | Maximum accuracy |
 
 **Options:**
-- `width`: Processing width (256-2048). HR variants work best at 2048, Lite variants at 512-1024.
-- `height`: Processing height (256-2048). HR variants work best at 2048, Lite variants at 512-1024.
-- `upscale_method`: Interpolation method for resizing (`bilinear`, `bicubic`, `lanczos`, `nearest`, `area`).
+- `width`: Processing width (256-2560). HR variants work best at 2048, lite-2K supports 2560.
+- `height`: Processing height (256-2560). HR variants work best at 2048, lite-2K supports 2560.
+- `upscale_method`: Interpolation method for resizing (`bilinear`, `bicubic`, `lanczos`, `nearest`, `nearest-exact`, `area`).
 - `device`: Processing device selection (`auto`, `cuda`, `cpu`, `mps`). Auto selects best available.
 - `dtype`: Data type (`float32`, `float16`). float16 uses ~50% less VRAM.
 - `fill_background`: Enable to fill background with solid color instead of transparent.
