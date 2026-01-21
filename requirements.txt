@@ -20,9 +20,10 @@ openai>=1.0.0
 tqdm>=4.65.0
 
 # Background Removal - rembg backend (ONNX-based, 14+ models)
-# Note: onnxruntime is required but rembg no longer auto-installs it
-rembg>=2.0.50
-onnxruntime>=1.16.0
+# The [gpu] extra installs onnxruntime-gpu for CUDA acceleration
+# macOS fallback: onnxruntime-gpu doesn't support darwin, so we add CPU runtime
+rembg[gpu]>=2.0.50
+onnxruntime>=1.16.0; sys_platform == "darwin"
 
 # Background Removal - InSPyReNet backend (PyTorch-based)
 transparent-background>=1.2.0

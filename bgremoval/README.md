@@ -3,7 +3,7 @@
 
 # Background Removal - ComfyUI Custom Nodes
 
-**Version:** 2025.12.18 (CalVer)
+**Version:** 2026.1.19 (CalVer)
 **Category:** ERPK/Background Removal
 **Namespace:** ERPK Organization Custom Nodes
 
@@ -29,24 +29,56 @@ Background removal nodes with multiple backend options for different quality/spe
 
 ONNX-based background removal with 14+ model options. Best for versatility and CPU support.
 
-**Models:**
-| Model | Description |
-|-------|-------------|
-| `u2net` | General purpose (default) |
-| `u2netp` | Lightweight, faster |
-| `u2net_human_seg` | Human segmentation |
-| `u2net_cloth_seg` | Clothing parsing |
-| `silueta` | Compact u2net (43MB) |
-| `isnet-general-use` | General purpose ISNet |
-| `isnet-anime` | Anime characters |
-| `sam` | Segment Anything Model |
-| `birefnet-general` | BiRefNet general |
-| `birefnet-general-lite` | BiRefNet lightweight |
-| `birefnet-portrait` | BiRefNet portraits |
-| `birefnet-dis` | BiRefNet DIS |
-| `birefnet-hrsod` | BiRefNet high-res |
-| `birefnet-cod` | BiRefNet camouflaged |
-| `birefnet-massive` | BiRefNet largest |
+**Model Selection Guide:**
+
+| Model | Best For | Speed | Quality | Size |
+|-------|----------|-------|---------|------|
+| `u2net` | General photos, simple backgrounds | Fast | Good | 176MB |
+| `u2netp` | Quick processing, resource-limited environments | Fastest | Moderate | 4MB |
+| `u2net_human_seg` | People, portraits, full-body shots | Fast | Good | 176MB |
+| `u2net_cloth_seg` | Fashion, apparel, clothing isolation | Fast | Good | 176MB |
+| `silueta` | General use with storage constraints | Fast | Good | 43MB |
+| `isnet-general-use` | Complex backgrounds, multiple objects | Medium | Very Good | 179MB |
+| `isnet-anime` | Anime, manga, stylized illustrations | Medium | Excellent | 179MB |
+| `sam` | Interactive segmentation with prompts | Slow | Variable | Large |
+| `birefnet-general` | High-quality general use, fine details | Slower | Excellent | 973MB |
+| `birefnet-general-lite` | Balanced quality/speed tradeoff | Medium | Very Good | ~200MB |
+| `birefnet-portrait` | Professional portraits, headshots | Slower | Excellent | 973MB |
+| `birefnet-dis` | Precise foreground/background separation | Slower | Excellent | 973MB |
+| `birefnet-hrsod` | High-resolution salient objects | Slower | Excellent | 973MB |
+| `birefnet-cod` | Camouflaged or hidden objects | Slower | Excellent | 973MB |
+| `birefnet-massive` | Maximum quality, diverse subjects | Slowest | Best | ~1GB |
+
+**Model Details:**
+
+#### U2-Net Family
+Multi-scale architecture that analyzes images at different zoom levels simultaneously. Works well for single subjects with clear separation from background.
+
+- **u2net**: Default general-purpose model. Good balance of speed and quality for typical photos.
+- **u2netp**: Lightweight version (~4MB). Use when speed matters more than edge precision.
+- **u2net_human_seg**: Trained specifically on human subjects. Best for portraits and people.
+- **u2net_cloth_seg**: Parses clothing into 3 categories (upper body, lower body, full body). Ideal for fashion/e-commerce.
+- **silueta**: Same architecture as u2net but compressed to 43MB. Good for deployment with storage limits.
+
+#### ISNet Family
+Two-step "intermediate supervision" approach: first suppresses background, then refines edges. Excels with cluttered or noisy backgrounds.
+
+- **isnet-general-use**: Modern general-purpose model. Better edge quality than u2net on complex scenes (IoU 0.82 vs 0.39 on DIS5K dataset).
+- **isnet-anime**: High-accuracy segmentation trained on anime/manga. Handles stylized art with clean lines.
+
+#### SAM (Segment Anything)
+Meta's versatile segmentation model. Designed for interactive use with prompts/input points. Not recommended for automatic background removal - produces lower accuracy on unprompted tasks.
+
+#### BiRefNet Family
+Bilateral Reference Network with bidirectional refinement. Achieves highest accuracy (IoU 0.87, Dice 0.92) by validating fine details against global context. Best for professional results.
+
+- **birefnet-general**: Best overall quality for diverse subjects. Handles fine details like hair, fur, bicycle spokes.
+- **birefnet-general-lite**: Lighter backbone (swin_v1_tiny). Good quality/speed tradeoff.
+- **birefnet-portrait**: Optimized for human portraits with alpha matting support.
+- **birefnet-dis**: Dichotomous Image Segmentation. Precise binary foreground/background masks.
+- **birefnet-hrsod**: High-Resolution Salient Object Detection. Best for large images (trained on 2048x2048).
+- **birefnet-cod**: Camouflaged Object Detection. Finds objects that blend into backgrounds.
+- **birefnet-massive**: Trained on combined datasets. Maximum quality at cost of speed.
 
 **Options:**
 - `alpha_matting`: Enable alpha matting refinement
@@ -99,9 +131,16 @@ pip install -r requirements.txt
 
 ### Backend-Specific Dependencies
 
-Each backend has its own dependencies. Install only what you need:
+All background removal dependencies are now included in the main package. If installing via ComfyUI Manager or Registry, dependencies are installed automatically.
 
-**rembg (ONNX):**
+For manual installation:
+
+**rembg (ONNX with GPU):**
+```bash
+pip install "rembg[gpu]>=2.0.50"
+```
+
+**rembg (CPU only, for macOS or systems without CUDA):**
 ```bash
 pip install rembg>=2.0.50 onnxruntime>=1.16.0
 ```
@@ -118,7 +157,7 @@ pip install transformers>=4.36.0 torchvision>=0.16.0
 
 ### GPU Acceleration
 
-- **rembg**: Use `onnxruntime-gpu` instead of `onnxruntime` for CUDA support
+- **rembg**: The `[gpu]` extra installs `onnxruntime-gpu` for CUDA acceleration on Windows/Linux. macOS users get CPU-only `onnxruntime` automatically.
 - **InSPyReNet**: Automatically uses CUDA if available
 - **BiRefNet**: Automatically uses CUDA or MPS (Apple Silicon) if available
 
