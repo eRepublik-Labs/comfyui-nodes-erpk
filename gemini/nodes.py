@@ -1119,7 +1119,7 @@ class GeminiImageEdit:
     Gemini Image Editing Node
 
     Uses Gemini's image generation models to edit/modify existing images based on text prompts.
-    Supports 1-3 input images for best results.
+    Gemini 3 Pro supports up to 14 reference images (up to 6 objects, up to 5 humans).
     Can use a client from GeminiAPIConfig or work standalone with an API key.
     """
 
@@ -1135,7 +1135,7 @@ class GeminiImageEdit:
             "required": {
                 "image": (
                     "IMAGE",
-                    {"tooltip": "Input image(s) to edit (supports 1-3 images)"}
+                    {"tooltip": "Reference image(s) to edit (Gemini 3 Pro supports up to 14 images)"}
                 ),
                 "prompt": (
                     "STRING",
@@ -1147,6 +1147,22 @@ class GeminiImageEdit:
                 ),
             },
             "optional": {
+                "image2": (
+                    "IMAGE",
+                    {"tooltip": "Additional reference image(s)"}
+                ),
+                "image3": (
+                    "IMAGE",
+                    {"tooltip": "Additional reference image(s)"}
+                ),
+                "image4": (
+                    "IMAGE",
+                    {"tooltip": "Additional reference image(s)"}
+                ),
+                "image5": (
+                    "IMAGE",
+                    {"tooltip": "Additional reference image(s)"}
+                ),
                 "client": (
                     "GEMINI_API_CLIENT",
                     {"tooltip": "Gemini API client from Gemini API Config node (uses API key from config)"}
@@ -1220,6 +1236,10 @@ class GeminiImageEdit:
         self,
         image,
         prompt: str,
+        image2=None,
+        image3=None,
+        image4=None,
+        image5=None,
         client: GeminiClient = None,
         model: str = "gemini-2.5-flash-image",
         temperature: float = 1.0,
@@ -1270,8 +1290,11 @@ class GeminiImageEdit:
                     model=model
                 )
 
-            # Convert ComfyUI tensors to PIL images
+            # Convert ComfyUI tensors to PIL images, combining all inputs
             pil_images = ImageConverter.tensors_to_pil_list(image)
+            for extra_image in [image2, image3, image4, image5]:
+                if extra_image is not None:
+                    pil_images.extend(ImageConverter.tensors_to_pil_list(extra_image))
             num_images = len(pil_images)
 
             print(f"[Gemini] Editing image with model: {model}")
@@ -1282,9 +1305,9 @@ class GeminiImageEdit:
             if image_size != "default":
                 print(f"[Gemini] Image size: {image_size}")
 
-            # Warn if using more than 3 images (API works best with 1-3)
-            if num_images > 3:
-                print(f"[Gemini] Warning: Using {num_images} images. API works best with 1-3 images.")
+            # Warn if using more than 14 images (Gemini 3 Pro limit)
+            if num_images > 14:
+                print(f"[Gemini] Warning: Using {num_images} images. Gemini 3 Pro supports up to 14 reference images.")
 
             # Build generation config
             from google.genai import types

@@ -10,7 +10,7 @@ Complete Google Gemini API integration providing text generation, vision analysi
 - **Text Generation** - Use all Gemini models (3 Pro, 3 Flash, 2.5 Pro, 2.5 Flash)
 - **Vision Analysis** - Analyze images with Gemini's multimodal capabilities
 - **Image Generation** - Generate images from text descriptions
-- **Image Editing** - Edit and modify images with natural language prompts (1-3 images)
+- **Image Editing** - Edit and modify images with natural language prompts (up to 14 reference images)
 - **Video Generation (Veo)** - Generate videos from text or images using Google's Veo models
 - **Multi-turn Conversations** - Maintain chat history across requests
 - **System Instructions** - Set persistent instructions to guide model behavior
@@ -206,7 +206,7 @@ Generate images from text descriptions using Gemini's image generation models.
 Edit and modify existing images using text prompts with Gemini's image generation models.
 
 **Inputs:**
-- `image`: Input image(s) to edit (ComfyUI IMAGE tensor, supports 1-3 images)
+- `image`: Input image(s) to edit (ComfyUI IMAGE tensor, up to 14 reference images)
 - `prompt`: Text description of how to modify the image(s)
 - `client`: Optional Gemini API client (from Gemini API Config node)
 - `model`: gemini-2.5-flash-image (fast, recommended) or gemini-3-pro-image-preview (best quality)
@@ -223,7 +223,7 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 
 **Features:**
 - Works with Gemini API Config node or standalone with API key
-- Supports 1-3 input images for best results (API optimized for this range)
+- Gemini 3 Pro supports up to 14 reference images (up to 6 objects, up to 5 humans)
 - Image-to-image editing with natural language instructions
 - Compatible with all ComfyUI image nodes
 - Full aspect ratio support (10 options)
@@ -243,7 +243,7 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 - Provide logo + product image: "Add this logo to the product packaging"
 - Provide style reference + content image: "Apply the artistic style from the first image to the second image"
 
-**Note:** Works best with 1-3 images. Using more images may reduce quality or accuracy.
+**Note:** Gemini 3 Pro Image supports up to 14 reference images (up to 6 objects, up to 5 humans for character consistency).
 
 ---
 

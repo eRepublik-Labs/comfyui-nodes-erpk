@@ -120,7 +120,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Gemini Chat** - Multi-turn conversations with automatic context preservation
 - **Gemini Vision** - Analyze images with multimodal capabilities
 - **Gemini Image Generation** - Generate images from text descriptions (standalone node with dedicated image gen models)
-- **Gemini Image Edit** - Edit and modify images with natural language prompts (supports 1-3 images)
+- **Gemini Image Edit** - Edit and modify images with natural language prompts (up to 14 reference images)
 - **Gemini System Instruction** - Set persistent system-level instructions to guide model behavior
 - **Gemini Safety Settings** - Configure content safety filters (strict/balanced/permissive presets or custom)
 
@@ -135,7 +135,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - Each node selects its own model for maximum flexibility
 - State-of-the-art reasoning with Gemini 3 Pro and 2.5 Pro
 - Image generation with Gemini 2.5 Flash Image models
-- Image editing with natural language instructions (1-3 images)
+- Image editing with natural language instructions (up to 14 reference images)
 - Simple, straightforward API integration
 - Vision capabilities with batch image support
 - Flexible safety controls
