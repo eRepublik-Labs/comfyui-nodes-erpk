@@ -53,37 +53,28 @@ DEVICE_OPTIONS = ["auto", "cuda", "cpu", "mps"]
 # Dtype options
 DTYPE_OPTIONS = ["float32", "float16"]
 
-# Background color presets
-BACKGROUND_COLORS = {
-    "transparent": None,
-    "white": (255, 255, 255),
-    "black": (0, 0, 0),
-    "green": (0, 255, 0),
-    "blue": (0, 0, 255),
-    "red": (255, 0, 0),
-    "yellow": (255, 255, 0),
-    "cyan": (0, 255, 255),
-    "magenta": (255, 0, 255),
-    "gray": (128, 128, 128),
-    "light_gray": (192, 192, 192),
-    "dark_gray": (64, 64, 64),
-    "orange": (255, 165, 0),
-    "pink": (255, 192, 203),
-    "purple": (128, 0, 128),
-    "brown": (139, 69, 19),
-    "navy": (0, 0, 128),
-    "teal": (0, 128, 128),
-    "olive": (128, 128, 0),
-    "maroon": (128, 0, 0),
-    "lime": (0, 255, 0),
-    "aqua": (0, 255, 255),
-    "silver": (192, 192, 192),
-    "fuchsia": (255, 0, 255),
-    "chroma_green": (0, 177, 64),
-    "chroma_blue": (0, 71, 187),
+# Upscale methods for resizing
+UPSCALE_METHODS = ["bilinear", "bicubic", "lanczos", "nearest", "area"]
+
+# Map upscale method names to PIL resampling constants
+UPSCALE_TO_PIL = {
+    "bilinear": Image.Resampling.BILINEAR,
+    "bicubic": Image.Resampling.BICUBIC,
+    "lanczos": Image.Resampling.LANCZOS,
+    "nearest": Image.Resampling.NEAREST,
+    "area": Image.Resampling.BOX,  # PIL doesn't have AREA, BOX is closest
 }
 
-BACKGROUND_COLOR_NAMES = list(BACKGROUND_COLORS.keys())
+
+def hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
+    """Convert hex color string to RGB tuple."""
+    hex_color = hex_color.lstrip("#")
+    if len(hex_color) != 6:
+        return (0, 0, 0)
+    try:
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    except ValueError:
+        return (0, 0, 0)
 
 
 def get_device(device_option: str) -> str:
@@ -138,7 +129,8 @@ class BiRefNetRemoveBackground:
     - 15 model variants for different use cases
     - dtype selection (float16 for VRAM efficiency)
     - Device selection (auto/cuda/cpu/mps)
-    - Background color options (26 colors)
+    - Configurable processing resolution with upscale method
+    - Optional background color fill
     - Local model loading support
     - MIT licensed - safe for commercial use
     """
@@ -160,14 +152,31 @@ class BiRefNetRemoveBackground:
                 "variant": (variant_choices, {"default": "ZhengPeng7/BiRefNet"}),
             },
             "optional": {
-                "resolution": (
+                "width": (
                     "INT",
                     {
                         "default": 1024,
                         "min": 256,
                         "max": 2048,
                         "step": 64,
-                        "tooltip": "Processing resolution. HR variants can use 2048, Lite variants work well at 512-1024.",
+                        "tooltip": "Processing width. HR variants can use 2048, Lite variants work well at 512-1024.",
+                    },
+                ),
+                "height": (
+                    "INT",
+                    {
+                        "default": 1024,
+                        "min": 256,
+                        "max": 2048,
+                        "step": 64,
+                        "tooltip": "Processing height. HR variants can use 2048, Lite variants work well at 512-1024.",
+                    },
+                ),
+                "upscale_method": (
+                    UPSCALE_METHODS,
+                    {
+                        "default": "bilinear",
+                        "tooltip": "Interpolation method for resizing.",
                     },
                 ),
                 "device": (
@@ -184,11 +193,18 @@ class BiRefNetRemoveBackground:
                         "tooltip": "Data type. float16 uses ~50% less VRAM but may have slight quality differences.",
                     },
                 ),
-                "background": (
-                    BACKGROUND_COLOR_NAMES,
+                "fill_background": (
+                    "BOOLEAN",
                     {
-                        "default": "transparent",
-                        "tooltip": "Background color for removed areas. 'transparent' outputs RGBA.",
+                        "default": False,
+                        "tooltip": "Fill background with solid color instead of transparent.",
+                    },
+                ),
+                "background_color": (
+                    "STRING",
+                    {
+                        "default": "#000000",
+                        "tooltip": "Hex color for background fill (e.g., #00FF00 for green).",
                     },
                 ),
                 "mask_threshold": (
@@ -261,10 +277,13 @@ class BiRefNetRemoveBackground:
         self,
         image,
         variant: str,
-        resolution: int = 1024,
+        width: int = 1024,
+        height: int = 1024,
+        upscale_method: str = "bilinear",
         device: str = "auto",
         dtype: str = "float32",
-        background: str = "transparent",
+        fill_background: bool = False,
+        background_color: str = "#000000",
         mask_threshold: float = 0.0,
     ) -> Tuple:
         """Remove background from images using BiRefNet."""
@@ -278,9 +297,12 @@ class BiRefNetRemoveBackground:
         # Get cached model
         model = self._get_model(variant, actual_device, actual_dtype)
 
+        # Get PIL resampling method
+        resample_method = UPSCALE_TO_PIL.get(upscale_method, Image.Resampling.BILINEAR)
+
         # Preprocessing transform
         transform = transforms.Compose([
-            transforms.Resize((resolution, resolution)),
+            transforms.Resize((height, width), interpolation=transforms.InterpolationMode.BILINEAR),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
@@ -290,8 +312,8 @@ class BiRefNetRemoveBackground:
         result_images: List[Image.Image] = []
         result_masks: List[Image.Image] = []
 
-        # Get background color
-        bg_color = BACKGROUND_COLORS.get(background)
+        # Get background color if filling
+        bg_color = hex_to_rgb(background_color) if fill_background else None
 
         # Process each image
         variant_short = variant.split("/")[-1] if "/" in variant else variant
@@ -315,27 +337,27 @@ class BiRefNetRemoveBackground:
             mask_np = (pred.numpy() * 255).astype(np.uint8)
             mask_pil = Image.fromarray(mask_np, mode="L")
 
-            # Resize mask back to original size
-            mask_pil = mask_pil.resize(original_size, Image.Resampling.LANCZOS)
+            # Resize mask back to original size using selected method
+            mask_pil = mask_pil.resize(original_size, resample_method)
             result_masks.append(mask_pil)
 
             # Create output image
-            if bg_color is None:
-                # Transparent RGBA
-                rgba = pil_img.copy()
-                rgba.putalpha(mask_pil)
-                result_images.append(rgba)
-            else:
+            if fill_background:
                 # Solid color background
                 background_img = Image.new("RGB", original_size, bg_color)
                 background_img.paste(pil_img, mask=mask_pil)
                 result_images.append(background_img)
+            else:
+                # Transparent RGBA
+                rgba = pil_img.copy()
+                rgba.putalpha(mask_pil)
+                result_images.append(rgba)
 
         # Convert back to tensors
-        if bg_color is None:
-            image_tensor = pil_rgba_to_tensor(result_images)
-        else:
+        if fill_background:
             image_tensor = pil_to_tensor(result_images)
+        else:
+            image_tensor = pil_rgba_to_tensor(result_images)
 
         mask_tensor = self._masks_to_tensor(result_masks)
 
@@ -372,13 +394,31 @@ class BiRefNetGetMask:
                 "variant": (variant_choices, {"default": "ZhengPeng7/BiRefNet"}),
             },
             "optional": {
-                "resolution": (
+                "width": (
                     "INT",
                     {
                         "default": 1024,
                         "min": 256,
                         "max": 2048,
                         "step": 64,
+                        "tooltip": "Processing width.",
+                    },
+                ),
+                "height": (
+                    "INT",
+                    {
+                        "default": 1024,
+                        "min": 256,
+                        "max": 2048,
+                        "step": 64,
+                        "tooltip": "Processing height.",
+                    },
+                ),
+                "upscale_method": (
+                    UPSCALE_METHODS,
+                    {
+                        "default": "bilinear",
+                        "tooltip": "Interpolation method for resizing.",
                     },
                 ),
                 "device": (DEVICE_OPTIONS, {"default": "auto"}),
@@ -390,6 +430,7 @@ class BiRefNetGetMask:
                         "min": 0.0,
                         "max": 1.0,
                         "step": 0.01,
+                        "tooltip": "Threshold for mask binarization. 0 = no threshold (soft mask).",
                     },
                 ),
             },
@@ -405,7 +446,9 @@ class BiRefNetGetMask:
         self,
         image,
         variant: str,
-        resolution: int = 1024,
+        width: int = 1024,
+        height: int = 1024,
+        upscale_method: str = "bilinear",
         device: str = "auto",
         dtype: str = "float32",
         mask_threshold: float = 0.0,
@@ -421,9 +464,12 @@ class BiRefNetGetMask:
         # Get cached model (reuse from main class)
         model = BiRefNetRemoveBackground._get_model(variant, actual_device, actual_dtype)
 
+        # Get PIL resampling method
+        resample_method = UPSCALE_TO_PIL.get(upscale_method, Image.Resampling.BILINEAR)
+
         # Preprocessing transform
         transform = transforms.Compose([
-            transforms.Resize((resolution, resolution)),
+            transforms.Resize((height, width), interpolation=transforms.InterpolationMode.BILINEAR),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
@@ -451,10 +497,10 @@ class BiRefNetGetMask:
             if mask_threshold > 0:
                 pred = (pred > mask_threshold).float()
 
-            # Resize mask back to original size
+            # Resize mask back to original size using selected method
             mask_np = pred.numpy()
             mask_pil = Image.fromarray((mask_np * 255).astype(np.uint8), mode="L")
-            mask_pil = mask_pil.resize(original_size, Image.Resampling.LANCZOS)
+            mask_pil = mask_pil.resize(original_size, resample_method)
 
             # Convert back to normalized tensor
             mask_resized = np.array(mask_pil).astype(np.float32) / 255.0
@@ -570,7 +616,7 @@ class BlurFusionForegroundEstimation:
             # Create output
             if fill_background:
                 # Parse hex color
-                bg_rgb = self._hex_to_rgb(background_color)
+                bg_rgb = hex_to_rgb(background_color)
                 # Composite onto background
                 alpha = mask_np.astype(np.float32) / 255.0
                 alpha = alpha[:, :, np.newaxis]
@@ -643,16 +689,6 @@ class BlurFusionForegroundEstimation:
         result = np.clip(result, 0, 255)
 
         return result
-
-    def _hex_to_rgb(self, hex_color: str) -> Tuple[int, int, int]:
-        """Convert hex color string to RGB tuple."""
-        hex_color = hex_color.lstrip("#")
-        if len(hex_color) != 6:
-            return (0, 0, 0)
-        try:
-            return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-        except ValueError:
-            return (0, 0, 0)
 
 
 # Node registration

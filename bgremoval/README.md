@@ -3,7 +3,7 @@
 
 # Background Removal - ComfyUI Custom Nodes
 
-**Version:** 2026.1.27 (CalVer)
+**Version:** 2026.1.28 (CalVer)
 **Category:** ERPK/Background Removal
 **Namespace:** ERPK Organization Custom Nodes
 
@@ -120,10 +120,13 @@ HuggingFace transformers-based. Highest quality dichotomous image segmentation w
 | `ZhengPeng7/BiRefNet-DIS5K-TR_TEs` | DIS Massive | Maximum accuracy |
 
 **Options:**
-- `resolution`: Processing resolution (256-2048). HR variants work best at 2048, Lite variants at 512-1024.
+- `width`: Processing width (256-2048). HR variants work best at 2048, Lite variants at 512-1024.
+- `height`: Processing height (256-2048). HR variants work best at 2048, Lite variants at 512-1024.
+- `upscale_method`: Interpolation method for resizing (`bilinear`, `bicubic`, `lanczos`, `nearest`, `area`).
 - `device`: Processing device selection (`auto`, `cuda`, `cpu`, `mps`). Auto selects best available.
 - `dtype`: Data type (`float32`, `float16`). float16 uses ~50% less VRAM.
-- `background`: Background color (26 options including `transparent`, `white`, `black`, `chroma_green`, `chroma_blue`).
+- `fill_background`: Enable to fill background with solid color instead of transparent.
+- `background_color`: Hex color for background fill (e.g., `#00FF00` for green). Only used when `fill_background` is enabled.
 - `mask_threshold`: Threshold for mask binarization (0.0-1.0). 0 = soft mask, higher = sharper edges.
 
 **Local Model Loading:**
@@ -133,7 +136,7 @@ Place `.safetensors` or `.pth` model files in `ComfyUI/models/BiRefNet/`. They w
 
 Mask-only output node using BiRefNet. Useful when you only need the segmentation mask for compositing or other operations.
 
-**Options:** Same as Remove Background (BiRefNet) except no background color option.
+**Options:** Same as Remove Background (BiRefNet) except no background options (`fill_background`, `background_color`).
 
 **Output:** MASK only (no image output).
 
