@@ -1147,21 +1147,9 @@ class GeminiImageEdit:
                 ),
             },
             "optional": {
-                "image2": (
+                "additional_images": (
                     "IMAGE",
-                    {"tooltip": "Additional reference image(s)"}
-                ),
-                "image3": (
-                    "IMAGE",
-                    {"tooltip": "Additional reference image(s)"}
-                ),
-                "image4": (
-                    "IMAGE",
-                    {"tooltip": "Additional reference image(s)"}
-                ),
-                "image5": (
-                    "IMAGE",
-                    {"tooltip": "Additional reference image(s)"}
+                    {"tooltip": "Additional reference image(s) to combine with main image input"}
                 ),
                 "client": (
                     "GEMINI_API_CLIENT",
@@ -1236,10 +1224,7 @@ class GeminiImageEdit:
         self,
         image,
         prompt: str,
-        image2=None,
-        image3=None,
-        image4=None,
-        image5=None,
+        additional_images=None,
         client: GeminiClient = None,
         model: str = "gemini-2.5-flash-image",
         temperature: float = 1.0,
@@ -1292,9 +1277,8 @@ class GeminiImageEdit:
 
             # Convert ComfyUI tensors to PIL images, combining all inputs
             pil_images = ImageConverter.tensors_to_pil_list(image)
-            for extra_image in [image2, image3, image4, image5]:
-                if extra_image is not None:
-                    pil_images.extend(ImageConverter.tensors_to_pil_list(extra_image))
+            if additional_images is not None:
+                pil_images.extend(ImageConverter.tensors_to_pil_list(additional_images))
             num_images = len(pil_images)
 
             print(f"[Gemini] Editing image with model: {model}")
