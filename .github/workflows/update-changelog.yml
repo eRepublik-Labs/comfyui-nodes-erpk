@@ -60,6 +60,8 @@ jobs:
           echo "$RELEASE_BODY" > release_notes.txt
 
       - name: Update registry changelog
+        # NOTE: This step fails with 401 until Comfy-Org/registry-backend#168 is fixed
+        # The PUT endpoint doesn't accept PAT auth yet (same token works for publishing)
         if: steps.release.outputs.found == 'true'
         env:
           REGISTRY_TOKEN: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
@@ -71,11 +73,11 @@ jobs:
 
           echo "Updating changelog for version $VERSION..."
 
-          # Token goes in request body, not header (per comfy-cli implementation)
           RESPONSE=$(curl -s -w "\n%{http_code}" \
             -X PUT "https://api.comfy.org/publishers/erpk/nodes/comfyui-nodes-erpk/versions/$VERSION" \
             -H "Content-Type: application/json" \
-            -d "{\"personal_access_token\": \"$REGISTRY_TOKEN\", \"changelog\": $ESCAPED_BODY}")
+            -H "Authorization: Bearer ${REGISTRY_TOKEN}" \
+            -d "{\"changelog\": $ESCAPED_BODY}")
 
           HTTP_STATUS=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | sed '$d')
