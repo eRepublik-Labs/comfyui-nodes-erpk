@@ -1,15 +1,10 @@
 # ABOUTME: GitHub Actions workflow for publishing to ComfyUI Registry
-# ABOUTME: Triggers on pyproject.toml changes, releases, or manual dispatch
+# ABOUTME: Triggers on GitHub releases or manual dispatch
 
 name: Publish to Comfy Registry
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - "pyproject.toml"
   release:
     types: [published]
 
@@ -29,8 +24,6 @@ jobs:
           submodules: true
 
       - name: Publish Custom Node
-        # Skip on release trigger - push already published the version
-        if: github.event_name != 'release'
         uses: Comfy-Org/publish-node-action@v1
         with:
           personal_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
@@ -38,7 +31,6 @@ jobs:
       - name: Update Registry Changelog
         # NOTE: This step fails with 401 until Comfy-Org/registry-backend#168 is fixed
         # The PUT endpoint doesn't accept PAT auth yet (same token works for publishing)
-        if: github.event_name == 'release'
         env:
           REGISTRY_TOKEN: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
           GH_TOKEN: ${{ github.token }}
