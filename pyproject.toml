@@ -16,6 +16,7 @@ dependencies = [
     "urllib3>=1.26.0",
     # Background removal
     "tqdm>=4.65.0",
+    "opencv-contrib-python>=4.8.0",
     "rembg[gpu]>=2.0.50",
     "onnxruntime>=1.16.0; sys_platform == 'darwin'",
     "transparent-background>=1.2.0",

@@ -26,6 +26,8 @@ rembg[gpu]>=2.0.50
 onnxruntime>=1.16.0; sys_platform == "darwin"
 
 # Background Removal - InSPyReNet backend (PyTorch-based)
+# opencv-contrib-python provides full OpenCV with all CV_ constants (fixes albucore compatibility)
+opencv-contrib-python>=4.8.0
 transparent-background>=1.2.0
 
 # Background Removal - BiRefNet backend (HuggingFace transformers)
