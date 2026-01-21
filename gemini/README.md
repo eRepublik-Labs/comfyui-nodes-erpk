@@ -243,6 +243,12 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 - Provide logo + product image: "Add this logo to the product packaging"
 - Provide style reference + content image: "Apply the artistic style from the first image to the second image"
 
+**Referencing Images in Prompts:**
+Gemini understands images by position and content. You can reference them as:
+- **By order:** "the first image", "the second image", "image 1", "image 2"
+- **By content:** "the person wearing red", "the logo", "the background"
+- **By role:** "the style reference", "the subject", "the product"
+
 **Note:** Gemini 3 Pro Image supports up to 14 reference images (up to 6 objects, up to 5 humans for character consistency).
 
 ---

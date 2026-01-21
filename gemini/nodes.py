@@ -1142,7 +1142,7 @@ class GeminiImageEdit:
                     {
                         "multiline": True,
                         "default": "",
-                        "tooltip": "Description of how to modify the image(s)"
+                        "tooltip": "Describe the edit. Reference images by order (first/second), content (the logo), or role (the style reference)"
                     }
                 ),
             },
