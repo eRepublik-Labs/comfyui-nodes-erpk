@@ -127,7 +127,7 @@ HuggingFace transformers-based. Highest quality dichotomous image segmentation w
 - `dtype`: Data type (`float32`, `float16`). float16 uses ~50% less VRAM.
 - `fill_background`: Enable to fill background with solid color instead of transparent.
 - `background_color`: Hex color for background fill (e.g., `#00FF00` for green). Only used when `fill_background` is enabled.
-- `mask_threshold`: Threshold for mask binarization (0.0-1.0). 0 = soft mask, higher = sharper edges.
+- `mask_threshold`: Soft threshold for noise removal (0.0-1.0). Removes values below threshold while preserving gradients. Try 0.004 for noise removal, 0 = no filtering.
 
 **Local Model Loading:**
 Place `.safetensors` or `.pth` model files in `ComfyUI/models/BiRefNet/`. They will appear in the variant dropdown as `local:ModelName`.

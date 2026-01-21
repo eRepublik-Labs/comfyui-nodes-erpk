@@ -213,8 +213,8 @@ class BiRefNetRemoveBackground:
                         "default": 0.0,
                         "min": 0.0,
                         "max": 1.0,
-                        "step": 0.01,
-                        "tooltip": "Threshold for mask binarization. 0 = no threshold (soft mask).",
+                        "step": 0.001,
+                        "tooltip": "Soft threshold for noise removal. Removes values below threshold while preserving gradients. Try 0.004 for noise removal.",
                     },
                 ),
             },
@@ -330,9 +330,9 @@ class BiRefNetRemoveBackground:
             # Post-process mask
             pred = preds[0].squeeze()
 
-            # Apply threshold if set
+            # Apply soft threshold (removes noise while preserving gradients)
             if mask_threshold > 0:
-                pred = (pred > mask_threshold).float()
+                pred = pred * (pred > mask_threshold).float()
 
             mask_np = (pred.numpy() * 255).astype(np.uint8)
             mask_pil = Image.fromarray(mask_np, mode="L")
@@ -429,8 +429,8 @@ class BiRefNetGetMask:
                         "default": 0.0,
                         "min": 0.0,
                         "max": 1.0,
-                        "step": 0.01,
-                        "tooltip": "Threshold for mask binarization. 0 = no threshold (soft mask).",
+                        "step": 0.001,
+                        "tooltip": "Soft threshold for noise removal. Removes values below threshold while preserving gradients. Try 0.004 for noise removal.",
                     },
                 ),
             },
@@ -493,9 +493,9 @@ class BiRefNetGetMask:
             # Post-process mask
             pred = preds[0].squeeze()
 
-            # Apply threshold if set
+            # Apply soft threshold (removes noise while preserving gradients)
             if mask_threshold > 0:
-                pred = (pred > mask_threshold).float()
+                pred = pred * (pred > mask_threshold).float()
 
             # Resize mask back to original size using selected method
             mask_np = pred.numpy()
