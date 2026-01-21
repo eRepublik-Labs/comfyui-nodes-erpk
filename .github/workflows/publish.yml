@@ -47,9 +47,9 @@ jobs:
           VERSION=$(grep -E '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
           echo "Version: $VERSION"
 
-          # Get release notes from GitHub release
+          # Get release notes from GitHub release using gh CLI (avoids shell interpolation issues)
           RELEASE_TAG="${{ github.event.release.tag_name }}"
-          RELEASE_BODY="${{ github.event.release.body }}"
+          RELEASE_BODY=$(gh release view "$RELEASE_TAG" --json body -q .body 2>/dev/null || echo "")
 
           echo "Release tag: $RELEASE_TAG"
           echo "Release body length: ${#RELEASE_BODY}"
@@ -60,8 +60,9 @@ jobs:
             exit 0
           fi
 
-          # Escape JSON special characters
-          ESCAPED_BODY=$(echo "$RELEASE_BODY" | jq -Rs .)
+          # Escape JSON special characters (write to file first to preserve formatting)
+          echo "$RELEASE_BODY" > release_notes.txt
+          ESCAPED_BODY=$(cat release_notes.txt | jq -Rs .)
 
           # Update changelog via registry API
           echo "Updating changelog for version $VERSION..."
