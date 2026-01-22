@@ -109,7 +109,7 @@ app.registerExtension({
                         const removeBtn = {
                             type: "button",
                             name: `_remove_${i}`,
-                            value: `Remove input ${i}`,
+                            value: "\u{1F5D1} Remove",
                             callback: () => {
                                 self._removeInput(i);
                             },
@@ -127,7 +127,7 @@ app.registerExtension({
                 this.addWidget(
                     "button",
                     "_add_btn",
-                    "+ Add Input",
+                    "\u2795 Add Input",
                     () => {
                         self._addInput();
                     },
