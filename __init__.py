@@ -78,6 +78,17 @@ try:
 except ImportError as e:
     print(f"[ERPK] Warning: Could not load Apple ML nodes: {e}")
 
+# Import and register utility nodes
+try:
+    from .utils import (
+        NODE_CLASS_MAPPINGS as UTILS_NODE_CLASS_MAPPINGS,
+        NODE_DISPLAY_NAME_MAPPINGS as UTILS_NODE_DISPLAY_NAME_MAPPINGS
+    )
+    NODE_CLASS_MAPPINGS.update(UTILS_NODE_CLASS_MAPPINGS)
+    NODE_DISPLAY_NAME_MAPPINGS.update(UTILS_NODE_DISPLAY_NAME_MAPPINGS)
+except ImportError as e:
+    print(f"[ERPK] Warning: Could not load utility nodes: {e}")
+
 # Print loaded nodes summary
 print(f"[ERPK] Loaded {len(NODE_CLASS_MAPPINGS)} total nodes")
 

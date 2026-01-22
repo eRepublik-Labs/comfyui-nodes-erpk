@@ -42,8 +42,12 @@ ComfyUI-Custom-Nodes/
 ├── apple/                         # Apple ML models integration
 │   ├── README.md                  # Package documentation
 │   └── sharp_nodes.py             # SHARP view synthesis nodes
+├── utils/                         # String and general utilities
+│   ├── __init__.py                # Module exports
+│   └── concat_strings.py          # String concatenation node
 └── web/                           # Frontend extensions
-    └── aspect_ratio.js            # Aspect ratio display in node titles
+    ├── aspect_ratio.js            # Aspect ratio display in node titles
+    └── concat_strings.js          # Dynamic UI for concat strings node
 ```
 
 ## Available Node Packages
@@ -250,6 +254,23 @@ SHARP converts a single photograph into a 3D Gaussian splat representation that 
 
 **Installation & Documentation:** See [apple/README.md](apple/README.md)
 
+### ERPK/utils
+
+String manipulation and general utility nodes.
+
+**Category in ComfyUI:** `ERPK/utils`
+
+#### Nodes
+
+- **Concatenate Strings** - Combine multiple text inputs with configurable delimiters. Features dynamic add/remove of input fields, optional labels, and escape sequence support (\n, \t, etc.).
+
+**Key Features:**
+- Dynamic input fields (add/remove at runtime)
+- Optional label prefix for each input
+- Configurable delimiter (supports escape sequences)
+- Label placement options (same line or new line)
+- Workflow-persistent state
+
 ## Installation
 
 ### Method 1: ComfyUI Manager (Recommended)
@@ -294,7 +315,7 @@ Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishe
    - **Background Removal:** No API keys required, models download automatically on first use
    - **Apple/SHARP:** No API keys required. Install with: `pip install git+https://github.com/apple/ml-sharp.git`
 
-2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, `ERPK/Gemini`, `ERPK/OpenAI`, `ERPK/Background Removal`, and `ERPK/Apple/SHARP`
+2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, `ERPK/Gemini`, `ERPK/OpenAI`, `ERPK/Background Removal`, `ERPK/Apple/SHARP`, and `ERPK/utils`
 
 ## ComfyUI API Integration
 
