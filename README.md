@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2026.1.30 (CalVer)
+**Current Version:** 2026.1.31 (CalVer)
 
 ## Repository Structure
 
@@ -265,11 +265,12 @@ String manipulation and general utility nodes.
 - **Concatenate Strings** - Combine multiple text inputs with configurable delimiters. Supports up to 10 connectable inputs - drag STRING outputs from other nodes or enter text directly.
 
 **Key Features:**
-- 10 connectable text inputs (text_1 through text_10)
-- Optional labels for each input (label_1 through label_10)
+- 10 connectable text inputs (Text 1 through Text 10)
+- Optional labels for each input (Label 1 through Label 10)
 - Configurable delimiter with escape sequence support (\n, \t)
 - Label placement options (same line or new line)
-- Expand/collapse UI to show only inputs you need
+- Add/Remove buttons to dynamically manage inputs
+- Visual separators between configuration and input sections
 
 ## Installation
 
