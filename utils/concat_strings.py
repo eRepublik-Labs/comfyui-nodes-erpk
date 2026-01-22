@@ -15,21 +15,21 @@ class ConcatenateStrings:
         inputs = {
             "required": {},
             "optional": {
-                "delimiter": ("STRING", {"default": "\\n", "multiline": False}),
-                "include_labels": ("BOOLEAN", {"default": False}),
-                "label_on_same_line": ("BOOLEAN", {"default": True}),
+                "Delimiter": ("STRING", {"default": "\\n", "multiline": False}),
+                "Include Labels": ("BOOLEAN", {"default": False}),
+                "Label on Same Line": ("BOOLEAN", {"default": True}),
             },
         }
 
-        # Add text and label input pairs
+        # Add label and text input pairs (label first so it appears on top)
         for i in range(1, MAX_INPUTS + 1):
-            inputs["optional"][f"text_{i}"] = ("STRING", {
-                "default": "",
-                "multiline": True,
-            })
-            inputs["optional"][f"label_{i}"] = ("STRING", {
+            inputs["optional"][f"Label {i}"] = ("STRING", {
                 "default": "",
                 "multiline": False,
+            })
+            inputs["optional"][f"Text {i}"] = ("STRING", {
+                "default": "",
+                "multiline": True,
             })
 
         return inputs
@@ -47,27 +47,25 @@ Concatenate multiple text inputs into a single output.
 - Set **delimiter** to control how values are joined (use \\n for newlines, \\t for tabs)
 """
 
-    def concatenate(
-        self,
-        delimiter="\\n",
-        include_labels=False,
-        label_on_same_line=True,
-        **kwargs
-    ):
+    def concatenate(self, **kwargs):
         # Handle escape sequences in delimiter (\n, \t, etc.)
+        delimiter = kwargs.get("Delimiter", "\\n")
         try:
             delimiter = delimiter.encode('utf-8').decode('unicode_escape')
         except (UnicodeDecodeError, ValueError):
             pass  # Keep delimiter as-is if escape processing fails
 
+        include_labels = kwargs.get("Include Labels", False)
+        label_on_same_line = kwargs.get("Label on Same Line", True)
+
         parts = []
         for i in range(1, MAX_INPUTS + 1):
-            text = kwargs.get(f"text_{i}", "")
+            text = kwargs.get(f"Text {i}", "")
             if not text:
                 continue
 
             if include_labels:
-                label = kwargs.get(f"label_{i}", "")
+                label = kwargs.get(f"Label {i}", "")
                 if label:
                     if label_on_same_line:
                         parts.append(f"{label} {text}")
