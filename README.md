@@ -262,14 +262,14 @@ String manipulation and general utility nodes.
 
 #### Nodes
 
-- **Concatenate Strings** - Combine multiple text inputs with configurable delimiters. Features dynamic add/remove of input fields, optional labels, and escape sequence support (\n, \t, etc.).
+- **Concatenate Strings** - Combine multiple text inputs with configurable delimiters. Supports up to 10 connectable inputs - drag STRING outputs from other nodes or enter text directly.
 
 **Key Features:**
-- Dynamic input fields (add/remove at runtime)
-- Optional label prefix for each input
-- Configurable delimiter (supports escape sequences)
+- 10 connectable text inputs (text_1 through text_10)
+- Optional labels for each input (label_1 through label_10)
+- Configurable delimiter with escape sequence support (\n, \t)
 - Label placement options (same line or new line)
-- Workflow-persistent state
+- Expand/collapse UI to show only inputs you need
 
 ## Installation
 

@@ -1,28 +1,38 @@
 # ABOUTME: ComfyUI node for concatenating multiple string inputs with configurable delimiters.
-# ABOUTME: Supports dynamic input count via JavaScript widgets, per-field naming, and various delimiter options.
+# ABOUTME: Supports up to 10 connectable text inputs, optional labels, and escape sequences.
 
-import json
+MAX_INPUTS = 10
 
 
 class ConcatenateStrings:
     """
     Concatenate multiple string inputs with configurable delimiter.
-    Supports dynamic number of inputs with optional per-field names.
-    UI is managed by JavaScript - see web/concat_strings.js
+    Each input slot accepts connections from other nodes or manual text entry.
     """
 
     @classmethod
     def INPUT_TYPES(cls):
-        return {
+        inputs = {
             "required": {},
-            "optional": {},
-            "hidden": {
-                "entries": "STRING",
-                "delimiter": "STRING",
-                "includeNames": "BOOLEAN",
-                "labelOnSameLine": "BOOLEAN",
+            "optional": {
+                "delimiter": ("STRING", {"default": "\\n", "multiline": False}),
+                "include_labels": ("BOOLEAN", {"default": False}),
+                "label_on_same_line": ("BOOLEAN", {"default": True}),
             },
         }
+
+        # Add text and label input pairs
+        for i in range(1, MAX_INPUTS + 1):
+            inputs["optional"][f"text_{i}"] = ("STRING", {
+                "default": "",
+                "multiline": True,
+            })
+            inputs["optional"][f"label_{i}"] = ("STRING", {
+                "default": "",
+                "multiline": False,
+            })
+
+        return inputs
 
     RETURN_TYPES = ("STRING",)
     RETURN_NAMES = ("STRING",)
@@ -31,39 +41,38 @@ class ConcatenateStrings:
     DESCRIPTION = """
 Concatenate multiple text inputs into a single output.
 
-- Click **+ Add Input** to add more text fields
-- Each field has a **Label** and **Text** area
-- Enable **Include Labels in Output** to prefix values with their labels
-- Set the **Delimiter** to control how values are joined (use \\n for newlines)
+- Connect STRING outputs from other nodes to text_1, text_2, etc.
+- Optionally set labels for each input (label_1, label_2, etc.)
+- Enable **include_labels** to prefix values with their labels
+- Set **delimiter** to control how values are joined (use \\n for newlines, \\t for tabs)
 """
 
-    def concatenate(self, entries=None, delimiter="\\n", includeNames=False, labelOnSameLine=True, **kwargs):
-        # Parse entries from JSON if it's a string
-        if isinstance(entries, str):
-            try:
-                entries = json.loads(entries)
-            except (json.JSONDecodeError, TypeError):
-                entries = []
-
-        if not entries:
-            entries = []
-
+    def concatenate(
+        self,
+        delimiter="\\n",
+        include_labels=False,
+        label_on_same_line=True,
+        **kwargs
+    ):
         # Handle escape sequences in delimiter (\n, \t, etc.)
-        delimiter = delimiter.encode('utf-8').decode('unicode_escape')
+        try:
+            delimiter = delimiter.encode('utf-8').decode('unicode_escape')
+        except (UnicodeDecodeError, ValueError):
+            pass  # Keep delimiter as-is if escape processing fails
 
         parts = []
-        for entry in entries:
-            text = entry.get("text", "")
+        for i in range(1, MAX_INPUTS + 1):
+            text = kwargs.get(f"text_{i}", "")
             if not text:
                 continue
 
-            if includeNames:
-                label = entry.get("label", "")
+            if include_labels:
+                label = kwargs.get(f"label_{i}", "")
                 if label:
-                    if labelOnSameLine:
-                        parts.append(f"{label}: {text}")
+                    if label_on_same_line:
+                        parts.append(f"{label} {text}")
                     else:
-                        parts.append(f"{label}:\n{text}")
+                        parts.append(f"{label}\n{text}")
                 else:
                     parts.append(text)
             else:
