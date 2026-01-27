@@ -24,10 +24,18 @@ app.registerExtension({
             this.properties = this.properties || {};
             this.properties.activeInputCount = this.activeInputCount;
 
-            // Delay to ensure widgets exist
-            // Check _isLoadingWorkflow flag (set by onConfigure which runs before this timeout fires)
+            // Delay to ensure widgets exist, then set up UI once
             setTimeout(() => {
-                this._setupUI(this._isLoadingWorkflow);
+                this._styleInputsHeader();
+                this._updateInputVisibility();
+                this._createControlWidgets();  // Create once, never remove
+                if (!this._isLoadingWorkflow) {
+                    this._resizeNode();
+                } else if (this._savedSize) {
+                    // Immediately restore size after widget creation
+                    this.size[0] = this._savedSize[0];
+                    this.size[1] = this._savedSize[1];
+                }
             }, 50);
 
             return result;
@@ -39,41 +47,37 @@ app.registerExtension({
             // Set flag SYNCHRONOUSLY - onNodeCreated's setTimeout will see this
             this._isLoadingWorkflow = true;
 
+            // Save the original size from workflow JSON
+            if (info.size) {
+                this._savedSize = [info.size[0], info.size[1]];
+            }
+
             const result = onConfigure?.apply(this, arguments);
 
             if (info.properties?.activeInputCount) {
                 this.activeInputCount = info.properties.activeInputCount;
             }
 
+            // On load, update visibility and restore size after LiteGraph's async resize
             setTimeout(() => {
-                this._setupUI(true);  // true = loading, don't override saved size
+                this._updateInputVisibility();
+                this._updateControlWidgetVisibility();
+
+                // Restore saved size after LiteGraph's requestAnimationFrame resize
+                if (this._savedSize) {
+                    const savedSize = this._savedSize;
+                    const node = this;
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            node.size[0] = savedSize[0];
+                            node.size[1] = savedSize[1];
+                            node.setDirtyCanvas(true, true);
+                        });
+                    });
+                }
             }, 100);
 
             return result;
-        };
-
-        // Setup the UI with proper visibility and buttons
-        nodeType.prototype._setupUI = function (isLoading = false) {
-            this._removeControlWidgets();
-            this._styleInputsHeader();
-            this._updateInputVisibility();
-            this._addControlWidgets();
-            // NOTE: Do NOT reorder widgets - ComfyUI serializes by index, not by name
-            // Reordering breaks save/load. Control widgets appear at end but data is safe.
-            if (!isLoading) {
-                this._resizeNode();
-            }
-        };
-
-        // Remove all control widgets (buttons and spacers)
-        nodeType.prototype._removeControlWidgets = function () {
-            if (!this.widgets) return;
-            this.widgets = this.widgets.filter(w => {
-                if (w.name === "\u2795 Add Input") return false;
-                if (w.name === "\u2796 Remove Last Input") return false;
-                if (w.name.startsWith("_spacer_")) return false;
-                return true;
-            });
         };
 
         // Update visibility of text/label widgets and inputs
@@ -94,7 +98,6 @@ app.registerExtension({
             }
 
             // Hide/show input slots (connection points) based on active count
-            // Use hidden flag instead of filtering to preserve state across serialize/deserialize
             if (this.inputs) {
                 for (const input of this.inputs) {
                     const textMatch = input.name.match(/^Text (\d+)$/);
@@ -109,9 +112,11 @@ app.registerExtension({
             }
         };
 
-        // Add control widgets (buttons and spacers)
-        nodeType.prototype._addControlWidgets = function () {
-            if (!this.widgets) return;
+        // Create control widgets once (called only from onNodeCreated)
+        nodeType.prototype._createControlWidgets = function () {
+            if (!this.widgets || this._controlWidgetsCreated) return;
+            this._controlWidgetsCreated = true;
+
             const self = this;
 
             // Spacer before buttons
@@ -119,52 +124,57 @@ app.registerExtension({
                 "text",
                 "_spacer_add",
                 "",
-                null,
+                () => {},
                 { serialize: false }
             );
             addSpacer.disabled = true;
             addSpacer.computeSize = () => [0, 10];
-            addSpacer._isAddSpacer = true;
             addSpacer.draw = () => {};
 
-            // Add "Add Input" button if not at max
-            if (this.activeInputCount < MAX_INPUTS) {
-                this.addWidget(
-                    "button",
-                    "\u2795 Add Input",
-                    null,
-                    () => {
-                        self._addInput();
-                    },
-                    { serialize: false }
-                );
-            }
+            // Add Input button (always create, control visibility)
+            const addBtn = this.addWidget(
+                "button",
+                "\u2795 Add Input",
+                null,
+                () => { self._addInput(); },
+                { serialize: false }
+            );
+            this._addInputBtn = addBtn;
 
-            // Add "Remove Last Input" button if more than 1 input
-            if (this.activeInputCount > 1) {
-                this.addWidget(
-                    "button",
-                    "\u2796 Remove Last Input",
-                    null,
-                    () => {
-                        self._removeLastInput();
-                    },
-                    { serialize: false }
-                );
-            }
+            // Remove Last Input button (always create, control visibility)
+            const removeBtn = this.addWidget(
+                "button",
+                "\u2796 Remove Last Input",
+                null,
+                () => { self._removeLastInput(); },
+                { serialize: false }
+            );
+            this._removeInputBtn = removeBtn;
 
             // Bottom spacer for margin
             const bottomSpacer = this.addWidget(
                 "text",
                 "_spacer_bottom",
                 "",
-                null,
+                () => {},
                 { serialize: false }
             );
             bottomSpacer.disabled = true;
             bottomSpacer.computeSize = () => [0, 8];
-            bottomSpacer._isBottomSpacer = true;
             bottomSpacer.draw = () => {};
+
+            // Set initial visibility
+            this._updateControlWidgetVisibility();
+        };
+
+        // Update control widget visibility based on activeInputCount
+        nodeType.prototype._updateControlWidgetVisibility = function () {
+            if (this._addInputBtn) {
+                this._addInputBtn.hidden = this.activeInputCount >= MAX_INPUTS;
+            }
+            if (this._removeInputBtn) {
+                this._removeInputBtn.hidden = this.activeInputCount <= 1;
+            }
         };
 
         // Add a new input slot
@@ -173,13 +183,15 @@ app.registerExtension({
                 this.activeInputCount++;
                 this.properties.activeInputCount = this.activeInputCount;
 
-                // Clear the newly revealed input's values to ensure it starts fresh
+                // Clear the newly revealed input's values
                 const textWidget = this.widgets?.find(w => w.name === `Text ${this.activeInputCount}`);
                 const labelWidget = this.widgets?.find(w => w.name === `Label ${this.activeInputCount}`);
                 if (textWidget) textWidget.value = "";
                 if (labelWidget) labelWidget.value = "";
 
-                this._setupUI();
+                this._updateInputVisibility();
+                this._updateControlWidgetVisibility();
+                this._resizeNode();
             }
         };
 
@@ -207,10 +219,12 @@ app.registerExtension({
 
             this.activeInputCount--;
             this.properties.activeInputCount = this.activeInputCount;
-            this._setupUI();
+            this._updateInputVisibility();
+            this._updateControlWidgetVisibility();
+            this._resizeNode();
         };
 
-        // Resize node to fit content (only grows, never shrinks user's manual resize)
+        // Resize node to fit content (only grows, never shrinks)
         nodeType.prototype._resizeNode = function () {
             const minSize = this.computeSize();
             const currentSize = this.size || [0, 0];
@@ -238,7 +252,6 @@ app.registerExtension({
 
                 ctx.save();
 
-                // Draw left line
                 ctx.strokeStyle = lineColor;
                 ctx.lineWidth = 1;
                 ctx.font = "11px Arial";
@@ -246,18 +259,19 @@ app.registerExtension({
                 const textWidth = ctx.measureText(text).width;
                 const textX = (widgetWidth - textWidth) / 2;
 
+                // Left line
                 ctx.beginPath();
                 ctx.moveTo(padding, lineY);
                 ctx.lineTo(textX - 8, lineY);
                 ctx.stroke();
 
-                // Draw right line
+                // Right line
                 ctx.beginPath();
                 ctx.moveTo(textX + textWidth + 8, lineY);
                 ctx.lineTo(widgetWidth - padding, lineY);
                 ctx.stroke();
 
-                // Draw text
+                // Text
                 ctx.fillStyle = textColor;
                 ctx.fillText(text, textX, lineY + 4);
                 ctx.restore();
