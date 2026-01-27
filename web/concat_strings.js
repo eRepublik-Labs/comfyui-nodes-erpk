@@ -20,15 +20,14 @@ app.registerExtension({
             const result = onNodeCreated?.apply(this, arguments);
 
             // Track active input count
-            // If properties.activeInputCount exists, we're loading from a saved workflow
-            const isLoading = this.properties?.activeInputCount !== undefined;
             this.activeInputCount = this.properties?.activeInputCount || INITIAL_INPUTS;
             this.properties = this.properties || {};
             this.properties.activeInputCount = this.activeInputCount;
 
             // Delay to ensure widgets exist
+            // Check _isLoadingWorkflow flag (set by onConfigure which runs before this timeout fires)
             setTimeout(() => {
-                this._setupUI(isLoading);
+                this._setupUI(this._isLoadingWorkflow);
             }, 50);
 
             return result;
@@ -37,6 +36,9 @@ app.registerExtension({
         // Restore state when loading workflow
         const onConfigure = nodeType.prototype.onConfigure;
         nodeType.prototype.onConfigure = function (info) {
+            // Set flag SYNCHRONOUSLY - onNodeCreated's setTimeout will see this
+            this._isLoadingWorkflow = true;
+
             const result = onConfigure?.apply(this, arguments);
 
             if (info.properties?.activeInputCount) {
