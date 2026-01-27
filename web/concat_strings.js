@@ -20,13 +20,15 @@ app.registerExtension({
             const result = onNodeCreated?.apply(this, arguments);
 
             // Track active input count
+            // If properties.activeInputCount exists, we're loading from a saved workflow
+            const isLoading = this.properties?.activeInputCount !== undefined;
             this.activeInputCount = this.properties?.activeInputCount || INITIAL_INPUTS;
             this.properties = this.properties || {};
             this.properties.activeInputCount = this.activeInputCount;
 
             // Delay to ensure widgets exist
             setTimeout(() => {
-                this._setupUI();
+                this._setupUI(isLoading);
             }, 50);
 
             return result;
@@ -42,21 +44,23 @@ app.registerExtension({
             }
 
             setTimeout(() => {
-                this._setupUI();
+                this._setupUI(true);  // true = loading, don't override saved size
             }, 100);
 
             return result;
         };
 
         // Setup the UI with proper visibility and buttons
-        nodeType.prototype._setupUI = function () {
+        nodeType.prototype._setupUI = function (isLoading = false) {
             this._removeControlWidgets();
             this._styleInputsHeader();
             this._updateInputVisibility();
             this._addControlWidgets();
             // NOTE: Do NOT reorder widgets - ComfyUI serializes by index, not by name
             // Reordering breaks save/load. Control widgets appear at end but data is safe.
-            this._resizeNode();
+            if (!isLoading) {
+                this._resizeNode();
+            }
         };
 
         // Remove all control widgets (buttons and spacers)
@@ -204,10 +208,14 @@ app.registerExtension({
             this._setupUI();
         };
 
-        // Resize node to fit content
+        // Resize node to fit content (only grows, never shrinks user's manual resize)
         nodeType.prototype._resizeNode = function () {
-            const sz = this.computeSize();
-            this.setSize([Math.max(sz[0], 300), sz[1]]);
+            const minSize = this.computeSize();
+            const currentSize = this.size || [0, 0];
+            this.setSize([
+                Math.max(minSize[0], currentSize[0], 300),
+                Math.max(minSize[1], currentSize[1])
+            ]);
             this.setDirtyCanvas(true, true);
         };
 
