@@ -18,6 +18,7 @@ class ConcatenateStrings:
                 "Delimiter": ("STRING", {"default": "\\n", "multiline": False}),
                 "Include Labels": ("BOOLEAN", {"default": False}),
                 "Label on Same Line": ("BOOLEAN", {"default": True}),
+                "_inputs_header": ("STRING", {"default": ""}),
             },
         }
 
