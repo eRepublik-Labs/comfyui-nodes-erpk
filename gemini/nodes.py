@@ -1196,6 +1196,10 @@ class GeminiImageEdit:
                         "tooltip": "Enable Google Search grounding (only for gemini-3-pro-image-preview)"
                     }
                 ),
+                "additional_images": (
+                    "IMAGE",
+                    {"tooltip": "Optional additional reference images (combined with primary image input, up to 14 total)"}
+                ),
                 "api_key": (
                     "STRING",
                     {
@@ -1227,6 +1231,7 @@ class GeminiImageEdit:
         image_size: str = "default",
         response_modalities: str = "IMAGE",
         enable_google_search: bool = False,
+        additional_images=None,
         api_key: str = "",
     ):
         """
@@ -1242,6 +1247,7 @@ class GeminiImageEdit:
             image_size: Image resolution (1K/2K/4K, only for gemini-3-pro-image-preview)
             response_modalities: Return image only or image+text description
             enable_google_search: Enable Google Search grounding (gemini-3-pro only)
+            additional_images: Optional additional reference images (combined with primary)
             api_key: Optional API key (fallback if no client)
 
         Returns:
@@ -1272,6 +1278,8 @@ class GeminiImageEdit:
 
             # Convert ComfyUI tensors to PIL images (handles batched images)
             pil_images = ImageConverter.tensors_to_pil_list(image)
+            if additional_images is not None:
+                pil_images.extend(ImageConverter.tensors_to_pil_list(additional_images))
             num_images = len(pil_images)
 
             print(f"[Gemini] Editing image with model: {model}")

@@ -215,6 +215,7 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 - `image_size`: Resolution - "default", "1K", "2K", "4K" (only for gemini-3-pro-image-preview, 2.5-flash always 1024px)
 - `response_modalities`: "IMAGE" (image only) or "TEXT+IMAGE" (image + text description)
 - `enable_google_search`: Enable Google Search grounding (only for gemini-3-pro-image-preview)
+- `additional_images`: Optional additional reference images (combined with primary image input, up to 14 total)
 - `api_key`: Optional API key (only needed if not using client input)
 
 **Outputs:**
