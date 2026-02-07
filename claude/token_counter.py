@@ -37,7 +37,7 @@ class ClaudeTokenCounter:
                 "model": (
                     [
                         "claude-sonnet-4-5-20250929",
-                        "claude-opus-4",
+                        "claude-opus-4-6",
                         "claude-haiku-4-5",
                     ],
                     {
@@ -83,7 +83,7 @@ class ClaudeTokenCounter:
             # Fallback pricing
             return {
                 "claude-sonnet-4-5-20250929": {"input": 3.0, "output": 15.0},
-                "claude-opus-4": {"input": 15.0, "output": 75.0},
+                "claude-opus-4-6": {"input": 5.0, "output": 25.0},
                 "claude-haiku-4-5": {"input": 1.0, "output": 5.0},
             }, "2025-10-22"
 

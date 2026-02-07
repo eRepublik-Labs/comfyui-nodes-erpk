@@ -72,7 +72,7 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 Initializes the Claude API client. Required for all other nodes.
 
 **Inputs:**
-- `model`: claude-sonnet-4-5 (default), claude-opus-4, claude-haiku-4-5
+- `model`: claude-sonnet-4-5 (default), claude-opus-4-6, claude-haiku-4-5
 - `api_key`: Optional API key (uses env/config if empty)
 - `enable_streaming`: Enable streaming responses
 - `enable_caching`: Enable prompt caching for cost savings
@@ -241,7 +241,7 @@ Enabled by default. Caches system prompts to reduce costs by up to 90% for repea
 ### Model Selection
 - **Claude Haiku 4.5**: $1/1M in, $5/1M out - Fastest, cheapest for simple tasks
 - **Claude Sonnet 4.5**: $3/1M in, $15/1M out - Best balance (default)
-- **Claude Opus 4**: $15/1M in, $75/1M out - Most capable for complex reasoning
+- **Claude Opus 4.6**: $5/1M in, $25/1M out - Most intelligent, best for agents and coding
 
 ## Workflow Examples
 

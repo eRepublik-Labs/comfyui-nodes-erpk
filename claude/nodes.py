@@ -22,7 +22,7 @@ class ClaudeAPIClient:
                 "model": (
                     [
                         "claude-sonnet-4-5-20250929",
-                        "claude-opus-4",
+                        "claude-opus-4-6",
                         "claude-haiku-4-5",
                     ],
                     {
