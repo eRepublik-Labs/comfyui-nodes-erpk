@@ -7,7 +7,7 @@ Complete OpenAI API integration providing text generation, vision analysis, mult
 
 ## Features
 
-- **Text Generation** - Use all GPT models (GPT-4.1, GPT-4o, o3-mini)
+- **Text Generation** - Use all GPT models (GPT-5.2, GPT-4.1, GPT-4o, o3)
 - **Vision Analysis** - Analyze images with GPT-4 vision capabilities
 - **Image Generation** - Generate images with GPT-Image-1 and DALL-E models
 - **Image Editing** - Edit and inpaint images with natural language prompts
@@ -85,7 +85,7 @@ General-purpose text generation and completion.
 **Inputs:**
 - `client`: OpenAI API client
 - `prompt`: Text prompt
-- `model`: gpt-4o (default), gpt-5.2, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4o-mini, o4-mini, o3
+- `model`: gpt-4o (default), gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o-mini, o4-mini, o3
 - `temperature`: 0.0-2.0 (creativity level, default: 0.7)
 - `max_tokens`: 256-16384 (output length, default: 4096)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 1.0, set <1.0 to enable)
@@ -110,7 +110,7 @@ Multi-turn conversation with message history preservation.
 **Inputs:**
 - `client`: OpenAI API client
 - `prompt`: Your message
-- `model`: gpt-4o (default), gpt-5.2, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4o-mini, o4-mini, o3
+- `model`: gpt-4o (default), gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o-mini, o4-mini, o3
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
 - `temperature`: 0.0-2.0 (default: 0.7)
@@ -138,7 +138,7 @@ Analyze images with questions or instructions.
 - `client`: OpenAI API client
 - `image`: ComfyUI image tensor (supports batches)
 - `prompt`: Question or instruction about the image(s)
-- `model`: gpt-4o (default), gpt-4o-mini, gpt-4.1, gpt-4.1-mini, gpt-5.2
+- `model`: gpt-5.2 (default), gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini
 - `detail`: Image analysis detail level - "auto" (default), "low" (faster/cheaper), "high" (more detailed)
 - `max_tokens`: 256-16384 (default: 4096)
 - `temperature`: 0.0-2.0 (default: 0.4, lower for more factual)
@@ -183,7 +183,7 @@ Generate images from text descriptions using OpenAI's image generation models.
 **Inputs:**
 - `prompt`: Text description of the image to generate
 - `client`: Optional OpenAI API client (from OpenAI API Config node)
-- `model`: gpt-image-1.5 (default, best quality), gpt-image-1, dall-e-3
+- `model`: gpt-image-1.5 (default, best quality), gpt-image-1, gpt-image-1-mini, dall-e-3 (deprecated)
 - `size`: Image dimensions - 1024x1024 (default), 1024x1536, 1536x1024, 512x512, 256x256, 1792x1024, 1024x1792
 - `quality`: Image quality - auto (default), low, medium, high (gpt-image-1) or hd, standard (dall-e-3)
 - `background`: Background type - auto, transparent, opaque (gpt-image-1 only)
@@ -215,7 +215,7 @@ Edit and modify existing images using text prompts with optional masking.
 - `prompt`: Text description of how to modify the image
 - `client`: Optional OpenAI API client (from OpenAI API Config node)
 - `mask`: Optional mask (ComfyUI MASK tensor) - white areas will be edited
-- `model`: gpt-image-1.5 (default, recommended), gpt-image-1
+- `model`: gpt-image-1.5 (default, recommended), gpt-image-1, gpt-image-1-mini
 - `size`: Output image size - 1024x1024 (default), 1024x1536, 1536x1024, 512x512, 256x256
 - `quality`: Image quality - auto (default), low, medium, high (gpt-image-1 only)
 - `n`: Number of variations (1-4)
@@ -246,13 +246,17 @@ Edit and modify existing images using text prompts with optional masking.
 | Model | Best For | Context Window | Notes |
 |-------|----------|----------------|-------|
 | **gpt-5.2** | Latest flagship | 400K tokens | Best for coding/agents |
+| **gpt-5.2-pro** | Precision tasks | 400K tokens | Smarter, more precise responses |
+| **gpt-5.1** | Coding/agents | 400K tokens | Configurable reasoning effort |
+| **gpt-5** | Reasoning | 400K tokens | Previous flagship reasoning model |
 | **gpt-5-mini** | Fast, cost-efficient | 400K tokens | Good balance |
 | **gpt-5-nano** | Fastest, lowest cost | 400K tokens | Simple tasks |
-| **gpt-4.1** | Coding and agents | 1M tokens | Great instruction following |
+| **gpt-4.1** | Non-reasoning tasks | 1M tokens | Smartest non-reasoning model |
 | **gpt-4.1-mini** | Fast, cost-effective | 1M tokens | Budget option |
+| **gpt-4.1-nano** | Fastest GPT-4.1 | 1M tokens | Lowest cost GPT-4.1 |
 | **gpt-4o** | Multimodal (text + vision) | 128K tokens | **Default**, great for vision |
 | **gpt-4o-mini** | Fast multimodal | 128K tokens | Budget vision |
-| **o4-mini** | Small reasoning | 200K tokens | STEM and technical |
+| **o4-mini** | Fast reasoning | 200K tokens | STEM and technical |
 | **o3** | Advanced reasoning | 200K tokens | Complex problems |
 
 ### Image Generation Models
@@ -261,7 +265,8 @@ Edit and modify existing images using text prompts with optional masking.
 |-------|----------|-------|
 | **gpt-image-1.5** | Highest quality | **Default**, latest model, best editing |
 | **gpt-image-1** | High quality | Editing, transparent backgrounds |
-| **dall-e-3** | Legacy generation | Being deprecated |
+| **gpt-image-1-mini** | Cost-efficient | Budget image generation |
+| **dall-e-3** | Legacy generation | Deprecated |
 
 ## Example Workflows
 

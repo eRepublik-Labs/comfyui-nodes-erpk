@@ -21,13 +21,17 @@ class OpenAIClient:
     # Available text/vision models
     MODELS = {
         "gpt-5.2": "GPT-5.2 (Latest flagship, best for coding/agents)",
+        "gpt-5.2-pro": "GPT-5.2 Pro (Smarter, more precise responses)",
+        "gpt-5.1": "GPT-5.1 (Coding/agents with configurable reasoning)",
+        "gpt-5": "GPT-5 (Reasoning model for coding/agents)",
         "gpt-5-mini": "GPT-5 Mini (Fast, cost-efficient)",
         "gpt-5-nano": "GPT-5 Nano (Fastest, lowest cost)",
-        "gpt-4.1": "GPT-4.1 (Great for coding and agents)",
+        "gpt-4.1": "GPT-4.1 (Smartest non-reasoning model)",
         "gpt-4.1-mini": "GPT-4.1 Mini (Fast, cost-effective)",
+        "gpt-4.1-nano": "GPT-4.1 Nano (Fastest, lowest cost GPT-4.1)",
         "gpt-4o": "GPT-4o (Multimodal, vision)",
         "gpt-4o-mini": "GPT-4o Mini (Fast multimodal)",
-        "o4-mini": "o4-mini (Small reasoning model)",
+        "o4-mini": "o4-mini (Fast reasoning model)",
         "o3": "o3 (Advanced reasoning)",
     }
 
@@ -35,7 +39,8 @@ class OpenAIClient:
     IMAGE_MODELS = {
         "gpt-image-1.5": "GPT Image 1.5 (Latest, best quality)",
         "gpt-image-1": "GPT Image 1 (High quality, editing support)",
-        "dall-e-3": "DALL-E 3 (Legacy, being deprecated)",
+        "gpt-image-1-mini": "GPT Image 1 Mini (Cost-efficient)",
+        "dall-e-3": "DALL-E 3 (Deprecated)",
     }
 
     # Default configuration
@@ -46,7 +51,7 @@ class OpenAIClient:
     INITIAL_RETRY_DELAY = 1.0
 
     # Models that use max_completion_tokens instead of max_tokens
-    NEW_TOKEN_PARAM_MODELS = {"gpt-5.2", "gpt-5-mini", "gpt-5-nano", "o3", "o4-mini"}
+    NEW_TOKEN_PARAM_MODELS = {"gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano", "o3", "o4-mini"}
 
     # Reasoning models that don't support temperature, top_p, or stop
     REASONING_MODELS = {"o3", "o4-mini"}
@@ -409,7 +414,7 @@ class OpenAIClient:
         }
 
         # Model-specific parameters
-        if model in ["gpt-image-1.5", "gpt-image-1"]:
+        if model in ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]:
             if quality != "auto":
                 params["quality"] = quality
             if background != "auto":
@@ -493,7 +498,7 @@ class OpenAIClient:
             params["mask"] = mask_file
 
         # Model-specific parameters
-        if model in ["gpt-image-1.5", "gpt-image-1"] and quality != "auto":
+        if model in ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"] and quality != "auto":
             params["quality"] = quality
 
         try:

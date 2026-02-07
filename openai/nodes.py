@@ -426,7 +426,7 @@ class OpenAIVision:
     """
 
     # Vision-capable models
-    VISION_MODELS = ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-5.2"]
+    VISION_MODELS = ["gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4o", "gpt-4o-mini"]
 
     @classmethod
     def INPUT_TYPES(cls):

@@ -14,7 +14,7 @@ class OpenAIImageGeneration:
     """
 
     # Image generation models
-    IMAGE_MODELS = ["gpt-image-1.5", "gpt-image-1", "dall-e-3"]
+    IMAGE_MODELS = ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini", "dall-e-3"]
 
     # Size options per model
     SIZES = [
@@ -192,7 +192,7 @@ class OpenAIImageEdit:
     """
 
     # Image editing models (gpt-image-1.5 is recommended)
-    IMAGE_MODELS = ["gpt-image-1.5", "gpt-image-1"]
+    IMAGE_MODELS = ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
 
     # Size options
     SIZES = [
