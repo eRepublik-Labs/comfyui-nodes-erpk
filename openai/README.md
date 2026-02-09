@@ -41,10 +41,10 @@ Complete OpenAI API integration providing text generation, vision analysis, mult
    pip install -r requirements.txt
    ```
 
-4. **Configure API key** (choose one method):
+4. **Configure API key** (choose one method — checked in priority order, highest first):
 
-   **Method 1: ComfyUI Settings** (Recommended)
-   Go to **Settings > ERPK > API Keys** and enter your OpenAI API key.
+   **Method 1: ComfyUI Settings** (Recommended — highest priority)
+   Go to **Settings > ERPK > API Keys** and enter your OpenAI API key. You can also access this via right-click canvas > **ERPK Settings**.
    Keys configured here are stored in your user settings, not in workflows, so they won't leak when sharing.
 
    **Method 2: Environment Variable**
@@ -56,10 +56,10 @@ Complete OpenAI API integration providing text generation, vision analysis, mult
    ```ini
    # Edit openai/config.ini
    [openai]
-   api_key = your-api-key-here
+   # api_key = YOUR_OPENAI_API_KEY_HERE
    ```
 
-   **Method 4: In ComfyUI Node**
+   **Method 4: In ComfyUI Node** (lowest priority)
    Enter API key directly in the OpenAI API Config node (not recommended for shared workflows)
 
 5. **Restart ComfyUI**
@@ -274,6 +274,8 @@ Edit and modify existing images using text prompts with optional masking.
 
 ## Example Workflows
 
+> **Note:** The OpenAI API Config node is optional when your API key is configured in ComfyUI Settings. Nodes can run standalone without it.
+
 ### Simple Text Generation
 ```
 OpenAI API Config → OpenAI Text Generation → Output
@@ -322,7 +324,8 @@ https://openai.com/pricing
 ## Troubleshooting
 
 ### "No API key found" error
-- Set your API key via ComfyUI Settings (**Settings > ERPK > API Keys**, recommended)
+- The API key is resolved in this priority order: ComfyUI Settings > node widget > environment variable > config.ini
+- Set your API key via ComfyUI Settings (**Settings > ERPK > API Keys**, recommended) or right-click canvas > **ERPK Settings**
 - Or verify your API key is set via environment variable, config.ini, or the node input
 - Check that the config.ini file has the correct format
 - Restart ComfyUI after setting environment variables

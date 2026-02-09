@@ -94,7 +94,7 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 
 #### Nodes
 
-- **Claude API Client** - Initialize Claude API connection with model selection (Sonnet 4.5, Opus 4, Haiku 4.5) and configuration. Required for all other Claude nodes.
+- **Claude API Client** - Initialize Claude API connection with model selection (Sonnet 4.5, Opus 4, Haiku 4.5) and configuration. Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- Claude nodes can run standalone.
 - **Claude Prompt Enhancer** - Transform simple prompts into detailed descriptions with 51 artistic styles (photorealistic, cinematic, fantasy, cyberpunk, anime, oil painting, watercolor, and more)
 - **Claude Vision Analysis** - Analyze images with Claude's multimodal capabilities (up to 20 images simultaneously)
 - **Claude Text Generation** - General-purpose text completion and generation
@@ -121,7 +121,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 
 #### Nodes
 
-- **Gemini API Config** - Initialize Gemini API connection (API key configuration)
+- **Gemini API Config** - Initialize Gemini API connection (API key configuration). Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- Gemini nodes can run standalone.
 - **Gemini Text Generation** - General-purpose text generation with model selection (Gemini 3 Pro, 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite)
 - **Gemini Chat** - Multi-turn conversations with automatic context preservation
 - **Gemini Vision** - Analyze images with multimodal capabilities
@@ -158,7 +158,7 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 
 #### Nodes
 
-- **OpenAI API Config** - Initialize OpenAI API connection (API key configuration)
+- **OpenAI API Config** - Initialize OpenAI API connection (API key configuration). Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- OpenAI nodes can run standalone.
 - **OpenAI Text Generation** - General-purpose text generation with model selection (GPT-5.2, GPT-4o, GPT-4.1, o3)
 - **OpenAI Chat** - Multi-turn conversations with automatic context preservation
 - **OpenAI Vision** - Analyze images with GPT-4 vision capabilities
@@ -311,7 +311,14 @@ Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishe
 ### Post-Installation
 
 1. Configure API keys for the services you want to use.
-   The easiest way is via **Settings > ERPK > API Keys** in ComfyUI — keys are stored per-user and never saved in workflows.
+   The easiest way is via right-click on the canvas > **ERPK Settings**, or **Settings > ERPK > API Keys** in ComfyUI -- keys are stored per-user and never saved in workflows.
+
+   API keys are resolved in priority order:
+   1. **ComfyUI Settings** (recommended) -- right-click canvas > ERPK Settings
+   2. **Widget input** -- api_key field on client/config nodes
+   3. **Environment variable** -- `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_API_KEY`, `WAVESPEED_API_KEY`
+   4. **Config file** -- `provider/config.ini`
+
    - **WaveSpeed:** See [wavespeed/README.md](wavespeed/README.md#installation)
    - **Claude:** See [claude/README.md](claude/README.md#installation)
    - **Gemini:** See [gemini/README.md](gemini/README.md#installation)

@@ -43,10 +43,10 @@ Complete Google Gemini API integration providing text generation, vision analysi
    pip install -r gemini/requirements.txt
    ```
 
-4. **Configure API key** (choose one method):
+4. **Configure API key** (choose one method, checked in priority order):
 
-   **Method 1: ComfyUI Settings** (Recommended)
-   Go to **Settings > ERPK > API Keys** and enter your Google API key.
+   **Method 1: ComfyUI Settings** (Recommended, highest priority)
+   Go to **Settings > ERPK > API Keys** and enter your Google API key. You can also access this via right-click canvas > **ERPK Settings**.
    Keys configured here are stored in your user settings, not in workflows, so they won't leak when sharing.
 
    **Method 2: Environment Variable**
@@ -58,10 +58,10 @@ Complete Google Gemini API integration providing text generation, vision analysi
    ```ini
    # Edit gemini/config.ini
    [gemini]
-   api_key = your-api-key-here
+   # api_key = YOUR_GOOGLE_API_KEY_HERE
    ```
 
-   **Method 4: In ComfyUI Node**
+   **Method 4: In ComfyUI Node** (lowest priority)
    Enter API key directly in the Gemini API Config node (not recommended for shared workflows)
 
 5. **Restart ComfyUI**
@@ -75,7 +75,7 @@ Complete Google Gemini API integration providing text generation, vision analysi
 ### Core Nodes
 
 #### Gemini API Config
-Initializes the Gemini API client. Optional if API key is configured in ComfyUI Settings — generation nodes can run standalone.
+Initializes the Gemini API client. Optional if API key is configured via ComfyUI Settings, environment variable, or config.ini — Gemini nodes can run standalone.
 
 **Inputs:**
 - `api_key`: Optional API key (uses env/config if empty)
@@ -89,7 +89,7 @@ Initializes the Gemini API client. Optional if API key is configured in ComfyUI 
 General-purpose text generation and completion.
 
 **Inputs:**
-- `client`: Gemini API client
+- `client`: Gemini API client (optional)
 - `prompt`: Text prompt
 - `model`: gemini-2.5-flash (default), gemini-3-pro-preview, gemini-3-flash-preview, gemini-2.5-pro, gemini-2.5-flash-lite
 - `temperature`: 0.0-2.0 (creativity level, default: 0.7)
@@ -116,7 +116,7 @@ General-purpose text generation and completion.
 Multi-turn conversation with message history preservation.
 
 **Inputs:**
-- `client`: Gemini API client
+- `client`: Gemini API client (optional)
 - `prompt`: Your message
 - `model`: gemini-2.5-flash (default), gemini-3-pro-preview, gemini-3-flash-preview, gemini-2.5-pro, gemini-2.5-flash-lite
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
@@ -145,7 +145,7 @@ Multi-turn conversation with message history preservation.
 Analyze images with questions or instructions.
 
 **Inputs:**
-- `client`: Gemini API client
+- `client`: Gemini API client (optional)
 - `image`: ComfyUI image tensor (supports batches)
 - `prompt`: Question or instruction about the image(s)
 - `model`: gemini-2.5-flash (default), gemini-3-pro-preview, gemini-3-flash-preview, gemini-2.5-pro, gemini-2.5-flash-lite
@@ -176,7 +176,7 @@ Generate images from text descriptions using Gemini's image generation models.
 **Inputs:**
 - `prompt`: Text description of the image to generate
 - `client`: Optional Gemini API client (from Gemini API Config node)
-- `model`: gemini-2.5-flash-image (fast, recommended) or gemini-3-pro-image-preview (best quality)
+- `model`: gemini-3-pro-image-preview (default, best quality) or gemini-2.5-flash-image (fast)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
 - `aspect_ratio`: Image dimensions - "default", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"
 - `image_size`: Resolution - "default", "1K", "2K", "4K" (only for gemini-3-pro-image-preview, 2.5-flash always 1024px)
@@ -213,7 +213,7 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 - `image`: Input image(s) to edit (up to 14 reference images). Use ComfyUI's **Batch Images** node to combine multiple images.
 - `prompt`: Text description of how to modify the image(s)
 - `client`: Optional Gemini API client (from Gemini API Config node)
-- `model`: gemini-2.5-flash-image (fast, recommended) or gemini-3-pro-image-preview (best quality)
+- `model`: gemini-3-pro-image-preview (default, best quality) or gemini-2.5-flash-image (fast)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
 - `aspect_ratio`: Image dimensions - "default", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"
 - `image_size`: Resolution - "default", "1K", "2K", "4K" (only for gemini-3-pro-image-preview, 2.5-flash always 1024px)
@@ -306,7 +306,7 @@ Generate videos from text prompts using Google's Veo models.
 **Inputs:**
 - `client`: Gemini API client (from Gemini API Config node)
 - `prompt`: Text description of the video to generate (max 2500 characters)
-- `model`: veo-3.1-generate-preview (default, includes audio), veo-3.0-generate-001, or veo-2.0-generate-001
+- `model`: veo-3.1-generate-preview (default, includes audio), veo-3.1-fast-generate-preview, veo-3.0-generate-001, veo-3.0-fast-generate-001, or veo-2.0-generate-001
 - `aspect_ratio`: 16:9 (landscape) or 9:16 (portrait)
 - `duration_seconds`: 5, 6, 7, or 8 seconds (Veo 3+ defaults to 8)
 - `person_generation`: Safety setting - allow_adult (default), dont_allow, or allow_all
@@ -338,7 +338,7 @@ Generate videos from an input image and optional text prompt.
 - `client`: Gemini API client (from Gemini API Config node)
 - `image`: Input image (ComfyUI IMAGE tensor) - used as first frame or style reference
 - `prompt`: Optional text description to guide the video generation
-- `model`: veo-3.1-generate-preview (default, includes audio), veo-3.0-generate-001, or veo-2.0-generate-001
+- `model`: veo-3.1-generate-preview (default, includes audio), veo-3.1-fast-generate-preview, veo-3.0-generate-001, veo-3.0-fast-generate-001, or veo-2.0-generate-001
 - `aspect_ratio`: 16:9 (landscape) or 9:16 (portrait)
 - `duration_seconds`: 5, 6, 7, or 8 seconds (Veo 3+ defaults to 8)
 - `person_generation`: Safety setting - allow_adult (default), dont_allow, or allow_all

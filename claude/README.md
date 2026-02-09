@@ -44,8 +44,10 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 
 4. **Configure API key** (choose one method):
 
-   **Method 1: ComfyUI Settings** (Recommended)
-   Go to **Settings > ERPK > API Keys** and enter your Anthropic API key.
+   When multiple methods are configured, they are checked in priority order: Settings > Node widget > Environment variable > config.ini.
+
+   **Method 1: ComfyUI Settings** (Recommended, highest priority)
+   Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**) and enter your Anthropic API key.
    Keys configured here are stored in your user settings, not in workflows, so they won't leak when sharing.
 
    **Method 2: Environment Variable**
@@ -53,11 +55,11 @@ Complete Claude API integration providing text generation, prompt enhancement, v
    export ANTHROPIC_API_KEY="your-api-key-here"
    ```
 
-   **Method 3: config.ini File**
+   **Method 3: config.ini File** (lowest priority)
    ```ini
    # Edit claude/config.ini
    [claude]
-   api_key = your-api-key-here
+   # api_key = YOUR_API_KEY_HERE
    ```
 
    **Method 4: In ComfyUI Node**
@@ -67,7 +69,7 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 
 6. **Verify installation:**
    - Look for `ERPK/Claude` category in ComfyUI node menu
-   - Should see 8 nodes available
+   - Should see 10 nodes available
 
 ## Available Nodes
 
@@ -89,7 +91,7 @@ Initializes the Claude API client. Optional if API key is configured in ComfyUI 
 **PRIMARY FEATURE** - Transforms simple prompts into detailed, styled descriptions.
 
 **Inputs:**
-- `client`: Claude API client
+- `client`: Claude API client (optional)
 - `prompt`: Simple prompt (e.g., "a cat")
 - `style`: 50+ styles (photorealistic, cinematic, fantasy, cyberpunk, anime, etc.)
 - `detail_level`: minimal, moderate, detailed, ultra-detailed
@@ -111,7 +113,7 @@ Initializes the Claude API client. Optional if API key is configured in ComfyUI 
 Analyzes images using Claude's multimodal capabilities.
 
 **Inputs:**
-- `client`: Claude API client
+- `client`: Claude API client (optional)
 - `image`: IMAGE tensor (ComfyUI format)
 - `question`: Question or instruction about the image
 - `additional_images`: Optional (up to 19 more images)
@@ -133,7 +135,7 @@ Analyzes images using Claude's multimodal capabilities.
 General-purpose text generation.
 
 **Inputs:**
-- `client`: Claude API client
+- `client`: Claude API client (optional)
 - `prompt`: User prompt
 - `system_prompt`: Optional system prompt
 - `temperature`: Creativity level
@@ -149,7 +151,7 @@ General-purpose text generation.
 Multi-turn conversations with message history.
 
 **Inputs:**
-- `client`: Claude API client
+- `client`: Claude API client (optional)
 - `prompt`: Your message
 - `conversation_history`: Previous conversation state (connect from previous node)
 - `system_prompt`: Optional (only for new conversations)
@@ -230,7 +232,7 @@ Builds an Anthropic tool definition for use with structured output. Chainable â€
 Forces Claude to respond with structured JSON matching your tool schema. Uses Anthropic's forced tool use â€” the model is guaranteed to produce valid JSON conforming to your schema.
 
 **Inputs:**
-- `client`: Claude API client
+- `client`: Claude API client (optional)
 - `prompt`: What to extract or generate
 - `tool`: Tool definition (exactly 1 tool from Tool Definition node)
 - `system_prompt`: Optional system prompt
@@ -338,7 +340,7 @@ Enabled by default. Caches system prompts to reduce costs by up to 90% for repea
 
 ### "No API key found" Error
 **Solution:** Set API key via ComfyUI Settings (recommended), environment variable, config.ini, or node input.
-Go to **Settings > ERPK > API Keys** or:
+Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**) or:
 ```bash
 export ANTHROPIC_API_KEY="your-key"
 ```

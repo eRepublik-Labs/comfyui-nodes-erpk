@@ -145,7 +145,7 @@ ComfyUI/
 ### Core Nodes
 
 #### WaveSpeedAI Client Node
-Optional if API key is configured in ComfyUI Settings — generation nodes can run standalone.
+Optional if API key is configured via ComfyUI Settings, environment variable, or config.ini — WaveSpeed model nodes can run standalone.
 
 1. Add the "WaveSpeedAI Client" node to your workflow
 2. Enter your WaveSpeed AI API key (or leave empty to use Settings/env/config.ini)
@@ -228,12 +228,16 @@ Optional if API key is configured in ComfyUI Settings — generation nodes can r
 
 ## API Configuration
 
-You'll need a WaveSpeed AI API key to use these nodes. There are three ways to provide your API key, checked in this priority order:
+You'll need a WaveSpeed AI API key to use these nodes. There are four ways to provide your API key, checked in this priority order (Settings highest, config.ini lowest):
 
-### 1. Direct Node Input (Highest Priority)
+### 1. ComfyUI Settings (Recommended, Highest Priority)
+Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**) and enter your WaveSpeed AI API key.
+Keys configured here are stored in your user settings, not in workflows, so they won't leak when sharing.
+
+### 2. Direct Node Input
 Enter your API key directly in the WaveSpeedAI Client node's `api_key` field.
 
-### 2. Environment Variable
+### 3. Environment Variable
 Set the `WAVESPEED_API_KEY` environment variable:
 
 ```bash
@@ -249,7 +253,7 @@ set WAVESPEED_API_KEY=your-api-key-here
 
 Then restart ComfyUI to load the environment variable.
 
-### 3. Config File (Lowest Priority)
+### 4. Config File (Lowest Priority)
 Create or edit `config.ini` in the wavespeed folder:
 
 ```ini
