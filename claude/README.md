@@ -49,6 +49,7 @@ Complete Claude API integration providing text generation, prompt enhancement, v
    **Method 1: ComfyUI Settings** (Recommended, highest priority)
    Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**) and enter your Anthropic API key.
    Keys configured here are stored in your user settings, not in workflows, so they won't leak when sharing.
+   In multi-user installations, each user's keys are resolved separately.
 
    **Method 2: Environment Variable**
    ```bash

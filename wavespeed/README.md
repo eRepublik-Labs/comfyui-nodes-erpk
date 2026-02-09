@@ -233,6 +233,7 @@ You'll need a WaveSpeed AI API key to use these nodes. There are four ways to pr
 ### 1. ComfyUI Settings (Recommended, Highest Priority)
 Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**) and enter your WaveSpeed AI API key.
 Keys configured here are stored in your user settings, not in workflows, so they won't leak when sharing.
+In multi-user installations, each user's keys are resolved separately.
 
 ### 2. Direct Node Input
 Enter your API key directly in the WaveSpeedAI Client node's `api_key` field.
