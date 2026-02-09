@@ -4,7 +4,7 @@
 
 Explored the full Claude node architecture. Key gaps identified:
 
-1. **No tool use / function calling** — The Anthropic API supports it, but none of our 8 Claude nodes implement it. This is the biggest gap for enabling agentic workflows.
+1. **~~No tool use / function calling~~** — Phase 1 (structured output) now implemented. `ClaudeToolDefinition` + `ClaudeStructuredOutput` nodes provide forced tool use for guaranteed JSON. Agentic loop (Phase 2) still missing.
 2. **No extended thinking** — Another supported API feature not exposed in nodes.
 3. **No agentic loop pattern** — No node that can run Claude in a call→tool→call→tool loop.
 4. **Agent Teams (Claude Code CLI) is not usable from API** — It's a CLI orchestration feature, not an SDK/API. Multi-agent patterns would need to be built from scratch using the Anthropic Python SDK.

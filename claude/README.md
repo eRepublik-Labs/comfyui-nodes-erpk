@@ -12,6 +12,7 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 - **Text Generation** - General-purpose text completion and generation
 - **Conversations** - Multi-turn dialogues with context preservation
 - **Token Management** - Count tokens, estimate costs, automatic context trimming
+- **Structured Output** - Guaranteed JSON output via forced tool use
 - **Cost Optimization** - Prompt caching (up to 90% savings), streaming support
 - **Full ComfyUI Integration** - Native node types, workflow compatibility
 
@@ -189,6 +190,53 @@ Display cumulative token usage and costs for a client.
 **Outputs:**
 - `stats`: Formatted usage statistics
 
+### Tool Use Nodes
+
+#### Claude Tool Definition
+Builds an Anthropic tool definition for use with structured output. Chainable — connect multiple Tool Definition nodes to build a tool list.
+
+**Inputs:**
+- `tool_name`: snake_case identifier (e.g. `extract_person`)
+- `description`: What the tool does (shown to the model)
+- `parameters_json`: JSON Schema for the tool's input parameters
+- `previous_tools`: Optional chain from another Tool Definition node
+
+**Outputs:**
+- `tools`: Tool definition list (`CLAUDE_TOOLS`)
+
+**Example parameters_json:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "name": {"type": "string", "description": "Person's full name"},
+    "age": {"type": "integer", "description": "Person's age"}
+  },
+  "required": ["name"]
+}
+```
+
+#### Claude Structured Output
+Forces Claude to respond with structured JSON matching your tool schema. Uses Anthropic's forced tool use — the model is guaranteed to produce valid JSON conforming to your schema.
+
+**Inputs:**
+- `client`: Claude API client
+- `prompt`: What to extract or generate
+- `tool`: Tool definition (exactly 1 tool from Tool Definition node)
+- `system_prompt`: Optional system prompt
+- `temperature`: 0.0-1.0 (default 0.0 — low for consistency)
+- `max_tokens`: 256-8192 (default 4096)
+
+**Outputs:**
+- `json_output`: Extracted JSON string (pretty-printed)
+- `thinking`: Any reasoning text Claude produced before the structured output
+
+**Use Cases:**
+- Extract structured data from unstructured text
+- Generate structured content (e.g. metadata, tags, classifications)
+- Parse and normalize data into a consistent schema
+- Guaranteed JSON output without regex parsing
+
 ## Prompt Enhancement Styles
 
 The Claude Prompt Enhancer supports 50+ artistic styles:
@@ -262,6 +310,11 @@ Enabled by default. Caches system prompts to reduce costs by up to 90% for repea
                            (conversation_history connections)
 ```
 
+### Structured Data Extraction
+```
+[Claude API Client] → [Claude Tool Definition] → [Claude Structured Output] → [Use JSON]
+```
+
 ### Cost-Aware Generation
 ```
 [Claude Token Counter] → [Decide if OK] → [Claude Text Generation]
@@ -313,6 +366,7 @@ export ANTHROPIC_API_KEY="your-key"
 ### Custom ComfyUI Types
 - `CLAUDE_API_CLIENT`: Client instance (passed between nodes)
 - `CLAUDE_CONVERSATION`: Conversation state (message history + system prompt)
+- `CLAUDE_TOOLS`: List of Anthropic tool definitions (for structured output)
 
 ### Context Window
 - All models: 200,000 tokens

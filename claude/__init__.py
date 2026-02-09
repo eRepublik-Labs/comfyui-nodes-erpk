@@ -7,6 +7,7 @@ Complete Claude API integration for ComfyUI including:
 - Vision analysis
 - Multi-turn conversations
 - Token counting utilities
+- Tool definitions and structured JSON output
 """
 
 import os
@@ -86,6 +87,28 @@ try:
     NODE_DISPLAY_NAME_MAPPINGS.update(TOKEN_COUNTER_DISPLAY_MAPPINGS)
 except ImportError as e:
     print(f"[Claude] Warning: Could not load token counter node: {e}")
+
+# Import and register tool definition node
+try:
+    from .tool_definition import (
+        NODE_CLASS_MAPPINGS as TOOL_DEF_MAPPINGS,
+        NODE_DISPLAY_NAME_MAPPINGS as TOOL_DEF_DISPLAY_MAPPINGS
+    )
+    NODE_CLASS_MAPPINGS.update(TOOL_DEF_MAPPINGS)
+    NODE_DISPLAY_NAME_MAPPINGS.update(TOOL_DEF_DISPLAY_MAPPINGS)
+except ImportError as e:
+    print(f"[Claude] Warning: Could not load tool definition node: {e}")
+
+# Import and register structured output node
+try:
+    from .structured_output import (
+        NODE_CLASS_MAPPINGS as STRUCTURED_OUTPUT_MAPPINGS,
+        NODE_DISPLAY_NAME_MAPPINGS as STRUCTURED_OUTPUT_DISPLAY_MAPPINGS
+    )
+    NODE_CLASS_MAPPINGS.update(STRUCTURED_OUTPUT_MAPPINGS)
+    NODE_DISPLAY_NAME_MAPPINGS.update(STRUCTURED_OUTPUT_DISPLAY_MAPPINGS)
+except ImportError as e:
+    print(f"[Claude] Warning: Could not load structured output node: {e}")
 
 # Print loaded nodes for debugging
 print(f"[Claude] Loaded {len(NODE_CLASS_MAPPINGS)} nodes:")

@@ -1,1 +1,36 @@
-[]
+[
+  {
+    "filename": "test_tool_definition.py",
+    "original_path": "/Users/alex.geana/GitHub/ComfyUI-Custom-Nodes/tests/test_tool_definition.py",
+    "timestamp": "2026-02-09T13:13:16Z",
+    "contains_secrets": 0
+  },
+  {
+    "filename": "tool_definition.py",
+    "original_path": "/Users/alex.geana/GitHub/ComfyUI-Custom-Nodes/claude/tool_definition.py",
+    "timestamp": "2026-02-09T13:14:04Z",
+    "contains_secrets": 0
+  },
+  {
+    "filename": "test_structured_output.py",
+    "original_path": "/Users/alex.geana/GitHub/ComfyUI-Custom-Nodes/tests/test_structured_output.py",
+    "timestamp": "2026-02-09T13:14:48Z",
+    "contains_secrets": 1,
+    "secrets": [
+      "cache_creation_input_tokens",
+      "cache_read_input_tokens",
+      "input_tokens",
+      "max_tokens",
+      "output_tokens"
+    ]
+  },
+  {
+    "filename": "structured_output.py",
+    "original_path": "/Users/alex.geana/GitHub/ComfyUI-Custom-Nodes/claude/structured_output.py",
+    "timestamp": "2026-02-09T13:15:15Z",
+    "contains_secrets": 1,
+    "secrets": [
+      "max_tokens"
+    ]
+  }
+]
