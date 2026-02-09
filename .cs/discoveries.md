@@ -13,7 +13,7 @@ Explored the full Claude node architecture. Key gaps identified:
 
 - All providers (Claude, OpenAI, Gemini, WaveSpeed) follow the same pattern: `provider/`, `provider_api/client.py`, `provider_api/utils.py`
 - Custom types: `CLAUDE_API_CLIENT`, `CLAUDE_CONVERSATION`, `OPENAI_API_CLIENT`, `GEMINI_API_CLIENT`
-- 8 Claude nodes total: APIClient, TextGeneration, VisionAnalysis, Conversation, ConversationInfo, PromptEnhancer (51 styles), TokenCounter, UsageStats
+- 10 Claude nodes total: APIClient, TextGeneration, VisionAnalysis, Conversation, ConversationInfo, PromptEnhancer (51 styles), TokenCounter, UsageStats, ToolDefinition, StructuredOutput
 - Models: claude-sonnet-4-5, claude-opus-4-6, claude-haiku-4-5
 - Prompt caching supported via beta headers
 - ComfyUI's node graph is a natural fit for multi-agent chaining (nodes already connect via dependency graph)
