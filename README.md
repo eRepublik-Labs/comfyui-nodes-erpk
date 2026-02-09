@@ -45,7 +45,9 @@ ComfyUI-Custom-Nodes/
 ├── utils/                         # String and general utilities
 │   ├── __init__.py                # Module exports
 │   └── concat_strings.py          # String concatenation node
+├── settings.py                    # ComfyUI settings reader for API keys
 └── web/                           # Frontend extensions
+    ├── erpk_settings.js           # API key settings in ComfyUI Settings UI
     ├── aspect_ratio.js            # Aspect ratio display in node titles
     └── concat_strings.js          # Dynamic UI for concat strings node
 ```
@@ -308,7 +310,8 @@ Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishe
 
 ### Post-Installation
 
-1. Configure API keys for the services you want to use:
+1. Configure API keys for the services you want to use.
+   The easiest way is via **Settings > ERPK > API Keys** in ComfyUI — keys are stored per-user and never saved in workflows.
    - **WaveSpeed:** See [wavespeed/README.md](wavespeed/README.md#installation)
    - **Claude:** See [claude/README.md](claude/README.md#installation)
    - **Gemini:** See [gemini/README.md](gemini/README.md#installation)

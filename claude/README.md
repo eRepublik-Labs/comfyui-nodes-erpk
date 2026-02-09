@@ -44,20 +44,24 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 
 4. **Configure API key** (choose one method):
 
-   **Method 1: Environment Variable** (Recommended)
+   **Method 1: ComfyUI Settings** (Recommended)
+   Go to **Settings > ERPK > API Keys** and enter your Anthropic API key.
+   Keys configured here are stored in your user settings, not in workflows, so they won't leak when sharing.
+
+   **Method 2: Environment Variable**
    ```bash
    export ANTHROPIC_API_KEY="your-api-key-here"
    ```
 
-   **Method 2: config.ini File**
+   **Method 3: config.ini File**
    ```ini
    # Edit claude/config.ini
    [claude]
    api_key = your-api-key-here
    ```
 
-   **Method 3: In ComfyUI Node**
-   Enter API key directly in the Claude API Client node
+   **Method 4: In ComfyUI Node**
+   Enter API key directly in the Claude API Client node (not recommended for shared workflows)
 
 5. **Restart ComfyUI**
 
@@ -333,7 +337,8 @@ Enabled by default. Caches system prompts to reduce costs by up to 90% for repea
 ## Troubleshooting
 
 ### "No API key found" Error
-**Solution:** Set API key via environment variable, config.ini, or node input.
+**Solution:** Set API key via ComfyUI Settings (recommended), environment variable, config.ini, or node input.
+Go to **Settings > ERPK > API Keys** or:
 ```bash
 export ANTHROPIC_API_KEY="your-key"
 ```

@@ -45,20 +45,24 @@ Complete Google Gemini API integration providing text generation, vision analysi
 
 4. **Configure API key** (choose one method):
 
-   **Method 1: Environment Variable** (Recommended)
+   **Method 1: ComfyUI Settings** (Recommended)
+   Go to **Settings > ERPK > API Keys** and enter your Google API key.
+   Keys configured here are stored in your user settings, not in workflows, so they won't leak when sharing.
+
+   **Method 2: Environment Variable**
    ```bash
    export GOOGLE_API_KEY="your-api-key-here"
    ```
 
-   **Method 2: config.ini File**
+   **Method 3: config.ini File**
    ```ini
    # Edit gemini/config.ini
    [gemini]
    api_key = your-api-key-here
    ```
 
-   **Method 3: In ComfyUI Node**
-   Enter API key directly in the Gemini API Config node
+   **Method 4: In ComfyUI Node**
+   Enter API key directly in the Gemini API Config node (not recommended for shared workflows)
 
 5. **Restart ComfyUI**
 
@@ -443,7 +447,8 @@ https://ai.google.dev/pricing
 ## Troubleshooting
 
 ### "No API key found" error
-- Verify your API key is set via environment variable, config.ini, or the node input
+- Set your API key via ComfyUI Settings (**Settings > ERPK > API Keys**, recommended)
+- Or verify your API key is set via environment variable, config.ini, or the node input
 - Check that the config.ini file has the correct format
 - Restart ComfyUI after setting environment variables
 

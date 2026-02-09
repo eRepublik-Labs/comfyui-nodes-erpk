@@ -87,9 +87,10 @@ class GeminiClient:
     def _resolve_api_key(self, api_key: Optional[str], config_path: Optional[str]) -> str:
         """
         Resolve API key from multiple sources in order of priority:
-        1. Provided api_key parameter
-        2. GOOGLE_API_KEY or GEMINI_API_KEY environment variable
-        3. config.ini file
+        1. ComfyUI Settings (comfy.settings.json)
+        2. Provided api_key parameter
+        3. GOOGLE_API_KEY or GEMINI_API_KEY environment variable
+        4. config.ini file
 
         Args:
             api_key: API key provided directly
@@ -101,7 +102,16 @@ class GeminiClient:
         Raises:
             ValueError: If no API key found
         """
-        # Priority 1: Direct parameter
+        # Priority 1: ComfyUI Settings
+        try:
+            from ...settings import get_comfy_setting
+            settings_key = get_comfy_setting("ERPK.GOOGLE_API_KEY")
+            if settings_key:
+                return settings_key
+        except (ImportError, ValueError):
+            pass
+
+        # Priority 2: Direct parameter
         if api_key and api_key.strip():
             return api_key.strip()
 
@@ -124,9 +134,10 @@ class GeminiClient:
 
         raise ValueError(
             "No API key found. Please provide via:\\n"
-            "1. api_key parameter\\n"
-            "2. GOOGLE_API_KEY or GEMINI_API_KEY environment variable\\n"
-            "3. config.ini file in gemini/ directory"
+            "1. ComfyUI Settings (Settings > ERPK > API Keys)\\n"
+            "2. api_key parameter\\n"
+            "3. GOOGLE_API_KEY or GEMINI_API_KEY environment variable\\n"
+            "4. config.ini file in gemini/ directory"
         )
 
     def update_config(

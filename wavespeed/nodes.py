@@ -66,13 +66,14 @@ class WaveSpeedAIAPIClient:
     @classmethod
     def INPUT_TYPES(cls) -> Dict[str, Any]:
         return {
-            "required": {
+            "required": {},
+            "optional": {
                 "api_key": (
                     "STRING",
                     {
                         "multiline": False,
                         "default": "",
-                        "tooltip": "WaveSpeed AI API key. If empty, checks WAVESPEED_API_KEY environment variable, then config.ini"
+                        "tooltip": "WaveSpeed AI API key. If empty, checks ComfyUI Settings, then WAVESPEED_API_KEY environment variable, then config.ini"
                     }
                 ),
             },
@@ -83,17 +84,18 @@ class WaveSpeedAIAPIClient:
     FUNCTION = "create_client"
     CATEGORY = "ERPK/WaveSpeedAI"
 
-    def create_client(self, api_key: str) -> Tuple[Dict[str, str]]:
+    def create_client(self, api_key: str = "") -> Tuple[Dict[str, str]]:
         """
         Create a WaveSpeed AI API client.
 
         API key priority (highest to lowest):
-        1. Direct input parameter
-        2. WAVESPEED_API_KEY environment variable
-        3. config.ini file
+        1. ComfyUI Settings (comfy.settings.json)
+        2. Direct input parameter
+        3. WAVESPEED_API_KEY environment variable
+        4. config.ini file
 
         Args:
-            api_key: WaveSpeed AI API key (leave empty to use env var or config)
+            api_key: WaveSpeed AI API key (leave empty to use settings, env var, or config)
 
         Returns:
             Tuple containing client configuration dict
@@ -103,13 +105,23 @@ class WaveSpeedAIAPIClient:
         """
         wavespeed_api_key = ""
 
-        # Priority 1: Direct input (highest priority)
-        if api_key and api_key.strip():
+        # Priority 1: ComfyUI Settings
+        try:
+            from ..settings import get_comfy_setting
+            settings_key = get_comfy_setting("ERPK.WAVESPEED_API_KEY")
+            if settings_key:
+                wavespeed_api_key = settings_key
+                print("[WaveSpeed] Using API key from ComfyUI Settings")
+        except (ImportError, ValueError):
+            pass
+
+        # Priority 2: Direct input
+        if not wavespeed_api_key and api_key and api_key.strip():
             wavespeed_api_key = api_key.strip()
             print("[WaveSpeed] Using API key from node input")
 
-        # Priority 2 & 3: Environment variable, then config file
-        else:
+        # Priority 3 & 4: Environment variable, then config file
+        if not wavespeed_api_key:
             # Try environment variable
             env_key = os.getenv("WAVESPEED_API_KEY", "").strip()
             if env_key:
@@ -126,33 +138,37 @@ class WaveSpeedAIAPIClient:
                     else:
                         raise ValueError(
                             "No API key found. Please provide via:\n"
-                            "  1. Node input parameter\n"
-                            "  2. WAVESPEED_API_KEY environment variable\n"
-                            "  3. config.ini file"
+                            "  1. ComfyUI Settings (Settings > ERPK > API Keys)\n"
+                            "  2. Node input parameter\n"
+                            "  3. WAVESPEED_API_KEY environment variable\n"
+                            "  4. config.ini file"
                         )
                 except KeyError:
                     raise ValueError(
                         "No API key found. Please provide via:\n"
-                        "  1. Node input parameter\n"
-                        "  2. WAVESPEED_API_KEY environment variable\n"
-                        "  3. config.ini file"
+                        "  1. ComfyUI Settings (Settings > ERPK > API Keys)\n"
+                        "  2. Node input parameter\n"
+                        "  3. WAVESPEED_API_KEY environment variable\n"
+                        "  4. config.ini file"
                     )
 
             # No source available
             else:
                 raise ValueError(
                     "No API key found. Please provide via:\n"
-                    "  1. Node input parameter\n"
-                    "  2. WAVESPEED_API_KEY environment variable\n"
-                    "  3. config.ini file"
+                    "  1. ComfyUI Settings (Settings > ERPK > API Keys)\n"
+                    "  2. Node input parameter\n"
+                    "  3. WAVESPEED_API_KEY environment variable\n"
+                    "  4. config.ini file"
                 )
 
         if not wavespeed_api_key:
             raise ValueError(
                 "No API key found. Please provide via:\n"
-                "  1. Node input parameter\n"
-                "  2. WAVESPEED_API_KEY environment variable\n"
-                "  3. config.ini file"
+                "  1. ComfyUI Settings (Settings > ERPK > API Keys)\n"
+                "  2. Node input parameter\n"
+                "  3. WAVESPEED_API_KEY environment variable\n"
+                "  4. config.ini file"
             )
 
         # Return client configuration
