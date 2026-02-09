@@ -1,4 +1,4 @@
-// ABOUTME: Registers ERPK API key settings in ComfyUI Settings UI
+// ABOUTME: Registers ERPK API key settings in ComfyUI Settings UI and canvas context menu
 // ABOUTME: Makes node api_key widgets read-only when keys are configured in Settings
 
 import { app } from "../../scripts/app.js";
@@ -45,6 +45,18 @@ app.registerExtension({
         category: ["ERPK", "API Keys", entry.name],
         tooltip: `${entry.name}. Leave empty to use environment variable or config.ini.`,
     })),
+
+    getCanvasMenuItems() {
+        return [
+            {
+                content: "ERPK Settings",
+                callback: () => {
+                    const btn = document.querySelector(".comfy-settings-btn");
+                    if (btn) btn.click();
+                },
+            },
+        ];
+    },
 
     nodeCreated(node) {
         const settingId = NODE_TO_SETTING[node.comfyClass];
