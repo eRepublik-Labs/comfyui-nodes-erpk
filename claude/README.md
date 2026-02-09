@@ -192,6 +192,8 @@ Display cumulative token usage and costs for a client.
 
 ### Tool Use Nodes
 
+**Category in ComfyUI:** `ERPK/Claude/Tools`
+
 #### Claude Tool Definition
 Builds an Anthropic tool definition for use with structured output. Chainable — connect multiple Tool Definition nodes to build a tool list.
 
