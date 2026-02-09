@@ -1,7 +1,8 @@
 // ABOUTME: Registers ERPK API key settings in ComfyUI Settings UI and canvas context menu
-// ABOUTME: Makes node api_key widgets read-only when keys are configured in Settings
+// ABOUTME: Handles multi-user client registration and read-only api_key widgets
 
 import { app } from "../../scripts/app.js";
+import { api } from "../../scripts/api.js";
 
 const API_KEY_SETTINGS = [
     {
@@ -34,31 +35,83 @@ for (const entry of API_KEY_SETTINGS) {
     }
 }
 
-app.registerExtension({
-    name: "ERPK.Settings",
+async function registerUserContext() {
+    // Register this client's user mapping for multi-user settings resolution.
+    // api.fetchApi automatically adds the Comfy-User header in multi-user mode.
+    try {
+        await api.fetchApi("/erpk/register_user", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ client_id: api.clientId }),
+        });
+    } catch (e) {
+        // Non-fatal: single-user mode works without this
+    }
+}
 
-    settings: API_KEY_SETTINGS.map((entry) => ({
+async function fetchUserInfo() {
+    // Fetch current user info for settings display
+    try {
+        const resp = await api.fetchApi("/erpk/user_info");
+        if (resp.ok) {
+            return await resp.json();
+        }
+    } catch (e) {
+        // Non-fatal
+    }
+    return { multi_user: false, user_id: "default", display_name: "default" };
+}
+
+function buildSettings() {
+    return API_KEY_SETTINGS.map((entry) => ({
         id: entry.id,
         name: entry.name,
         type: "text",
         defaultValue: "",
         category: ["ERPK", "API Keys", entry.name],
         tooltip: `${entry.name}. Leave empty to use environment variable or config.ini.`,
-    })),
+    }));
+}
 
-    setup() {
+app.registerExtension({
+    name: "ERPK.Settings",
+
+    settings: buildSettings(),
+
+    async setup() {
+        // Register user context for multi-user settings resolution
+        await registerUserContext();
+
+        // Re-register on WebSocket reconnect (client_id may change)
+        api.addEventListener("reconnected", () => {
+            registerUserContext();
+        });
+
+        // Fetch user info and show indicator in multi-user mode
+        const userInfo = await fetchUserInfo();
+        if (userInfo.multi_user) {
+            const indicator = document.createElement("div");
+            indicator.className = "erpk-user-indicator";
+            indicator.textContent = `Settings for: ${userInfo.display_name}`;
+            indicator.style.cssText =
+                "position:fixed;bottom:4px;right:4px;padding:4px 8px;" +
+                "background:rgba(0,0,0,0.6);color:#ccc;font-size:11px;" +
+                "border-radius:4px;z-index:9999;pointer-events:none;";
+            document.body.appendChild(indicator);
+        }
+
+        // Add ERPK Settings to canvas context menu
         const origGetCanvasMenuOptions =
             LGraphCanvas.prototype.getCanvasMenuOptions;
         LGraphCanvas.prototype.getCanvasMenuOptions = function (...args) {
             const options = origGetCanvasMenuOptions.apply(this, [...args]);
             options.push(null);
             options.push({
-                content: "⚙️ ERPK Settings",
+                content: "ERPK Settings",
                 callback: () => {
                     const btn = document.querySelector(".comfy-settings-btn");
                     if (!btn) return;
                     btn.click();
-                    // Poll for the search box in the settings dialog and type "ERPK"
                     let attempts = 0;
                     const searchERPK = () => {
                         const input = document.querySelector(

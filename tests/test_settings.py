@@ -162,3 +162,114 @@ class TestGetComfySetting:
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
             result = get_comfy_setting("ERPK.ANTHROPIC_API_KEY")
             assert result == "sk-ant-test123"
+
+
+class TestMultiUserSettings:
+    """Tests for multi-user settings resolution via user_id parameter."""
+
+    def test_reads_specific_user_settings(self, tmp_path):
+        """When user_id is provided, reads that user's settings file."""
+        user_dir = tmp_path / "user"
+        user_dir.mkdir()
+        alice_dir = user_dir / "alice_abc123"
+        alice_dir.mkdir()
+        write_settings(alice_dir, {"ERPK.GOOGLE_API_KEY": "alice-key"})
+
+        mock_folder_paths = MagicMock()
+        mock_folder_paths.get_user_directory.return_value = str(user_dir)
+
+        with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
+            result = get_comfy_setting("ERPK.GOOGLE_API_KEY", user_id="alice_abc123")
+            assert result == "alice-key"
+
+    def test_different_users_get_different_keys(self, tmp_path):
+        """Two users with different API keys get their own values."""
+        user_dir = tmp_path / "user"
+        user_dir.mkdir()
+        alice_dir = user_dir / "alice_abc123"
+        alice_dir.mkdir()
+        write_settings(alice_dir, {"ERPK.GOOGLE_API_KEY": "alice-key"})
+        bob_dir = user_dir / "bob_def456"
+        bob_dir.mkdir()
+        write_settings(bob_dir, {"ERPK.GOOGLE_API_KEY": "bob-key"})
+
+        mock_folder_paths = MagicMock()
+        mock_folder_paths.get_user_directory.return_value = str(user_dir)
+
+        with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
+            assert get_comfy_setting("ERPK.GOOGLE_API_KEY", user_id="alice_abc123") == "alice-key"
+            assert get_comfy_setting("ERPK.GOOGLE_API_KEY", user_id="bob_def456") == "bob-key"
+
+    def test_user_id_not_found_falls_back_to_iteration(self, tmp_path):
+        """If user_id directory doesn't exist, falls back to iterating dirs."""
+        user_dir = tmp_path / "user"
+        user_dir.mkdir()
+        default_dir = user_dir / "default"
+        default_dir.mkdir()
+        write_settings(default_dir, {"ERPK.GOOGLE_API_KEY": "default-key"})
+
+        mock_folder_paths = MagicMock()
+        mock_folder_paths.get_user_directory.return_value = str(user_dir)
+
+        with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
+            result = get_comfy_setting("ERPK.GOOGLE_API_KEY", user_id="nonexistent_user")
+            assert result == "default-key"
+
+    def test_no_user_id_uses_iteration(self, tmp_path):
+        """Without user_id, falls back to iterating (default first)."""
+        user_dir = tmp_path / "user"
+        user_dir.mkdir()
+        default_dir = user_dir / "default"
+        default_dir.mkdir()
+        write_settings(default_dir, {"ERPK.GOOGLE_API_KEY": "default-key"})
+
+        mock_folder_paths = MagicMock()
+        mock_folder_paths.get_user_directory.return_value = str(user_dir)
+
+        with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
+            result = get_comfy_setting("ERPK.GOOGLE_API_KEY")
+            assert result == "default-key"
+
+    def test_resolve_current_user_from_server(self, tmp_path):
+        """get_current_user_id() reads client_id from PromptServer and maps to user_id."""
+        from settings import get_current_user_id, _client_user_map
+
+        # Set up the mapping
+        _client_user_map["ws-client-42"] = "alice_abc123"
+
+        # Mock PromptServer.instance.client_id
+        mock_server = MagicMock()
+        mock_server.client_id = "ws-client-42"
+
+        mock_server_module = MagicMock()
+        mock_server_module.PromptServer.instance = mock_server
+
+        with patch.dict(sys.modules, {"server": mock_server_module}):
+            result = get_current_user_id()
+            assert result == "alice_abc123"
+
+        # Clean up
+        _client_user_map.clear()
+
+    def test_resolve_current_user_returns_none_when_no_mapping(self):
+        """get_current_user_id() returns None when client_id has no mapping."""
+        from settings import get_current_user_id, _client_user_map
+        _client_user_map.clear()
+
+        mock_server = MagicMock()
+        mock_server.client_id = "unknown-client"
+
+        mock_server_module = MagicMock()
+        mock_server_module.PromptServer.instance = mock_server
+
+        with patch.dict(sys.modules, {"server": mock_server_module}):
+            result = get_current_user_id()
+            assert result is None
+
+    def test_resolve_current_user_returns_none_when_no_server(self):
+        """get_current_user_id() returns None when PromptServer unavailable."""
+        from settings import get_current_user_id
+
+        with patch.dict(sys.modules, {"server": None}):
+            result = get_current_user_id()
+            assert result is None
