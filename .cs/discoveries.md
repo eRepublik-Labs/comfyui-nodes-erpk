@@ -12,7 +12,7 @@ Explored the full Claude node architecture. Key gaps identified:
 ## Architecture Notes
 
 - All providers (Claude, OpenAI, Gemini, WaveSpeed) follow the same pattern: `provider/`, `provider_api/client.py`, `provider_api/utils.py`
-- Custom types: `CLAUDE_API_CLIENT`, `CLAUDE_CONVERSATION`, `OPENAI_API_CLIENT`, `GEMINI_API_CLIENT`
+- Custom types: `CLAUDE_API_CLIENT`, `CLAUDE_CONVERSATION`, `CLAUDE_TOOLS`, `OPENAI_API_CLIENT`, `GEMINI_API_CLIENT`
 - 10 Claude nodes total: APIClient, TextGeneration, VisionAnalysis, Conversation, ConversationInfo, PromptEnhancer (51 styles), TokenCounter, UsageStats, ToolDefinition, StructuredOutput
 - Models: claude-sonnet-4-5, claude-opus-4-6, claude-haiku-4-5
 - Prompt caching supported via beta headers
