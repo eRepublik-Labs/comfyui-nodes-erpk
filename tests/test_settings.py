@@ -145,3 +145,20 @@ class TestGetComfySetting:
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
             result = get_comfy_setting("ERPK.ANTHROPIC_API_KEY", "fallback")
             assert result == "fallback"
+
+    def test_finds_settings_when_manager_dir_exists(self, tmp_path):
+        """Settings in 'default' are found even when '__manager' dir comes first."""
+        user_dir = tmp_path / "user"
+        user_dir.mkdir()
+        # __manager comes first alphabetically but has no settings file
+        (user_dir / "__manager").mkdir()
+        default_dir = user_dir / "default"
+        default_dir.mkdir()
+        write_settings(default_dir, {"ERPK.ANTHROPIC_API_KEY": "sk-ant-test123"})
+
+        mock_folder_paths = MagicMock()
+        mock_folder_paths.get_user_directory.return_value = str(user_dir)
+
+        with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
+            result = get_comfy_setting("ERPK.ANTHROPIC_API_KEY")
+            assert result == "sk-ant-test123"

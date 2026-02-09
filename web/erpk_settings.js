@@ -46,16 +46,44 @@ app.registerExtension({
         tooltip: `${entry.name}. Leave empty to use environment variable or config.ini.`,
     })),
 
-    getCanvasMenuItems() {
-        return [
-            {
+    setup() {
+        const origGetCanvasMenuOptions =
+            LGraphCanvas.prototype.getCanvasMenuOptions;
+        LGraphCanvas.prototype.getCanvasMenuOptions = function (...args) {
+            const options = origGetCanvasMenuOptions.apply(this, [...args]);
+            options.push(null);
+            options.push({
                 content: "ERPK Settings",
                 callback: () => {
                     const btn = document.querySelector(".comfy-settings-btn");
-                    if (btn) btn.click();
+                    if (!btn) return;
+                    btn.click();
+                    // Poll for the search box in the settings dialog and type "ERPK"
+                    let attempts = 0;
+                    const searchERPK = () => {
+                        const input = document.querySelector(
+                            ".settings-search-box input"
+                        );
+                        if (input) {
+                            const setter = Object.getOwnPropertyDescriptor(
+                                HTMLInputElement.prototype,
+                                "value"
+                            ).set;
+                            setter.call(input, "ERPK");
+                            input.dispatchEvent(
+                                new Event("input", { bubbles: true })
+                            );
+                            return;
+                        }
+                        if (++attempts < 10) {
+                            setTimeout(searchERPK, 100);
+                        }
+                    };
+                    setTimeout(searchERPK, 100);
                 },
-            },
-        ];
+            });
+            return options;
+        };
     },
 
     nodeCreated(node) {
