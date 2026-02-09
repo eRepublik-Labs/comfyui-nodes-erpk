@@ -204,6 +204,10 @@ Builds an Anthropic tool definition for use with structured output. Chainable â€
 **Outputs:**
 - `tools`: Tool definition list (`CLAUDE_TOOLS`)
 
+**Notes:**
+- If a chained tool has the same name as a previous one, it replaces the earlier definition
+- Invalid JSON in `parameters_json` raises an error at queue time
+
 **Example parameters_json:**
 ```json
 {
@@ -229,7 +233,11 @@ Forces Claude to respond with structured JSON matching your tool schema. Uses An
 
 **Outputs:**
 - `json_output`: Extracted JSON string (pretty-printed)
-- `thinking`: Any reasoning text Claude produced before the structured output
+- `thinking`: Any text blocks Claude produced before the tool use block. Usually empty at low temperature. This captures optional reasoning text from the response, not Anthropic's extended thinking feature (which is a separate API capability).
+
+**Notes:**
+- The `tool` input must contain exactly 1 tool â€” connecting a chain of multiple tools will raise an error
+- Empty or whitespace-only prompts are rejected at queue time
 
 **Use Cases:**
 - Extract structured data from unstructured text

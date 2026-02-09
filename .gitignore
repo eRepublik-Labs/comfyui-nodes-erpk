@@ -15,5 +15,5 @@ __pycache__/
 
 # macOS
 .DS_Store
-.cs/archives/
-.cs/.discoveries-reminder-cooldown
+.cs/
+AGENTS.md
