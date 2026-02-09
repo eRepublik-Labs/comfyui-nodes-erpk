@@ -107,7 +107,7 @@ app.registerExtension({
             const options = origGetCanvasMenuOptions.apply(this, [...args]);
             options.push(null);
             options.push({
-                content: "ERPK Settings",
+                content: "⚙️ ERPK Settings",
                 callback: () => {
                     const btn = document.querySelector(".comfy-settings-btn");
                     if (!btn) return;
