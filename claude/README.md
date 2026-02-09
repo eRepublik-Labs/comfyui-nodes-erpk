@@ -74,7 +74,7 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 ### Core Nodes
 
 #### Claude API Client
-Initializes the Claude API client. Required for all other nodes.
+Initializes the Claude API client. Optional if API key is configured in ComfyUI Settings — generation nodes can run standalone.
 
 **Inputs:**
 - `model`: claude-sonnet-4-5 (default), claude-opus-4-6, claude-haiku-4-5

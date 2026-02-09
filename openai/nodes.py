@@ -76,10 +76,6 @@ class OpenAITextGeneration:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "client": (
-                    "OPENAI_API_CLIENT",
-                    {"tooltip": "OpenAI API client from OpenAI API Config node"}
-                ),
                 "prompt": (
                     "STRING",
                     {
@@ -90,6 +86,10 @@ class OpenAITextGeneration:
                 ),
             },
             "optional": {
+                "client": (
+                    "OPENAI_API_CLIENT",
+                    {"tooltip": "OpenAI API client from OpenAI API Config node (optional if API key is configured in Settings)"}
+                ),
                 "model": (
                     cls.TEXT_MODELS,
                     {
@@ -157,8 +157,8 @@ class OpenAITextGeneration:
 
     def generate(
         self,
-        client: OpenAIClient,
         prompt: str,
+        client: OpenAIClient = None,
         model: str = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
@@ -184,6 +184,10 @@ class OpenAITextGeneration:
         """
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
+
+        # Create default client if none provided
+        if client is None:
+            client = OpenAIClient(api_key=None)
 
         # Use specified model or default
         if model is None:
@@ -241,10 +245,6 @@ class OpenAIChat:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "client": (
-                    "OPENAI_API_CLIENT",
-                    {"tooltip": "OpenAI API client from OpenAI API Config node"}
-                ),
                 "prompt": (
                     "STRING",
                     {
@@ -255,6 +255,10 @@ class OpenAIChat:
                 ),
             },
             "optional": {
+                "client": (
+                    "OPENAI_API_CLIENT",
+                    {"tooltip": "OpenAI API client from OpenAI API Config node (optional if API key is configured in Settings)"}
+                ),
                 "model": (
                     cls.TEXT_MODELS,
                     {
@@ -333,8 +337,8 @@ class OpenAIChat:
 
     def chat(
         self,
-        client: OpenAIClient,
         prompt: str,
+        client: OpenAIClient = None,
         model: str = None,
         chat_session=None,
         reset_conversation: bool = False,
@@ -364,6 +368,10 @@ class OpenAIChat:
         """
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
+
+        # Create default client if none provided
+        if client is None:
+            client = OpenAIClient(api_key=None)
 
         # Use specified model or default
         if model is None:
@@ -432,10 +440,6 @@ class OpenAIVision:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "client": (
-                    "OPENAI_API_CLIENT",
-                    {"tooltip": "OpenAI API client from OpenAI API Config node"}
-                ),
                 "image": (
                     "IMAGE",
                     {"tooltip": "Image(s) to analyze (ComfyUI tensor)"}
@@ -450,6 +454,10 @@ class OpenAIVision:
                 ),
             },
             "optional": {
+                "client": (
+                    "OPENAI_API_CLIENT",
+                    {"tooltip": "OpenAI API client from OpenAI API Config node (optional if API key is configured in Settings)"}
+                ),
                 "model": (
                     cls.VISION_MODELS,
                     {
@@ -499,9 +507,9 @@ class OpenAIVision:
 
     def analyze(
         self,
-        client: OpenAIClient,
         image,
         prompt: str,
+        client: OpenAIClient = None,
         model: str = "gpt-4o",
         detail: str = "auto",
         max_tokens: int = 4096,
@@ -524,6 +532,10 @@ class OpenAIVision:
         """
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
+
+        # Create default client if none provided
+        if client is None:
+            client = OpenAIClient(api_key=None)
 
         try:
             # Convert tensor(s) to vision API format

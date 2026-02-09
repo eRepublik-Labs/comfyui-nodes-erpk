@@ -23,10 +23,6 @@ class ClaudeTextGeneration:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "client": (
-                    "CLAUDE_API_CLIENT",
-                    {"tooltip": "Claude API client from Claude API Client node"}
-                ),
                 "prompt": (
                     "STRING",
                     {
@@ -37,6 +33,10 @@ class ClaudeTextGeneration:
                 ),
             },
             "optional": {
+                "client": (
+                    "CLAUDE_API_CLIENT",
+                    {"tooltip": "Claude API client from Claude API Client node (optional if API key is configured in Settings)"}
+                ),
                 "system_prompt": (
                     "STRING",
                     {
@@ -87,8 +87,8 @@ class ClaudeTextGeneration:
 
     def generate(
         self,
-        client: ClaudeClient,
         prompt: str,
+        client: ClaudeClient = None,
         system_prompt: str = "",
         temperature: float = 0.7,
         max_tokens: int = 1024,
@@ -98,8 +98,8 @@ class ClaudeTextGeneration:
         Generate text using Claude.
 
         Args:
-            client: Claude API client
             prompt: User prompt
+            client: Claude API client (optional if API key is configured in Settings)
             system_prompt: Optional system prompt
             temperature: Creativity level
             max_tokens: Max output tokens
@@ -108,6 +108,9 @@ class ClaudeTextGeneration:
         Returns:
             Tuple containing generated text
         """
+        if client is None:
+            client = ClaudeClient(api_key=None)
+
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 

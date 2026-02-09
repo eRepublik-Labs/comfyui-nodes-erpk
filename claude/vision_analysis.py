@@ -25,10 +25,6 @@ class ClaudeVisionAnalysis:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "client": (
-                    "CLAUDE_API_CLIENT",
-                    {"tooltip": "Claude API client from Claude API Client node"}
-                ),
                 "image": (
                     "IMAGE",
                     {"tooltip": "Primary image to analyze (ComfyUI tensor)"}
@@ -43,6 +39,10 @@ class ClaudeVisionAnalysis:
                 ),
             },
             "optional": {
+                "client": (
+                    "CLAUDE_API_CLIENT",
+                    {"tooltip": "Claude API client (optional if API key is configured in Settings)"}
+                ),
                 "additional_images": (
                     "IMAGE",
                     {"tooltip": "Optional additional images (up to 19 more, for 20 total)"}
@@ -79,9 +79,9 @@ class ClaudeVisionAnalysis:
 
     def analyze(
         self,
-        client: ClaudeClient,
         image,
         question: str,
+        client: ClaudeClient = None,
         additional_images=None,
         detail_level: str = "high",
         max_tokens: int = 2048
@@ -90,9 +90,9 @@ class ClaudeVisionAnalysis:
         Analyze image(s) using Claude's vision capabilities.
 
         Args:
-            client: Claude API client
             image: Primary image tensor
             question: Question or instruction about images
+            client: Claude API client (optional if API key is configured in Settings)
             additional_images: Optional additional image tensors
             detail_level: Analysis detail level
             max_tokens: Max output tokens
@@ -100,6 +100,9 @@ class ClaudeVisionAnalysis:
         Returns:
             Tuple containing analysis text
         """
+        if client is None:
+            client = ClaudeClient(api_key=None)
+
         if not question or not question.strip():
             raise ValueError("Question cannot be empty")
 

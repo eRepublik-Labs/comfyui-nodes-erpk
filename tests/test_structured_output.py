@@ -223,11 +223,11 @@ class TestStructuredOutputNodeMeta:
         from claude.structured_output import ClaudeStructuredOutput
 
         input_types = ClaudeStructuredOutput.INPUT_TYPES()
-        assert "client" in input_types["required"]
-        assert input_types["required"]["client"][0] == "CLAUDE_API_CLIENT"
         assert "prompt" in input_types["required"]
         assert "tool" in input_types["required"]
         assert input_types["required"]["tool"][0] == "CLAUDE_TOOLS"
+        assert "client" in input_types["optional"]
+        assert input_types["optional"]["client"][0] == "CLAUDE_API_CLIENT"
 
     def test_return_types(self):
         from claude.structured_output import ClaudeStructuredOutput

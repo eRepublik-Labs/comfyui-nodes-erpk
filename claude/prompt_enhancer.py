@@ -233,10 +233,6 @@ Emphasize architectural beauty and structural design."""
 
         return {
             "required": {
-                "client": (
-                    "CLAUDE_API_CLIENT",
-                    {"tooltip": "Claude API client from Claude API Client node"}
-                ),
                 "prompt": (
                     "STRING",
                     {
@@ -261,6 +257,10 @@ Emphasize architectural beauty and structural design."""
                 ),
             },
             "optional": {
+                "client": (
+                    "CLAUDE_API_CLIENT",
+                    {"tooltip": "Claude API client (optional if API key is configured in Settings)"}
+                ),
                 "temperature": (
                     "FLOAT",
                     {
@@ -303,10 +303,10 @@ Emphasize architectural beauty and structural design."""
 
     def enhance_prompt(
         self,
-        client: ClaudeClient,
         prompt: str,
         style: str,
         detail_level: str,
+        client: ClaudeClient = None,
         temperature: float = 0.7,
         max_tokens: int = 1024,
         use_streaming: bool = False
@@ -315,10 +315,10 @@ Emphasize architectural beauty and structural design."""
         Enhance a simple prompt with rich detail and style.
 
         Args:
-            client: Claude API client
             prompt: Simple prompt to enhance
             style: Enhancement style
             detail_level: Detail level
+            client: Claude API client (optional if API key is configured in Settings)
             temperature: Creativity level
             max_tokens: Max output tokens
             use_streaming: Enable streaming
@@ -326,6 +326,9 @@ Emphasize architectural beauty and structural design."""
         Returns:
             Tuple containing enhanced prompt
         """
+        if client is None:
+            client = ClaudeClient(api_key=None)
+
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 

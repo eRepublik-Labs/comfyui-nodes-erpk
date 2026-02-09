@@ -75,7 +75,7 @@ Complete Google Gemini API integration providing text generation, vision analysi
 ### Core Nodes
 
 #### Gemini API Config
-Initializes the Gemini API client. Required for all other nodes.
+Initializes the Gemini API client. Optional if API key is configured in ComfyUI Settings — generation nodes can run standalone.
 
 **Inputs:**
 - `api_key`: Optional API key (uses env/config if empty)

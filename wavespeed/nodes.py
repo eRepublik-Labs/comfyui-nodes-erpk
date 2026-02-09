@@ -351,8 +351,10 @@ class UploadImage:
     def INPUT_TYPES(cls) -> Dict[str, Any]:
         return {
             "required": {
-                "client": ("WAVESPEED_AI_API_CLIENT",),
                 "image": ("IMAGE",)
+            },
+            "optional": {
+                "client": ("WAVESPEED_AI_API_CLIENT", {"tooltip": "WaveSpeed API client (optional if API key is configured in Settings)"}),
             }
         }
 
@@ -362,19 +364,22 @@ class UploadImage:
     CATEGORY = "ERPK/WaveSpeedAI"
     FUNCTION = "upload_file"
 
-    def upload_file(self, client: Dict[str, str], image) -> Tuple[str, List[str]]:
+    def upload_file(self, image, client: Dict[str, str] = None) -> Tuple[str, List[str]]:
         """
         Upload image(s) to WaveSpeed AI.
 
         Args:
-            client: API client configuration
             image: ComfyUI image tensor (can be single or batch)
+            client: API client configuration (optional if API key is configured in Settings)
 
         Returns:
             Tuple of (single_image_url, all_image_urls):
             - single_image_url: First image URL, for nodes expecting a single image
             - all_image_urls: List of all uploaded image URLs, for batch processing
         """
+        if client is None:
+            client = WaveSpeedAIAPIClient().create_client()[0]
+
         # Convert tensor to PIL images
         images = tensor2images(image)
         image_urls = []

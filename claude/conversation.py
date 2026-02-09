@@ -26,10 +26,6 @@ class ClaudeConversation:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "client": (
-                    "CLAUDE_API_CLIENT",
-                    {"tooltip": "Claude API client from Claude API Client node"}
-                ),
                 "prompt": (
                     "STRING",
                     {
@@ -40,6 +36,10 @@ class ClaudeConversation:
                 ),
             },
             "optional": {
+                "client": (
+                    "CLAUDE_API_CLIENT",
+                    {"tooltip": "Claude API client (optional if API key is configured in Settings)"}
+                ),
                 "conversation_history": (
                     "CLAUDE_CONVERSATION",
                     {"tooltip": "Previous conversation state (connect from previous conversation node)"}
@@ -101,8 +101,8 @@ class ClaudeConversation:
 
     def chat(
         self,
-        client: ClaudeClient,
         prompt: str,
+        client: ClaudeClient = None,
         conversation_history=None,
         system_prompt: str = "",
         auto_trim: bool = True,
@@ -114,8 +114,8 @@ class ClaudeConversation:
         Continue or start a conversation with Claude.
 
         Args:
-            client: Claude API client
             prompt: User message
+            client: Claude API client (optional if API key is configured in Settings)
             conversation_history: Previous conversation state
             system_prompt: Optional system prompt (for new conversations)
             auto_trim: Auto-trim to context window
@@ -126,6 +126,9 @@ class ClaudeConversation:
         Returns:
             Tuple of (response_text, updated_conversation_state)
         """
+        if client is None:
+            client = ClaudeClient(api_key=None)
+
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 

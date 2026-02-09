@@ -142,11 +142,13 @@ ComfyUI/
 
 ## Usage
 
-### Core Nodes (Required for all workflows)
+### Core Nodes
 
 #### WaveSpeedAI Client Node
+Optional if API key is configured in ComfyUI Settings — generation nodes can run standalone.
+
 1. Add the "WaveSpeedAI Client" node to your workflow
-2. Enter your WaveSpeed AI API key (or leave empty to use config.ini)
+2. Enter your WaveSpeed AI API key (or leave empty to use Settings/env/config.ini)
 3. Connect the client output to any WaveSpeed AI node
 
 #### Upload Image Node

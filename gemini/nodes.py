@@ -76,10 +76,6 @@ class GeminiTextGeneration:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "client": (
-                    "GEMINI_API_CLIENT",
-                    {"tooltip": "Gemini API client from Gemini API Config node"}
-                ),
                 "prompt": (
                     "STRING",
                     {
@@ -90,6 +86,10 @@ class GeminiTextGeneration:
                 ),
             },
             "optional": {
+                "client": (
+                    "GEMINI_API_CLIENT",
+                    {"tooltip": "Gemini API client from Gemini API Config node (optional if API key is configured in Settings)"}
+                ),
                 "model": (
                     cls.TEXT_MODELS,
                     {
@@ -175,8 +175,8 @@ class GeminiTextGeneration:
 
     def generate(
         self,
-        client: GeminiClient,
         prompt: str,
+        client: GeminiClient = None,
         model: str = None,
         temperature: float = 0.7,
         max_tokens: int = 8192,
@@ -206,6 +206,10 @@ class GeminiTextGeneration:
         """
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
+
+        # Create default client if none provided
+        if client is None:
+            client = GeminiClient(api_key=None)
 
         # Use specified model or default
         if model is None:
@@ -269,10 +273,6 @@ class GeminiChat:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "client": (
-                    "GEMINI_API_CLIENT",
-                    {"tooltip": "Gemini API client from Gemini API Config node"}
-                ),
                 "prompt": (
                     "STRING",
                     {
@@ -283,6 +283,10 @@ class GeminiChat:
                 ),
             },
             "optional": {
+                "client": (
+                    "GEMINI_API_CLIENT",
+                    {"tooltip": "Gemini API client from Gemini API Config node (optional if API key is configured in Settings)"}
+                ),
                 "model": (
                     cls.TEXT_MODELS,
                     {
@@ -379,8 +383,8 @@ class GeminiChat:
 
     def chat(
         self,
-        client: GeminiClient,
         prompt: str,
+        client: GeminiClient = None,
         model: str = None,
         chat_session=None,
         reset_conversation: bool = False,
@@ -414,6 +418,10 @@ class GeminiChat:
         """
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
+
+        # Create default client if none provided
+        if client is None:
+            client = GeminiClient(api_key=None)
 
         # Use specified model or default
         if model is None:
@@ -492,10 +500,6 @@ class GeminiVision:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "client": (
-                    "GEMINI_API_CLIENT",
-                    {"tooltip": "Gemini API client from Gemini API Config node"}
-                ),
                 "image": (
                     "IMAGE",
                     {"tooltip": "Image(s) to analyze (ComfyUI tensor)"}
@@ -510,6 +514,10 @@ class GeminiVision:
                 ),
             },
             "optional": {
+                "client": (
+                    "GEMINI_API_CLIENT",
+                    {"tooltip": "Gemini API client from Gemini API Config node (optional if API key is configured in Settings)"}
+                ),
                 "model": (
                     cls.TEXT_MODELS,
                     {
@@ -595,9 +603,9 @@ class GeminiVision:
 
     def analyze(
         self,
-        client: GeminiClient,
         image,
         prompt: str,
+        client: GeminiClient = None,
         model: str = None,
         max_tokens: int = 8192,
         temperature: float = 0.4,
@@ -631,6 +639,10 @@ class GeminiVision:
             model = GeminiClient.DEFAULT_MODEL
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
+
+        # Create default client if none provided
+        if client is None:
+            client = GeminiClient(api_key=None)
 
         try:
             # Convert tensor(s) to PIL images

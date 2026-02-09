@@ -11,10 +11,6 @@ class ClaudeStructuredOutput:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "client": (
-                    "CLAUDE_API_CLIENT",
-                    {"tooltip": "Claude API client from Claude API Client node"}
-                ),
                 "prompt": (
                     "STRING",
                     {
@@ -29,6 +25,10 @@ class ClaudeStructuredOutput:
                 ),
             },
             "optional": {
+                "client": (
+                    "CLAUDE_API_CLIENT",
+                    {"tooltip": "Claude API client (optional if API key is configured in Settings)"}
+                ),
                 "system_prompt": (
                     "STRING",
                     {
@@ -71,14 +71,18 @@ class ClaudeStructuredOutput:
 
     def extract(
         self,
-        client,
         prompt,
         tool,
+        client=None,
         system_prompt="",
         temperature=0.0,
         max_tokens=4096,
     ):
         """Call Claude with forced tool use and extract the structured JSON result."""
+        if client is None:
+            from .claude_api.client import ClaudeClient
+            client = ClaudeClient(api_key=None)
+
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 

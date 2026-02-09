@@ -15,7 +15,6 @@ class QwenImageTextToImageNode:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "client": ("WAVESPEED_AI_API_CLIENT",),
                 "prompt": (
                     "STRING",
                     {
@@ -26,6 +25,7 @@ class QwenImageTextToImageNode:
                 ),
             },
             "optional": {
+                "client": ("WAVESPEED_AI_API_CLIENT", {"tooltip": "WaveSpeed API client (optional if API key is configured in Settings)"}),
                 "width": (
                     "INT",
                     {
@@ -89,8 +89,8 @@ class QwenImageTextToImageNode:
 
     def execute(
         self,
-        client,
         prompt,
+        client=None,
         width=1024,
         height=1024,
         seed=-1,
@@ -98,6 +98,10 @@ class QwenImageTextToImageNode:
         enable_sync_mode=False,
         enable_base64_output=False,
     ):
+        if client is None:
+            from .nodes import WaveSpeedAIAPIClient
+            client = WaveSpeedAIAPIClient().create_client()[0]
+
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 

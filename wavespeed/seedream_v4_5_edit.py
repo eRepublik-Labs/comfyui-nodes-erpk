@@ -15,7 +15,6 @@ class SeedreamV4_5EditNode:
     def INPUT_TYPES(s):
         return {
             "required": {
-                "client": ("WAVESPEED_AI_API_CLIENT",),
                 "prompt": (
                     "STRING",
                     {
@@ -39,6 +38,7 @@ class SeedreamV4_5EditNode:
                 ),
             },
             "optional": {
+                "client": ("WAVESPEED_AI_API_CLIENT", {"tooltip": "WaveSpeed API client (optional if API key is configured in Settings)"}),
                 "width": (
                     "INT",
                     {
@@ -97,16 +97,20 @@ class SeedreamV4_5EditNode:
 
     def execute(
         self,
-        client,
         prompt,
         image_url,
         size_preset,
+        client=None,
         width=2048,
         height=2048,
         show_aspect_ratio=True,
         enable_sync_mode=False,
         enable_base64_output=False,
     ):
+        if client is None:
+            from .nodes import WaveSpeedAIAPIClient
+            client = WaveSpeedAIAPIClient().create_client()[0]
+
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
