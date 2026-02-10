@@ -279,22 +279,29 @@ String manipulation and general utility nodes.
 
 ### Shared Workflows (Multi-User)
 
-In multi-user ComfyUI (`--multi-user`), each user's workflows are sandboxed. Shared Workflows provides a common directory where any user can save, browse, load, and delete workflow templates.
+In multi-user ComfyUI (`--multi-user`), each user's workflows are sandboxed. Shared Workflows provides a common directory where any user can save, browse, load, and delete workflow templates. Also works in single-user mode.
 
-**Access:** Right-click the canvas > **Shared Workflows**
+**Access:** Right-click the canvas > **ERPK** submenu
 
-- **Browse Shared Workflows...** - View all shared workflows with name, size, and date. Load any workflow into your canvas or delete it.
-- **Share Current Workflow...** - Save the current canvas workflow to the shared directory under a chosen name.
+- **Browse Shared Workflows...** - View all shared workflows with name, size, date, and authorship (created by / last edited by). Load any workflow into your canvas or delete it.
+- **Share Current Workflow...** - Save the current canvas workflow to the shared directory. The name field is pre-populated from the current workflow tab.
+- **Save to "[name]"** - Appears after loading or sharing a workflow. Saves directly to the linked shared workflow without opening a dialog.
 
-**Storage:** Workflows are saved as JSON files in `shared_workflows/` inside the extension directory. This directory is gitignored and persists across ComfyUI restarts. No API keys or user-specific data are stored — only the workflow graph (node positions, connections, settings).
+**Linked save-back:** When you load a shared workflow or share one, the workflow name is linked. Subsequent edits can be pushed back to the shared copy via the "Save to" menu item. Other users see the updated version when they browse.
+
+**Authorship tracking:** Each shared workflow records who created it and who last modified it. On overwrite, the original creator is preserved while the modifier is updated.
+
+**Toast notifications:** Success/error feedback appears as a brief toast in the top-right corner for all save, load, and delete operations.
+
+**Storage:** Workflows are saved as JSON files in `shared_workflows/` inside the extension directory. This directory is gitignored and persists across ComfyUI restarts. Each file uses an envelope format (`{meta, workflow}`) that stores authorship metadata alongside the workflow graph. No API keys or user-specific data are stored.
 
 **API Endpoints:**
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/erpk/shared_workflows` | GET | List all shared workflows (metadata) |
+| `/erpk/shared_workflows` | GET | List all shared workflows (metadata including authorship) |
 | `/erpk/shared_workflows/{name}` | GET | Get a single workflow by name |
-| `/erpk/shared_workflows` | POST | Save a workflow (`{name, workflow}`) |
+| `/erpk/shared_workflows` | POST | Save a workflow (`{name, workflow}`); records user as author |
 | `/erpk/shared_workflows/{name}` | DELETE | Delete a workflow by name |
 
 ## Installation

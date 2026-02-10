@@ -9,8 +9,8 @@ import tempfile
 # Storage lives inside the extension directory, not in ComfyUI's user/ tree
 STORAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shared_workflows")
 
-# Whitelist: alphanumeric start/end, spaces/hyphens/underscores in the middle, max 200 chars
-_NAME_RE = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9 _-]{0,198}[a-zA-Z0-9])?$")
+# Whitelist: alphanumeric/bracket start/end, spaces/hyphens/underscores/brackets in middle, max 200 chars
+_NAME_RE = re.compile(r"^[a-zA-Z0-9\[\]()]([a-zA-Z0-9 _\-\[\]()]{0,198}[a-zA-Z0-9\[\]()])?$")
 
 
 def validate_name(name):

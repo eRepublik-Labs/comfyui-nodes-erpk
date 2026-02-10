@@ -39,6 +39,10 @@ class TestValidateName:
     def test_accepts_underscores(self):
         assert validate_name("my_workflow_1") == "my_workflow_1"
 
+    def test_accepts_brackets_and_parentheses(self):
+        assert validate_name("Background Removal [DEMO]") == "Background Removal [DEMO]"
+        assert validate_name("workflow (copy)") == "workflow (copy)"
+
     def test_accepts_single_character(self):
         assert validate_name("a") == "a"
 

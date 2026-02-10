@@ -92,6 +92,30 @@ function clearChildren(el) {
     while (el.firstChild) el.removeChild(el.firstChild);
 }
 
+function showToast(message, severity = "success") {
+    const colors = {
+        success: { bg: "#14532d", border: "#22c55e", text: "#bbf7d0" },
+        error: { bg: "#7f1d1d", border: "#ef4444", text: "#fca5a5" },
+        info: { bg: "#1e3a5f", border: "#3b82f6", text: "#bfdbfe" },
+    };
+    const c = colors[severity] || colors.info;
+    const toast = document.createElement("div");
+    toast.textContent = message;
+    toast.style.cssText =
+        `position:fixed;top:20px;right:20px;z-index:10001;padding:10px 18px;` +
+        `border-radius:6px;font-size:13px;font-family:sans-serif;` +
+        `background:${c.bg};border:1px solid ${c.border};color:${c.text};` +
+        `opacity:0;transition:opacity 0.3s ease;pointer-events:none;`;
+    document.body.appendChild(toast);
+    requestAnimationFrame(() => {
+        toast.style.opacity = "1";
+    });
+    setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
 function createOverlay(onClose) {
     const overlay = document.createElement("div");
     overlay.style.cssText = OVERLAY_STYLE;
@@ -192,6 +216,7 @@ async function showBrowseDialog() {
                         await app.loadGraphData(data);
                         linkedSharedWorkflowName = wf.name;
                         overlay.remove();
+                        showToast(`Loaded "${wf.name}"`);
                     }
                 })
             );
@@ -204,7 +229,8 @@ async function showBrowseDialog() {
                         )
                     )
                         return;
-                    await deleteSharedWorkflow(wf.name);
+                    const deleted = await deleteSharedWorkflow(wf.name);
+                    if (deleted) showToast(`Deleted "${wf.name}"`);
                     refreshList();
                 })
             );
@@ -267,6 +293,7 @@ function showSaveDialog() {
         if (resp.ok) {
             linkedSharedWorkflowName = name;
             overlay.remove();
+            showToast(`Shared "${name}"`);
         } else {
             const data = await resp.json().catch(() => null);
             errorEl.textContent =
@@ -342,10 +369,15 @@ app.registerExtension({
                     content: `Save to "${linkedSharedWorkflowName}"`,
                     callback: async () => {
                         const workflow = app.graph.serialize();
-                        await saveSharedWorkflow(
+                        const resp = await saveSharedWorkflow(
                             linkedSharedWorkflowName,
                             workflow
                         );
+                        if (resp.ok) {
+                            showToast(`Saved to "${linkedSharedWorkflowName}"`);
+                        } else {
+                            showToast("Failed to save workflow", "error");
+                        }
                     },
                 });
             }
