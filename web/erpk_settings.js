@@ -63,7 +63,7 @@ async function fetchUserInfo() {
 }
 
 function buildSettings() {
-    return API_KEY_SETTINGS.map((entry) => ({
+    const settings = API_KEY_SETTINGS.map((entry) => ({
         id: entry.id,
         name: entry.name,
         type: "text",
@@ -71,6 +71,19 @@ function buildSettings() {
         category: ["ERPK", "API Keys", entry.name],
         tooltip: `${entry.name}. Leave empty to use environment variable or config.ini.`,
     }));
+
+    // User indicator displayed in the ERPK Settings panel
+    settings.unshift({
+        id: "ERPK.CURRENT_USER",
+        name: "Settings for",
+        type: "text",
+        defaultValue: "",
+        category: ["ERPK", "User Info"],
+        tooltip:
+            "The ComfyUI user whose settings are displayed. Updated automatically on page load.",
+    });
+
+    return settings;
 }
 
 app.registerExtension({
@@ -87,17 +100,16 @@ app.registerExtension({
             registerUserContext();
         });
 
-        // Fetch user info and show indicator in multi-user mode
+        // Update user display in ERPK Settings panel
         const userInfo = await fetchUserInfo();
-        if (userInfo.multi_user) {
-            const indicator = document.createElement("div");
-            indicator.className = "erpk-user-indicator";
-            indicator.textContent = `Settings for: ${userInfo.display_name}`;
-            indicator.style.cssText =
-                "position:fixed;bottom:4px;right:4px;padding:4px 8px;" +
-                "background:rgba(0,0,0,0.6);color:#ccc;font-size:11px;" +
-                "border-radius:4px;z-index:9999;pointer-events:none;";
-            document.body.appendChild(indicator);
+        try {
+            await api.fetchApi("/settings/ERPK.CURRENT_USER", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(userInfo.display_name),
+            });
+        } catch (e) {
+            // Non-fatal
         }
 
         // Add ERPK Settings to canvas context menu
