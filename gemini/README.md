@@ -97,7 +97,7 @@ General-purpose text generation and completion.
 - `max_tokens`: 256-8192 (output length, default: 8192)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
 - `top_k`: 0-100 (top-k sampling, default: 40, set 0 to disable)
-- `stop_sequences`: Newline-separated sequences where generation stops
+- `stop_sequences`: Newline-separated sequences where generation stops (max 5)
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
 
@@ -126,7 +126,7 @@ Multi-turn conversation with message history preservation.
 - `max_tokens`: 256-8192 (default: 8192)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
 - `top_k`: 0-100 (top-k sampling, default: 40, set 0 to disable)
-- `stop_sequences`: Newline-separated sequences where generation stops
+- `stop_sequences`: Newline-separated sequences where generation stops (max 5)
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
 
@@ -154,7 +154,7 @@ Analyze images with questions or instructions.
 - `temperature`: 0.0-2.0 (default: 0.4, lower for more factual)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
 - `top_k`: 0-100 (top-k sampling, default: 40, set 0 to disable)
-- `stop_sequences`: Newline-separated sequences where generation stops
+- `stop_sequences`: Newline-separated sequences where generation stops (max 5)
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
 
