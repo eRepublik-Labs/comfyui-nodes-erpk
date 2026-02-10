@@ -246,7 +246,7 @@ async function showBrowseDialog() {
 
 // ── Save Dialog ──────────────────────────────────────────────────
 
-function showSaveDialog() {
+function showSaveDialog(onSave) {
     const overlay = createOverlay(() => overlay.remove());
     const dialog = createDialog();
     dialog.style.minWidth = "360px";
@@ -294,6 +294,7 @@ function showSaveDialog() {
             linkedSharedWorkflowName = name;
             overlay.remove();
             showToast(`Shared "${name}"`);
+            if (onSave) onSave();
         } else {
             const data = await resp.json().catch(() => null);
             errorEl.textContent =
@@ -310,6 +311,158 @@ function showSaveDialog() {
 
     document.body.appendChild(overlay);
     input.focus();
+}
+
+// ── Settings Panel Workflows Section ─────────────────────────────
+
+const SETTINGS_PANEL_ID = "erpk-shared-workflows-panel";
+
+function createSettingsWorkflowList() {
+    const section = document.createElement("div");
+    section.id = SETTINGS_PANEL_ID;
+    section.style.cssText =
+        "border:1px solid #444;border-radius:6px;padding:12px;margin-top:12px;" +
+        "background:#1e1e1e;font-family:sans-serif;";
+
+    const header = document.createElement("div");
+    header.style.cssText =
+        "display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;";
+    const title = document.createElement("span");
+    title.textContent = "Shared Workflows";
+    title.style.cssText = "font-size:14px;font-weight:600;color:#eee;";
+    header.appendChild(title);
+
+    const listContainer = document.createElement("div");
+    listContainer.style.cssText = "max-height:240px;overflow-y:auto;";
+
+    async function refreshList() {
+        clearChildren(listContainer);
+        const workflows = await listSharedWorkflows();
+
+        if (workflows.length === 0) {
+            const empty = document.createElement("div");
+            empty.textContent = "No shared workflows yet.";
+            empty.style.cssText =
+                "color:#888;text-align:center;padding:16px 0;font-size:13px;";
+            listContainer.appendChild(empty);
+            return;
+        }
+
+        for (const wf of workflows) {
+            const row = document.createElement("div");
+            row.style.cssText =
+                "display:flex;align-items:center;justify-content:space-between;padding:6px 8px;" +
+                "border-bottom:1px solid #333;gap:8px;";
+
+            const info = document.createElement("div");
+            info.style.cssText =
+                "flex:1;min-width:0;display:flex;align-items:center;gap:8px;";
+            const nameEl = document.createElement("span");
+            nameEl.textContent = wf.name;
+            nameEl.style.cssText =
+                "font-size:13px;color:#eee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+            const sizeEl = document.createElement("span");
+            sizeEl.textContent = formatBytes(wf.size);
+            sizeEl.style.cssText = "font-size:11px;color:#888;flex-shrink:0;";
+            info.appendChild(nameEl);
+            info.appendChild(sizeEl);
+            row.appendChild(info);
+
+            const actions = document.createElement("div");
+            actions.style.cssText = "display:flex;gap:4px;flex-shrink:0;";
+
+            actions.appendChild(
+                createButton("Load", PRIMARY_BUTTON_STYLE, async () => {
+                    if (
+                        !confirm(
+                            "This will replace your current workflow. Continue?"
+                        )
+                    )
+                        return;
+                    const data = await getSharedWorkflow(wf.name);
+                    if (data) {
+                        await app.loadGraphData(data);
+                        linkedSharedWorkflowName = wf.name;
+                        showToast(`Loaded "${wf.name}"`);
+                    }
+                })
+            );
+
+            actions.appendChild(
+                createButton("Delete", DANGER_BUTTON_STYLE, async () => {
+                    if (
+                        !confirm(
+                            `Delete shared workflow "${wf.name}"?`
+                        )
+                    )
+                        return;
+                    const deleted = await deleteSharedWorkflow(wf.name);
+                    if (deleted) showToast(`Deleted "${wf.name}"`);
+                    refreshList();
+                })
+            );
+
+            row.appendChild(actions);
+            listContainer.appendChild(row);
+        }
+    }
+
+    header.appendChild(
+        createButton("Share Current", PRIMARY_BUTTON_STYLE, () =>
+            showSaveDialog(refreshList)
+        )
+    );
+    section.appendChild(header);
+    section.appendChild(listContainer);
+
+    refreshList();
+    return section;
+}
+
+function tryInjectSettingsPanel() {
+    if (document.getElementById(SETTINGS_PANEL_ID)) return;
+
+    const allText = document.querySelectorAll(
+        ".p-dialog-content span, .p-dialog-content label, " +
+            ".comfy-modal-content span, .comfy-modal-content label"
+    );
+    let firstLabel = null;
+    let lastLabel = null;
+    for (const el of allText) {
+        const text = el.textContent.trim();
+        if (text === "Anthropic API Key" && !firstLabel) firstLabel = el;
+        if (text === "WaveSpeed API Key") lastLabel = el;
+    }
+    if (!firstLabel || !lastLabel) return;
+
+    // Find the lowest common ancestor of first and last ERPK settings —
+    // this is the settings content container, not the full dialog wrapper
+    const ancestors = new Set();
+    let node = firstLabel;
+    while (node) {
+        ancestors.add(node);
+        node = node.parentElement;
+    }
+    let container = lastLabel;
+    while (container) {
+        if (ancestors.has(container)) break;
+        container = container.parentElement;
+    }
+    if (!container) return;
+
+    container.appendChild(createSettingsWorkflowList());
+}
+
+function observeSettingsForWorkflows() {
+    const observer = new MutationObserver(() => {
+        const dialogOpen =
+            document.querySelector(".p-dialog-content") ||
+            document.querySelector(".comfy-modal-content");
+        if (dialogOpen) {
+            tryInjectSettingsPanel();
+        }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
 }
 
 // ── Open ERPK Settings panel ─────────────────────────────────────
@@ -387,5 +540,7 @@ app.registerExtension({
             });
             return options;
         };
+
+        observeSettingsForWorkflows();
     },
 });

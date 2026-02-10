@@ -92,19 +92,31 @@ function tryInjectBanner(displayName) {
         ".p-dialog-content span, .p-dialog-content label, " +
             ".comfy-modal-content span, .comfy-modal-content label"
     );
+    let firstLabel = null;
+    let lastLabel = null;
     for (const el of allText) {
-        if (el.textContent.trim() === "Anthropic API Key") {
-            // Walk up to the scrollable settings container
-            const container =
-                el.closest(".p-dialog-content") ||
-                el.closest(".comfy-modal-content") ||
-                el.closest("[class*='settings']");
-            if (container) {
-                container.prepend(createUserBanner(displayName));
-            }
-            return;
-        }
+        const text = el.textContent.trim();
+        if (text === "Anthropic API Key" && !firstLabel) firstLabel = el;
+        if (text === "WaveSpeed API Key") lastLabel = el;
     }
+    if (!firstLabel || !lastLabel) return;
+
+    // Find the lowest common ancestor of first and last ERPK settings —
+    // this is the settings content container, not the full dialog wrapper
+    const ancestors = new Set();
+    let node = firstLabel;
+    while (node) {
+        ancestors.add(node);
+        node = node.parentElement;
+    }
+    let container = lastLabel;
+    while (container) {
+        if (ancestors.has(container)) break;
+        container = container.parentElement;
+    }
+    if (!container) return;
+
+    container.prepend(createUserBanner(displayName));
 }
 
 function observeSettingsDialog(displayName) {
