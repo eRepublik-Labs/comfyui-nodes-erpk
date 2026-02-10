@@ -18,6 +18,7 @@ dependencies = [
     "tqdm>=4.65.0",
     "opencv-contrib-python>=4.8.0",
     "rembg[gpu]>=2.0.70",
+    "numba>=0.61.0",
     "onnxruntime>=1.16.0; sys_platform == 'darwin'",
     "transparent-background>=1.2.0",
     "transformers>=4.36.0",
