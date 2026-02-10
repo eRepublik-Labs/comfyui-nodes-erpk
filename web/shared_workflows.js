@@ -1,4 +1,4 @@
-// ABOUTME: Adds canvas context menu for browsing, loading, saving, and deleting shared workflows
+// ABOUTME: Registers the ERPK canvas context menu with settings and shared workflow actions
 // ABOUTME: Provides modal dialogs for multi-user workflow sharing via /erpk/shared_workflows API
 
 import { app } from "../../scripts/app.js";
@@ -37,6 +37,12 @@ async function deleteSharedWorkflow(name) {
     return resp.ok;
 }
 
+// ── Linked workflow state ─────────────────────────────────────────
+
+// Tracks the name of the shared workflow currently loaded on the canvas.
+// Set on Load (browse dialog) or Share (save dialog). Enables "Save to [name]".
+let linkedSharedWorkflowName = null;
+
 // ── Shared styles ────────────────────────────────────────────────
 
 const OVERLAY_STYLE =
@@ -65,6 +71,13 @@ const DANGER_BUTTON_STYLE =
     );
 
 // ── Utility ──────────────────────────────────────────────────────
+
+function getActiveWorkflowName() {
+    const activeTab = document.querySelector(
+        ".p-togglebutton-checked .workflow-label"
+    );
+    return activeTab?.textContent?.trim() || null;
+}
 
 function formatBytes(bytes) {
     if (bytes < 1024) return bytes + " B";
@@ -153,7 +166,11 @@ async function showBrowseDialog() {
             nameEl.style.cssText =
                 "font-size:14px;color:#eee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
             const meta = document.createElement("div");
-            meta.textContent = `${formatBytes(wf.size)}  |  ${formatDate(wf.mtime)}`;
+            const parts = [formatBytes(wf.size), formatDate(wf.mtime)];
+            if (wf.created_by) parts.push(`by ${wf.created_by}`);
+            if (wf.modified_by && wf.modified_by !== wf.created_by)
+                parts.push(`edited by ${wf.modified_by}`);
+            meta.textContent = parts.join("  |  ");
             meta.style.cssText = "font-size:11px;color:#888;margin-top:2px;";
             info.appendChild(nameEl);
             info.appendChild(meta);
@@ -173,6 +190,7 @@ async function showBrowseDialog() {
                     const data = await getSharedWorkflow(wf.name);
                     if (data) {
                         await app.loadGraphData(data);
+                        linkedSharedWorkflowName = wf.name;
                         overlay.remove();
                     }
                 })
@@ -247,6 +265,7 @@ function showSaveDialog() {
         const workflow = app.graph.serialize();
         const resp = await saveSharedWorkflow(name, workflow);
         if (resp.ok) {
+            linkedSharedWorkflowName = name;
             overlay.remove();
         } else {
             const data = await resp.json().catch(() => null);
@@ -259,8 +278,36 @@ function showSaveDialog() {
     buttons.appendChild(saveBtn);
     dialog.appendChild(buttons);
 
+    input.value =
+        linkedSharedWorkflowName || getActiveWorkflowName() || "";
+
     document.body.appendChild(overlay);
     input.focus();
+}
+
+// ── Open ERPK Settings panel ─────────────────────────────────────
+
+function openErpkSettings() {
+    const btn = document.querySelector(".comfy-settings-btn");
+    if (!btn) return;
+    btn.click();
+    let attempts = 0;
+    const searchERPK = () => {
+        const input = document.querySelector(".settings-search-box input");
+        if (input) {
+            const setter = Object.getOwnPropertyDescriptor(
+                HTMLInputElement.prototype,
+                "value"
+            ).set;
+            setter.call(input, "ERPK");
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            return;
+        }
+        if (++attempts < 10) {
+            setTimeout(searchERPK, 100);
+        }
+    };
+    setTimeout(searchERPK, 100);
 }
 
 // ── Extension registration ───────────────────────────────────────
@@ -274,20 +321,37 @@ app.registerExtension({
         LGraphCanvas.prototype.getCanvasMenuOptions = function (...args) {
             const options = origGetCanvasMenuOptions.apply(this, [...args]);
             options.push(null); // separator
-            options.push({
-                content: "Shared Workflows",
-                submenu: {
-                    options: [
-                        {
-                            content: "Browse Shared Workflows...",
-                            callback: () => showBrowseDialog(),
-                        },
-                        {
-                            content: "Share Current Workflow...",
-                            callback: () => showSaveDialog(),
-                        },
-                    ],
+            const erpkItems = [
+                {
+                    content: "Settings...",
+                    callback: () => openErpkSettings(),
                 },
+                null, // separator
+                {
+                    content: "Browse Shared Workflows...",
+                    callback: () => showBrowseDialog(),
+                },
+                {
+                    content: "Share Current Workflow...",
+                    callback: () => showSaveDialog(),
+                },
+            ];
+            if (linkedSharedWorkflowName) {
+                erpkItems.push(null); // separator
+                erpkItems.push({
+                    content: `Save to "${linkedSharedWorkflowName}"`,
+                    callback: async () => {
+                        const workflow = app.graph.serialize();
+                        await saveSharedWorkflow(
+                            linkedSharedWorkflowName,
+                            workflow
+                        );
+                    },
+                });
+            }
+            options.push({
+                content: "\uD83C\uDD74 ERPK",
+                submenu: { options: erpkItems },
             });
             return options;
         };

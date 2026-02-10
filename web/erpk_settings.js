@@ -1,4 +1,4 @@
-// ABOUTME: Registers ERPK API key settings in ComfyUI Settings UI and canvas context menu
+// ABOUTME: Registers ERPK API key settings in ComfyUI Settings UI
 // ABOUTME: Handles multi-user client registration and read-only api_key widgets
 
 import { app } from "../../scripts/app.js";
@@ -150,44 +150,6 @@ app.registerExtension({
         if (userInfo.display_name) {
             observeSettingsDialog(userInfo.display_name);
         }
-
-        // Add ERPK Settings to canvas context menu
-        const origGetCanvasMenuOptions =
-            LGraphCanvas.prototype.getCanvasMenuOptions;
-        LGraphCanvas.prototype.getCanvasMenuOptions = function (...args) {
-            const options = origGetCanvasMenuOptions.apply(this, [...args]);
-            options.push(null);
-            options.push({
-                content: "⚙️ ERPK Settings",
-                callback: () => {
-                    const btn = document.querySelector(".comfy-settings-btn");
-                    if (!btn) return;
-                    btn.click();
-                    let attempts = 0;
-                    const searchERPK = () => {
-                        const input = document.querySelector(
-                            ".settings-search-box input"
-                        );
-                        if (input) {
-                            const setter = Object.getOwnPropertyDescriptor(
-                                HTMLInputElement.prototype,
-                                "value"
-                            ).set;
-                            setter.call(input, "ERPK");
-                            input.dispatchEvent(
-                                new Event("input", { bubbles: true })
-                            );
-                            return;
-                        }
-                        if (++attempts < 10) {
-                            setTimeout(searchERPK, 100);
-                        }
-                    };
-                    setTimeout(searchERPK, 100);
-                },
-            });
-            return options;
-        };
     },
 
     nodeCreated(node) {

@@ -165,7 +165,13 @@ try:
             workflow = body.get("workflow")
             if workflow is None:
                 return web.json_response({"error": "Missing 'workflow' field"}, status=400)
-            shared_workflows.save_workflow(name, workflow)
+            try:
+                user_id = PromptServer.instance.user_manager.get_request_user_id(request)
+                users = PromptServer.instance.user_manager.users
+                user = users.get(user_id, user_id)
+            except Exception:
+                user = None
+            shared_workflows.save_workflow(name, workflow, user=user)
             return web.json_response({"ok": True, "name": name})
         except ValueError as e:
             return web.json_response({"error": str(e)}, status=400)

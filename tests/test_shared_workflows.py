@@ -100,12 +100,9 @@ class TestListWorkflows:
         assert list_workflows() == []
 
     def test_list_multiple_sorted_newest_first(self, storage_dir):
-        # Write two workflows with different mtimes
-        w1 = storage_dir / "alpha.json"
-        w1.write_text(json.dumps({"nodes": []}))
+        save_workflow("alpha", {"nodes": []}, user="alice")
         time.sleep(0.05)
-        w2 = storage_dir / "beta.json"
-        w2.write_text(json.dumps({"nodes": [], "extra": True}))
+        save_workflow("beta", {"nodes": [], "extra": True}, user="bob")
 
         result = list_workflows()
         assert len(result) == 2
@@ -117,20 +114,44 @@ class TestListWorkflows:
             assert "name" in entry
             assert "size" in entry
             assert "mtime" in entry
+            assert "created_by" in entry
+            assert "modified_by" in entry
+
+    def test_list_includes_user_metadata(self, storage_dir):
+        save_workflow("tracked", {"nodes": []}, user="alice")
+        result = list_workflows()
+        assert result[0]["created_by"] == "alice"
+        assert result[0]["modified_by"] == "alice"
 
     def test_list_ignores_non_json(self, storage_dir):
         (storage_dir / "readme.txt").write_text("not a workflow")
-        (storage_dir / "real.json").write_text(json.dumps({}))
+        save_workflow("real", {})
         result = list_workflows()
         assert len(result) == 1
         assert result[0]["name"] == "real"
+
+    def test_list_handles_raw_json_without_envelope(self, storage_dir):
+        # A manually placed file without the envelope format
+        (storage_dir / "legacy.json").write_text(json.dumps({"nodes": []}))
+        result = list_workflows()
+        assert len(result) == 1
+        assert result[0]["name"] == "legacy"
+        assert result[0]["created_by"] is None
+        assert result[0]["modified_by"] is None
 
 
 class TestGetWorkflow:
     def test_get_existing(self, storage_dir):
         data = {"nodes": [1, 2, 3]}
-        (storage_dir / "demo.json").write_text(json.dumps(data))
+        save_workflow("demo", data)
         result = get_workflow("demo")
+        assert result == data
+
+    def test_get_raw_json_without_envelope(self, storage_dir):
+        # A manually placed file without the envelope format
+        data = {"nodes": [1, 2, 3]}
+        (storage_dir / "legacy.json").write_text(json.dumps(data))
+        result = get_workflow("legacy")
         assert result == data
 
     def test_get_missing(self, storage_dir):
@@ -144,15 +165,26 @@ class TestGetWorkflow:
 class TestSaveWorkflow:
     def test_save_new(self, storage_dir):
         data = {"nodes": [1]}
-        save_workflow("newflow", data)
+        save_workflow("newflow", data, user="alice")
         saved = json.loads((storage_dir / "newflow.json").read_text())
-        assert saved == data
+        # Stored in envelope format
+        assert saved["workflow"] == data
+        assert saved["meta"]["created_by"] == "alice"
+        assert saved["meta"]["modified_by"] == "alice"
 
-    def test_save_overwrites(self, storage_dir):
-        save_workflow("overwrite", {"v": 1})
-        save_workflow("overwrite", {"v": 2})
-        saved = json.loads((storage_dir / "overwrite.json").read_text())
-        assert saved == {"v": 2}
+    def test_save_overwrites_preserves_creator(self, storage_dir):
+        save_workflow("shared", {"v": 1}, user="alice")
+        save_workflow("shared", {"v": 2}, user="bob")
+        saved = json.loads((storage_dir / "shared.json").read_text())
+        assert saved["workflow"] == {"v": 2}
+        assert saved["meta"]["created_by"] == "alice"
+        assert saved["meta"]["modified_by"] == "bob"
+
+    def test_save_without_user(self, storage_dir):
+        save_workflow("anon", {"v": 1})
+        saved = json.loads((storage_dir / "anon.json").read_text())
+        assert saved["meta"]["created_by"] is None
+        assert saved["meta"]["modified_by"] is None
 
     def test_save_creates_dir(self, tmp_path, monkeypatch):
         import shared_workflows
