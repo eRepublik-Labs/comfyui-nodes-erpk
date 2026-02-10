@@ -62,8 +62,66 @@ async function fetchUserInfo() {
     return { multi_user: false, user_id: "default", display_name: "default" };
 }
 
+const BANNER_ID = "erpk-user-banner";
+
+function createUserBanner(displayName) {
+    const banner = document.createElement("div");
+    banner.id = BANNER_ID;
+    banner.style.cssText =
+        "display:flex;align-items:center;gap:8px;padding:8px 12px;" +
+        "background:#1a2744;color:#5b8def;border:1px solid #2a3f6b;" +
+        "border-radius:6px;font-size:13px;margin-bottom:8px;";
+
+    const icon = document.createElement("span");
+    icon.style.fontSize = "16px";
+    icon.textContent = "\u{1F464}";
+
+    const text = document.createElement("span");
+    text.textContent = "Current user: " + displayName;
+
+    banner.appendChild(icon);
+    banner.appendChild(text);
+    return banner;
+}
+
+function tryInjectBanner(displayName) {
+    if (document.getElementById(BANNER_ID)) return;
+
+    // Find ERPK settings by looking for our setting labels in the dialog
+    const allText = document.querySelectorAll(
+        ".p-dialog-content span, .p-dialog-content label, " +
+            ".comfy-modal-content span, .comfy-modal-content label"
+    );
+    for (const el of allText) {
+        if (el.textContent.trim() === "Anthropic API Key") {
+            // Walk up to the scrollable settings container
+            const container =
+                el.closest(".p-dialog-content") ||
+                el.closest(".comfy-modal-content") ||
+                el.closest("[class*='settings']");
+            if (container) {
+                container.prepend(createUserBanner(displayName));
+            }
+            return;
+        }
+    }
+}
+
+function observeSettingsDialog(displayName) {
+    // Watch for dialog open/close to inject the banner
+    const observer = new MutationObserver(() => {
+        const dialogOpen =
+            document.querySelector(".p-dialog-content") ||
+            document.querySelector(".comfy-modal-content");
+        if (dialogOpen) {
+            tryInjectBanner(displayName);
+        }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+}
+
 function buildSettings() {
-    const settings = API_KEY_SETTINGS.map((entry) => ({
+    return API_KEY_SETTINGS.map((entry) => ({
         id: entry.id,
         name: entry.name,
         type: "text",
@@ -71,19 +129,6 @@ function buildSettings() {
         category: ["ERPK", "API Keys", entry.name],
         tooltip: `${entry.name}. Leave empty to use environment variable or config.ini.`,
     }));
-
-    // User indicator displayed in the ERPK Settings panel
-    settings.unshift({
-        id: "ERPK.CURRENT_USER",
-        name: "Settings for",
-        type: "text",
-        defaultValue: "",
-        category: ["ERPK", "User Info"],
-        tooltip:
-            "The ComfyUI user whose settings are displayed. Updated automatically on page load.",
-    });
-
-    return settings;
 }
 
 app.registerExtension({
@@ -100,16 +145,10 @@ app.registerExtension({
             registerUserContext();
         });
 
-        // Update user display in ERPK Settings panel
+        // Inject user banner into ERPK Settings panel when dialog opens
         const userInfo = await fetchUserInfo();
-        try {
-            await api.fetchApi("/settings/ERPK.CURRENT_USER", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(userInfo.display_name),
-            });
-        } catch (e) {
-            // Non-fatal
+        if (userInfo.display_name) {
+            observeSettingsDialog(userInfo.display_name);
         }
 
         // Add ERPK Settings to canvas context menu
