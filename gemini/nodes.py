@@ -4,6 +4,22 @@
 from .gemini_api.client import GeminiClient
 from .gemini_api.utils import ImageConverter, SafetySettings
 
+GEMINI_MAX_STOP_SEQUENCES = 5
+
+
+def _parse_stop_sequences(text):
+    """Parse newline-separated stop sequences, enforcing the Gemini API limit."""
+    if not text or not text.strip():
+        return None
+    sequences = [s.strip() for s in text.strip().split('\n') if s.strip()]
+    if not sequences:
+        return None
+    if len(sequences) > GEMINI_MAX_STOP_SEQUENCES:
+        print(f"[Gemini] Warning: {len(sequences)} stop sequences provided, "
+              f"truncating to {GEMINI_MAX_STOP_SEQUENCES} (Gemini API limit)")
+        sequences = sequences[:GEMINI_MAX_STOP_SEQUENCES]
+    return sequences
+
 
 class GeminiAPIConfig:
     """
@@ -215,10 +231,7 @@ class GeminiTextGeneration:
         if model is None:
             model = GeminiClient.DEFAULT_MODEL
 
-        # Parse stop sequences (one per line)
-        stop_seq_list = None
-        if stop_sequences and stop_sequences.strip():
-            stop_seq_list = [s.strip() for s in stop_sequences.strip().split('\n') if s.strip()]
+        stop_seq_list = _parse_stop_sequences(stop_sequences)
 
         # Parse response schema if provided
         schema_obj = None
@@ -439,10 +452,7 @@ class GeminiChat:
             from google.genai import types
             import json
 
-            # Parse stop sequences (one per line)
-            stop_seq_list = None
-            if stop_sequences and stop_sequences.strip():
-                stop_seq_list = [s.strip() for s in stop_sequences.strip().split('\n') if s.strip()]
+            stop_seq_list = _parse_stop_sequences(stop_sequences)
 
             # Parse response schema if provided
             schema_obj = None
@@ -649,10 +659,7 @@ class GeminiVision:
             pil_images = ImageConverter.tensors_to_pil_list(image)
             print(f"[Gemini] Analyzing {len(pil_images)} image(s)")
 
-            # Parse stop sequences (one per line)
-            stop_seq_list = None
-            if stop_sequences and stop_sequences.strip():
-                stop_seq_list = [s.strip() for s in stop_sequences.strip().split('\n') if s.strip()]
+            stop_seq_list = _parse_stop_sequences(stop_sequences)
 
             # Parse response schema if provided
             schema_obj = None
