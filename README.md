@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2026.2.5 (CalVer)
+**Current Version:** 2026.2.7 (CalVer)
 
 ## Repository Structure
 
@@ -319,7 +319,7 @@ Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishe
    3. **Environment variable** -- `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_API_KEY`, `WAVESPEED_API_KEY`
    4. **Config file** -- `provider/config.ini`
 
-   **Multi-user support:** In multi-user ComfyUI installations, each user's API keys are stored separately in their own `comfy.settings.json`. The correct user's keys are resolved automatically during workflow execution. A "Settings for: [username]" indicator appears at the bottom-right of the canvas when multi-user mode is active.
+   **Multi-user support:** In multi-user ComfyUI installations, each user's API keys are stored separately in their own `comfy.settings.json`. The correct user's keys are resolved automatically during workflow execution. A "Current user: [name]" banner appears in the ERPK Settings panel when multi-user mode is active.
 
    - **WaveSpeed:** See [wavespeed/README.md](wavespeed/README.md#installation)
    - **Claude:** See [claude/README.md](claude/README.md#installation)
