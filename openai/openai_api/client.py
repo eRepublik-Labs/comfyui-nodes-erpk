@@ -430,10 +430,8 @@ class OpenAIClient:
                 params["quality"] = quality
             if background != "auto":
                 params["background"] = background
-            # GPT Image models return base64 by default
-            params["response_format"] = "b64_json"
+            # GPT Image models always return base64, do not accept response_format
         elif model == "dall-e-3":
-            # DALL-E 3 quality options
             if quality in ["hd", "standard"]:
                 params["quality"] = quality
             params["response_format"] = "b64_json"
@@ -500,7 +498,6 @@ class OpenAIClient:
             "prompt": prompt,
             "size": size,
             "n": n,
-            "response_format": "b64_json",
         }
 
         # Add mask if provided
@@ -509,8 +506,12 @@ class OpenAIClient:
             params["mask"] = mask_file
 
         # Model-specific parameters
-        if model in ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"] and quality != "auto":
-            params["quality"] = quality
+        if model in ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]:
+            # GPT Image models always return base64, do not accept response_format
+            if quality != "auto":
+                params["quality"] = quality
+        else:
+            params["response_format"] = "b64_json"
 
         try:
             response = self.client.images.edit(**params)
