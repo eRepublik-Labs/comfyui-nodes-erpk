@@ -43,32 +43,57 @@ async function deleteSharedWorkflow(name) {
 // Set on Load (browse dialog) or Share (save dialog). Enables "Save to [name]".
 let linkedSharedWorkflowName = null;
 
-// ── Shared styles ────────────────────────────────────────────────
+// ── Design system ────────────────────────────────────────────────
+
+const FONT_STACK = "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
 
 const OVERLAY_STYLE =
-    "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);" +
-    "display:flex;align-items:center;justify-content:center;z-index:10000;";
+    "position:fixed;top:0;left:0;width:100%;height:100%;z-index:10000;" +
+    "background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);" +
+    "display:flex;align-items:center;justify-content:center;" +
+    "animation:erpkFadeIn 0.15s ease;";
 
 const DIALOG_STYLE =
-    "background:#1e1e1e;color:#ccc;border:1px solid #444;border-radius:8px;" +
-    "padding:24px;min-width:420px;max-width:640px;max-height:80vh;" +
-    "display:flex;flex-direction:column;font-family:sans-serif;";
+    `background:#1c1e28;color:#c8cad0;border:1px solid rgba(255,255,255,0.06);` +
+    `border-top:2px solid #4f8ff7;border-radius:12px;` +
+    `padding:28px;min-width:440px;max-width:640px;max-height:80vh;` +
+    `display:flex;flex-direction:column;font-family:${FONT_STACK};` +
+    `box-shadow:0 24px 80px rgba(0,0,0,0.5),0 0 0 1px rgba(255,255,255,0.04);` +
+    `animation:erpkSlideUp 0.2s ease;`;
 
 const BUTTON_STYLE =
-    "padding:6px 14px;border:1px solid #555;border-radius:4px;" +
-    "background:#2a2a2a;color:#ccc;cursor:pointer;font-size:13px;";
+    "padding:7px 16px;border:1px solid rgba(255,255,255,0.08);border-radius:6px;" +
+    "background:rgba(255,255,255,0.04);color:#9ca0b0;cursor:pointer;" +
+    "font-size:12px;font-weight:500;letter-spacing:0.02em;" +
+    "transition:all 0.15s ease;";
 
 const PRIMARY_BUTTON_STYLE =
-    BUTTON_STYLE.replace("background:#2a2a2a", "background:#2563eb").replace(
-        "color:#ccc",
-        "color:#fff"
-    );
+    "padding:7px 16px;border:none;border-radius:6px;" +
+    "background:linear-gradient(135deg,#4f8ff7,#3d7be5);color:#fff;cursor:pointer;" +
+    "font-size:12px;font-weight:600;letter-spacing:0.02em;" +
+    "box-shadow:0 2px 8px rgba(79,143,247,0.25);" +
+    "transition:all 0.15s ease;";
 
 const DANGER_BUTTON_STYLE =
-    BUTTON_STYLE.replace("background:#2a2a2a", "background:#7f1d1d").replace(
-        "color:#ccc",
-        "color:#fca5a5"
-    );
+    "padding:7px 16px;border:1px solid rgba(232,84,84,0.2);border-radius:6px;" +
+    "background:rgba(232,84,84,0.08);color:#f07070;cursor:pointer;" +
+    "font-size:12px;font-weight:500;letter-spacing:0.02em;" +
+    "transition:all 0.15s ease;";
+
+function injectStylesheet() {
+    if (document.getElementById("erpk-styles")) return;
+    const style = document.createElement("style");
+    style.id = "erpk-styles";
+    style.textContent = [
+        "@keyframes erpkFadeIn{from{opacity:0}to{opacity:1}}",
+        "@keyframes erpkSlideUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}",
+        ".erpk-row:hover{background:rgba(255,255,255,0.03)!important}",
+        ".erpk-btn:hover{filter:brightness(1.2);transform:translateY(-1px)}",
+        ".erpk-btn:active{transform:translateY(0);filter:brightness(0.95)}",
+        ".erpk-input:focus{outline:none;border-color:#4f8ff7!important;box-shadow:0 0 0 2px rgba(79,143,247,0.15)!important}",
+    ].join("\n");
+    document.head.appendChild(style);
+}
 
 // ── Utility ──────────────────────────────────────────────────────
 
@@ -94,23 +119,27 @@ function clearChildren(el) {
 
 function showToast(message, severity = "success") {
     const colors = {
-        success: { bg: "#14532d", border: "#22c55e", text: "#bbf7d0" },
-        error: { bg: "#7f1d1d", border: "#ef4444", text: "#fca5a5" },
-        info: { bg: "#1e3a5f", border: "#3b82f6", text: "#bfdbfe" },
+        success: { accent: "#43b581", bg: "rgba(67,181,129,0.1)", text: "#7dcea0" },
+        error: { accent: "#e85454", bg: "rgba(232,84,84,0.1)", text: "#f07070" },
+        info: { accent: "#4f8ff7", bg: "rgba(79,143,247,0.1)", text: "#8bb4f7" },
     };
     const c = colors[severity] || colors.info;
     const toast = document.createElement("div");
     toast.textContent = message;
     toast.style.cssText =
-        `position:fixed;top:20px;right:20px;z-index:10001;padding:10px 18px;` +
-        `border-radius:6px;font-size:13px;font-family:sans-serif;` +
-        `background:${c.bg};border:1px solid ${c.border};color:${c.text};` +
-        `opacity:0;transition:opacity 0.3s ease;pointer-events:none;`;
+        `position:fixed;top:20px;right:20px;z-index:10001;padding:12px 18px 12px 15px;` +
+        `border-radius:8px;font-size:13px;font-weight:500;font-family:${FONT_STACK};` +
+        `background:${c.bg};border:1px solid ${c.accent}33;color:${c.text};` +
+        `border-left:3px solid ${c.accent};` +
+        `box-shadow:0 8px 32px rgba(0,0,0,0.3);` +
+        `transform:translateX(120%);transition:transform 0.3s cubic-bezier(0.16,1,0.3,1),opacity 0.2s ease;` +
+        `pointer-events:none;`;
     document.body.appendChild(toast);
     requestAnimationFrame(() => {
-        toast.style.opacity = "1";
+        toast.style.transform = "translateX(0)";
     });
     setTimeout(() => {
+        toast.style.transform = "translateX(120%)";
         toast.style.opacity = "0";
         setTimeout(() => toast.remove(), 300);
     }, 3000);
@@ -133,6 +162,7 @@ function createDialog() {
 
 function createButton(text, style, onClick) {
     const btn = document.createElement("button");
+    btn.className = "erpk-btn";
     btn.textContent = text;
     btn.style.cssText = style;
     btn.addEventListener("click", onClick);
@@ -149,10 +179,10 @@ async function showBrowseDialog() {
     // Header
     const header = document.createElement("div");
     header.style.cssText =
-        "display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;";
+        "display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;";
     const title = document.createElement("h3");
     title.textContent = "Shared Workflows";
-    title.style.cssText = "margin:0;color:#eee;font-size:16px;";
+    title.style.cssText = "margin:0;color:#e8eaed;font-size:15px;font-weight:600;letter-spacing:0.01em;";
     header.appendChild(title);
     header.appendChild(
         createButton("Close", BUTTON_STYLE, () => overlay.remove())
@@ -161,7 +191,7 @@ async function showBrowseDialog() {
 
     // List container
     const listContainer = document.createElement("div");
-    listContainer.style.cssText = "overflow-y:auto;flex:1;";
+    listContainer.style.cssText = "overflow-y:auto;flex:1;margin:0 -4px;";
     dialog.appendChild(listContainer);
 
     async function refreshList() {
@@ -172,30 +202,31 @@ async function showBrowseDialog() {
             const empty = document.createElement("div");
             empty.textContent = "No shared workflows yet.";
             empty.style.cssText =
-                "color:#888;text-align:center;padding:32px 0;font-size:14px;";
+                "color:#6b6f80;text-align:center;padding:32px 0;font-size:13px;font-style:italic;";
             listContainer.appendChild(empty);
             return;
         }
 
         for (const wf of workflows) {
             const row = document.createElement("div");
+            row.className = "erpk-row";
             row.style.cssText =
-                "display:flex;align-items:center;justify-content:space-between;padding:8px 12px;" +
-                "border-bottom:1px solid #333;gap:12px;";
+                "display:flex;align-items:center;justify-content:space-between;padding:10px 12px;" +
+                "border-radius:6px;gap:12px;transition:background 0.15s ease;";
 
             const info = document.createElement("div");
             info.style.cssText = "flex:1;min-width:0;";
             const nameEl = document.createElement("div");
             nameEl.textContent = wf.name;
             nameEl.style.cssText =
-                "font-size:14px;color:#eee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+                "font-size:13px;color:#e8eaed;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
             const meta = document.createElement("div");
             const parts = [formatBytes(wf.size), formatDate(wf.mtime)];
             if (wf.created_by) parts.push(`by ${wf.created_by}`);
             if (wf.modified_by && wf.modified_by !== wf.created_by)
                 parts.push(`edited by ${wf.modified_by}`);
-            meta.textContent = parts.join("  |  ");
-            meta.style.cssText = "font-size:11px;color:#888;margin-top:2px;";
+            meta.textContent = parts.join("  \u00b7  ");
+            meta.style.cssText = "font-size:11px;color:#6b6f80;margin-top:3px;letter-spacing:0.01em;";
             info.appendChild(nameEl);
             info.appendChild(meta);
             row.appendChild(info);
@@ -254,20 +285,22 @@ function showSaveDialog(onSave) {
 
     const title = document.createElement("h3");
     title.textContent = "Share Current Workflow";
-    title.style.cssText = "margin:0 0 16px 0;color:#eee;font-size:16px;";
+    title.style.cssText = "margin:0 0 20px 0;color:#e8eaed;font-size:15px;font-weight:600;letter-spacing:0.01em;";
     dialog.appendChild(title);
 
     const input = document.createElement("input");
     input.type = "text";
+    input.className = "erpk-input";
     input.placeholder = "Workflow name";
     input.style.cssText =
-        "width:100%;padding:8px 10px;border:1px solid #555;border-radius:4px;" +
-        "background:#2a2a2a;color:#eee;font-size:14px;box-sizing:border-box;";
+        "width:100%;padding:10px 12px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;" +
+        `background:rgba(255,255,255,0.04);color:#e8eaed;font-size:14px;font-family:${FONT_STACK};` +
+        "box-sizing:border-box;transition:border-color 0.15s ease,box-shadow 0.15s ease;";
     dialog.appendChild(input);
 
     const errorEl = document.createElement("div");
     errorEl.style.cssText =
-        "color:#f87171;font-size:12px;margin-top:6px;min-height:18px;";
+        "color:#f07070;font-size:12px;margin-top:8px;min-height:18px;";
     dialog.appendChild(errorEl);
 
     const buttons = document.createElement("div");
@@ -321,19 +354,19 @@ function createSettingsWorkflowList() {
     const section = document.createElement("div");
     section.id = SETTINGS_PANEL_ID;
     section.style.cssText =
-        "border:1px solid #444;border-radius:6px;padding:12px;margin-top:12px;" +
-        "background:#1e1e1e;font-family:sans-serif;";
+        `margin-top:20px;padding-top:20px;font-family:${FONT_STACK};` +
+        "border-top:1px solid rgba(255,255,255,0.06);";
 
     const header = document.createElement("div");
     header.style.cssText =
-        "display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;";
-    const title = document.createElement("span");
+        "display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;";
+    const title = document.createElement("h3");
     title.textContent = "Shared Workflows";
-    title.style.cssText = "font-size:14px;font-weight:600;color:#eee;";
+    title.style.cssText = "margin:0;font-size:inherit;font-weight:700;color:inherit;";
     header.appendChild(title);
 
     const listContainer = document.createElement("div");
-    listContainer.style.cssText = "max-height:240px;overflow-y:auto;";
+    listContainer.style.cssText = "max-height:240px;overflow-y:auto;margin:0 -4px;";
 
     async function refreshList() {
         clearChildren(listContainer);
@@ -343,33 +376,37 @@ function createSettingsWorkflowList() {
             const empty = document.createElement("div");
             empty.textContent = "No shared workflows yet.";
             empty.style.cssText =
-                "color:#888;text-align:center;padding:16px 0;font-size:13px;";
+                "color:#6b6f80;text-align:center;padding:20px 0;font-size:13px;font-style:italic;";
             listContainer.appendChild(empty);
             return;
         }
 
         for (const wf of workflows) {
             const row = document.createElement("div");
+            row.className = "erpk-row";
             row.style.cssText =
-                "display:flex;align-items:center;justify-content:space-between;padding:6px 8px;" +
-                "border-bottom:1px solid #333;gap:8px;";
+                "display:flex;align-items:center;justify-content:space-between;padding:8px 10px;" +
+                "border-radius:6px;gap:8px;transition:background 0.15s ease;";
 
             const info = document.createElement("div");
-            info.style.cssText =
-                "flex:1;min-width:0;display:flex;align-items:center;gap:8px;";
-            const nameEl = document.createElement("span");
+            info.style.cssText = "flex:1;min-width:0;";
+            const nameEl = document.createElement("div");
             nameEl.textContent = wf.name;
             nameEl.style.cssText =
-                "font-size:13px;color:#eee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
-            const sizeEl = document.createElement("span");
-            sizeEl.textContent = formatBytes(wf.size);
-            sizeEl.style.cssText = "font-size:11px;color:#888;flex-shrink:0;";
+                "font-size:13px;color:#e8eaed;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+            const meta = document.createElement("div");
+            const parts = [formatBytes(wf.size), formatDate(wf.mtime)];
+            if (wf.created_by) parts.push(`by ${wf.created_by}`);
+            if (wf.modified_by && wf.modified_by !== wf.created_by)
+                parts.push(`edited by ${wf.modified_by}`);
+            meta.textContent = parts.join("  \u00b7  ");
+            meta.style.cssText = "font-size:11px;color:#6b6f80;margin-top:3px;letter-spacing:0.01em;";
             info.appendChild(nameEl);
-            info.appendChild(sizeEl);
+            info.appendChild(meta);
             row.appendChild(info);
 
             const actions = document.createElement("div");
-            actions.style.cssText = "display:flex;gap:4px;flex-shrink:0;";
+            actions.style.cssText = "display:flex;gap:6px;flex-shrink:0;";
 
             actions.appendChild(
                 createButton("Load", PRIMARY_BUTTON_STYLE, async () => {
@@ -541,6 +578,7 @@ app.registerExtension({
             return options;
         };
 
+        injectStylesheet();
         observeSettingsForWorkflows();
     },
 });

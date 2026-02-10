@@ -68,19 +68,22 @@ function createUserBanner(displayName) {
     const banner = document.createElement("div");
     banner.id = BANNER_ID;
     banner.style.cssText =
-        "display:flex;align-items:center;gap:8px;padding:8px 12px;" +
-        "background:#1a2744;color:#5b8def;border:1px solid #2a3f6b;" +
-        "border-radius:6px;font-size:13px;margin-bottom:8px;";
+        "display:flex;align-items:center;gap:10px;padding:10px 14px;" +
+        "background:rgba(79,143,247,0.06);color:#8bb4f7;" +
+        "border:1px solid rgba(79,143,247,0.12);border-left:3px solid #4f8ff7;" +
+        "border-radius:8px;font-size:13px;font-weight:400;margin-bottom:12px;" +
+        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;";
 
-    const icon = document.createElement("span");
-    icon.style.fontSize = "16px";
-    icon.textContent = "\u{1F464}";
+    const label = document.createElement("span");
+    label.textContent = "Signed in as ";
+    label.style.opacity = "0.7";
 
-    const text = document.createElement("span");
-    text.textContent = "Current user: " + displayName;
+    const name = document.createElement("span");
+    name.textContent = displayName;
+    name.style.fontWeight = "600";
 
-    banner.appendChild(icon);
-    banner.appendChild(text);
+    banner.appendChild(label);
+    banner.appendChild(name);
     return banner;
 }
 

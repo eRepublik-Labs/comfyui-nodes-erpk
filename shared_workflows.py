@@ -6,8 +6,17 @@ import os
 import re
 import tempfile
 
-# Storage lives inside the extension directory, not in ComfyUI's user/ tree
-STORAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "shared_workflows")
+def _resolve_storage_dir():
+    """Resolve storage path: ComfyUI base dir when available, plugin dir otherwise."""
+    try:
+        import folder_paths
+        user_dir = folder_paths.get_user_directory()
+        return os.path.join(os.path.dirname(user_dir), "shared_workflows")
+    except (ImportError, ValueError):
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), "shared_workflows")
+
+
+STORAGE_DIR = _resolve_storage_dir()
 
 # Whitelist: alphanumeric/bracket start/end, spaces/hyphens/underscores/brackets in middle, max 200 chars
 _NAME_RE = re.compile(r"^[a-zA-Z0-9\[\]()]([a-zA-Z0-9 _\-\[\]()]{0,198}[a-zA-Z0-9\[\]()])?$")

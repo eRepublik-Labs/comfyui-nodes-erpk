@@ -3,12 +3,14 @@
 
 import json
 import os
+import sys
 import time
+import types
 
 import pytest
 
 from shared_workflows import (
-    STORAGE_DIR,
+    _resolve_storage_dir,
     delete_workflow,
     get_workflow,
     list_workflows,
@@ -24,6 +26,31 @@ def storage_dir(tmp_path, monkeypatch):
     import shared_workflows
     monkeypatch.setattr(shared_workflows, "STORAGE_DIR", str(d))
     return d
+
+
+# ── Phase 0: Storage directory resolution ─────────────────────────
+
+
+class TestResolveStorageDir:
+    def test_uses_comfyui_base_when_folder_paths_available(self, monkeypatch, tmp_path):
+        import shared_workflows
+
+        user_dir = str(tmp_path / "user")
+        mock_module = types.ModuleType("folder_paths")
+        mock_module.get_user_directory = lambda: user_dir
+        monkeypatch.setitem(sys.modules, "folder_paths", mock_module)
+
+        result = _resolve_storage_dir()
+        assert result == os.path.join(str(tmp_path), "shared_workflows")
+
+    def test_falls_back_to_plugin_dir(self, monkeypatch):
+        import shared_workflows
+
+        monkeypatch.delitem(sys.modules, "folder_paths", raising=False)
+
+        result = _resolve_storage_dir()
+        plugin_dir = os.path.dirname(os.path.abspath(shared_workflows.__file__))
+        assert result == os.path.join(plugin_dir, "shared_workflows")
 
 
 # ── Phase 1: Name validation ──────────────────────────────────────
