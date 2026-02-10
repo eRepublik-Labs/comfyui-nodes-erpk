@@ -131,5 +131,63 @@ try:
 except Exception as e:
     print(f"[ERPK] Warning: Could not register settings routes: {e}")
 
+# Register shared workflows API routes
+try:
+    from server import PromptServer
+    from aiohttp import web
+    from . import shared_workflows
+
+    @PromptServer.instance.routes.get("/erpk/shared_workflows")
+    async def erpk_list_shared_workflows(request):
+        try:
+            return web.json_response(shared_workflows.list_workflows())
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    @PromptServer.instance.routes.get("/erpk/shared_workflows/{name}")
+    async def erpk_get_shared_workflow(request):
+        name = request.match_info["name"]
+        try:
+            data = shared_workflows.get_workflow(name)
+            if data is None:
+                return web.json_response({"error": "Not found"}, status=404)
+            return web.json_response(data)
+        except ValueError as e:
+            return web.json_response({"error": str(e)}, status=400)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    @PromptServer.instance.routes.post("/erpk/shared_workflows")
+    async def erpk_save_shared_workflow(request):
+        try:
+            body = await request.json()
+            name = body.get("name", "")
+            workflow = body.get("workflow")
+            if workflow is None:
+                return web.json_response({"error": "Missing 'workflow' field"}, status=400)
+            shared_workflows.save_workflow(name, workflow)
+            return web.json_response({"ok": True, "name": name})
+        except ValueError as e:
+            return web.json_response({"error": str(e)}, status=400)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    @PromptServer.instance.routes.delete("/erpk/shared_workflows/{name}")
+    async def erpk_delete_shared_workflow(request):
+        name = request.match_info["name"]
+        try:
+            deleted = shared_workflows.delete_workflow(name)
+            if not deleted:
+                return web.json_response({"error": "Not found"}, status=404)
+            return web.json_response({"ok": True})
+        except ValueError as e:
+            return web.json_response({"error": str(e)}, status=400)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    print("[ERPK] Registered shared workflows routes")
+except Exception as e:
+    print(f"[ERPK] Warning: Could not register shared workflows routes: {e}")
+
 # Export for ComfyUI
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

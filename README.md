@@ -46,8 +46,11 @@ ComfyUI-Custom-Nodes/
 │   ├── __init__.py                # Module exports
 │   └── concat_strings.py          # String concatenation node
 ├── settings.py                    # ComfyUI settings reader for API keys
+├── shared_workflows.py            # Shared workflows CRUD for multi-user
+├── shared_workflows/              # Shared workflow storage (gitignored)
 └── web/                           # Frontend extensions
     ├── erpk_settings.js           # API key settings in ComfyUI Settings UI
+    ├── shared_workflows.js        # Browse/save/delete shared workflows UI
     ├── aspect_ratio.js            # Aspect ratio display in node titles
     └── concat_strings.js          # Dynamic UI for concat strings node
 ```
@@ -273,6 +276,26 @@ String manipulation and general utility nodes.
 - Label placement options (same line or new line)
 - Add/Remove buttons to dynamically manage inputs
 - Visual separators between configuration and input sections
+
+### Shared Workflows (Multi-User)
+
+In multi-user ComfyUI (`--multi-user`), each user's workflows are sandboxed. Shared Workflows provides a common directory where any user can save, browse, load, and delete workflow templates.
+
+**Access:** Right-click the canvas > **Shared Workflows**
+
+- **Browse Shared Workflows...** - View all shared workflows with name, size, and date. Load any workflow into your canvas or delete it.
+- **Share Current Workflow...** - Save the current canvas workflow to the shared directory under a chosen name.
+
+**Storage:** Workflows are saved as JSON files in `shared_workflows/` inside the extension directory. This directory is gitignored and persists across ComfyUI restarts. No API keys or user-specific data are stored — only the workflow graph (node positions, connections, settings).
+
+**API Endpoints:**
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/erpk/shared_workflows` | GET | List all shared workflows (metadata) |
+| `/erpk/shared_workflows/{name}` | GET | Get a single workflow by name |
+| `/erpk/shared_workflows` | POST | Save a workflow (`{name, workflow}`) |
+| `/erpk/shared_workflows/{name}` | DELETE | Delete a workflow by name |
 
 ## Installation
 

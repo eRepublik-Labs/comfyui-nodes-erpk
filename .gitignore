@@ -6,6 +6,9 @@ CLAUDE.md
 claude/config.ini
 gemini/config.ini
 
+# Shared workflow storage (user-generated content)
+shared_workflows/
+
 # Python
 __pycache__/
 *.py[cod]
