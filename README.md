@@ -97,7 +97,7 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 
 #### Nodes
 
-- **Claude API Client** - Initialize Claude API connection with model selection (Sonnet 4.5, Opus 4, Haiku 4.5) and configuration. Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- Claude nodes can run standalone.
+- **Claude API Client** - Initialize Claude API connection with model selection (Sonnet 4.6, Opus 4.6, Haiku 4.5) and configuration. Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- Claude nodes can run standalone.
 - **Claude Prompt Enhancer** - Transform simple prompts into detailed descriptions with 51 artistic styles (photorealistic, cinematic, fantasy, cyberpunk, anime, oil painting, watercolor, and more)
 - **Claude Vision Analysis** - Analyze images with Claude's multimodal capabilities (up to 20 images simultaneously)
 - **Claude Text Generation** - General-purpose text completion and generation
@@ -163,7 +163,7 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 #### Nodes
 
 - **OpenAI API Config** - Initialize OpenAI API connection (API key configuration). Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- OpenAI nodes can run standalone.
-- **OpenAI Text Generation** - General-purpose text generation with model selection (GPT-5.2, GPT-4o, GPT-4.1, o3)
+- **OpenAI Text Generation** - General-purpose text generation with model selection (GPT-5.2, GPT-4o, GPT-4.1, o3, o3-mini, o3-pro)
 - **OpenAI Chat** - Multi-turn conversations with automatic context preservation
 - **OpenAI Vision** - Analyze images with GPT-4 vision capabilities
 - **OpenAI System Instruction** - Set persistent system-level instructions to guide model behavior
@@ -171,7 +171,7 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 - **OpenAI Image Edit** - Edit and inpaint images with natural language prompts
 
 **Key Benefits:**
-- Support for latest GPT-5.2, GPT-4.1, and GPT-4o models
+- Support for latest GPT-5.2, GPT-4.1, GPT-4o, and o-series reasoning models
 - Image generation with GPT-Image-1.5 (best quality) and DALL-E 3
 - Image editing with optional mask support for inpainting
 - Multi-turn conversation with session management

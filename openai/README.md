@@ -7,7 +7,7 @@ Complete OpenAI API integration providing text generation, vision analysis, mult
 
 ## Features
 
-- **Text Generation** - Use all GPT models (GPT-5.2, GPT-4.1, GPT-4o, o3)
+- **Text Generation** - Use all GPT models (GPT-5.2, GPT-4.1, GPT-4o, o3, o3-mini, o3-pro)
 - **Vision Analysis** - Analyze images with GPT-4 vision capabilities
 - **Image Generation** - Generate images with GPT-Image-1 and DALL-E models
 - **Image Editing** - Edit and inpaint images with natural language prompts
@@ -90,7 +90,7 @@ General-purpose text generation and completion.
 **Inputs:**
 - `client`: OpenAI API client
 - `prompt`: Text prompt
-- `model`: gpt-4o (default), gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o-mini, o4-mini, o3
+- `model`: gpt-4o (default), gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o-mini, o4-mini, o3, o3-mini, o3-pro
 - `temperature`: 0.0-2.0 (creativity level, default: 0.7)
 - `max_tokens`: 256-16384 (output length, default: 4096)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 1.0, set <1.0 to enable)
@@ -115,7 +115,7 @@ Multi-turn conversation with message history preservation.
 **Inputs:**
 - `client`: OpenAI API client
 - `prompt`: Your message
-- `model`: gpt-4o (default), gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o-mini, o4-mini, o3
+- `model`: gpt-4o (default), gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o-mini, o4-mini, o3, o3-mini, o3-pro
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
 - `temperature`: 0.0-2.0 (default: 0.7)
@@ -263,6 +263,8 @@ Edit and modify existing images using text prompts with optional masking.
 | **gpt-4o-mini** | Fast multimodal | 128K tokens | Budget vision |
 | **o4-mini** | Fast reasoning | 200K tokens | STEM and technical |
 | **o3** | Advanced reasoning | 200K tokens | Complex problems |
+| **o3-mini** | Cost-efficient reasoning | 200K tokens | Budget STEM |
+| **o3-pro** | Most powerful reasoning | 200K tokens | Hardest problems |
 
 ### Image Generation Models
 

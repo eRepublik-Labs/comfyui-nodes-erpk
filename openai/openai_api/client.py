@@ -33,6 +33,8 @@ class OpenAIClient:
         "gpt-4o-mini": "GPT-4o Mini (Fast multimodal)",
         "o4-mini": "o4-mini (Fast reasoning model)",
         "o3": "o3 (Advanced reasoning)",
+        "o3-mini": "o3-mini (Cost-efficient reasoning)",
+        "o3-pro": "o3-pro (Most powerful reasoning)",
     }
 
     # Available image generation models
@@ -51,10 +53,10 @@ class OpenAIClient:
     INITIAL_RETRY_DELAY = 1.0
 
     # Models that use max_completion_tokens instead of max_tokens
-    NEW_TOKEN_PARAM_MODELS = {"gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano", "o3", "o4-mini"}
+    NEW_TOKEN_PARAM_MODELS = {"gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano", "o3", "o3-mini", "o3-pro", "o4-mini"}
 
     # Reasoning models that don't support temperature, top_p, or stop
-    REASONING_MODELS = {"o3", "o4-mini"}
+    REASONING_MODELS = {"o3", "o3-mini", "o3-pro", "o4-mini"}
 
     def __init__(
         self,
