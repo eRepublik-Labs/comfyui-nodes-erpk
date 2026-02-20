@@ -2,7 +2,7 @@
 
 Complete OpenAI API integration providing text generation, vision analysis, multi-turn conversations, and image generation/editing for ComfyUI workflows.
 
-**Version:** 2026.1.18
+**Version:** 2026.2.11
 **Category in ComfyUI:** `ERPK/OpenAI`
 
 ## Features
