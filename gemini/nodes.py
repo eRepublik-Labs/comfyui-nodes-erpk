@@ -21,6 +21,17 @@ def _parse_stop_sequences(text):
     return sequences
 
 
+def _build_thinking_config(thinking_level):
+    """Build a ThinkingConfig if SDK supports it and level is not 'none'."""
+    if thinking_level == "none":
+        return None
+    from google.genai import types as genai_types
+    if hasattr(genai_types, 'ThinkingConfig') and 'thinking_level' in genai_types.ThinkingConfig.model_fields:
+        return genai_types.ThinkingConfig(thinking_level=thinking_level.upper())
+    print("[Gemini] Warning: thinking_level not supported by SDK, ignoring")
+    return None
+
+
 class GeminiAPIConfig:
     """
     Gemini API Configuration Node
@@ -128,7 +139,7 @@ class GeminiTextGeneration:
                     {
                         "default": 8192,
                         "min": 256,
-                        "max": 8192,
+                        "max": 65536,
                         "step": 128,
                         "tooltip": "Maximum length of response"
                     }
@@ -176,6 +187,13 @@ class GeminiTextGeneration:
                         "tooltip": "JSON schema for structured output (only used with application/json, leave empty for free-form JSON)"
                     }
                 ),
+                "thinking_level": (
+                    ["none", "low", "medium", "high"],
+                    {
+                        "default": "none",
+                        "tooltip": "Reasoning depth (Gemini 3+ only). Higher = better quality, more tokens."
+                    }
+                ),
             }
         }
 
@@ -200,7 +218,8 @@ class GeminiTextGeneration:
         top_k: int = 40,
         stop_sequences: str = "",
         response_mime_type: str = "default",
-        response_schema: str = ""
+        response_schema: str = "",
+        thinking_level: str = "none"
     ):
         """
         Generate text using Gemini.
@@ -242,6 +261,8 @@ class GeminiTextGeneration:
             except json.JSONDecodeError as e:
                 raise ValueError(f"Invalid JSON schema: {str(e)}")
 
+        thinking_cfg = _build_thinking_config(thinking_level)
+
         try:
             response = client.generate_content(
                 prompt=prompt.strip(),
@@ -252,7 +273,8 @@ class GeminiTextGeneration:
                 top_k=top_k if top_k > 0 else None,
                 stop_sequences=stop_seq_list,
                 response_mime_type=response_mime_type if response_mime_type != "default" else None,
-                response_schema=schema_obj
+                response_schema=schema_obj,
+                thinking_config=thinking_cfg
             )
 
             if response.get("blocked", False):
@@ -333,7 +355,7 @@ class GeminiChat:
                     {
                         "default": 8192,
                         "min": 256,
-                        "max": 8192,
+                        "max": 65536,
                         "step": 128,
                         "tooltip": "Maximum length of response"
                     }
@@ -381,6 +403,13 @@ class GeminiChat:
                         "tooltip": "JSON schema for structured output (only used with application/json, leave empty for free-form JSON)"
                     }
                 ),
+                "thinking_level": (
+                    ["none", "low", "medium", "high"],
+                    {
+                        "default": "none",
+                        "tooltip": "Reasoning depth (Gemini 3+ only). Higher = better quality, more tokens."
+                    }
+                ),
             }
         }
 
@@ -407,7 +436,8 @@ class GeminiChat:
         top_k: int = 40,
         stop_sequences: str = "",
         response_mime_type: str = "default",
-        response_schema: str = ""
+        response_schema: str = "",
+        thinking_level: str = "none"
     ):
         """
         Continue or start a conversation with Gemini.
@@ -440,10 +470,12 @@ class GeminiChat:
         if model is None:
             model = GeminiClient.DEFAULT_MODEL
 
+        thinking_cfg = _build_thinking_config(thinking_level)
+
         try:
             # Start new session or use existing
             if reset_conversation or chat_session is None:
-                chat_session = client.start_chat(model=model)
+                chat_session = client.start_chat(model=model, thinking_config=thinking_cfg)
                 print(f"[Gemini] Started new conversation with {model}")
             else:
                 print(f"[Gemini] Continuing conversation")
@@ -479,6 +511,8 @@ class GeminiChat:
                 config_params["response_schema"] = schema_obj
 
             config = types.GenerateContentConfig(**config_params)
+            if thinking_cfg is not None:
+                config.thinking_config = thinking_cfg
             response = chat_session.send_message(
                 prompt.strip(),
                 config=config
@@ -540,7 +574,7 @@ class GeminiVision:
                     {
                         "default": 8192,
                         "min": 256,
-                        "max": 8192,
+                        "max": 65536,
                         "step": 128,
                         "tooltip": "Maximum length of analysis"
                     }
@@ -598,6 +632,13 @@ class GeminiVision:
                         "tooltip": "JSON schema for structured output (only used with application/json, leave empty for free-form JSON)"
                     }
                 ),
+                "thinking_level": (
+                    ["none", "low", "medium", "high"],
+                    {
+                        "default": "none",
+                        "tooltip": "Reasoning depth (Gemini 3+ only). Higher = better quality, more tokens."
+                    }
+                ),
             }
         }
 
@@ -623,7 +664,8 @@ class GeminiVision:
         top_k: int = 40,
         stop_sequences: str = "",
         response_mime_type: str = "default",
-        response_schema: str = ""
+        response_schema: str = "",
+        thinking_level: str = "none"
     ):
         """
         Analyze image(s) using Gemini's vision capabilities.
@@ -670,6 +712,8 @@ class GeminiVision:
                 except json.JSONDecodeError as e:
                     raise ValueError(f"Invalid JSON schema: {str(e)}")
 
+            thinking_cfg = _build_thinking_config(thinking_level)
+
             # Generate content with images
             response = client.generate_content(
                 prompt=prompt.strip(),
@@ -681,7 +725,8 @@ class GeminiVision:
                 top_k=top_k if top_k > 0 else None,
                 stop_sequences=stop_seq_list,
                 response_mime_type=response_mime_type if response_mime_type != "default" else None,
-                response_schema=schema_obj
+                response_schema=schema_obj,
+                thinking_config=thinking_cfg
             )
 
             if response.get("blocked", False):
@@ -878,11 +923,7 @@ class GeminiImageGeneration:
     Can use a client from GeminiAPIConfig or work standalone with an API key.
     """
 
-    # Image generation models
-    IMAGE_MODELS = [
-        "gemini-3-pro-image-preview",
-        "gemini-2.5-flash-image",
-    ]
+    IMAGE_MODELS = GeminiClient.IMAGE_MODELS
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -971,7 +1012,7 @@ class GeminiImageGeneration:
         self,
         prompt: str,
         client: GeminiClient = None,
-        model: str = "gemini-2.5-flash-image",
+        model: str = "gemini-3-pro-image-preview",
         temperature: float = 1.0,
         aspect_ratio: str = "default",
         image_size: str = "default",
@@ -1142,11 +1183,7 @@ class GeminiImageEdit:
     Can use a client from GeminiAPIConfig or work standalone with an API key.
     """
 
-    # Same image generation models as GeminiImageGeneration
-    IMAGE_MODELS = [
-        "gemini-3-pro-image-preview",
-        "gemini-2.5-flash-image",
-    ]
+    IMAGE_MODELS = GeminiClient.IMAGE_MODELS
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -1244,7 +1281,7 @@ class GeminiImageEdit:
         image,
         prompt: str,
         client: GeminiClient = None,
-        model: str = "gemini-2.5-flash-image",
+        model: str = "gemini-3-pro-image-preview",
         temperature: float = 1.0,
         aspect_ratio: str = "default",
         image_size: str = "default",

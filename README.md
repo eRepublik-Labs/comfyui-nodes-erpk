@@ -125,7 +125,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 #### Nodes
 
 - **Gemini API Config** - Initialize Gemini API connection (API key configuration). Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- Gemini nodes can run standalone.
-- **Gemini Text Generation** - General-purpose text generation with model selection (Gemini 3 Pro, 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite)
+- **Gemini Text Generation** - General-purpose text generation with model selection (Gemini 3.1 Pro, 3 Pro, 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite)
 - **Gemini Chat** - Multi-turn conversations with automatic context preservation
 - **Gemini Vision** - Analyze images with multimodal capabilities
 - **Gemini Image Generation** - Generate images from text descriptions (standalone node with dedicated image gen models)
@@ -139,10 +139,11 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Veo Image to Video** - Generate videos from an input image and optional text prompt
 
 **Key Benefits:**
-- Support for Gemini 3 Pro Preview and Gemini 2.5 models
+- Support for Gemini 3.1 Pro, 3 Pro, and Gemini 2.5 models
+- **Thinking level** control for Gemini 3+ models (none/low/medium/high reasoning depth)
 - **Veo video generation** with text-to-video and image-to-video (Veo 3 includes audio)
 - Each node selects its own model for maximum flexibility
-- State-of-the-art reasoning with Gemini 3 Pro and 2.5 Pro
+- State-of-the-art reasoning with Gemini 3.1 Pro and 2.5 Pro
 - Image generation with Gemini 2.5 Flash Image models
 - Image editing with natural language instructions (up to 14 reference images)
 - Simple, straightforward API integration

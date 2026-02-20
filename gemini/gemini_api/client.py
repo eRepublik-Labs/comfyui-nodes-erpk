@@ -8,7 +8,7 @@ from google import genai
 from google.genai import types
 
 # Minimum recommended SDK version
-MIN_SDK_VERSION = "1.49.0"
+MIN_SDK_VERSION = "1.56.0"
 _sdk_version_checked = False
 
 
@@ -43,12 +43,19 @@ class GeminiClient:
 
     # Available models
     MODELS = {
+        "gemini-3.1-pro-preview": "Gemini 3.1 Pro Preview (Most advanced reasoning)",
         "gemini-3-pro-preview": "Gemini 3 Pro Preview (Most intelligent, best reasoning)",
         "gemini-3-flash-preview": "Gemini 3 Flash Preview (Balanced speed and intelligence)",
         "gemini-2.5-pro": "Gemini 2.5 Pro (Complex reasoning, 1M context)",
         "gemini-2.5-flash": "Gemini 2.5 Flash (Best price-performance)",
         "gemini-2.5-flash-lite": "Gemini 2.5 Flash-Lite (Fastest, most cost-efficient)",
     }
+
+    # Image generation models
+    IMAGE_MODELS = [
+        "gemini-3-pro-image-preview",
+        "gemini-2.5-flash-image",
+    ]
 
     # Default configuration
     DEFAULT_MODEL = "gemini-3-flash-preview"
@@ -169,6 +176,7 @@ class GeminiClient:
         stop_sequences: Optional[List[str]] = None,
         response_mime_type: Optional[str] = None,
         response_schema: Optional[Dict] = None,
+        thinking_config: Optional[Any] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -224,6 +232,10 @@ class GeminiClient:
         if self.safety_settings:
             config.safety_settings = self.safety_settings
 
+        # Add thinking config if provided
+        if thinking_config is not None:
+            config.thinking_config = thinking_config
+
         # Build content list (images + text)
         contents = []
         if images:
@@ -254,7 +266,7 @@ class GeminiClient:
                 "error": str(e)
             }
 
-    def start_chat(self, model: Optional[str] = None, history: Optional[List[Dict[str, str]]] = None):
+    def start_chat(self, model: Optional[str] = None, history: Optional[List[Dict[str, str]]] = None, thinking_config: Optional[Any] = None):
         """
         Start a chat session for multi-turn conversations.
 
@@ -273,6 +285,8 @@ class GeminiClient:
             config.system_instruction = self.system_instruction
         if self.safety_settings:
             config.safety_settings = self.safety_settings
+        if thinking_config is not None:
+            config.thinking_config = thinking_config
 
         # Create chat
         return self.client.chats.create(

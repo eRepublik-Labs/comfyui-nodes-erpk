@@ -7,7 +7,7 @@ Complete Google Gemini API integration providing text generation, vision analysi
 
 ## Features
 
-- **Text Generation** - Use all Gemini models (3 Pro, 3 Flash, 2.5 Pro, 2.5 Flash)
+- **Text Generation** - Use all Gemini models (3.1 Pro, 3 Pro, 3 Flash, 2.5 Pro, 2.5 Flash)
 - **Vision Analysis** - Analyze images with Gemini's multimodal capabilities
 - **Image Generation** - Generate images from text descriptions
 - **Image Editing** - Edit and modify images with natural language prompts (up to 14 reference images)
@@ -92,14 +92,15 @@ General-purpose text generation and completion.
 **Inputs:**
 - `client`: Gemini API client (optional)
 - `prompt`: Text prompt
-- `model`: gemini-2.5-flash (default), gemini-3-pro-preview, gemini-3-flash-preview, gemini-2.5-pro, gemini-2.5-flash-lite
+- `model`: gemini-3-flash-preview (default), gemini-3.1-pro-preview, gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
 - `temperature`: 0.0-2.0 (creativity level, default: 0.7)
-- `max_tokens`: 256-8192 (output length, default: 8192)
+- `max_tokens`: 256-65536 (output length, default: 8192)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
 - `top_k`: 0-100 (top-k sampling, default: 40, set 0 to disable)
 - `stop_sequences`: Newline-separated sequences where generation stops (max 5)
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
+- `thinking_level`: Reasoning depth - "none" (default), "low", "medium", "high" (Gemini 3+ only)
 
 **Outputs:**
 - `response`: Generated text
@@ -110,6 +111,7 @@ General-purpose text generation and completion.
 - Content generation
 - Text transformation
 - **JSON mode**: Set response_mime_type to "application/json" for structured data extraction
+- **Deep reasoning**: Set thinking_level to "high" for complex analytical tasks
 
 ---
 
@@ -119,16 +121,17 @@ Multi-turn conversation with message history preservation.
 **Inputs:**
 - `client`: Gemini API client (optional)
 - `prompt`: Your message
-- `model`: gemini-2.5-flash (default), gemini-3-pro-preview, gemini-3-flash-preview, gemini-2.5-pro, gemini-2.5-flash-lite
+- `model`: gemini-3-flash-preview (default), gemini-3.1-pro-preview, gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
 - `temperature`: 0.0-2.0 (default: 0.7)
-- `max_tokens`: 256-8192 (default: 8192)
+- `max_tokens`: 256-65536 (default: 8192)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
 - `top_k`: 0-100 (top-k sampling, default: 40, set 0 to disable)
 - `stop_sequences`: Newline-separated sequences where generation stops (max 5)
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
+- `thinking_level`: Reasoning depth - "none" (default), "low", "medium", "high" (Gemini 3+ only)
 
 **Outputs:**
 - `response`: Chat response
@@ -149,14 +152,15 @@ Analyze images with questions or instructions.
 - `client`: Gemini API client (optional)
 - `image`: ComfyUI image tensor (supports batches)
 - `prompt`: Question or instruction about the image(s)
-- `model`: gemini-2.5-flash (default), gemini-3-pro-preview, gemini-3-flash-preview, gemini-2.5-pro, gemini-2.5-flash-lite
-- `max_tokens`: 256-8192 (default: 8192)
+- `model`: gemini-3-flash-preview (default), gemini-3.1-pro-preview, gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+- `max_tokens`: 256-65536 (default: 8192)
 - `temperature`: 0.0-2.0 (default: 0.4, lower for more factual)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
 - `top_k`: 0-100 (top-k sampling, default: 40, set 0 to disable)
 - `stop_sequences`: Newline-separated sequences where generation stops (max 5)
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
+- `thinking_level`: Reasoning depth - "none" (default), "low", "medium", "high" (Gemini 3+ only)
 
 **Outputs:**
 - `analysis`: Text analysis of the image(s)
@@ -365,8 +369,9 @@ Generate videos from an input image and optional text prompt.
 
 | Model | Best For | Context Window | Notes |
 |-------|----------|----------------|-------|
-| **gemini-3-pro-preview** | Most intelligent, best reasoning | 1M tokens | Latest flagship model |
-| **gemini-3-flash-preview** | Balanced speed and intelligence | 1M tokens | New balanced model |
+| **gemini-3.1-pro-preview** | Most advanced reasoning | 1M tokens | Supports thinking levels |
+| **gemini-3-pro-preview** | Most intelligent, best reasoning | 1M tokens | Flagship model |
+| **gemini-3-flash-preview** | Balanced speed and intelligence | 1M tokens | Balanced model |
 | **gemini-2.5-pro** | Complex reasoning, thinking | 1M tokens | Stable, production-ready |
 | **gemini-2.5-flash** | Best price-performance | 1M tokens | Recommended default |
 | **gemini-2.5-flash-lite** | High-speed, cost-efficient | 1M tokens | Fastest, lowest cost |
