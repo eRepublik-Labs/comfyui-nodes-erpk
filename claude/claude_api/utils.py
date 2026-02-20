@@ -85,15 +85,16 @@ class TokenManager:
 
     # Context window sizes for different Claude models
     CONTEXT_WINDOWS = {
-        "claude-sonnet-4-5-20250929": 200_000,
+        "claude-sonnet-4-6": 200_000,
         "claude-opus-4-6": 200_000,
-        "claude-haiku-4-5": 200_000,
+        "claude-haiku-4-5-20251001": 200_000,
+        "claude-sonnet-4-5-20250929": 200_000,
     }
 
     # Default reserve tokens for response generation
     DEFAULT_RESERVE_TOKENS = 20_000
 
-    def __init__(self, model: str = "claude-sonnet-4-5-20250929"):
+    def __init__(self, model: str = "claude-sonnet-4-6"):
         """
         Initialize token manager.
 

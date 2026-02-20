@@ -25,7 +25,7 @@ class ClaudeClient:
     """
 
     # Default configuration
-    DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
+    DEFAULT_MODEL = "claude-sonnet-4-6"
     DEFAULT_MAX_TOKENS = 1024
     DEFAULT_TEMPERATURE = 0.7
     MAX_RETRIES = 3
@@ -334,8 +334,8 @@ class ClaudeClient:
         Returns:
             Dict with token usage counts and cost estimates
         """
-        # Pricing for Claude Sonnet 4.5 (per million tokens)
-        # Updated: October 2025
+        # Pricing for Claude Sonnet 4.6 (per million tokens)
+        # Updated: February 2026
         # Source: https://www.anthropic.com/pricing
         INPUT_PRICE = 3.0
         OUTPUT_PRICE = 15.0

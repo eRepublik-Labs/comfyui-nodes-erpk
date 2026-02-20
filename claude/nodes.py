@@ -21,13 +21,14 @@ class ClaudeAPIClient:
             "required": {
                 "model": (
                     [
-                        "claude-sonnet-4-5-20250929",
+                        "claude-sonnet-4-6",
                         "claude-opus-4-6",
-                        "claude-haiku-4-5",
+                        "claude-haiku-4-5-20251001",
+                        "claude-sonnet-4-5-20250929",
                     ],
                     {
-                        "default": "claude-sonnet-4-5-20250929",
-                        "tooltip": "Claude model to use. Sonnet 4.5 offers best balance of performance and cost."
+                        "default": "claude-sonnet-4-6",
+                        "tooltip": "Claude model to use. Sonnet 4.6 offers best balance of performance and cost."
                     }
                 ),
             },
