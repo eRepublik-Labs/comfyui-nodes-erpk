@@ -7,6 +7,14 @@ const NODE_ID = "ERPK_ConcatenateStrings";
 const MAX_INPUTS = 10;
 const INITIAL_INPUTS = 2;
 
+// Classic LiteGraph checks widget.hidden; Nodes 2.0 (Vue) checks widget.options.hidden.
+// Set both so visibility works in either renderer.
+function setWidgetHidden(widget, hidden) {
+    widget.hidden = hidden;
+    if (!widget.options) widget.options = {};
+    widget.options.hidden = hidden;
+}
+
 app.registerExtension({
     name: "erpk.utils.concat_strings",
 
@@ -90,10 +98,10 @@ app.registerExtension({
 
                 if (textMatch) {
                     const idx = parseInt(textMatch[1]);
-                    widget.hidden = idx > this.activeInputCount;
+                    setWidgetHidden(widget, idx > this.activeInputCount);
                 } else if (labelMatch) {
                     const idx = parseInt(labelMatch[1]);
-                    widget.hidden = idx > this.activeInputCount;
+                    setWidgetHidden(widget, idx > this.activeInputCount);
                 }
             }
 
@@ -119,13 +127,13 @@ app.registerExtension({
 
             const self = this;
 
-            // Spacer before buttons
+            // Spacer before buttons (canvas-only; hidden from Nodes 2.0)
             const addSpacer = this.addWidget(
                 "text",
                 "_spacer_add",
                 "",
                 () => {},
-                { serialize: false }
+                { serialize: false, hidden: true }
             );
             addSpacer.disabled = true;
             addSpacer.computeSize = () => [0, 10];
@@ -151,13 +159,13 @@ app.registerExtension({
             );
             this._removeInputBtn = removeBtn;
 
-            // Bottom spacer for margin
+            // Bottom spacer for margin (canvas-only; hidden from Nodes 2.0)
             const bottomSpacer = this.addWidget(
                 "text",
                 "_spacer_bottom",
                 "",
                 () => {},
-                { serialize: false }
+                { serialize: false, hidden: true }
             );
             bottomSpacer.disabled = true;
             bottomSpacer.computeSize = () => [0, 8];
@@ -170,10 +178,10 @@ app.registerExtension({
         // Update control widget visibility based on activeInputCount
         nodeType.prototype._updateControlWidgetVisibility = function () {
             if (this._addInputBtn) {
-                this._addInputBtn.hidden = this.activeInputCount >= MAX_INPUTS;
+                setWidgetHidden(this._addInputBtn, this.activeInputCount >= MAX_INPUTS);
             }
             if (this._removeInputBtn) {
-                this._removeInputBtn.hidden = this.activeInputCount <= 1;
+                setWidgetHidden(this._removeInputBtn, this.activeInputCount <= 1);
             }
         };
 
@@ -244,6 +252,9 @@ app.registerExtension({
 
             headerWidget.disabled = true;
             headerWidget.computeSize = () => [0, 24];
+            // Canvas-only custom draw; hide from Nodes 2.0 Vue renderer
+            if (!headerWidget.options) headerWidget.options = {};
+            headerWidget.options.hidden = true;
             headerWidget.draw = function (ctx, node, widgetWidth, y, widgetHeight) {
                 const lineColor = "#555";
                 const textColor = "#888";
