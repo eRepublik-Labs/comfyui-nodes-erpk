@@ -6,6 +6,7 @@ import { app } from "../../../scripts/app.js";
 const NODE_ID = "ERPK_ConcatenateStrings";
 const MAX_INPUTS = 10;
 const INITIAL_INPUTS = 2;
+const MIN_HEIGHT = 40;
 
 // Classic LiteGraph checks widget.hidden; Nodes 2.0 (Vue) checks widget.options.hidden.
 // Set both so visibility works in either renderer.
@@ -234,42 +235,100 @@ app.registerExtension({
             this._resizeNode();
         };
 
-        // Check if a DOM element is actually visible on screen
-        function isVisible(el) {
-            if (!el || !el.offsetParent) return false;
-            const style = window.getComputedStyle(el);
-            return style.display !== "none" && style.visibility !== "hidden";
-        }
-
         // Find the textarea element for a widget across both renderers.
-        // In Nodes 2.0, widget.element points to the classic-mode textarea (not visible).
-        // The visible textarea is rendered separately by WidgetTextarea.vue.
+        // In Nodes 2.0, widget.element points to a detached classic-mode textarea.
+        // The visible textarea is rendered by Vue (WidgetTextarea.vue / PrimeVue FloatLabel).
         function findTextarea(widget) {
-            // Check widget references first — works in classic mode
-            const candidates = [
+            // Strategy 1: widget references with DOM-attached check (works in classic mode)
+            const refs = [
                 widget.element?.tagName === "TEXTAREA" ? widget.element : null,
                 widget.element?.querySelector?.("textarea"),
                 widget.inputEl?.tagName === "TEXTAREA" ? widget.inputEl : null,
             ].filter(Boolean);
 
-            // Return the first visible candidate
-            for (const el of candidates) {
-                if (isVisible(el)) return el;
+            for (const el of refs) {
+                if (el.parentElement) return el;
             }
 
-            // Nodes 2.0: WidgetTextarea.vue renders its own textarea with a <label>
-            // showing the widget name. Find it via the label text.
-            const labels = document.querySelectorAll("label");
-            for (const label of labels) {
-                if (label.textContent.trim() !== widget.name) continue;
-                const container = label.parentElement;
-                if (!container) continue;
-                const ta = container.querySelector("textarea");
-                if (ta && isVisible(ta)) return ta;
+            // Strategy 2: search all DOM textareas and walk up ancestors for a matching label.
+            // Handles Nodes 2.0 where PrimeVue FloatLabel wraps the textarea and label.
+            const allTextareas = document.querySelectorAll("textarea");
+            for (const ta of allTextareas) {
+                if (!ta.parentElement) continue;
+                let parent = ta.parentElement;
+                for (let depth = 0; depth < 4 && parent; depth++) {
+                    const label = parent.querySelector("label");
+                    if (label && label.textContent.trim() === widget.name) {
+                        return ta;
+                    }
+                    parent = parent.parentElement;
+                }
             }
 
-            // Fallback: return first candidate even if not visible (setup in progress)
-            return candidates[0] || null;
+            return refs[0] || null;
+        }
+
+        // Create a visible drag handle below the textarea for vertical resizing.
+        // We insert our own DOM element because PrimeVue/Nodes 2.0 captures all
+        // pointer/mouse events on the textarea itself, and the native CSS resize
+        // handle doesn't appear due to Tailwind/design-system overrides.
+        function setupDragResize(textarea, widget, node) {
+            const handle = document.createElement("div");
+            handle.style.cssText = [
+                "height: 8px",
+                "cursor: s-resize",
+                "display: flex",
+                "align-items: center",
+                "justify-content: center",
+                "opacity: 0.4",
+                "transition: opacity 0.15s",
+                "margin-top: -2px",
+                "border-radius: 0 0 6px 6px",
+            ].join(";");
+
+            // Visual grip indicator (three small dots)
+            const grip = document.createElement("div");
+            grip.style.cssText = "width: 24px; height: 3px; background: #888; border-radius: 2px;";
+            handle.appendChild(grip);
+
+            handle.addEventListener("mouseenter", () => { handle.style.opacity = "0.8"; });
+            handle.addEventListener("mouseleave", () => { handle.style.opacity = "0.4"; });
+
+            // Insert the handle after the textarea inside its parent container
+            if (textarea.nextSibling) {
+                textarea.parentElement.insertBefore(handle, textarea.nextSibling);
+            } else {
+                textarea.parentElement.appendChild(handle);
+            }
+
+            handle.addEventListener("pointerdown", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const startY = e.clientY;
+                const startHeight = textarea.getBoundingClientRect().height;
+                handle.style.opacity = "1";
+                handle.setPointerCapture(e.pointerId);
+
+                const onMove = (ev) => {
+                    const newHeight = Math.max(MIN_HEIGHT, startHeight + (ev.clientY - startY));
+                    textarea.style.setProperty("height", newHeight + "px", "important");
+                };
+
+                const onUp = () => {
+                    handle.removeEventListener("pointermove", onMove);
+                    handle.removeEventListener("pointerup", onUp);
+                    handle.style.opacity = "0.4";
+
+                    const h = Math.round(textarea.getBoundingClientRect().height);
+                    node.properties.inputHeights = node.properties.inputHeights || {};
+                    node.properties.inputHeights[widget.name] = h;
+                    node.setDirtyCanvas?.(true, true);
+                };
+
+                handle.addEventListener("pointermove", onMove);
+                handle.addEventListener("pointerup", onUp);
+            });
         }
 
         // Enable vertical resize on Text N textareas and persist heights.
@@ -277,7 +336,6 @@ app.registerExtension({
         nodeType.prototype._setupResizableInputs = function (attempt = 0) {
             if (!this.widgets) return;
             this.properties.inputHeights = this.properties.inputHeights || {};
-            if (!this._resizeObservers) this._resizeObservers = [];
             const node = this;
             let pending = false;
 
@@ -286,37 +344,23 @@ app.registerExtension({
                 if (widget._resizeSetup) continue;
 
                 const textarea = findTextarea(widget);
-                if (!textarea || !isVisible(textarea)) {
+                if (!textarea || !textarea.parentElement) {
                     pending = true;
                     continue;
                 }
 
-                // Inline !important overrides both Tailwind's resize-none class
-                // and the design-system's resize:none rule
-                textarea.style.setProperty("resize", "vertical", "important");
-                textarea.style.setProperty("overflow-y", "auto", "important");
-                textarea.style.setProperty("min-height", "40px", "important");
+                // Allow textarea to have a custom height (override size-full's height:100%)
                 textarea.style.setProperty("height", "auto", "important");
+                textarea.style.setProperty("min-height", MIN_HEIGHT + "px", "important");
+                textarea.style.setProperty("overflow-y", "auto", "important");
 
-                // Restore saved height (after setting height:auto)
+                // Restore saved height
                 const savedHeight = this.properties.inputHeights[widget.name];
                 if (savedHeight) {
                     textarea.style.setProperty("height", savedHeight + "px", "important");
                 }
 
-                // Track resize and persist
-                const observer = new ResizeObserver((entries) => {
-                    for (const entry of entries) {
-                        const h = Math.round(entry.contentRect.height);
-                        node.properties.inputHeights[widget.name] = h;
-                        if (widget.computeSize) {
-                            widget.computeSize = () => [0, h + 10];
-                        }
-                        node.setDirtyCanvas?.(true, true);
-                    }
-                });
-                observer.observe(textarea);
-                this._resizeObservers.push(observer);
+                setupDragResize(textarea, widget, node);
                 widget._resizeSetup = true;
             }
 
