@@ -6,7 +6,6 @@ import { app } from "../../../scripts/app.js";
 const NODE_ID = "ERPK_ConcatenateStrings";
 const MAX_INPUTS = 10;
 const INITIAL_INPUTS = 2;
-const MIN_HEIGHT = 40;
 
 // Classic LiteGraph checks widget.hidden; Nodes 2.0 (Vue) checks widget.options.hidden.
 // Set both so visibility works in either renderer.
@@ -33,11 +32,10 @@ app.registerExtension({
             this.properties = this.properties || {};
             this.properties.activeInputCount = this.activeInputCount;
 
-            // Delay to ensure widgets and DOM elements exist, then set up UI once
+            // Delay to ensure widgets exist, then set up UI once
             setTimeout(() => {
                 this._styleInputsHeader();
                 this._updateInputVisibility();
-                this._setupResizableInputs();
                 this._createControlWidgets();  // Create once, never remove
                 if (!this._isLoadingWorkflow) {
                     this._resizeNode();
@@ -68,11 +66,10 @@ app.registerExtension({
                 this.activeInputCount = info.properties.activeInputCount;
             }
 
-            // On load, update visibility, restore input heights, and restore size
+            // On load, update visibility and restore size after LiteGraph's async resize
             setTimeout(() => {
                 this._updateInputVisibility();
                 this._updateControlWidgetVisibility();
-                this._restoreInputHeights();
 
                 // Restore saved size after LiteGraph's requestAnimationFrame resize
                 if (this._savedSize) {
@@ -233,158 +230,6 @@ app.registerExtension({
             this._updateInputVisibility();
             this._updateControlWidgetVisibility();
             this._resizeNode();
-        };
-
-        // Find the textarea element for a widget across both renderers.
-        // In Nodes 2.0, widget.element points to a detached classic-mode textarea.
-        // The visible textarea is rendered by Vue (WidgetTextarea.vue / PrimeVue FloatLabel).
-        function findTextarea(widget) {
-            // Strategy 1: widget references with DOM-attached check (works in classic mode)
-            const refs = [
-                widget.element?.tagName === "TEXTAREA" ? widget.element : null,
-                widget.element?.querySelector?.("textarea"),
-                widget.inputEl?.tagName === "TEXTAREA" ? widget.inputEl : null,
-            ].filter(Boolean);
-
-            for (const el of refs) {
-                if (el.parentElement) return el;
-            }
-
-            // Strategy 2: search all DOM textareas and walk up ancestors for a matching label.
-            // Handles Nodes 2.0 where PrimeVue FloatLabel wraps the textarea and label.
-            const allTextareas = document.querySelectorAll("textarea");
-            for (const ta of allTextareas) {
-                if (!ta.parentElement) continue;
-                let parent = ta.parentElement;
-                for (let depth = 0; depth < 4 && parent; depth++) {
-                    const label = parent.querySelector("label");
-                    if (label && label.textContent.trim() === widget.name) {
-                        return ta;
-                    }
-                    parent = parent.parentElement;
-                }
-            }
-
-            return refs[0] || null;
-        }
-
-        // Create a visible drag handle below the textarea for vertical resizing.
-        // We insert our own DOM element because PrimeVue/Nodes 2.0 captures all
-        // pointer/mouse events on the textarea itself, and the native CSS resize
-        // handle doesn't appear due to Tailwind/design-system overrides.
-        function setupDragResize(textarea, widget, node) {
-            const handle = document.createElement("div");
-            handle.style.cssText = [
-                "height: 8px",
-                "cursor: s-resize",
-                "display: flex",
-                "align-items: center",
-                "justify-content: center",
-                "opacity: 0.4",
-                "transition: opacity 0.15s",
-                "margin-top: -2px",
-                "border-radius: 0 0 6px 6px",
-            ].join(";");
-
-            // Visual grip indicator (three small dots)
-            const grip = document.createElement("div");
-            grip.style.cssText = "width: 24px; height: 3px; background: #888; border-radius: 2px;";
-            handle.appendChild(grip);
-
-            handle.addEventListener("mouseenter", () => { handle.style.opacity = "0.8"; });
-            handle.addEventListener("mouseleave", () => { handle.style.opacity = "0.4"; });
-
-            // Insert the handle after the textarea inside its parent container
-            if (textarea.nextSibling) {
-                textarea.parentElement.insertBefore(handle, textarea.nextSibling);
-            } else {
-                textarea.parentElement.appendChild(handle);
-            }
-
-            handle.addEventListener("pointerdown", (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-
-                const startY = e.clientY;
-                const startHeight = textarea.getBoundingClientRect().height;
-                handle.style.opacity = "1";
-                handle.setPointerCapture(e.pointerId);
-
-                const onMove = (ev) => {
-                    const newHeight = Math.max(MIN_HEIGHT, startHeight + (ev.clientY - startY));
-                    textarea.style.setProperty("height", newHeight + "px", "important");
-                };
-
-                const onUp = () => {
-                    handle.removeEventListener("pointermove", onMove);
-                    handle.removeEventListener("pointerup", onUp);
-                    handle.style.opacity = "0.4";
-
-                    const h = Math.round(textarea.getBoundingClientRect().height);
-                    node.properties.inputHeights = node.properties.inputHeights || {};
-                    node.properties.inputHeights[widget.name] = h;
-                    node.setDirtyCanvas?.(true, true);
-                };
-
-                handle.addEventListener("pointermove", onMove);
-                handle.addEventListener("pointerup", onUp);
-            });
-        }
-
-        // Enable vertical resize on Text N textareas and persist heights.
-        // Retries to handle async DOM rendering in Nodes 2.0.
-        nodeType.prototype._setupResizableInputs = function (attempt = 0) {
-            if (!this.widgets) return;
-            this.properties.inputHeights = this.properties.inputHeights || {};
-            const node = this;
-            let pending = false;
-
-            for (const widget of this.widgets) {
-                if (!widget.name.match(/^Text \d+$/)) continue;
-                if (widget._resizeSetup) continue;
-
-                const textarea = findTextarea(widget);
-                if (!textarea || !textarea.parentElement) {
-                    pending = true;
-                    continue;
-                }
-
-                // Allow textarea to have a custom height (override size-full's height:100%)
-                textarea.style.setProperty("height", "auto", "important");
-                textarea.style.setProperty("min-height", MIN_HEIGHT + "px", "important");
-                textarea.style.setProperty("overflow-y", "auto", "important");
-
-                // Restore saved height
-                const savedHeight = this.properties.inputHeights[widget.name];
-                if (savedHeight) {
-                    textarea.style.setProperty("height", savedHeight + "px", "important");
-                }
-
-                setupDragResize(textarea, widget, node);
-                widget._resizeSetup = true;
-            }
-
-            // Retry if some textareas weren't available yet (Vue async rendering)
-            if (pending && attempt < 10) {
-                setTimeout(() => this._setupResizableInputs(attempt + 1), 200);
-            }
-        };
-
-        // Restore textarea heights from saved properties (used on workflow load)
-        nodeType.prototype._restoreInputHeights = function () {
-            const heights = this.properties?.inputHeights;
-            if (!heights || !this.widgets) return;
-
-            for (const widget of this.widgets) {
-                if (!widget.name.match(/^Text \d+$/)) continue;
-                const h = heights[widget.name];
-                if (!h) continue;
-
-                const textarea = findTextarea(widget);
-                if (textarea) {
-                    textarea.style.setProperty("height", h + "px", "important");
-                }
-            }
         };
 
         // Resize node to fit content (only grows, never shrinks)
