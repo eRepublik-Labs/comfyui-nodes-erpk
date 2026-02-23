@@ -32,10 +32,11 @@ app.registerExtension({
             this.properties = this.properties || {};
             this.properties.activeInputCount = this.activeInputCount;
 
-            // Delay to ensure widgets exist, then set up UI once
+            // Delay to ensure widgets and DOM elements exist, then set up UI once
             setTimeout(() => {
                 this._styleInputsHeader();
                 this._updateInputVisibility();
+                this._setupResizableInputs();
                 this._createControlWidgets();  // Create once, never remove
                 if (!this._isLoadingWorkflow) {
                     this._resizeNode();
@@ -66,10 +67,11 @@ app.registerExtension({
                 this.activeInputCount = info.properties.activeInputCount;
             }
 
-            // On load, update visibility and restore size after LiteGraph's async resize
+            // On load, update visibility, restore input heights, and restore size
             setTimeout(() => {
                 this._updateInputVisibility();
                 this._updateControlWidgetVisibility();
+                this._restoreInputHeights();
 
                 // Restore saved size after LiteGraph's requestAnimationFrame resize
                 if (this._savedSize) {
@@ -230,6 +232,106 @@ app.registerExtension({
             this._updateInputVisibility();
             this._updateControlWidgetVisibility();
             this._resizeNode();
+        };
+
+        // Find the textarea element for a widget across both renderers
+        function findTextarea(widget) {
+            // Direct element reference (classic mode + some Nodes 2.0 widgets)
+            if (widget.element?.tagName === "TEXTAREA") return widget.element;
+            if (widget.element?.querySelector) {
+                const ta = widget.element.querySelector("textarea");
+                if (ta) return ta;
+            }
+            // Nodes 2.0 inputEl reference
+            if (widget.inputEl?.tagName === "TEXTAREA") return widget.inputEl;
+            return null;
+        }
+
+        // Inject a stylesheet once to override ComfyUI's resize:none on our textareas.
+        // Both the design-system CSS and Nodes 2.0 Tailwind set resize:none.
+        function injectResizeStyles() {
+            if (document.getElementById("erpk-concat-resize-styles")) return;
+            const style = document.createElement("style");
+            style.id = "erpk-concat-resize-styles";
+            style.textContent = `
+                textarea.erpk-resizable {
+                    resize: vertical !important;
+                    overflow-y: auto !important;
+                    min-height: 40px;
+                    height: auto;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // Enable vertical resize on Text N textareas and persist heights.
+        // Retries to handle async DOM rendering in Nodes 2.0.
+        nodeType.prototype._setupResizableInputs = function (attempt = 0) {
+            if (!this.widgets) return;
+            this.properties.inputHeights = this.properties.inputHeights || {};
+            if (!this._resizeObservers) this._resizeObservers = [];
+            const node = this;
+            let pending = false;
+
+            injectResizeStyles();
+
+            for (const widget of this.widgets) {
+                if (!widget.name.match(/^Text \d+$/)) continue;
+                if (widget._resizeSetup) continue;
+
+                const textarea = findTextarea(widget);
+                if (!textarea) {
+                    pending = true;
+                    continue;
+                }
+
+                // Strip Tailwind/ComfyUI classes that force resize:none and fixed height
+                textarea.classList.remove("resize-none", "size-full");
+                textarea.classList.add("erpk-resizable");
+
+                // Restore saved height
+                const savedHeight = this.properties.inputHeights[widget.name];
+                if (savedHeight) {
+                    textarea.style.height = savedHeight + "px";
+                }
+
+                // Track resize and persist
+                const observer = new ResizeObserver((entries) => {
+                    for (const entry of entries) {
+                        const h = Math.round(entry.contentRect.height);
+                        node.properties.inputHeights[widget.name] = h;
+                        if (widget.computeSize) {
+                            widget.computeSize = () => [0, h + 10];
+                        }
+                        node.setDirtyCanvas?.(true, true);
+                    }
+                });
+                observer.observe(textarea);
+                this._resizeObservers.push(observer);
+                widget._resizeSetup = true;
+            }
+
+            // Retry if some textareas weren't available yet (Vue async rendering)
+            if (pending && attempt < 10) {
+                setTimeout(() => this._setupResizableInputs(attempt + 1), 200);
+            }
+        };
+
+        // Restore textarea heights from saved properties (used on workflow load)
+        nodeType.prototype._restoreInputHeights = function () {
+            const heights = this.properties?.inputHeights;
+            if (!heights || !this.widgets) return;
+
+            for (const widget of this.widgets) {
+                if (!widget.name.match(/^Text \d+$/)) continue;
+                const h = heights[widget.name];
+                if (!h) continue;
+
+                const textarea = findTextarea(widget);
+                if (textarea) {
+                    textarea.style.height = h + "px";
+                }
+            }
         };
 
         // Resize node to fit content (only grows, never shrinks)
