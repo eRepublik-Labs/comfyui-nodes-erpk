@@ -234,34 +234,42 @@ app.registerExtension({
             this._resizeNode();
         };
 
-        // Find the textarea element for a widget across both renderers
-        function findTextarea(widget) {
-            // Direct element reference (classic mode + some Nodes 2.0 widgets)
-            if (widget.element?.tagName === "TEXTAREA") return widget.element;
-            if (widget.element?.querySelector) {
-                const ta = widget.element.querySelector("textarea");
-                if (ta) return ta;
-            }
-            // Nodes 2.0 inputEl reference
-            if (widget.inputEl?.tagName === "TEXTAREA") return widget.inputEl;
-            return null;
+        // Check if a DOM element is actually visible on screen
+        function isVisible(el) {
+            if (!el || !el.offsetParent) return false;
+            const style = window.getComputedStyle(el);
+            return style.display !== "none" && style.visibility !== "hidden";
         }
 
-        // Inject a stylesheet once to override ComfyUI's resize:none on our textareas.
-        // Both the design-system CSS and Nodes 2.0 Tailwind set resize:none.
-        function injectResizeStyles() {
-            if (document.getElementById("erpk-concat-resize-styles")) return;
-            const style = document.createElement("style");
-            style.id = "erpk-concat-resize-styles";
-            style.textContent = `
-                textarea.erpk-resizable {
-                    resize: vertical !important;
-                    overflow-y: auto !important;
-                    min-height: 40px;
-                    height: auto;
-                }
-            `;
-            document.head.appendChild(style);
+        // Find the textarea element for a widget across both renderers.
+        // In Nodes 2.0, widget.element points to the classic-mode textarea (not visible).
+        // The visible textarea is rendered separately by WidgetTextarea.vue.
+        function findTextarea(widget) {
+            // Check widget references first — works in classic mode
+            const candidates = [
+                widget.element?.tagName === "TEXTAREA" ? widget.element : null,
+                widget.element?.querySelector?.("textarea"),
+                widget.inputEl?.tagName === "TEXTAREA" ? widget.inputEl : null,
+            ].filter(Boolean);
+
+            // Return the first visible candidate
+            for (const el of candidates) {
+                if (isVisible(el)) return el;
+            }
+
+            // Nodes 2.0: WidgetTextarea.vue renders its own textarea with a <label>
+            // showing the widget name. Find it via the label text.
+            const labels = document.querySelectorAll("label");
+            for (const label of labels) {
+                if (label.textContent.trim() !== widget.name) continue;
+                const container = label.parentElement;
+                if (!container) continue;
+                const ta = container.querySelector("textarea");
+                if (ta && isVisible(ta)) return ta;
+            }
+
+            // Fallback: return first candidate even if not visible (setup in progress)
+            return candidates[0] || null;
         }
 
         // Enable vertical resize on Text N textareas and persist heights.
@@ -273,26 +281,27 @@ app.registerExtension({
             const node = this;
             let pending = false;
 
-            injectResizeStyles();
-
             for (const widget of this.widgets) {
                 if (!widget.name.match(/^Text \d+$/)) continue;
                 if (widget._resizeSetup) continue;
 
                 const textarea = findTextarea(widget);
-                if (!textarea) {
+                if (!textarea || !isVisible(textarea)) {
                     pending = true;
                     continue;
                 }
 
-                // Strip Tailwind/ComfyUI classes that force resize:none and fixed height
-                textarea.classList.remove("resize-none", "size-full");
-                textarea.classList.add("erpk-resizable");
+                // Inline !important overrides both Tailwind's resize-none class
+                // and the design-system's resize:none rule
+                textarea.style.setProperty("resize", "vertical", "important");
+                textarea.style.setProperty("overflow-y", "auto", "important");
+                textarea.style.setProperty("min-height", "40px", "important");
+                textarea.style.setProperty("height", "auto", "important");
 
-                // Restore saved height
+                // Restore saved height (after setting height:auto)
                 const savedHeight = this.properties.inputHeights[widget.name];
                 if (savedHeight) {
-                    textarea.style.height = savedHeight + "px";
+                    textarea.style.setProperty("height", savedHeight + "px", "important");
                 }
 
                 // Track resize and persist
@@ -329,7 +338,7 @@ app.registerExtension({
 
                 const textarea = findTextarea(widget);
                 if (textarea) {
-                    textarea.style.height = h + "px";
+                    textarea.style.setProperty("height", h + "px", "important");
                 }
             }
         };
