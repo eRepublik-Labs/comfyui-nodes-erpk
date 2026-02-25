@@ -8,7 +8,8 @@ Uses BEN2 (Background Erase Network 2) via HuggingFace hub.
 Features confidence-guided matting (CGM) for accurate alpha mattes,
 especially at fine details like hair and fur.
 
-Install: pip install git+https://github.com/PramaLLC/BEN2.git
+Model code and weights are downloaded automatically from HuggingFace
+on first use (PramaLLC/BEN2). No separate pip install required.
 """
 
 from typing import Dict, Any, Tuple, List
@@ -88,21 +89,36 @@ class BEN2RemoveBackground:
     CATEGORY = "ERPK/Background Removal"
     DESCRIPTION = "Remove background using BEN2. Confidence-guided matting for accurate edges. MIT licensed."
 
+    # HuggingFace repo for model code and weights
+    HF_REPO_ID = "PramaLLC/BEN2"
+
+    @classmethod
+    def _load_ben2_class(cls):
+        """Download and import BEN_Base class from HuggingFace."""
+        import importlib.util
+        from huggingface_hub import hf_hub_download
+
+        model_code_path = hf_hub_download(cls.HF_REPO_ID, "BEN2.py")
+        spec = importlib.util.spec_from_file_location("BEN2_model", model_code_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.BEN_Base
+
     @classmethod
     def _get_model(cls, device: str):
-        """Get or create BEN2 model with caching."""
-        try:
-            from ben2 import BEN_Base
-        except ImportError:
-            raise ImportError(
-                "ben2 is required. Install with: pip install git+https://github.com/PramaLLC/BEN2.git"
-            )
-
+        """Get or create BEN2 model, downloading from HuggingFace if needed."""
         if cls._model is None or cls._current_device != device:
             import torch
+            from huggingface_hub import hf_hub_download
 
             print(f"[BGRemoval] Loading BEN2 on {device}")
-            model = BEN_Base.from_pretrained("PramaLLC/BEN2")
+
+            BEN_Base = cls._load_ben2_class()
+            model = BEN_Base()
+
+            weights_path = hf_hub_download(cls.HF_REPO_ID, "BEN2_Base.pth")
+            model.loadcheckpoints(weights_path)
+
             model.to(torch.device(device))
             model.eval()
             cls._model = model

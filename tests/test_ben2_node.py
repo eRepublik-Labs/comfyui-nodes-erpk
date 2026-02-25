@@ -23,7 +23,7 @@ class TestBEN2NodeImport:
     """Test BEN2 node module structure."""
 
     def test_module_imports(self):
-        """Module should import even without ben2 package installed."""
+        """Module should import (model downloads from HuggingFace at runtime)."""
         from bgremoval import ben2_node
         assert hasattr(ben2_node, "NODE_CLASS_MAPPINGS")
         assert hasattr(ben2_node, "NODE_DISPLAY_NAME_MAPPINGS")
@@ -105,6 +105,15 @@ class TestBEN2RemoveBackground:
         """Should have class-level model cache."""
         assert hasattr(node_class, "_model")
         assert hasattr(node_class, "_current_device")
+
+    def test_hf_repo_id(self, node_class):
+        """Should reference the correct HuggingFace repo."""
+        assert node_class.HF_REPO_ID == "PramaLLC/BEN2"
+
+    def test_has_load_ben2_class_method(self, node_class):
+        """Should have classmethod for downloading model from HuggingFace."""
+        assert hasattr(node_class, "_load_ben2_class")
+        assert callable(node_class._load_ben2_class)
 
 
 class TestBiRefNetVariants:

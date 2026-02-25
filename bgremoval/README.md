@@ -108,7 +108,7 @@ Background Erase Network 2 with confidence-guided matting (CGM). Targets pixels 
 - Processes internally at 1024x1024, auto-resizes mask back to original dimensions
 - Auto dtype: float16 on CUDA, float32 on CPU
 - Single model variant (BEN_Base, SwinTransformer backbone)
-- Requires separate install: `pip install git+https://github.com/PramaLLC/BEN2.git`
+- Model code and weights download automatically from HuggingFace on first use
 
 ### Remove Background (BiRefNet)
 
@@ -224,9 +224,7 @@ pip install transformers>=4.36.0 torchvision>=0.16.0
 ```
 
 **BEN2 (Background Erase Network 2):**
-```bash
-pip install git+https://github.com/PramaLLC/BEN2.git
-```
+Included in the main package. Model code and weights download automatically from [HuggingFace](https://huggingface.co/PramaLLC/BEN2) on first use.
 
 ### GPU Acceleration
 
@@ -285,7 +283,7 @@ For best results with complex subjects (hair, fur, transparent materials):
 python -c "import rembg; print('rembg OK')"
 python -c "from transparent_background import Remover; print('InSPyReNet OK')"
 python -c "from transformers import AutoModelForImageSegmentation; print('BiRefNet OK')"
-python -c "from ben2 import BEN_Base; print('BEN2 OK')"
+python -c "from huggingface_hub import hf_hub_download; print('BEN2 OK (deps installed, model downloads on first use)')"
 ```
 
 2. Check ComfyUI console for import errors
