@@ -1,7 +1,6 @@
-# ABOUTME: API integration layer for Google Gemini
-# ABOUTME: Exports client and utility classes for Gemini API access
+# ABOUTME: API integration layer for Google Gemini.
+# ABOUTME: Exports client class; utils are imported lazily by nodes that need them.
 
 from .client import GeminiClient
-from .utils import ImageConverter, SafetySettings
 
-__all__ = ['GeminiClient', 'ImageConverter', 'SafetySettings']
+__all__ = ['GeminiClient']

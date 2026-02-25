@@ -1,15 +1,7 @@
-# ABOUTME: Tests that IMAGE_MODELS is defined as a shared constant in GeminiClient
-# ABOUTME: Verifies image node defaults match the dropdown and use the shared constant
-
-import sys
-import inspect
-from unittest.mock import MagicMock
+# ABOUTME: Tests that IMAGE_MODELS is defined as a shared constant in GeminiClient.
+# ABOUTME: Verifies image node COMBO options and defaults use the shared constant.
 
 import pytest
-
-for mod_name in ["numpy", "torch", "PIL", "PIL.Image"]:
-    if mod_name not in sys.modules:
-        sys.modules[mod_name] = MagicMock()
 
 from gemini.gemini_api.client import GeminiClient
 from gemini.nodes import GeminiImageGeneration, GeminiImageEdit
@@ -27,29 +19,25 @@ class TestImageModelsConstant:
             assert model in GeminiClient.IMAGE_MODELS
 
     def test_image_gen_uses_client_image_models(self):
-        inputs = GeminiImageGeneration.INPUT_TYPES()
-        dropdown_choices = inputs["optional"]["model"][0]
-        assert list(dropdown_choices) == list(GeminiClient.IMAGE_MODELS)
+        schema = GeminiImageGeneration.define_schema()
+        model_input = [i for i in schema.inputs if i.id == "model"][0]
+        assert list(model_input.options) == list(GeminiClient.IMAGE_MODELS)
 
     def test_image_edit_uses_client_image_models(self):
-        inputs = GeminiImageEdit.INPUT_TYPES()
-        dropdown_choices = inputs["optional"]["model"][0]
-        assert list(dropdown_choices) == list(GeminiClient.IMAGE_MODELS)
+        schema = GeminiImageEdit.define_schema()
+        model_input = [i for i in schema.inputs if i.id == "model"][0]
+        assert list(model_input.options) == list(GeminiClient.IMAGE_MODELS)
 
 
 class TestImageModelDefaults:
-    """Verify method signature defaults match dropdown defaults."""
+    """Verify schema model COMBO defaults for image nodes."""
 
-    def test_generate_image_default_matches_dropdown(self):
-        inputs = GeminiImageGeneration.INPUT_TYPES()
-        dropdown_default = inputs["optional"]["model"][1]["default"]
-        sig = inspect.signature(GeminiImageGeneration.generate_image)
-        param_default = sig.parameters["model"].default
-        assert param_default == dropdown_default
+    def test_generate_image_default(self):
+        schema = GeminiImageGeneration.define_schema()
+        model_input = [i for i in schema.inputs if i.id == "model"][0]
+        assert model_input.default == "gemini-3-pro-image-preview"
 
-    def test_edit_image_default_matches_dropdown(self):
-        inputs = GeminiImageEdit.INPUT_TYPES()
-        dropdown_default = inputs["optional"]["model"][1]["default"]
-        sig = inspect.signature(GeminiImageEdit.edit_image)
-        param_default = sig.parameters["model"].default
-        assert param_default == dropdown_default
+    def test_edit_image_default(self):
+        schema = GeminiImageEdit.define_schema()
+        model_input = [i for i in schema.inputs if i.id == "model"][0]
+        assert model_input.default == "gemini-3-pro-image-preview"

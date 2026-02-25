@@ -1,14 +1,7 @@
-# ABOUTME: Tests that the MODELS dict contains expected model entries
-# ABOUTME: Verifies gemini-3.1-pro-preview is registered and DEFAULT_MODEL is unchanged
-
-import sys
-from unittest.mock import MagicMock
+# ABOUTME: Tests that the MODELS dict contains expected model entries.
+# ABOUTME: Verifies gemini-3.1-pro-preview is registered and DEFAULT_MODEL is unchanged.
 
 import pytest
-
-for mod_name in ["numpy", "torch", "PIL", "PIL.Image"]:
-    if mod_name not in sys.modules:
-        sys.modules[mod_name] = MagicMock()
 
 from gemini.gemini_api.client import GeminiClient
 

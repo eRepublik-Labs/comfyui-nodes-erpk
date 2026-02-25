@@ -1,16 +1,7 @@
-# ABOUTME: Tests for Gemini stop sequence parsing and validation
-# ABOUTME: Ensures the 5-sequence Gemini API limit is enforced at the node level
-
-import sys
-import types
-from unittest.mock import MagicMock
+# ABOUTME: Tests for Gemini stop sequence parsing and validation.
+# ABOUTME: Ensures the 5-sequence Gemini API limit is enforced at the node level.
 
 import pytest
-
-# Stub out heavy dependencies so gemini.nodes can be imported outside ComfyUI
-for mod_name in ["numpy", "torch", "PIL", "PIL.Image"]:
-    if mod_name not in sys.modules:
-        sys.modules[mod_name] = MagicMock()
 
 from gemini.nodes import _parse_stop_sequences
 

@@ -1,47 +1,29 @@
-# ABOUTME: Gemini ComfyUI Custom Nodes package initialization
-# ABOUTME: Registers all Gemini nodes with ComfyUI
+# ABOUTME: Gemini provider nodes for ComfyUI V3 API.
+# ABOUTME: Exports all Gemini node classes for registration via comfy_entrypoint.
 
-import os
-import sys
+from .nodes import (
+    GeminiAPIConfig,
+    GeminiTextGeneration,
+    GeminiChat,
+    GeminiVision,
+    GeminiSystemInstruction,
+    GeminiSafetySettings,
+    GeminiImageGeneration,
+    GeminiImageEdit,
+)
+from .veo_nodes import VeoTextToVideo, VeoImageToVideo
 
-# Add current directory to path for imports
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
+NODES = [
+    GeminiAPIConfig,
+    GeminiTextGeneration,
+    GeminiChat,
+    GeminiVision,
+    GeminiSystemInstruction,
+    GeminiSafetySettings,
+    GeminiImageGeneration,
+    GeminiImageEdit,
+    VeoTextToVideo,
+    VeoImageToVideo,
+]
 
-# Initialize combined mappings
-NODE_CLASS_MAPPINGS = {}
-NODE_DISPLAY_NAME_MAPPINGS = {}
-
-# Import and register all nodes
-try:
-    from .nodes import (
-        NODE_CLASS_MAPPINGS as GEMINI_NODE_CLASS_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as GEMINI_NODE_DISPLAY_NAME_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(GEMINI_NODE_CLASS_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(GEMINI_NODE_DISPLAY_NAME_MAPPINGS)
-except ImportError as e:
-    print(f"[Gemini] Warning: Could not load nodes: {e}")
-
-# Import Veo video generation nodes
-try:
-    from .veo_nodes import (
-        NODE_CLASS_MAPPINGS as VEO_NODE_CLASS_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as VEO_NODE_DISPLAY_NAME_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(VEO_NODE_CLASS_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(VEO_NODE_DISPLAY_NAME_MAPPINGS)
-except ImportError as e:
-    print(f"[Gemini] Warning: Could not load Veo nodes: {e}")
-
-# Print loaded nodes for debugging
-print(f"[Gemini] Loaded {len(NODE_CLASS_MAPPINGS)} nodes:")
-for node_name in sorted(NODE_CLASS_MAPPINGS.keys()):
-    print(f"  - {node_name}")
-
-# Web directory for frontend extensions (if any)
-WEB_DIRECTORY = "./web"
-
-# Export for ComfyUI
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
+__all__ = ["NODES"]

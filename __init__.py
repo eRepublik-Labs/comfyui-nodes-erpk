@@ -24,8 +24,8 @@ class ERPKExtension(ComfyExtension):
         _providers = [
             (".utils", "utility"),
             (".claude", "Claude"),
+            (".gemini", "Gemini"),
             # Providers below will be added as they're converted to V3:
-            # (".gemini", "Gemini"),
             # (".openai", "OpenAI"),
             # (".wavespeed", "WaveSpeed"),
             # (".bgremoval", "Background Removal"),
