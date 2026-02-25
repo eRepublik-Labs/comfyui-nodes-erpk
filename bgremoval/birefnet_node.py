@@ -1,5 +1,5 @@
 # ABOUTME: ComfyUI nodes for background removal using BiRefNet via HuggingFace transformers.
-# ABOUTME: Supports 15 model variants, dtype/device selection, local loading, and foreground refinement.
+# ABOUTME: Supports 17 model variants, dtype/device selection, local loading, and foreground refinement.
 
 """
 BiRefNet Backend Nodes for ComfyUI
@@ -21,12 +21,13 @@ from PIL import Image
 
 from .utils import tensor_to_pil, pil_rgba_to_tensor, pil_to_tensor, extract_mask_from_rgba
 
-# All available BiRefNet variants on HuggingFace (15 models)
+# All available BiRefNet variants on HuggingFace (17 models)
 BIREFNET_VARIANTS = [
     # General purpose
     ("ZhengPeng7/BiRefNet", "General (default)"),
     ("ZhengPeng7/BiRefNet_HR", "General HR (2048x2048)"),
     ("ZhengPeng7/BiRefNet_T", "General Lite (fast)"),
+    ("ZhengPeng7/BiRefNet_lite", "General Lite (44M params)"),
     ("ZhengPeng7/BiRefNet_lite-2K", "General Lite 2K"),
     ("ZhengPeng7/BiRefNet_dynamic", "General Dynamic"),
     ("ZhengPeng7/BiRefNet_512x512", "General 512x512 (fastest)"),
@@ -37,6 +38,7 @@ BIREFNET_VARIANTS = [
     ("ZhengPeng7/BiRefNet-matting", "Matting"),
     ("ZhengPeng7/BiRefNet_HR-matting", "Matting HR"),
     ("ZhengPeng7/BiRefNet_lite-matting", "Matting Lite"),
+    ("ZhengPeng7/BiRefNet_dynamic-matting", "Matting Dynamic"),
     # Specialized detection
     ("ZhengPeng7/BiRefNet-DIS5K", "DIS (dichotomous)"),
     ("ZhengPeng7/BiRefNet-HRSOD", "HRSOD (salient object)"),
@@ -127,7 +129,7 @@ class BiRefNetRemoveBackground:
     Remove background using BiRefNet via HuggingFace transformers.
 
     Features:
-    - 15 model variants for different use cases
+    - 17 model variants for different use cases
     - dtype selection (float16 for VRAM efficiency)
     - Device selection (auto/cuda/cpu/mps)
     - Configurable processing resolution with upscale method
@@ -225,7 +227,7 @@ class BiRefNetRemoveBackground:
     RETURN_NAMES = ("image", "mask")
     FUNCTION = "remove_background"
     CATEGORY = "ERPK/Background Removal"
-    DESCRIPTION = "Remove background using BiRefNet. 15 model variants, dtype/device selection. MIT licensed."
+    DESCRIPTION = "Remove background using BiRefNet. 17 model variants, dtype/device selection. MIT licensed."
 
     @classmethod
     def _get_model(cls, variant: str, device: str, dtype):
