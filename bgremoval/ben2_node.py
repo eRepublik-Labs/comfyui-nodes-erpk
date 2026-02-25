@@ -1,28 +1,9 @@
-# ABOUTME: ComfyUI node for background removal using BEN2 (Background Erase Network 2).
+# ABOUTME: ComfyUI V3 node for background removal using BEN2 (Background Erase Network 2).
 # ABOUTME: Confidence-guided matting for accurate alpha mattes at edges. MIT licensed.
 
-"""
-BEN2 Backend Node for ComfyUI
+from comfy_api.latest import IO
 
-Uses BEN2 (Background Erase Network 2) via HuggingFace hub.
-Features confidence-guided matting (CGM) for accurate alpha mattes,
-especially at fine details like hair and fur.
-
-Model code and weights are downloaded automatically from HuggingFace
-on first use (PramaLLC/BEN2). No separate pip install required.
-"""
-
-from typing import Dict, Any, Tuple, List
-
-try:
-    from tqdm import tqdm
-except ImportError:
-    def tqdm(iterable, **kwargs):
-        return iterable
-
-from .utils import tensor_to_pil, pil_rgba_to_tensor, extract_mask_from_rgba
-
-# Device options (shared with birefnet_node)
+# Device options
 DEVICE_OPTIONS = ["auto", "cuda", "cpu", "mps"]
 
 
@@ -40,7 +21,7 @@ def get_device(device_option: str) -> str:
     return device_option
 
 
-class BEN2RemoveBackground:
+class BEN2RemoveBackground(IO.ComfyNode):
     """
     Remove background using BEN2 (Background Erase Network 2).
 
@@ -56,41 +37,28 @@ class BEN2RemoveBackground:
     _model = None
     _current_device = None
 
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(cls) -> Dict[str, Any]:
-        return {
-            "required": {
-                "image": ("IMAGE",),
-            },
-            "optional": {
-                "refine_foreground": (
-                    "BOOLEAN",
-                    {
-                        "default": False,
-                        "tooltip": "Enable blur-fusion foreground refinement for cleaner edges. Slower but better for hair/fur.",
-                    },
-                ),
-                "device": (
-                    DEVICE_OPTIONS,
-                    {
-                        "default": "auto",
-                        "tooltip": "Processing device. Auto selects best available (CUDA > MPS > CPU).",
-                    },
-                ),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE", "MASK")
-    RETURN_NAMES = ("image", "mask")
-    FUNCTION = "remove_background"
-    CATEGORY = "ERPK/Background Removal"
-    DESCRIPTION = "Remove background using BEN2. Confidence-guided matting for accurate edges. MIT licensed."
-
     # HuggingFace repo for model code and weights
     HF_REPO_ID = "PramaLLC/BEN2"
+
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="BEN2RemoveBackground",
+            display_name="Remove Background (BEN2)",
+            category="ERPK/Background Removal",
+            description="Remove background using BEN2. Confidence-guided matting for accurate edges. MIT licensed.",
+            inputs=[
+                IO.Image.Input("image"),
+                IO.Boolean.Input("refine_foreground", default=False, optional=True,
+                                 tooltip="Enable blur-fusion foreground refinement for cleaner edges. Slower but better for hair/fur."),
+                IO.Combo.Input("device", options=DEVICE_OPTIONS, default="auto", optional=True,
+                               tooltip="Processing device. Auto selects best available (CUDA > MPS > CPU)."),
+            ],
+            outputs=[
+                IO.Image.Output("image"),
+                IO.Mask.Output("mask"),
+            ],
+        )
 
     @classmethod
     def _load_ben2_class(cls):
@@ -120,29 +88,27 @@ class BEN2RemoveBackground:
             model.loadcheckpoints(weights_path)
 
             model.to(torch.device(device))
-            model.eval()
+            model.train(False)
             cls._model = model
             cls._current_device = device
             print(f"[BGRemoval] BEN2 loaded on {device}")
 
         return cls._model
 
-    def remove_background(
-        self,
-        image,
-        refine_foreground: bool = False,
-        device: str = "auto",
-    ) -> Tuple:
-        """Remove background from images using BEN2."""
+    @classmethod
+    def execute(cls, image, refine_foreground=False, device="auto", **kwargs):
+        from tqdm import tqdm
+        from .utils import tensor_to_pil, pil_rgba_to_tensor, extract_mask_from_rgba
+
         # Resolve device
         actual_device = get_device(device)
 
         # Get cached model
-        model = self._get_model(actual_device)
+        model = cls._get_model(actual_device)
 
         # Convert tensor to PIL images
         pil_images = tensor_to_pil(image)
-        result_images: List = []
+        result_images = []
 
         # Process each image
         refine_str = "refine" if refine_foreground else "default"
@@ -155,14 +121,4 @@ class BEN2RemoveBackground:
         image_tensor = pil_rgba_to_tensor(result_images)
         mask_tensor = extract_mask_from_rgba(result_images)
 
-        return (image_tensor, mask_tensor)
-
-
-# Node registration
-NODE_CLASS_MAPPINGS = {
-    "ERPK Remove Background (BEN2)": BEN2RemoveBackground,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "ERPK Remove Background (BEN2)": "Remove Background (BEN2)",
-}
+        return IO.NodeOutput(image_tensor, mask_tensor)

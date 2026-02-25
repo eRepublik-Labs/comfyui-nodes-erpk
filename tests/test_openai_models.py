@@ -2,18 +2,8 @@
 # ABOUTME: Verifies reasoning models, token param models, and vision models are consistent
 
 import pytest
-import sys
-import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
-# Prime the module cache: openai_api/__init__.py imports client then utils.
-# utils needs numpy which isn't in the test env. The try/except ensures
-# client.py gets cached in sys.modules so subsequent imports succeed.
-try:
-    from openai.openai_api.client import OpenAIClient
-except ModuleNotFoundError:
-    from openai.openai_api.client import OpenAIClient
+from openai.openai_api.client import OpenAIClient
 
 
 class TestOpenAIModels:

@@ -1,4 +1,4 @@
-# ABOUTME: ComfyUI nodes for Apple's SHARP model.
+# ABOUTME: ComfyUI V3 nodes for Apple's SHARP model.
 # ABOUTME: Converts single images to 3D Gaussian splats for novel view synthesis.
 
 """
@@ -11,22 +11,12 @@ Paper: https://machinelearning.apple.com/research/sharp
 Code: https://github.com/apple/ml-sharp
 """
 
-import os
-import tempfile
-from typing import Dict, Any, Tuple, List, Optional
-
-import numpy as np
-from PIL import Image
-import torch
-import torch.nn.functional as F
-
-# ComfyUI imports
-import folder_paths
-
+from comfy_api.latest import IO
 
 # Model URL from Apple CDN
 SHARP_MODEL_URL = "https://ml-site.cdn-apple.com/models/sharp/sharp_2572gikvuh.pt"
 SHARP_INTERNAL_RESOLUTION = 1536
+DEVICE_OPTIONS = ["auto", "cuda", "mps", "cpu"]
 
 
 def load_ply_fixed(path):
@@ -35,6 +25,8 @@ def load_ply_fixed(path):
     SHARP's load_ply has a bug where it calls sRGB2linearRGB on numpy arrays
     but the function expects tensors. This wrapper fixes that.
     """
+    import numpy as np
+    import torch
     from pathlib import Path
     from plyfile import PlyData
     from sharp.utils.gaussians import Gaussians3D
@@ -103,8 +95,10 @@ class SHARPModelLoader:
     _device = None
 
     @classmethod
-    def get_model(cls, device: str = "auto"):
+    def get_model(cls, device="auto"):
         """Get or load the SHARP model."""
+        import torch
+
         # Determine device
         if device == "auto":
             if torch.cuda.is_available():
@@ -146,12 +140,14 @@ class SHARPModelLoader:
         cls._model = model
         cls._device = device
 
-        print(f"[SHARP] Model loaded successfully")
+        print("[SHARP] Model loaded successfully")
         return cls._model, cls._device
 
 
-def tensor_to_numpy(tensor: torch.Tensor) -> np.ndarray:
+def tensor_to_numpy(tensor):
     """Convert ComfyUI image tensor to numpy array."""
+    import numpy as np
+
     # ComfyUI: (B, H, W, C) float [0,1]
     # Output: (H, W, C) uint8 [0,255]
     if tensor.dim() == 4:
@@ -160,78 +156,52 @@ def tensor_to_numpy(tensor: torch.Tensor) -> np.ndarray:
     return img_np
 
 
-def numpy_to_tensor(img_np: np.ndarray) -> torch.Tensor:
+def numpy_to_tensor(img_np):
     """Convert numpy array to ComfyUI image tensor."""
+    import numpy as np
+    import torch
+
     # Input: (H, W, C) uint8 [0,255]
     # Output: (1, H, W, C) float [0,1]
     tensor = torch.from_numpy(img_np.astype(np.float32) / 255.0)
     return tensor.unsqueeze(0)
 
 
-class SHARPPredict:
-    """
-    Convert a single image to a 3D Gaussian splat (.ply file).
-
-    Uses Apple's SHARP model to predict a 3D Gaussian representation
-    from a single photograph in under one second on GPU.
-    """
-
-    def __init__(self):
-        pass
+class SHARPPredict(IO.ComfyNode):
+    """Convert a single image to a 3D Gaussian splat (.ply file)."""
 
     @classmethod
-    def INPUT_TYPES(cls) -> Dict[str, Any]:
-        return {
-            "required": {
-                "image": ("IMAGE",),
-            },
-            "optional": {
-                "focal_length_px": (
-                    "FLOAT",
-                    {
-                        "default": 0.0,
-                        "min": 0.0,
-                        "max": 10000.0,
-                        "step": 1.0,
-                        "tooltip": "Focal length in pixels. 0 = auto-estimate from image width.",
-                    },
-                ),
-                "output_dir": (
-                    "STRING",
-                    {
-                        "default": "",
-                        "tooltip": "Output directory for .ply file. Empty = ComfyUI output folder.",
-                    },
-                ),
-                "filename_prefix": (
-                    "STRING",
-                    {
-                        "default": "sharp",
-                        "tooltip": "Prefix for output filename.",
-                    },
-                ),
-                "device": (
-                    ["auto", "cuda", "mps", "cpu"],
-                    {"default": "auto"},
-                ),
-            },
-        }
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="SHARPPredict",
+            display_name="SHARP Predict (Image to 3D Gaussian)",
+            category="ERPK/Apple/SHARP",
+            description="Convert a single image to 3D Gaussian splat (.ply file)",
+            inputs=[
+                IO.Image.Input("image"),
+                IO.Float.Input("focal_length_px", optional=True, default=0.0,
+                               min=0.0, max=10000.0, step=1.0,
+                               tooltip="Focal length in pixels. 0 = auto-estimate from image width."),
+                IO.String.Input("output_dir", optional=True, default="",
+                                tooltip="Output directory for .ply file. Empty = ComfyUI output folder."),
+                IO.String.Input("filename_prefix", optional=True, default="sharp",
+                                tooltip="Prefix for output filename."),
+                IO.Combo.Input("device", optional=True, options=DEVICE_OPTIONS, default="auto"),
+            ],
+            outputs=[
+                IO.String.Output("ply_path"),
+                IO.Custom("SHARP_GAUSSIANS").Output("gaussians"),
+            ],
+        )
 
-    RETURN_TYPES = ("STRING", "SHARP_GAUSSIANS")
-    RETURN_NAMES = ("ply_path", "gaussians")
-    FUNCTION = "predict"
-    CATEGORY = "ERPK/Apple/SHARP"
-    DESCRIPTION = "Convert a single image to 3D Gaussian splat (.ply file)"
+    @classmethod
+    def execute(cls, image, focal_length_px=0.0, output_dir="",
+                filename_prefix="sharp", device="auto", **kwargs):
+        import os
+        import torch
+        import torch.nn.functional as F
+        import folder_paths
 
-    def predict(
-        self,
-        image: torch.Tensor,
-        focal_length_px: float = 0.0,
-        output_dir: str = "",
-        filename_prefix: str = "sharp",
-        device: str = "auto",
-    ) -> Tuple[str, Any]:
-        """Run SHARP prediction on input image."""
         try:
             from sharp.utils.gaussians import save_ply, unproject_gaussians
         except ImportError:
@@ -317,76 +287,40 @@ class SHARPPredict:
         save_ply(gaussians, focal_length_px, (height, width), ply_path)
         print(f"[SHARP] Saved: {ply_path}")
 
-        return (ply_path, gaussians)
+        return IO.NodeOutput(ply_path, gaussians)
 
 
-class SHARPRenderViews:
-    """
-    Render novel views from SHARP Gaussian splat.
-
-    Renders the 3D Gaussian representation from multiple viewpoints
-    to generate novel view images.
-
-    Note: Requires CUDA for rendering.
-    """
-
-    def __init__(self):
-        pass
+class SHARPRenderViews(IO.ComfyNode):
+    """Render novel views from SHARP Gaussian splat (requires CUDA)."""
 
     @classmethod
-    def INPUT_TYPES(cls) -> Dict[str, Any]:
-        return {
-            "required": {
-                "ply_path": ("STRING", {"forceInput": True}),
-                "num_views": (
-                    "INT",
-                    {
-                        "default": 8,
-                        "min": 1,
-                        "max": 64,
-                        "step": 1,
-                        "tooltip": "Number of views to render around the scene.",
-                    },
-                ),
-            },
-            "optional": {
-                "resolution": (
-                    "INT",
-                    {
-                        "default": 512,
-                        "min": 256,
-                        "max": 2048,
-                        "step": 64,
-                        "tooltip": "Output image resolution.",
-                    },
-                ),
-                "max_disparity": (
-                    "FLOAT",
-                    {
-                        "default": 0.08,
-                        "min": 0.01,
-                        "max": 0.5,
-                        "step": 0.01,
-                        "tooltip": "Maximum camera disparity for view synthesis.",
-                    },
-                ),
-            },
-        }
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="SHARPRenderViews",
+            display_name="SHARP Render Views",
+            category="ERPK/Apple/SHARP",
+            description="Render novel views from SHARP Gaussian splat (requires CUDA)",
+            inputs=[
+                IO.String.Input("ply_path", force_input=True),
+                IO.Int.Input("num_views", default=8, min=1, max=64, step=1,
+                             tooltip="Number of views to render around the scene."),
+                IO.Int.Input("resolution", optional=True, default=512,
+                             min=256, max=2048, step=64,
+                             tooltip="Output image resolution."),
+                IO.Float.Input("max_disparity", optional=True, default=0.08,
+                               min=0.01, max=0.5, step=0.01,
+                               tooltip="Maximum camera disparity for view synthesis."),
+            ],
+            outputs=[
+                IO.Image.Output("images"),
+            ],
+        )
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("images",)
-    FUNCTION = "render_views"
-    CATEGORY = "ERPK/Apple/SHARP"
-    DESCRIPTION = "Render novel views from SHARP Gaussian splat (requires CUDA)"
+    @classmethod
+    def execute(cls, ply_path, num_views=8, resolution=512,
+                max_disparity=0.08, **kwargs):
+        import torch
 
-    def render_views(
-        self,
-        ply_path: str,
-        num_views: int = 8,
-        resolution: int = 512,
-        max_disparity: float = 0.08,
-    ) -> Tuple[torch.Tensor]:
-        """Render multiple views from Gaussian splat."""
         if not torch.cuda.is_available():
             raise RuntimeError(
                 "SHARP rendering requires CUDA. "
@@ -483,102 +417,53 @@ class SHARPRenderViews:
         # Stack into batch tensor (B, H, W, C) for ComfyUI IMAGE format
         images_tensor = torch.stack(rendered_images, dim=0)
 
-        return (images_tensor,)
+        return IO.NodeOutput(images_tensor)
 
 
-class SHARPRenderVideo:
-    """
-    Render orbit video from SHARP Gaussian splat.
-
-    Creates an MP4 video showing the scene from a rotating camera.
-
-    Note: Requires CUDA for rendering.
-    """
-
-    def __init__(self):
-        pass
+class SHARPRenderVideo(IO.ComfyNode):
+    """Render orbit video from SHARP Gaussian splat (requires CUDA)."""
 
     @classmethod
-    def INPUT_TYPES(cls) -> Dict[str, Any]:
-        return {
-            "required": {
-                "ply_path": ("STRING", {"forceInput": True}),
-            },
-            "optional": {
-                "num_frames": (
-                    "INT",
-                    {
-                        "default": 60,
-                        "min": 10,
-                        "max": 300,
-                        "step": 10,
-                        "tooltip": "Number of frames in the video.",
-                    },
-                ),
-                "resolution": (
-                    "INT",
-                    {
-                        "default": 512,
-                        "min": 256,
-                        "max": 2048,
-                        "step": 64,
-                        "tooltip": "Video resolution.",
-                    },
-                ),
-                "fps": (
-                    "INT",
-                    {
-                        "default": 30,
-                        "min": 15,
-                        "max": 60,
-                        "step": 5,
-                        "tooltip": "Frames per second.",
-                    },
-                ),
-                "max_disparity": (
-                    "FLOAT",
-                    {
-                        "default": 0.08,
-                        "min": 0.01,
-                        "max": 0.5,
-                        "step": 0.01,
-                        "tooltip": "Maximum camera disparity for view synthesis.",
-                    },
-                ),
-                "output_dir": (
-                    "STRING",
-                    {
-                        "default": "",
-                        "tooltip": "Output directory. Empty = ComfyUI output folder.",
-                    },
-                ),
-                "filename_prefix": (
-                    "STRING",
-                    {
-                        "default": "sharp_video",
-                        "tooltip": "Prefix for output filename.",
-                    },
-                ),
-            },
-        }
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="SHARPRenderVideo",
+            display_name="SHARP Render Video",
+            category="ERPK/Apple/SHARP",
+            description="Render orbit video from SHARP Gaussian splat (requires CUDA)",
+            inputs=[
+                IO.String.Input("ply_path", force_input=True),
+                IO.Int.Input("num_frames", optional=True, default=60,
+                             min=10, max=300, step=10,
+                             tooltip="Number of frames in the video."),
+                IO.Int.Input("resolution", optional=True, default=512,
+                             min=256, max=2048, step=64,
+                             tooltip="Video resolution."),
+                IO.Int.Input("fps", optional=True, default=30,
+                             min=15, max=60, step=5,
+                             tooltip="Frames per second."),
+                IO.Float.Input("max_disparity", optional=True, default=0.08,
+                               min=0.01, max=0.5, step=0.01,
+                               tooltip="Maximum camera disparity for view synthesis."),
+                IO.String.Input("output_dir", optional=True, default="",
+                                tooltip="Output directory. Empty = ComfyUI output folder."),
+                IO.String.Input("filename_prefix", optional=True, default="sharp_video",
+                                tooltip="Prefix for output filename."),
+            ],
+            outputs=[
+                IO.String.Output("video_path"),
+                IO.Image.Output("frames"),
+            ],
+        )
 
-    RETURN_TYPES = ("STRING", "IMAGE")
-    RETURN_NAMES = ("video_path", "frames")
-    FUNCTION = "render_video"
-    CATEGORY = "ERPK/Apple/SHARP"
-    DESCRIPTION = "Render orbit video from SHARP Gaussian splat (requires CUDA)"
+    @classmethod
+    def execute(cls, ply_path, num_frames=60, resolution=512, fps=30,
+                max_disparity=0.08, output_dir="", filename_prefix="sharp_video",
+                **kwargs):
+        import os
+        import numpy as np
+        import torch
+        import folder_paths
 
-    def render_video(
-        self,
-        ply_path: str,
-        num_frames: int = 60,
-        resolution: int = 512,
-        fps: int = 30,
-        max_disparity: float = 0.08,
-        output_dir: str = "",
-        filename_prefix: str = "sharp_video",
-    ) -> Tuple[str, torch.Tensor]:
-        """Render orbit video from Gaussian splat."""
         if not torch.cuda.is_available():
             raise RuntimeError(
                 "SHARP video rendering requires CUDA. "
@@ -703,18 +588,4 @@ class SHARPRenderVideo:
         # Stack frames into batch tensor (B, H, W, C) for ComfyUI IMAGE format
         frames_tensor = torch.stack(rendered_frames, dim=0)
 
-        return (video_path, frames_tensor)
-
-
-# Node registration
-NODE_CLASS_MAPPINGS = {
-    "ERPK SHARP Predict": SHARPPredict,
-    "ERPK SHARP Render Views": SHARPRenderViews,
-    "ERPK SHARP Render Video": SHARPRenderVideo,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "ERPK SHARP Predict": "SHARP Predict (Image to 3D Gaussian)",
-    "ERPK SHARP Render Views": "SHARP Render Views",
-    "ERPK SHARP Render Video": "SHARP Render Video",
-}
+        return IO.NodeOutput(video_path, frames_tensor)

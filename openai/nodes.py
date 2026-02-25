@@ -1,48 +1,40 @@
-# ABOUTME: ComfyUI nodes for OpenAI API integration
+# ABOUTME: ComfyUI V3 nodes for OpenAI API integration
 # ABOUTME: Provides text generation, vision, chat, and configuration nodes
 
+from comfy_api.latest import IO
 from .openai_api.client import OpenAIClient
-from .openai_api.utils import ImageConverter
+
+TEXT_MODELS = list(OpenAIClient.MODELS.keys())
+VISION_MODELS = ["gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-mini",
+                 "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4o", "gpt-4o-mini"]
 
 
-class OpenAIAPIConfig:
-    """
-    OpenAI API Configuration Node
-
-    Initializes and provides an OpenAI API client for use by other nodes.
-    Handles API key configuration. Each node selects its own model.
-    """
+class OpenAIAPIConfig(IO.ComfyNode):
+    """Initializes and provides an OpenAI API client for use by other nodes."""
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {},
-            "optional": {
-                "api_key": (
-                    "STRING",
-                    {
-                        "default": "",
-                        "tooltip": "OpenAI API key. If empty, will use OPENAI_API_KEY env var or config.ini."
-                    }
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="OpenAIAPIConfig",
+            display_name="OpenAI API Config",
+            category="ERPK/OpenAI",
+            inputs=[
+                IO.String.Input(
+                    "api_key",
+                    default="",
+                    optional=True,
+                    tooltip="OpenAI API key. If empty, will use OPENAI_API_KEY env var or config.ini.",
                 ),
-            }
-        }
+            ],
+            outputs=[
+                IO.Custom("OPENAI_API_CLIENT").Output("client"),
+            ],
+        )
 
-    RETURN_TYPES = ("OPENAI_API_CLIENT",)
-    RETURN_NAMES = ("client",)
-    FUNCTION = "create_client"
-    CATEGORY = "ERPK/OpenAI"
+    @classmethod
+    def execute(cls, **kwargs) -> IO.NodeOutput:
+        api_key = kwargs.get("api_key", "")
 
-    def create_client(self, api_key: str = ""):
-        """
-        Create and return an OpenAI API client.
-
-        Args:
-            api_key: Optional API key
-
-        Returns:
-            Tuple containing the client instance
-        """
         try:
             client = OpenAIClient(
                 api_key=api_key if api_key.strip() else None
@@ -50,7 +42,7 @@ class OpenAIAPIConfig:
 
             print(f"[OpenAI] Client initialized")
 
-            return (client,)
+            return IO.NodeOutput(client)
 
         except Exception as e:
             error_msg = f"Failed to create OpenAI client: {str(e)}"
@@ -58,138 +50,98 @@ class OpenAIAPIConfig:
             raise ValueError(error_msg)
 
 
-class OpenAITextGeneration:
-    """
-    OpenAI Text Generation Node
-
-    General-purpose text generation for various tasks including:
-    - Text completion and expansion
-    - Creative writing
-    - Text transformation
-    - Content generation
-    """
-
-    # Text generation models
-    TEXT_MODELS = list(OpenAIClient.MODELS.keys())
+class OpenAITextGeneration(IO.ComfyNode):
+    """General-purpose text generation for various tasks."""
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "prompt": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "Text prompt for OpenAI"
-                    }
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="OpenAITextGeneration",
+            display_name="OpenAI Text Generation",
+            category="ERPK/OpenAI",
+            not_idempotent=True,
+            inputs=[
+                IO.String.Input(
+                    "prompt",
+                    multiline=True,
+                    default="",
+                    tooltip="Text prompt for OpenAI",
                 ),
-            },
-            "optional": {
-                "client": (
-                    "OPENAI_API_CLIENT",
-                    {"tooltip": "OpenAI API client from OpenAI API Config node (optional if API key is configured in Settings)"}
+                IO.Custom("OPENAI_API_CLIENT").Input(
+                    "client",
+                    optional=True,
+                    tooltip="OpenAI API client from OpenAI API Config node (optional if API key is configured in Settings)",
                 ),
-                "model": (
-                    cls.TEXT_MODELS,
-                    {
-                        "default": OpenAIClient.DEFAULT_MODEL,
-                        "tooltip": "OpenAI model to use for generation"
-                    }
+                IO.Combo.Input(
+                    "model",
+                    options=TEXT_MODELS,
+                    default=OpenAIClient.DEFAULT_MODEL,
+                    optional=True,
+                    tooltip="OpenAI model to use for generation",
                 ),
-                "temperature": (
-                    "FLOAT",
-                    {
-                        "default": 0.7,
-                        "min": 0.0,
-                        "max": 2.0,
-                        "step": 0.05,
-                        "tooltip": "Creativity level (0.0=focused, 2.0=very creative)"
-                    }
+                IO.Float.Input(
+                    "temperature",
+                    default=0.7,
+                    min=0.0,
+                    max=2.0,
+                    step=0.05,
+                    optional=True,
+                    tooltip="Creativity level (0.0=focused, 2.0=very creative)",
                 ),
-                "max_tokens": (
-                    "INT",
-                    {
-                        "default": 4096,
-                        "min": 256,
-                        "max": 16384,
-                        "step": 128,
-                        "tooltip": "Maximum length of response"
-                    }
+                IO.Int.Input(
+                    "max_tokens",
+                    default=4096,
+                    min=256,
+                    max=16384,
+                    step=128,
+                    optional=True,
+                    tooltip="Maximum length of response",
                 ),
-                "top_p": (
-                    "FLOAT",
-                    {
-                        "default": 1.0,
-                        "min": 0.0,
-                        "max": 1.0,
-                        "step": 0.05,
-                        "tooltip": "Nucleus sampling - cumulative probability threshold (1.0=disabled)"
-                    }
+                IO.Float.Input(
+                    "top_p",
+                    default=1.0,
+                    min=0.0,
+                    max=1.0,
+                    step=0.05,
+                    optional=True,
+                    tooltip="Nucleus sampling - cumulative probability threshold (1.0=disabled)",
                 ),
-                "stop_sequences": (
-                    "STRING",
-                    {
-                        "default": "",
-                        "multiline": True,
-                        "tooltip": "Stop generation at these sequences (one per line, leave empty to disable)"
-                    }
+                IO.String.Input(
+                    "stop_sequences",
+                    default="",
+                    multiline=True,
+                    optional=True,
+                    tooltip="Stop generation at these sequences (one per line, leave empty to disable)",
                 ),
-                "response_format": (
-                    ["default", "json_object"],
-                    {
-                        "default": "default",
-                        "tooltip": "Output format (use json_object for JSON mode)"
-                    }
+                IO.Combo.Input(
+                    "response_format",
+                    options=["default", "json_object"],
+                    default="default",
+                    optional=True,
+                    tooltip="Output format (use json_object for JSON mode)",
                 ),
-            }
-        }
-
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("response",)
-    FUNCTION = "generate"
-    CATEGORY = "ERPK/OpenAI"
+            ],
+            outputs=[
+                IO.String.Output("response"),
+            ],
+        )
 
     @classmethod
-    def IS_CHANGED(cls, **kwargs):
-        # Always regenerate - disable caching for text generation
-        return float("nan")
+    def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
+        client = kwargs.get("client")
+        model = kwargs.get("model")
+        temperature = kwargs.get("temperature", 0.7)
+        max_tokens = kwargs.get("max_tokens", 4096)
+        top_p = kwargs.get("top_p", 1.0)
+        stop_sequences = kwargs.get("stop_sequences", "")
+        response_format = kwargs.get("response_format", "default")
 
-    def generate(
-        self,
-        prompt: str,
-        client: OpenAIClient = None,
-        model: str = None,
-        temperature: float = 0.7,
-        max_tokens: int = 4096,
-        top_p: float = 1.0,
-        stop_sequences: str = "",
-        response_format: str = "default"
-    ):
-        """
-        Generate text using OpenAI.
-
-        Args:
-            client: OpenAI API client
-            prompt: User prompt
-            model: OpenAI model to use
-            temperature: Creativity level
-            max_tokens: Max output tokens
-            top_p: Nucleus sampling threshold (1.0 to disable)
-            stop_sequences: Newline-separated stop sequences
-            response_format: Output format (default/json_object)
-
-        Returns:
-            Tuple containing generated text
-        """
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 
-        # Create default client if none provided
         if client is None:
             client = OpenAIClient(api_key=None)
 
-        # Use specified model or default
         if model is None:
             model = OpenAIClient.DEFAULT_MODEL
 
@@ -222,7 +174,7 @@ class OpenAITextGeneration:
             text = response.get("text", "")
             print(f"[OpenAI] Text generated successfully ({len(text)} characters)")
 
-            return (text,)
+            return IO.NodeOutput(text)
 
         except Exception as e:
             error_msg = f"Failed to generate text: {str(e)}"
@@ -230,150 +182,112 @@ class OpenAITextGeneration:
             raise ValueError(error_msg)
 
 
-class OpenAIChat:
-    """
-    OpenAI Chat Node
-
-    Maintains multi-turn conversations with OpenAI, preserving message history
-    across multiple node executions.
-    """
-
-    # Text generation models
-    TEXT_MODELS = list(OpenAIClient.MODELS.keys())
+class OpenAIChat(IO.ComfyNode):
+    """Maintains multi-turn conversations with OpenAI, preserving message history."""
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "prompt": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "Your message in the conversation"
-                    }
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="OpenAIChat",
+            display_name="OpenAI Chat",
+            category="ERPK/OpenAI",
+            not_idempotent=True,
+            inputs=[
+                IO.String.Input(
+                    "prompt",
+                    multiline=True,
+                    default="",
+                    tooltip="Your message in the conversation",
                 ),
-            },
-            "optional": {
-                "client": (
-                    "OPENAI_API_CLIENT",
-                    {"tooltip": "OpenAI API client from OpenAI API Config node (optional if API key is configured in Settings)"}
+                IO.Custom("OPENAI_API_CLIENT").Input(
+                    "client",
+                    optional=True,
+                    tooltip="OpenAI API client from OpenAI API Config node (optional if API key is configured in Settings)",
                 ),
-                "model": (
-                    cls.TEXT_MODELS,
-                    {
-                        "default": OpenAIClient.DEFAULT_MODEL,
-                        "tooltip": "OpenAI model to use for chat"
-                    }
+                IO.Combo.Input(
+                    "model",
+                    options=TEXT_MODELS,
+                    default=OpenAIClient.DEFAULT_MODEL,
+                    optional=True,
+                    tooltip="OpenAI model to use for chat",
                 ),
-                "chat_session": (
-                    "OPENAI_CHAT_SESSION",
-                    {"tooltip": "Previous chat session (connect from previous chat node)"}
+                IO.Custom("OPENAI_CHAT_SESSION").Input(
+                    "chat_session",
+                    optional=True,
+                    tooltip="Previous chat session (connect from previous chat node)",
                 ),
-                "reset_conversation": (
-                    "BOOLEAN",
-                    {
-                        "default": False,
-                        "tooltip": "Start a new conversation, discarding history"
-                    }
+                IO.Boolean.Input(
+                    "reset_conversation",
+                    default=False,
+                    optional=True,
+                    tooltip="Start a new conversation, discarding history",
                 ),
-                "temperature": (
-                    "FLOAT",
-                    {
-                        "default": 0.7,
-                        "min": 0.0,
-                        "max": 2.0,
-                        "step": 0.05,
-                        "tooltip": "Creativity level"
-                    }
+                IO.Float.Input(
+                    "temperature",
+                    default=0.7,
+                    min=0.0,
+                    max=2.0,
+                    step=0.05,
+                    optional=True,
+                    tooltip="Creativity level",
                 ),
-                "max_tokens": (
-                    "INT",
-                    {
-                        "default": 4096,
-                        "min": 256,
-                        "max": 16384,
-                        "step": 128,
-                        "tooltip": "Maximum length of response"
-                    }
+                IO.Int.Input(
+                    "max_tokens",
+                    default=4096,
+                    min=256,
+                    max=16384,
+                    step=128,
+                    optional=True,
+                    tooltip="Maximum length of response",
                 ),
-                "top_p": (
-                    "FLOAT",
-                    {
-                        "default": 1.0,
-                        "min": 0.0,
-                        "max": 1.0,
-                        "step": 0.05,
-                        "tooltip": "Nucleus sampling - cumulative probability threshold (1.0=disabled)"
-                    }
+                IO.Float.Input(
+                    "top_p",
+                    default=1.0,
+                    min=0.0,
+                    max=1.0,
+                    step=0.05,
+                    optional=True,
+                    tooltip="Nucleus sampling - cumulative probability threshold (1.0=disabled)",
                 ),
-                "stop_sequences": (
-                    "STRING",
-                    {
-                        "default": "",
-                        "multiline": True,
-                        "tooltip": "Stop generation at these sequences (one per line, leave empty to disable)"
-                    }
+                IO.String.Input(
+                    "stop_sequences",
+                    default="",
+                    multiline=True,
+                    optional=True,
+                    tooltip="Stop generation at these sequences (one per line, leave empty to disable)",
                 ),
-                "response_format": (
-                    ["default", "json_object"],
-                    {
-                        "default": "default",
-                        "tooltip": "Output format (use json_object for JSON mode)"
-                    }
+                IO.Combo.Input(
+                    "response_format",
+                    options=["default", "json_object"],
+                    default="default",
+                    optional=True,
+                    tooltip="Output format (use json_object for JSON mode)",
                 ),
-            }
-        }
-
-    RETURN_TYPES = ("STRING", "OPENAI_CHAT_SESSION")
-    RETURN_NAMES = ("response", "chat_session")
-    FUNCTION = "chat"
-    CATEGORY = "ERPK/OpenAI"
+            ],
+            outputs=[
+                IO.String.Output("response"),
+                IO.Custom("OPENAI_CHAT_SESSION").Output("chat_session"),
+            ],
+        )
 
     @classmethod
-    def IS_CHANGED(cls, **kwargs):
-        # Always regenerate - disable caching for chat
-        return float("nan")
+    def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
+        client = kwargs.get("client")
+        model = kwargs.get("model")
+        chat_session = kwargs.get("chat_session")
+        reset_conversation = kwargs.get("reset_conversation", False)
+        temperature = kwargs.get("temperature", 0.7)
+        max_tokens = kwargs.get("max_tokens", 4096)
+        top_p = kwargs.get("top_p", 1.0)
+        stop_sequences = kwargs.get("stop_sequences", "")
+        response_format = kwargs.get("response_format", "default")
 
-    def chat(
-        self,
-        prompt: str,
-        client: OpenAIClient = None,
-        model: str = None,
-        chat_session=None,
-        reset_conversation: bool = False,
-        temperature: float = 0.7,
-        max_tokens: int = 4096,
-        top_p: float = 1.0,
-        stop_sequences: str = "",
-        response_format: str = "default"
-    ):
-        """
-        Continue or start a conversation with OpenAI.
-
-        Args:
-            client: OpenAI API client
-            prompt: User message
-            model: OpenAI model to use
-            chat_session: Previous chat session (list of messages)
-            reset_conversation: Start new conversation
-            temperature: Creativity level
-            max_tokens: Max output tokens
-            top_p: Nucleus sampling threshold (1.0 to disable)
-            stop_sequences: Newline-separated stop sequences
-            response_format: Output format (default/json_object)
-
-        Returns:
-            Tuple containing (response text, chat session)
-        """
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 
-        # Create default client if none provided
         if client is None:
             client = OpenAIClient(api_key=None)
 
-        # Use specified model or default
         if model is None:
             model = OpenAIClient.DEFAULT_MODEL
 
@@ -417,7 +331,7 @@ class OpenAIChat:
 
             print(f"[OpenAI] Chat response generated ({len(text)} characters)")
 
-            return (text, messages)
+            return IO.NodeOutput(text, messages)
 
         except Exception as e:
             error_msg = f"Failed to generate chat response: {str(e)}"
@@ -425,115 +339,83 @@ class OpenAIChat:
             raise ValueError(error_msg)
 
 
-class OpenAIVision:
-    """
-    OpenAI Vision Analysis Node
-
-    Uses OpenAI's vision capabilities to analyze images and answer questions about them.
-    Supports single or multiple images.
-    """
-
-    # Vision-capable models
-    VISION_MODELS = ["gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4o", "gpt-4o-mini"]
+class OpenAIVision(IO.ComfyNode):
+    """Uses OpenAI's vision capabilities to analyze images and answer questions about them."""
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": (
-                    "IMAGE",
-                    {"tooltip": "Image(s) to analyze (ComfyUI tensor)"}
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="OpenAIVision",
+            display_name="OpenAI Vision",
+            category="ERPK/OpenAI",
+            not_idempotent=True,
+            inputs=[
+                IO.Image.Input(
+                    "image",
+                    tooltip="Image(s) to analyze (ComfyUI tensor)",
                 ),
-                "prompt": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "Describe this image in detail.",
-                        "tooltip": "Question or instruction about the image(s)"
-                    }
+                IO.String.Input(
+                    "prompt",
+                    multiline=True,
+                    default="Describe this image in detail.",
+                    tooltip="Question or instruction about the image(s)",
                 ),
-            },
-            "optional": {
-                "client": (
-                    "OPENAI_API_CLIENT",
-                    {"tooltip": "OpenAI API client from OpenAI API Config node (optional if API key is configured in Settings)"}
+                IO.Custom("OPENAI_API_CLIENT").Input(
+                    "client",
+                    optional=True,
+                    tooltip="OpenAI API client from OpenAI API Config node (optional if API key is configured in Settings)",
                 ),
-                "model": (
-                    cls.VISION_MODELS,
-                    {
-                        "default": "gpt-4o",
-                        "tooltip": "OpenAI model to use for vision analysis"
-                    }
+                IO.Combo.Input(
+                    "model",
+                    options=VISION_MODELS,
+                    default="gpt-4o",
+                    optional=True,
+                    tooltip="OpenAI model to use for vision analysis",
                 ),
-                "detail": (
-                    ["auto", "low", "high"],
-                    {
-                        "default": "auto",
-                        "tooltip": "Image detail level (low=faster/cheaper, high=more detailed)"
-                    }
+                IO.Combo.Input(
+                    "detail",
+                    options=["auto", "low", "high"],
+                    default="auto",
+                    optional=True,
+                    tooltip="Image detail level (low=faster/cheaper, high=more detailed)",
                 ),
-                "max_tokens": (
-                    "INT",
-                    {
-                        "default": 4096,
-                        "min": 256,
-                        "max": 16384,
-                        "step": 128,
-                        "tooltip": "Maximum length of analysis"
-                    }
+                IO.Int.Input(
+                    "max_tokens",
+                    default=4096,
+                    min=256,
+                    max=16384,
+                    step=128,
+                    optional=True,
+                    tooltip="Maximum length of analysis",
                 ),
-                "temperature": (
-                    "FLOAT",
-                    {
-                        "default": 0.4,
-                        "min": 0.0,
-                        "max": 2.0,
-                        "step": 0.05,
-                        "tooltip": "Creativity level (lower=more factual)"
-                    }
+                IO.Float.Input(
+                    "temperature",
+                    default=0.4,
+                    min=0.0,
+                    max=2.0,
+                    step=0.05,
+                    optional=True,
+                    tooltip="Creativity level (lower=more factual)",
                 ),
-            }
-        }
-
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("analysis",)
-    FUNCTION = "analyze"
-    CATEGORY = "ERPK/OpenAI"
+            ],
+            outputs=[
+                IO.String.Output("analysis"),
+            ],
+        )
 
     @classmethod
-    def IS_CHANGED(cls, **kwargs):
-        # Always regenerate - disable caching for vision analysis
-        return float("nan")
+    def execute(cls, image, prompt, **kwargs) -> IO.NodeOutput:
+        from .openai_api.utils import ImageConverter
 
-    def analyze(
-        self,
-        image,
-        prompt: str,
-        client: OpenAIClient = None,
-        model: str = "gpt-4o",
-        detail: str = "auto",
-        max_tokens: int = 4096,
-        temperature: float = 0.4,
-    ):
-        """
-        Analyze image(s) using OpenAI's vision capabilities.
+        client = kwargs.get("client")
+        model = kwargs.get("model", "gpt-4o")
+        detail = kwargs.get("detail", "auto")
+        max_tokens = kwargs.get("max_tokens", 4096)
+        temperature = kwargs.get("temperature", 0.4)
 
-        Args:
-            client: OpenAI API client
-            image: Image tensor(s)
-            prompt: Question or instruction about images
-            model: OpenAI model to use
-            detail: Image detail level (auto/low/high)
-            max_tokens: Max output tokens
-            temperature: Creativity level
-
-        Returns:
-            Tuple containing analysis text
-        """
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 
-        # Create default client if none provided
         if client is None:
             client = OpenAIClient(api_key=None)
 
@@ -559,7 +441,7 @@ class OpenAIVision:
             text = response.get("text", "")
             print(f"[OpenAI] Vision analysis completed ({len(text)} characters)")
 
-            return (text,)
+            return IO.NodeOutput(text)
 
         except Exception as e:
             error_msg = f"Failed to analyze image: {str(e)}"
@@ -567,49 +449,34 @@ class OpenAIVision:
             raise ValueError(error_msg)
 
 
-class OpenAISystemInstruction:
-    """
-    OpenAI System Instruction Node
-
-    Sets a system-level instruction that persists across all requests
-    for an OpenAI client. System instructions guide the model's behavior.
-    """
+class OpenAISystemInstruction(IO.ComfyNode):
+    """Sets a system-level instruction that persists across all requests for an OpenAI client."""
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "client": (
-                    "OPENAI_API_CLIENT",
-                    {"tooltip": "OpenAI API client to configure"}
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="OpenAISystemInstruction",
+            display_name="OpenAI System Instruction",
+            category="ERPK/OpenAI",
+            inputs=[
+                IO.Custom("OPENAI_API_CLIENT").Input(
+                    "client",
+                    tooltip="OpenAI API client to configure",
                 ),
-                "system_instruction": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "System-level instruction to guide model behavior"
-                    }
+                IO.String.Input(
+                    "system_instruction",
+                    multiline=True,
+                    default="",
+                    tooltip="System-level instruction to guide model behavior",
                 ),
-            }
-        }
+            ],
+            outputs=[
+                IO.Custom("OPENAI_API_CLIENT").Output("client"),
+            ],
+        )
 
-    RETURN_TYPES = ("OPENAI_API_CLIENT",)
-    RETURN_NAMES = ("client",)
-    FUNCTION = "set_instruction"
-    CATEGORY = "ERPK/OpenAI"
-
-    def set_instruction(self, client: OpenAIClient, system_instruction: str):
-        """
-        Set system instruction for the client.
-
-        Args:
-            client: OpenAI API client
-            system_instruction: System instruction text
-
-        Returns:
-            Tuple containing the updated client
-        """
+    @classmethod
+    def execute(cls, client, system_instruction, **kwargs) -> IO.NodeOutput:
         try:
             instruction = system_instruction.strip() if system_instruction else None
 
@@ -619,27 +486,9 @@ class OpenAISystemInstruction:
             else:
                 print("[OpenAI] Warning: Empty system instruction, skipping")
 
-            return (client,)
+            return IO.NodeOutput(client)
 
         except Exception as e:
             error_msg = f"Failed to set system instruction: {str(e)}"
             print(f"[OpenAI] Error: {error_msg}")
             raise ValueError(error_msg)
-
-
-# Node registration
-NODE_CLASS_MAPPINGS = {
-    "OpenAIAPIConfig": OpenAIAPIConfig,
-    "OpenAITextGeneration": OpenAITextGeneration,
-    "OpenAIChat": OpenAIChat,
-    "OpenAIVision": OpenAIVision,
-    "OpenAISystemInstruction": OpenAISystemInstruction,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "OpenAIAPIConfig": "OpenAI API Config",
-    "OpenAITextGeneration": "OpenAI Text Generation",
-    "OpenAIChat": "OpenAI Chat",
-    "OpenAIVision": "OpenAI Vision",
-    "OpenAISystemInstruction": "OpenAI System Instruction",
-}

@@ -1,35 +1,11 @@
-"""
-Core WaveSpeed AI nodes for ComfyUI
-
-This module provides the essential nodes for WaveSpeed AI integration:
-- API Client node for authentication
-- Preview nodes for videos and audio
-- Upload nodes for images, videos, and audio
-"""
+# ABOUTME: Core WaveSpeed AI nodes for ComfyUI (API client, video preview, audio save, image upload).
+# ABOUTME: Provides authentication, media download/preview, and image upload to WaveSpeed AI API.
 
 import os
 import time
-import requests
 import configparser
-from typing import Tuple, Dict, Any, List
 
-# ComfyUI imports
-try:
-    import folder_paths
-except ImportError:
-    # Fallback for testing outside ComfyUI
-    class folder_paths:
-        @staticmethod
-        def get_output_directory():
-            return os.path.join(os.path.dirname(__file__), "output")
-
-        @staticmethod
-        def get_save_image_path(prefix, directory):
-            filename = f"{prefix}_{int(time.time())}"
-            return directory, filename, 0, None, None
-
-from .wavespeed_api.client import WaveSpeedClient
-from .wavespeed_api.utils import tensor2images
+from comfy_api.latest import IO
 
 # Configuration handling
 try:
@@ -52,7 +28,7 @@ except Exception as e:
     config = None
 
 
-class WaveSpeedAIAPIClient:
+class WaveSpeedAIAPIClient(IO.ComfyNode):
     """
     WaveSpeed AI API Client Node
 
@@ -60,49 +36,23 @@ class WaveSpeedAIAPIClient:
     It can use an API key from the input or from the config.ini file.
     """
 
-    def __init__(self):
-        pass
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="WaveSpeedAIAPIClient",
+            display_name="WaveSpeed Client",
+            category="ERPK/WaveSpeedAI",
+            inputs=[
+                IO.String.Input("api_key", optional=True, default="",
+                                tooltip="WaveSpeed AI API key. If empty, checks ComfyUI Settings, then WAVESPEED_API_KEY environment variable, then config.ini"),
+            ],
+            outputs=[
+                IO.Custom("WAVESPEED_AI_API_CLIENT").Output("client"),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(cls) -> Dict[str, Any]:
-        return {
-            "required": {},
-            "optional": {
-                "api_key": (
-                    "STRING",
-                    {
-                        "multiline": False,
-                        "default": "",
-                        "tooltip": "WaveSpeed AI API key. If empty, checks ComfyUI Settings, then WAVESPEED_API_KEY environment variable, then config.ini"
-                    }
-                ),
-            },
-        }
-
-    RETURN_TYPES = ("WAVESPEED_AI_API_CLIENT",)
-    RETURN_NAMES = ("client",)
-    FUNCTION = "create_client"
-    CATEGORY = "ERPK/WaveSpeedAI"
-
-    def create_client(self, api_key: str = "") -> Tuple[Dict[str, str]]:
-        """
-        Create a WaveSpeed AI API client.
-
-        API key priority (highest to lowest):
-        1. ComfyUI Settings (comfy.settings.json)
-        2. Direct input parameter
-        3. WAVESPEED_API_KEY environment variable
-        4. config.ini file
-
-        Args:
-            api_key: WaveSpeed AI API key (leave empty to use settings, env var, or config)
-
-        Returns:
-            Tuple containing client configuration dict
-
-        Raises:
-            ValueError: If no API key is found in any source
-        """
+    def execute(cls, api_key="", **kwargs):
         wavespeed_api_key = ""
 
         # Priority 1: ComfyUI Settings
@@ -122,13 +72,10 @@ class WaveSpeedAIAPIClient:
 
         # Priority 3 & 4: Environment variable, then config file
         if not wavespeed_api_key:
-            # Try environment variable
             env_key = os.getenv("WAVESPEED_API_KEY", "").strip()
             if env_key:
                 wavespeed_api_key = env_key
                 print("[WaveSpeed] Using API key from environment variable WAVESPEED_API_KEY")
-
-            # Fall back to config file
             elif config:
                 try:
                     config_key = config['API']['WAVESPEED_API_KEY'].strip()
@@ -151,8 +98,6 @@ class WaveSpeedAIAPIClient:
                         "  3. WAVESPEED_API_KEY environment variable\n"
                         "  4. config.ini file"
                     )
-
-            # No source available
             else:
                 raise ValueError(
                     "No API key found. Please provide via:\n"
@@ -171,11 +116,10 @@ class WaveSpeedAIAPIClient:
                 "  4. config.ini file"
             )
 
-        # Return client configuration
-        return ({"api_key": wavespeed_api_key},)
+        return IO.NodeOutput({"api_key": wavespeed_api_key})
 
 
-class PreviewVideo:
+class PreviewVideo(IO.ComfyNode):
     """
     Preview Video Node for ComfyUI
 
@@ -183,51 +127,37 @@ class PreviewVideo:
     """
 
     @classmethod
-    def INPUT_TYPES(cls) -> Dict[str, Any]:
-        return {
-            "required": {
-                "video_url": (
-                    "STRING",
-                    {
-                        "forceInput": False,
-                        "tooltip": "URL of the video to preview and save"
-                    }
-                ),
-                "save_file_prefix": (
-                    "STRING",
-                    {
-                        "default": "wavespeed_video",
-                        "tooltip": "Prefix for the saved video file"
-                    }
-                ),
-            }
-        }
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="PreviewVideo",
+            display_name="WaveSpeed Preview Video",
+            category="ERPK/WaveSpeedAI",
+            inputs=[
+                IO.String.Input("video_url",
+                                tooltip="URL of the video to preview and save"),
+                IO.String.Input("save_file_prefix", default="wavespeed_video",
+                                tooltip="Prefix for the saved video file"),
+            ],
+            outputs=[
+                IO.String.Output("file_path"),
+            ],
+            is_output_node=True,
+        )
 
-    OUTPUT_NODE = True
-    FUNCTION = "run"
-    CATEGORY = "ERPK/WaveSpeedAI"
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("file_path",)
+    @classmethod
+    def execute(cls, video_url, save_file_prefix, **kwargs):
+        import requests
+        try:
+            import folder_paths
+        except ImportError:
+            class folder_paths:
+                @staticmethod
+                def get_output_directory():
+                    return os.path.join(os.path.dirname(__file__), "output")
 
-    def run(self, video_url: str, save_file_prefix: str) -> Dict[str, Any]:
-        """
-        Preview and save a video.
-
-        Args:
-            video_url: URL of the video
-            save_file_prefix: Prefix for the saved file
-
-        Returns:
-            Dict with UI data and result containing file path
-
-        Raises:
-            ValueError: If no video URL provided
-            RuntimeError: If download fails
-        """
         if not video_url:
             raise ValueError("No video URL provided")
 
-        # Download video
         try:
             response = requests.get(video_url, timeout=60)
             response.raise_for_status()
@@ -235,12 +165,10 @@ class PreviewVideo:
         except requests.RequestException as e:
             raise RuntimeError(f"Error downloading video: {e}")
 
-        # Determine file extension
         file_extension = os.path.splitext(video_url)[-1].lower()
         if not file_extension or file_extension == '.' or len(file_extension) > 5:
             file_extension = '.mp4'
 
-        # Save video to output directory
         output_dir = folder_paths.get_output_directory()
         filename = f"{save_file_prefix}_{int(time.time())}{file_extension}"
         file_path = os.path.join(output_dir, filename)
@@ -250,14 +178,10 @@ class PreviewVideo:
 
         print(f"[WaveSpeed] Video saved to: {file_path}")
 
-        # Return UI data for ComfyUI preview
-        return {
-            "ui": {"video_url": [video_url]},
-            "result": (file_path,)
-        }
+        return IO.NodeOutput(file_path, ui={"video_url": [video_url]})
 
 
-class SaveAudio:
+class SaveAudio(IO.ComfyNode):
     """
     Save Audio Node for ComfyUI
 
@@ -265,51 +189,42 @@ class SaveAudio:
     """
 
     @classmethod
-    def INPUT_TYPES(cls) -> Dict[str, Any]:
-        return {
-            "required": {
-                "audio_url": (
-                    "STRING",
-                    {
-                        "forceInput": False,
-                        "tooltip": "URL of the audio to download and save"
-                    }
-                ),
-                "save_file_prefix": (
-                    "STRING",
-                    {
-                        "default": "wavespeed_audio",
-                        "tooltip": "Prefix for the saved audio file"
-                    }
-                ),
-            }
-        }
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="SaveAudio",
+            display_name="WaveSpeed Save Audio",
+            category="ERPK/WaveSpeedAI",
+            inputs=[
+                IO.String.Input("audio_url",
+                                tooltip="URL of the audio to download and save"),
+                IO.String.Input("save_file_prefix", default="wavespeed_audio",
+                                tooltip="Prefix for the saved audio file"),
+            ],
+            outputs=[
+                IO.String.Output("file_path"),
+            ],
+            is_output_node=True,
+        )
 
-    OUTPUT_NODE = True
-    FUNCTION = "run"
-    CATEGORY = "ERPK/WaveSpeedAI"
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("file_path",)
+    @classmethod
+    def execute(cls, audio_url, save_file_prefix, **kwargs):
+        import requests
+        try:
+            import folder_paths
+        except ImportError:
+            class folder_paths:
+                @staticmethod
+                def get_output_directory():
+                    return os.path.join(os.path.dirname(__file__), "output")
 
-    def run(self, audio_url: str, save_file_prefix: str) -> Tuple[str]:
-        """
-        Download and save an audio file.
+                @staticmethod
+                def get_save_image_path(prefix, directory):
+                    filename = f"{prefix}_{int(time.time())}"
+                    return directory, filename, 0, None, None
 
-        Args:
-            audio_url: URL of the audio
-            save_file_prefix: Prefix for the saved file
-
-        Returns:
-            Tuple containing the file path
-
-        Raises:
-            ValueError: If no audio URL provided
-            RuntimeError: If download fails
-        """
         if not audio_url:
             raise ValueError("No audio URL provided")
 
-        # Download audio
         try:
             response = requests.get(audio_url, timeout=60)
             response.raise_for_status()
@@ -317,12 +232,10 @@ class SaveAudio:
         except requests.RequestException as e:
             raise RuntimeError(f"Error downloading audio: {e}")
 
-        # Determine file extension
         file_extension = os.path.splitext(audio_url)[-1].lower()
         if not file_extension or file_extension == '.' or len(file_extension) > 5:
             file_extension = '.mp3'
 
-        # Save audio to output directory
         full_output_folder, filename, counter, _, _ = folder_paths.get_save_image_path(
             save_file_prefix,
             folder_paths.get_output_directory()
@@ -336,10 +249,10 @@ class SaveAudio:
 
         print(f"[WaveSpeed] Audio saved to: {file_path}")
 
-        return (file_path,)
+        return IO.NodeOutput(file_path)
 
 
-class UploadImage:
+class UploadImage(IO.ComfyNode):
     """
     Upload Image Node for WaveSpeed AI
 
@@ -347,68 +260,44 @@ class UploadImage:
     Note: Uploaded URLs expire after a short time.
     """
 
-    @classmethod
-    def INPUT_TYPES(cls) -> Dict[str, Any]:
-        return {
-            "required": {
-                "image": ("IMAGE",)
-            },
-            "optional": {
-                "client": ("WAVESPEED_AI_API_CLIENT", {"tooltip": "WaveSpeed API client (optional if API key is configured in Settings)"}),
-            }
-        }
-
     DESCRIPTION = "Upload image(s) to WaveSpeed AI API. The URL expires after a short time. Use 'single_image_url' for nodes expecting one image, 'all_image_urls' for batch processing."
-    RETURN_TYPES = ("STRING", "STRING",)
-    RETURN_NAMES = ("single_image_url (string)", "all_image_urls (array)",)
-    CATEGORY = "ERPK/WaveSpeedAI"
-    FUNCTION = "upload_file"
 
-    def upload_file(self, image, client: Dict[str, str] = None) -> Tuple[str, List[str]]:
-        """
-        Upload image(s) to WaveSpeed AI.
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="UploadImage",
+            display_name="WaveSpeed Upload Image",
+            category="ERPK/WaveSpeedAI",
+            description=cls.DESCRIPTION,
+            inputs=[
+                IO.Image.Input("image", tooltip="Image(s) to upload to WaveSpeed AI"),
+                IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
+                    tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
+            ],
+            outputs=[
+                IO.String.Output("single_image_url"),
+                IO.String.Output("all_image_urls"),
+            ],
+        )
 
-        Args:
-            image: ComfyUI image tensor (can be single or batch)
-            client: API client configuration (optional if API key is configured in Settings)
+    @classmethod
+    def execute(cls, image, client=None, **kwargs):
+        from .wavespeed_api.client import WaveSpeedClient
+        from .wavespeed_api.utils import tensor2images
 
-        Returns:
-            Tuple of (single_image_url, all_image_urls):
-            - single_image_url: First image URL, for nodes expecting a single image
-            - all_image_urls: List of all uploaded image URLs, for batch processing
-        """
         if client is None:
-            client = WaveSpeedAIAPIClient().create_client()[0]
+            client = WaveSpeedAIAPIClient.execute()[0]
 
-        # Convert tensor to PIL images
         images = tensor2images(image)
         image_urls = []
 
-        # Create client and upload each image
         real_client = WaveSpeedClient(api_key=client["api_key"])
         for img in images:
             image_url = real_client.upload_file(img)
             image_urls.append(image_url)
             print(f"[WaveSpeed] Image uploaded: {image_url}")
 
-        # Return single URL (first) and list of all URLs
-        return (
+        return IO.NodeOutput(
             image_urls[0] if image_urls else "",
-            image_urls
+            image_urls,
         )
-
-
-# Node registration mappings
-NODE_CLASS_MAPPINGS = {
-    'WaveSpeed Custom Client': WaveSpeedAIAPIClient,
-    'WaveSpeed Custom Preview Video': PreviewVideo,
-    'WaveSpeed Custom Save Audio': SaveAudio,
-    'WaveSpeed Custom Upload Image': UploadImage,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    'WaveSpeed Custom Client': 'WaveSpeed Client (Custom)',
-    'WaveSpeed Custom Preview Video': 'WaveSpeed Preview Video (Custom)',
-    'WaveSpeed Custom Save Audio': 'WaveSpeed Save Audio (Custom)',
-    'WaveSpeed Custom Upload Image': 'WaveSpeed Upload Image (Custom)',
-}

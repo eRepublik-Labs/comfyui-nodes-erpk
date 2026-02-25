@@ -1,16 +1,7 @@
-# ABOUTME: ComfyUI node for background removal using rembg library.
+# ABOUTME: ComfyUI V3 node for background removal using rembg library.
 # ABOUTME: Supports 14+ models including u2net, isnet, birefnet variants via ONNX.
 
-"""
-rembg Backend Node for ComfyUI
-
-Uses the rembg library (ONNX Runtime) for background removal with 14+ model options.
-"""
-
-from typing import Dict, Any, Tuple, List
-from tqdm import tqdm
-
-from .utils import tensor_to_pil, pil_rgba_to_tensor, extract_mask_from_rgba
+from comfy_api.latest import IO
 
 # Available rembg models with descriptions
 REMBG_MODELS = [
@@ -35,7 +26,7 @@ REMBG_MODELS = [
 MODEL_NAMES = [name for name, _ in REMBG_MODELS]
 
 
-class RembgRemoveBackground:
+class RembgRemoveBackground(IO.ComfyNode):
     """
     Remove background using rembg library.
 
@@ -47,50 +38,30 @@ class RembgRemoveBackground:
     _session = None
     _current_model = None
 
-    def __init__(self):
-        pass
-
     @classmethod
-    def INPUT_TYPES(cls) -> Dict[str, Any]:
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "model": (MODEL_NAMES, {"default": "u2net"}),
-            },
-            "optional": {
-                "alpha_matting": (
-                    "BOOLEAN",
-                    {
-                        "default": False,
-                        "tooltip": "Enable alpha matting for cleaner edges",
-                    },
-                ),
-                "alpha_matting_foreground_threshold": (
-                    "INT",
-                    {
-                        "default": 240,
-                        "min": 0,
-                        "max": 255,
-                        "tooltip": "Foreground threshold for alpha matting",
-                    },
-                ),
-                "alpha_matting_background_threshold": (
-                    "INT",
-                    {
-                        "default": 10,
-                        "min": 0,
-                        "max": 255,
-                        "tooltip": "Background threshold for alpha matting",
-                    },
-                ),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE", "MASK")
-    RETURN_NAMES = ("image", "mask")
-    FUNCTION = "remove_background"
-    CATEGORY = "ERPK/Background Removal"
-    DESCRIPTION = "Remove background using rembg (ONNX). Supports 14+ models."
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="RembgRemoveBackground",
+            display_name="Remove Background (rembg)",
+            category="ERPK/Background Removal",
+            description="Remove background using rembg (ONNX). Supports 14+ models.",
+            inputs=[
+                IO.Image.Input("image"),
+                IO.Combo.Input("model", options=MODEL_NAMES, default="u2net"),
+                IO.Boolean.Input("alpha_matting", default=False, optional=True,
+                                 tooltip="Enable alpha matting for cleaner edges"),
+                IO.Int.Input("alpha_matting_foreground_threshold", default=240,
+                             min=0, max=255, optional=True,
+                             tooltip="Foreground threshold for alpha matting"),
+                IO.Int.Input("alpha_matting_background_threshold", default=10,
+                             min=0, max=255, optional=True,
+                             tooltip="Background threshold for alpha matting"),
+            ],
+            outputs=[
+                IO.Image.Output("image"),
+                IO.Mask.Output("mask"),
+            ],
+        )
 
     @classmethod
     def _get_session(cls, model_name: str):
@@ -109,27 +80,19 @@ class RembgRemoveBackground:
 
         return cls._session
 
-    def remove_background(
-        self,
+    @classmethod
+    def execute(
+        cls,
         image,
-        model: str,
-        alpha_matting: bool = False,
-        alpha_matting_foreground_threshold: int = 240,
-        alpha_matting_background_threshold: int = 10,
-    ) -> Tuple:
-        """
-        Remove background from images.
+        model="u2net",
+        alpha_matting=False,
+        alpha_matting_foreground_threshold=240,
+        alpha_matting_background_threshold=10,
+        **kwargs,
+    ):
+        from tqdm import tqdm
+        from .utils import tensor_to_pil, pil_rgba_to_tensor, extract_mask_from_rgba
 
-        Args:
-            image: ComfyUI IMAGE tensor (B, H, W, C)
-            model: rembg model name
-            alpha_matting: Enable alpha matting refinement
-            alpha_matting_foreground_threshold: Foreground threshold (0-255)
-            alpha_matting_background_threshold: Background threshold (0-255)
-
-        Returns:
-            Tuple of (image_tensor, mask_tensor)
-        """
         try:
             from rembg import remove
         except ImportError:
@@ -138,11 +101,11 @@ class RembgRemoveBackground:
             )
 
         # Get cached session
-        session = self._get_session(model)
+        session = cls._get_session(model)
 
         # Convert tensor to PIL images
         pil_images = tensor_to_pil(image)
-        result_images: List = []
+        result_images = []
 
         # Process each image
         for pil_img in tqdm(pil_images, desc=f"[BGRemoval] rembg ({model})"):
@@ -159,14 +122,4 @@ class RembgRemoveBackground:
         image_tensor = pil_rgba_to_tensor(result_images)
         mask_tensor = extract_mask_from_rgba(result_images)
 
-        return (image_tensor, mask_tensor)
-
-
-# Node registration
-NODE_CLASS_MAPPINGS = {
-    "ERPK Remove Background (rembg)": RembgRemoveBackground,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "ERPK Remove Background (rembg)": "Remove Background (rembg)",
-}
+        return IO.NodeOutput(image_tensor, mask_tensor)

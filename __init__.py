@@ -25,11 +25,10 @@ class ERPKExtension(ComfyExtension):
             (".utils", "utility"),
             (".claude", "Claude"),
             (".gemini", "Gemini"),
-            # Providers below will be added as they're converted to V3:
-            # (".openai", "OpenAI"),
-            # (".wavespeed", "WaveSpeed"),
-            # (".bgremoval", "Background Removal"),
-            # (".apple", "Apple ML"),
+            (".openai", "OpenAI"),
+            (".wavespeed", "WaveSpeed"),
+            (".bgremoval", "Background Removal"),
+            (".apple", "Apple ML"),
         ]
 
         for module_path, label in _providers:

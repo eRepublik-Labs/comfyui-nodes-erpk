@@ -1,129 +1,35 @@
-"""
-WaveSpeed AI ComfyUI Custom Nodes
+# ABOUTME: WaveSpeed AI provider package for ComfyUI V3.
+# ABOUTME: Exports flat NODES list of all 15 WaveSpeed node classes for ERPKExtension.
 
-This package provides ComfyUI nodes for integrating WaveSpeed AI's API,
-including ByteDance's Seedream V4 and Qwen Image models for text-to-image
-and image editing capabilities.
-"""
+from .nodes import WaveSpeedAIAPIClient, PreviewVideo, SaveAudio, UploadImage
+from .seedream_v4 import SeedreamV4Node
+from .seedream_v4_edit import SeedreamV4EditNode
+from .seedream_v4_sequential import SeedreamV4SequentialNode
+from .seedream_v4_edit_sequential import SeedreamV4EditSequentialNode
+from .seedream_v4_5 import SeedreamV4_5Node
+from .seedream_v4_5_edit import SeedreamV4_5EditNode
+from .seedream_v4_5_sequential import SeedreamV4_5SequentialNode
+from .seedream_v4_5_edit_sequential import SeedreamV4_5EditSequentialNode
+from .qwen_image_text_to_image import QwenImageTextToImageNode
+from .qwen_image_edit import QwenImageEditNode
+from .qwen_image_edit_plus import QwenImageEditPlusNode
 
-import os
-import sys
+NODES = [
+    WaveSpeedAIAPIClient,
+    PreviewVideo,
+    SaveAudio,
+    UploadImage,
+    SeedreamV4Node,
+    SeedreamV4EditNode,
+    SeedreamV4SequentialNode,
+    SeedreamV4EditSequentialNode,
+    SeedreamV4_5Node,
+    SeedreamV4_5EditNode,
+    SeedreamV4_5SequentialNode,
+    SeedreamV4_5EditSequentialNode,
+    QwenImageTextToImageNode,
+    QwenImageEditNode,
+    QwenImageEditPlusNode,
+]
 
-# Add current directory to path for imports
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
-
-# Import node mappings from core nodes module
-from .nodes import (
-    NODE_CLASS_MAPPINGS as CORE_NODE_CLASS_MAPPINGS,
-    NODE_DISPLAY_NAME_MAPPINGS as CORE_NODE_DISPLAY_NAME_MAPPINGS
-)
-
-# Initialize combined mappings
-NODE_CLASS_MAPPINGS = {}
-NODE_DISPLAY_NAME_MAPPINGS = {}
-
-# Add core nodes
-NODE_CLASS_MAPPINGS.update(CORE_NODE_CLASS_MAPPINGS)
-NODE_DISPLAY_NAME_MAPPINGS.update(CORE_NODE_DISPLAY_NAME_MAPPINGS)
-
-# Import and register individual model nodes
-try:
-    # Seedream V4 nodes
-    from .seedream_v4 import NODE_CLASS_MAPPINGS as SEEDREAM_V4_MAPPINGS
-    from .seedream_v4 import NODE_DISPLAY_NAME_MAPPINGS as SEEDREAM_V4_DISPLAY_MAPPINGS
-    NODE_CLASS_MAPPINGS.update(SEEDREAM_V4_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(SEEDREAM_V4_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[WaveSpeed] Warning: Could not load Seedream V4 node: {e}")
-
-try:
-    from .seedream_v4_edit import NODE_CLASS_MAPPINGS as SEEDREAM_V4_EDIT_MAPPINGS
-    from .seedream_v4_edit import NODE_DISPLAY_NAME_MAPPINGS as SEEDREAM_V4_EDIT_DISPLAY_MAPPINGS
-    NODE_CLASS_MAPPINGS.update(SEEDREAM_V4_EDIT_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(SEEDREAM_V4_EDIT_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[WaveSpeed] Warning: Could not load Seedream V4 Edit node: {e}")
-
-try:
-    from .seedream_v4_sequential import NODE_CLASS_MAPPINGS as SEEDREAM_V4_SEQ_MAPPINGS
-    from .seedream_v4_sequential import NODE_DISPLAY_NAME_MAPPINGS as SEEDREAM_V4_SEQ_DISPLAY_MAPPINGS
-    NODE_CLASS_MAPPINGS.update(SEEDREAM_V4_SEQ_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(SEEDREAM_V4_SEQ_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[WaveSpeed] Warning: Could not load Seedream V4 Sequential node: {e}")
-
-try:
-    from .seedream_v4_edit_sequential import NODE_CLASS_MAPPINGS as SEEDREAM_V4_EDIT_SEQ_MAPPINGS
-    from .seedream_v4_edit_sequential import NODE_DISPLAY_NAME_MAPPINGS as SEEDREAM_V4_EDIT_SEQ_DISPLAY_MAPPINGS
-    NODE_CLASS_MAPPINGS.update(SEEDREAM_V4_EDIT_SEQ_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(SEEDREAM_V4_EDIT_SEQ_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[WaveSpeed] Warning: Could not load Seedream V4 Edit Sequential node: {e}")
-
-# Seedream V4.5 nodes
-try:
-    from .seedream_v4_5 import NODE_CLASS_MAPPINGS as SEEDREAM_V4_5_MAPPINGS
-    from .seedream_v4_5 import NODE_DISPLAY_NAME_MAPPINGS as SEEDREAM_V4_5_DISPLAY_MAPPINGS
-    NODE_CLASS_MAPPINGS.update(SEEDREAM_V4_5_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(SEEDREAM_V4_5_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[WaveSpeed] Warning: Could not load Seedream V4.5 node: {e}")
-
-try:
-    from .seedream_v4_5_edit import NODE_CLASS_MAPPINGS as SEEDREAM_V4_5_EDIT_MAPPINGS
-    from .seedream_v4_5_edit import NODE_DISPLAY_NAME_MAPPINGS as SEEDREAM_V4_5_EDIT_DISPLAY_MAPPINGS
-    NODE_CLASS_MAPPINGS.update(SEEDREAM_V4_5_EDIT_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(SEEDREAM_V4_5_EDIT_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[WaveSpeed] Warning: Could not load Seedream V4.5 Edit node: {e}")
-
-try:
-    from .seedream_v4_5_sequential import NODE_CLASS_MAPPINGS as SEEDREAM_V4_5_SEQ_MAPPINGS
-    from .seedream_v4_5_sequential import NODE_DISPLAY_NAME_MAPPINGS as SEEDREAM_V4_5_SEQ_DISPLAY_MAPPINGS
-    NODE_CLASS_MAPPINGS.update(SEEDREAM_V4_5_SEQ_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(SEEDREAM_V4_5_SEQ_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[WaveSpeed] Warning: Could not load Seedream V4.5 Sequential node: {e}")
-
-try:
-    from .seedream_v4_5_edit_sequential import NODE_CLASS_MAPPINGS as SEEDREAM_V4_5_EDIT_SEQ_MAPPINGS
-    from .seedream_v4_5_edit_sequential import NODE_DISPLAY_NAME_MAPPINGS as SEEDREAM_V4_5_EDIT_SEQ_DISPLAY_MAPPINGS
-    NODE_CLASS_MAPPINGS.update(SEEDREAM_V4_5_EDIT_SEQ_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(SEEDREAM_V4_5_EDIT_SEQ_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[WaveSpeed] Warning: Could not load Seedream V4.5 Edit Sequential node: {e}")
-
-# Qwen Image nodes
-try:
-    from .qwen_image_text_to_image import NODE_CLASS_MAPPINGS as QWEN_T2I_MAPPINGS
-    from .qwen_image_text_to_image import NODE_DISPLAY_NAME_MAPPINGS as QWEN_T2I_DISPLAY_MAPPINGS
-    NODE_CLASS_MAPPINGS.update(QWEN_T2I_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(QWEN_T2I_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[WaveSpeed] Warning: Could not load Qwen Image Text-to-Image node: {e}")
-
-try:
-    from .qwen_image_edit import NODE_CLASS_MAPPINGS as QWEN_EDIT_MAPPINGS
-    from .qwen_image_edit import NODE_DISPLAY_NAME_MAPPINGS as QWEN_EDIT_DISPLAY_MAPPINGS
-    NODE_CLASS_MAPPINGS.update(QWEN_EDIT_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(QWEN_EDIT_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[WaveSpeed] Warning: Could not load Qwen Image Edit node: {e}")
-
-try:
-    from .qwen_image_edit_plus import NODE_CLASS_MAPPINGS as QWEN_EDIT_PLUS_MAPPINGS
-    from .qwen_image_edit_plus import NODE_DISPLAY_NAME_MAPPINGS as QWEN_EDIT_PLUS_DISPLAY_MAPPINGS
-    NODE_CLASS_MAPPINGS.update(QWEN_EDIT_PLUS_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(QWEN_EDIT_PLUS_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[WaveSpeed] Warning: Could not load Qwen Image Edit Plus node: {e}")
-
-# Print loaded nodes for debugging
-print(f"[WaveSpeed] Loaded {len(NODE_CLASS_MAPPINGS)} nodes:")
-for node_name in NODE_CLASS_MAPPINGS.keys():
-    print(f"  - {node_name}")
-
-# Export for ComfyUI
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+__all__ = ["NODES"]

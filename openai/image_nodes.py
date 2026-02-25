@@ -1,134 +1,106 @@
-# ABOUTME: ComfyUI nodes for OpenAI image generation and editing
+# ABOUTME: ComfyUI V3 nodes for OpenAI image generation and editing
 # ABOUTME: Provides image generation with DALL-E and GPT-Image models
 
+from comfy_api.latest import IO
 from .openai_api.client import OpenAIClient
-from .openai_api.utils import ImageConverter
+
+IMAGE_MODELS = list(OpenAIClient.IMAGE_MODELS.keys())
+EDIT_MODELS = ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
+
+GEN_SIZES = [
+    "1024x1024", "1024x1536", "1536x1024",
+    "512x512", "256x256", "1792x1024", "1024x1792",
+]
+
+EDIT_SIZES = [
+    "1024x1024", "1024x1536", "1536x1024",
+    "512x512", "256x256",
+]
 
 
-class OpenAIImageGeneration:
-    """
-    OpenAI Image Generation Node
-
-    Generates images using OpenAI's image generation models.
-    Can use a client from OpenAIAPIConfig or work standalone with an API key.
-    """
-
-    # Image generation models
-    IMAGE_MODELS = ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini", "dall-e-3"]
-
-    # Size options per model
-    SIZES = [
-        "1024x1024",
-        "1024x1536",
-        "1536x1024",
-        "512x512",
-        "256x256",
-        "1792x1024",
-        "1024x1792",
-    ]
+class OpenAIImageGeneration(IO.ComfyNode):
+    """Generates images using OpenAI's image generation models."""
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "prompt": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "Description of the image to generate"
-                    }
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="OpenAIImageGeneration",
+            display_name="OpenAI Image Generation",
+            category="ERPK/OpenAI",
+            not_idempotent=True,
+            inputs=[
+                IO.String.Input(
+                    "prompt",
+                    multiline=True,
+                    default="",
+                    tooltip="Description of the image to generate",
                 ),
-            },
-            "optional": {
-                "client": (
-                    "OPENAI_API_CLIENT",
-                    {"tooltip": "OpenAI API client from OpenAI API Config node (uses API key from config)"}
+                IO.Custom("OPENAI_API_CLIENT").Input(
+                    "client",
+                    optional=True,
+                    tooltip="OpenAI API client from OpenAI API Config node (uses API key from config)",
                 ),
-                "model": (
-                    cls.IMAGE_MODELS,
-                    {
-                        "default": "gpt-image-1.5",
-                        "tooltip": "Image generation model"
-                    }
+                IO.Combo.Input(
+                    "model",
+                    options=IMAGE_MODELS,
+                    default="gpt-image-1.5",
+                    optional=True,
+                    tooltip="Image generation model",
                 ),
-                "size": (
-                    cls.SIZES,
-                    {
-                        "default": "1024x1024",
-                        "tooltip": "Image size (available sizes depend on model)"
-                    }
+                IO.Combo.Input(
+                    "size",
+                    options=GEN_SIZES,
+                    default="1024x1024",
+                    optional=True,
+                    tooltip="Image size (available sizes depend on model)",
                 ),
-                "quality": (
-                    ["auto", "low", "medium", "high", "hd", "standard"],
-                    {
-                        "default": "auto",
-                        "tooltip": "Image quality (gpt-image-1: low/medium/high/auto, dall-e-3: hd/standard)"
-                    }
+                IO.Combo.Input(
+                    "quality",
+                    options=["auto", "low", "medium", "high", "hd", "standard"],
+                    default="auto",
+                    optional=True,
+                    tooltip="Image quality (gpt-image-1: low/medium/high/auto, dall-e-3: hd/standard)",
                 ),
-                "background": (
-                    ["auto", "transparent", "opaque"],
-                    {
-                        "default": "auto",
-                        "tooltip": "Background type (gpt-image-1 only)"
-                    }
+                IO.Combo.Input(
+                    "background",
+                    options=["auto", "transparent", "opaque"],
+                    default="auto",
+                    optional=True,
+                    tooltip="Background type (gpt-image-1 only)",
                 ),
-                "n": (
-                    "INT",
-                    {
-                        "default": 1,
-                        "min": 1,
-                        "max": 4,
-                        "tooltip": "Number of images to generate (dall-e-3 only supports 1)"
-                    }
+                IO.Int.Input(
+                    "n",
+                    default=1,
+                    min=1,
+                    max=4,
+                    optional=True,
+                    tooltip="Number of images to generate (dall-e-3 only supports 1)",
                 ),
-                "api_key": (
-                    "STRING",
-                    {
-                        "default": "",
-                        "tooltip": "OpenAI API key (only needed if not using client input)"
-                    }
+                IO.String.Input(
+                    "api_key",
+                    default="",
+                    optional=True,
+                    tooltip="OpenAI API key (only needed if not using client input)",
                 ),
-            }
-        }
-
-    RETURN_TYPES = ("IMAGE", "STRING")
-    RETURN_NAMES = ("image", "revised_prompt")
-    FUNCTION = "generate_image"
-    CATEGORY = "ERPK/OpenAI"
+            ],
+            outputs=[
+                IO.Image.Output("image"),
+                IO.String.Output("revised_prompt"),
+            ],
+        )
 
     @classmethod
-    def IS_CHANGED(cls, **kwargs):
-        # Always regenerate - disable caching for image generation
-        return float("nan")
+    def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
+        from .openai_api.utils import ImageConverter
 
-    def generate_image(
-        self,
-        prompt: str,
-        client: OpenAIClient = None,
-        model: str = "gpt-image-1.5",
-        size: str = "1024x1024",
-        quality: str = "auto",
-        background: str = "auto",
-        n: int = 1,
-        api_key: str = "",
-    ):
-        """
-        Generate an image using OpenAI's image generation models.
+        client = kwargs.get("client")
+        model = kwargs.get("model", "gpt-image-1.5")
+        size = kwargs.get("size", "1024x1024")
+        quality = kwargs.get("quality", "auto")
+        background = kwargs.get("background", "auto")
+        n = kwargs.get("n", 1)
+        api_key = kwargs.get("api_key", "")
 
-        Args:
-            prompt: Text description of image to generate
-            client: Optional OpenAI API client from OpenAIAPIConfig
-            model: Image generation model to use
-            size: Image size
-            quality: Image quality
-            background: Background type (gpt-image-1 only)
-            n: Number of images to generate
-            api_key: Optional API key (fallback if no client)
-
-        Returns:
-            Tuple containing (image tensor, revised prompt)
-        """
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 
@@ -137,7 +109,6 @@ class OpenAIImageGeneration:
             if client is not None:
                 image_client = client
             else:
-                # Standalone mode - use provided API key or env/config
                 image_client = OpenAIClient(
                     api_key=api_key if api_key.strip() else None,
                     model=model
@@ -175,7 +146,7 @@ class OpenAIImageGeneration:
             if revised_prompt:
                 print(f"[OpenAI] Revised prompt: {revised_prompt[:100]}...")
 
-            return (image_tensor, revised_prompt)
+            return IO.NodeOutput(image_tensor, revised_prompt)
 
         except Exception as e:
             error_msg = f"Failed to generate image: {str(e)}"
@@ -183,131 +154,90 @@ class OpenAIImageGeneration:
             raise ValueError(error_msg)
 
 
-class OpenAIImageEdit:
-    """
-    OpenAI Image Editing Node
-
-    Uses OpenAI's image editing API to modify existing images based on text prompts.
-    Supports optional mask for inpainting.
-    """
-
-    # Image editing models (gpt-image-1.5 is recommended)
-    IMAGE_MODELS = ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
-
-    # Size options
-    SIZES = [
-        "1024x1024",
-        "1024x1536",
-        "1536x1024",
-        "512x512",
-        "256x256",
-    ]
+class OpenAIImageEdit(IO.ComfyNode):
+    """Uses OpenAI's image editing API to modify existing images based on text prompts."""
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "image": (
-                    "IMAGE",
-                    {"tooltip": "Input image to edit"}
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="OpenAIImageEdit",
+            display_name="OpenAI Image Edit",
+            category="ERPK/OpenAI",
+            not_idempotent=True,
+            inputs=[
+                IO.Image.Input(
+                    "image",
+                    tooltip="Input image to edit",
                 ),
-                "prompt": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "Description of how to modify the image"
-                    }
+                IO.String.Input(
+                    "prompt",
+                    multiline=True,
+                    default="",
+                    tooltip="Description of how to modify the image",
                 ),
-            },
-            "optional": {
-                "client": (
-                    "OPENAI_API_CLIENT",
-                    {"tooltip": "OpenAI API client from OpenAI API Config node"}
+                IO.Custom("OPENAI_API_CLIENT").Input(
+                    "client",
+                    optional=True,
+                    tooltip="OpenAI API client from OpenAI API Config node",
                 ),
-                "mask": (
-                    "MASK",
-                    {"tooltip": "Optional mask indicating areas to edit (white = edit, black = keep)"}
+                IO.Mask.Input(
+                    "mask",
+                    optional=True,
+                    tooltip="Optional mask indicating areas to edit (white = edit, black = keep)",
                 ),
-                "model": (
-                    cls.IMAGE_MODELS,
-                    {
-                        "default": "gpt-image-1",
-                        "tooltip": "Image editing model"
-                    }
+                IO.Combo.Input(
+                    "model",
+                    options=EDIT_MODELS,
+                    default="gpt-image-1",
+                    optional=True,
+                    tooltip="Image editing model",
                 ),
-                "size": (
-                    cls.SIZES,
-                    {
-                        "default": "1024x1024",
-                        "tooltip": "Output image size"
-                    }
+                IO.Combo.Input(
+                    "size",
+                    options=EDIT_SIZES,
+                    default="1024x1024",
+                    optional=True,
+                    tooltip="Output image size",
                 ),
-                "quality": (
-                    ["auto", "low", "medium", "high"],
-                    {
-                        "default": "auto",
-                        "tooltip": "Image quality (gpt-image-1 only)"
-                    }
+                IO.Combo.Input(
+                    "quality",
+                    options=["auto", "low", "medium", "high"],
+                    default="auto",
+                    optional=True,
+                    tooltip="Image quality (gpt-image-1 only)",
                 ),
-                "n": (
-                    "INT",
-                    {
-                        "default": 1,
-                        "min": 1,
-                        "max": 4,
-                        "tooltip": "Number of images to generate"
-                    }
+                IO.Int.Input(
+                    "n",
+                    default=1,
+                    min=1,
+                    max=4,
+                    optional=True,
+                    tooltip="Number of images to generate",
                 ),
-                "api_key": (
-                    "STRING",
-                    {
-                        "default": "",
-                        "tooltip": "OpenAI API key (only needed if not using client input)"
-                    }
+                IO.String.Input(
+                    "api_key",
+                    default="",
+                    optional=True,
+                    tooltip="OpenAI API key (only needed if not using client input)",
                 ),
-            }
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
-    FUNCTION = "edit_image"
-    CATEGORY = "ERPK/OpenAI"
+            ],
+            outputs=[
+                IO.Image.Output("image"),
+            ],
+        )
 
     @classmethod
-    def IS_CHANGED(cls, **kwargs):
-        # Always regenerate - disable caching for image editing
-        return float("nan")
+    def execute(cls, image, prompt, **kwargs) -> IO.NodeOutput:
+        from .openai_api.utils import ImageConverter
 
-    def edit_image(
-        self,
-        image,
-        prompt: str,
-        client: OpenAIClient = None,
-        mask=None,
-        model: str = "gpt-image-1.5",
-        size: str = "1024x1024",
-        quality: str = "auto",
-        n: int = 1,
-        api_key: str = "",
-    ):
-        """
-        Edit an image using OpenAI's image editing API.
+        client = kwargs.get("client")
+        mask = kwargs.get("mask")
+        model = kwargs.get("model", "gpt-image-1.5")
+        size = kwargs.get("size", "1024x1024")
+        quality = kwargs.get("quality", "auto")
+        n = kwargs.get("n", 1)
+        api_key = kwargs.get("api_key", "")
 
-        Args:
-            image: Input image as ComfyUI tensor
-            prompt: Text description of how to modify the image
-            client: Optional OpenAI API client
-            mask: Optional mask tensor (white areas will be edited)
-            model: Image editing model to use
-            size: Output image size
-            quality: Image quality (gpt-image-1 only)
-            n: Number of images to generate
-            api_key: Optional API key (fallback if no client)
-
-        Returns:
-            Tuple containing edited image tensor
-        """
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 
@@ -330,8 +260,6 @@ class OpenAIImageEdit:
             # Convert mask if provided
             mask_bytes = None
             if mask is not None:
-                # Mask should be a grayscale image where white = edit area
-                # Convert to RGBA with transparency in edit areas
                 import numpy as np
                 from PIL import Image
                 from io import BytesIO
@@ -398,21 +326,9 @@ class OpenAIImageEdit:
             image_tensor = ImageConverter.base64_to_tensor(images[0])
             print(f"[OpenAI] Image edited successfully: {image_tensor.shape}")
 
-            return (image_tensor,)
+            return IO.NodeOutput(image_tensor)
 
         except Exception as e:
             error_msg = f"Failed to edit image: {str(e)}"
             print(f"[OpenAI] Error: {error_msg}")
             raise ValueError(error_msg)
-
-
-# Node registration
-NODE_CLASS_MAPPINGS = {
-    "OpenAIImageGeneration": OpenAIImageGeneration,
-    "OpenAIImageEdit": OpenAIImageEdit,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "OpenAIImageGeneration": "OpenAI Image Generation",
-    "OpenAIImageEdit": "OpenAI Image Edit",
-}

@@ -1,9 +1,10 @@
-from .wavespeed_api.utils import imageurl2tensor
-from .wavespeed_api.client import WaveSpeedClient
-from .wavespeed_api.requests.qwen_image_edit_plus import QwenImageEditPlus
+# ABOUTME: Qwen Image Edit Plus node for advanced multi-reference image editing via WaveSpeed AI.
+# ABOUTME: Accepts up to 3 reference images with bilingual (Chinese/English) text prompts.
+
+from comfy_api.latest import IO
 
 
-class QwenImageEditPlusNode:
+class QwenImageEditPlusNode(IO.ComfyNode):
     """
     Qwen Image Edit Plus Node
 
@@ -12,102 +13,49 @@ class QwenImageEditPlusNode:
     """
 
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "prompt": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "Text description of the desired image modifications (Chinese or English)",
-                    },
-                ),
-                "images": (
-                    "STRING",
-                    {
-                        "tooltip": "Reference images to edit. Maximum of 3 images can be provided (comma-separated URLs or paths)",
-                    },
-                ),
-            },
-            "optional": {
-                "client": ("WAVESPEED_AI_API_CLIENT", {"tooltip": "WaveSpeed API client (optional if API key is configured in Settings)"}),
-                "width": (
-                    "INT",
-                    {
-                        "default": 1024,
-                        "min": 256,
-                        "max": 1536,
-                        "step": 8,
-                        "display": "number",
-                        "tooltip": "Image width (256 to 1536)",
-                    },
-                ),
-                "height": (
-                    "INT",
-                    {
-                        "default": 1024,
-                        "min": 256,
-                        "max": 1536,
-                        "step": 8,
-                        "display": "number",
-                        "tooltip": "Image height (256 to 1536)",
-                    },
-                ),
-                "seed": (
-                    "INT",
-                    {
-                        "default": -1,
-                        "min": -1,
-                        "max": 2147483647,
-                        "tooltip": "Random seed for reproducibility (-1 for random)",
-                    },
-                ),
-                "output_format": (
-                    ["jpeg", "png", "webp"],
-                    {
-                        "default": "jpeg",
-                        "tooltip": "Output image format",
-                    },
-                ),
-                "enable_sync_mode": (
-                    "BOOLEAN",
-                    {
-                        "default": False,
-                        "tooltip": "Wait for completion before returning response",
-                    },
-                ),
-                "enable_base64_output": (
-                    "BOOLEAN",
-                    {
-                        "default": False,
-                        "tooltip": "Return BASE64-encoded output instead of URL",
-                    },
-                ),
-            },
-        }
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="QwenImageEditPlusNode",
+            display_name="Qwen Image Edit Plus",
+            category="ERPK/WaveSpeedAI",
+            inputs=[
+                IO.String.Input("prompt", multiline=True, default="",
+                                tooltip="Text description of the desired image modifications (Chinese or English)"),
+                IO.String.Input("images",
+                                tooltip="Reference images to edit. Maximum of 3 images can be provided (comma-separated URLs or paths)"),
+                IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
+                    tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
+                IO.Int.Input("width", optional=True, default=1024, min=256, max=1536, step=8,
+                             tooltip="Image width (256 to 1536)"),
+                IO.Int.Input("height", optional=True, default=1024, min=256, max=1536, step=8,
+                             tooltip="Image height (256 to 1536)"),
+                IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647,
+                             tooltip="Random seed for reproducibility (-1 for random)"),
+                IO.Combo.Input("output_format", optional=True,
+                               options=["jpeg", "png", "webp"],
+                               default="jpeg",
+                               tooltip="Output image format"),
+                IO.Boolean.Input("enable_sync_mode", optional=True, default=False,
+                                 tooltip="Wait for completion before returning response"),
+                IO.Boolean.Input("enable_base64_output", optional=True, default=False,
+                                 tooltip="Return BASE64-encoded output instead of URL"),
+            ],
+            outputs=[
+                IO.Image.Output("image"),
+            ],
+        )
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
+    @classmethod
+    def execute(cls, prompt, images, client=None, width=1024, height=1024, seed=-1,
+                output_format="jpeg", enable_sync_mode=False, enable_base64_output=False,
+                **kwargs):
+        from .wavespeed_api.client import WaveSpeedClient
+        from .wavespeed_api.utils import imageurl2tensor
+        from .wavespeed_api.requests.qwen_image_edit_plus import QwenImageEditPlus
 
-    CATEGORY = "ERPK/WaveSpeedAI"
-    FUNCTION = "execute"
-
-    def execute(
-        self,
-        prompt,
-        images,
-        client=None,
-        width=1024,
-        height=1024,
-        seed=-1,
-        output_format="jpeg",
-        enable_sync_mode=False,
-        enable_base64_output=False,
-    ):
         if client is None:
             from .nodes import WaveSpeedAIAPIClient
-            client = WaveSpeedAIAPIClient().create_client()[0]
+            client = WaveSpeedAIAPIClient.execute()[0]
 
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
@@ -115,13 +63,11 @@ class QwenImageEditPlusNode:
         if images is None or images == "":
             raise ValueError("Images must be provided")
 
-        # Parse images input - support comma-separated URLs or array
         if isinstance(images, str):
             images_list = [img.strip() for img in images.split(",") if img.strip()]
         else:
             images_list = images
 
-        # Ensure we have at most 3 images
         if len(images_list) > 3:
             raise ValueError("Maximum of 3 reference images can be uploaded")
 
@@ -142,17 +88,9 @@ class QwenImageEditPlusNode:
         waveSpeedClient = WaveSpeedClient(client["api_key"])
         response = waveSpeedClient.send_request(request, True, 1)
 
-        # Download and process images
         image_urls = response.get("outputs", [])
         if not image_urls:
             raise ValueError("No image URLs in the generated result")
 
-        images = imageurl2tensor(image_urls)
-        return (images,)
-
-
-NODE_CLASS_MAPPINGS = {"WaveSpeed Custom QwenImageEditPlus": QwenImageEditPlusNode}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "WaveSpeed Custom QwenImageEditPlus": "Qwen Image Edit Plus (Custom)"
-}
+        result_images = imageurl2tensor(image_urls)
+        return IO.NodeOutput(result_images)

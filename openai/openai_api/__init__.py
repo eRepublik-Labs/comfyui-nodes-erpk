@@ -1,7 +1,6 @@
 # ABOUTME: OpenAI API package initialization
-# ABOUTME: Exports client and utility classes
+# ABOUTME: Exports client class for API interaction
 
 from .client import OpenAIClient
-from .utils import ImageConverter
 
-__all__ = ["OpenAIClient", "ImageConverter"]
+__all__ = ['OpenAIClient']

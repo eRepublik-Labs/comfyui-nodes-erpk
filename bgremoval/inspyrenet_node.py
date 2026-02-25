@@ -1,20 +1,10 @@
-# ABOUTME: ComfyUI node for background removal using InSPyReNet via transparent-background.
+# ABOUTME: ComfyUI V3 node for background removal using InSPyReNet via transparent-background.
 # ABOUTME: PyTorch-based, supports JIT compilation for faster inference. MIT licensed.
 
-"""
-InSPyReNet Backend Node for ComfyUI
-
-Uses the transparent-background package which wraps InSPyReNet.
-PyTorch-based, runs on GPU, MIT licensed for commercial use.
-"""
-
-from typing import Dict, Any, Tuple, List
-from tqdm import tqdm
-
-from .utils import tensor_to_pil, pil_rgba_to_tensor, extract_mask_from_rgba
+from comfy_api.latest import IO
 
 
-class InSPyReNetRemoveBackground:
+class InSPyReNetRemoveBackground(IO.ComfyNode):
     """
     Remove background using InSPyReNet via transparent-background.
 
@@ -28,31 +18,23 @@ class InSPyReNetRemoveBackground:
     _remover = None
     _jit_enabled = None
 
-    def __init__(self):
-        pass
-
     @classmethod
-    def INPUT_TYPES(cls) -> Dict[str, Any]:
-        return {
-            "required": {
-                "image": ("IMAGE",),
-            },
-            "optional": {
-                "torchscript_jit": (
-                    "BOOLEAN",
-                    {
-                        "default": False,
-                        "tooltip": "Enable TorchScript JIT for faster inference and lower memory",
-                    },
-                ),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE", "MASK")
-    RETURN_NAMES = ("image", "mask")
-    FUNCTION = "remove_background"
-    CATEGORY = "ERPK/Background Removal"
-    DESCRIPTION = "Remove background using InSPyReNet (PyTorch). MIT licensed."
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="InSPyReNetRemoveBackground",
+            display_name="Remove Background (InSPyReNet)",
+            category="ERPK/Background Removal",
+            description="Remove background using InSPyReNet (PyTorch). MIT licensed.",
+            inputs=[
+                IO.Image.Input("image"),
+                IO.Boolean.Input("torchscript_jit", default=False, optional=True,
+                                 tooltip="Enable TorchScript JIT for faster inference and lower memory"),
+            ],
+            outputs=[
+                IO.Image.Output("image"),
+                IO.Mask.Output("mask"),
+            ],
+        )
 
     @classmethod
     def _get_remover(cls, jit: bool):
@@ -71,27 +53,17 @@ class InSPyReNetRemoveBackground:
 
         return cls._remover
 
-    def remove_background(
-        self,
-        image,
-        torchscript_jit: bool = False,
-    ) -> Tuple:
-        """
-        Remove background from images using InSPyReNet.
+    @classmethod
+    def execute(cls, image, torchscript_jit=False, **kwargs):
+        from tqdm import tqdm
+        from .utils import tensor_to_pil, pil_rgba_to_tensor, extract_mask_from_rgba
 
-        Args:
-            image: ComfyUI IMAGE tensor (B, H, W, C)
-            torchscript_jit: Enable JIT compilation for faster inference
-
-        Returns:
-            Tuple of (image_tensor, mask_tensor)
-        """
         # Get cached remover
-        remover = self._get_remover(torchscript_jit)
+        remover = cls._get_remover(torchscript_jit)
 
         # Convert tensor to PIL images
         pil_images = tensor_to_pil(image)
-        result_images: List = []
+        result_images = []
 
         # Process each image
         jit_str = "JIT" if torchscript_jit else "default"
@@ -104,14 +76,4 @@ class InSPyReNetRemoveBackground:
         image_tensor = pil_rgba_to_tensor(result_images)
         mask_tensor = extract_mask_from_rgba(result_images)
 
-        return (image_tensor, mask_tensor)
-
-
-# Node registration
-NODE_CLASS_MAPPINGS = {
-    "ERPK Remove Background (InSPyReNet)": InSPyReNetRemoveBackground,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "ERPK Remove Background (InSPyReNet)": "Remove Background (InSPyReNet)",
-}
+        return IO.NodeOutput(image_tensor, mask_tensor)

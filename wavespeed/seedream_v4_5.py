@@ -1,7 +1,7 @@
-from .wavespeed_api.utils import imageurl2tensor
-from .wavespeed_api.client import WaveSpeedClient
-from .wavespeed_api.requests.seedream_v4_5 import SeedreamV4_5
+# ABOUTME: ByteDance Seedream V4.5 text-to-image generation node for WaveSpeed AI.
+# ABOUTME: Enhanced typography and text rendering for posters, logos, UI, and marketing layouts.
 
+from comfy_api.latest import IO
 
 # Recommended resolutions from WaveSpeed API docs for V4.5
 SEEDREAM_V4_5_SIZE_PRESETS = {
@@ -17,7 +17,7 @@ SEEDREAM_V4_5_SIZE_PRESETS = {
 }
 
 
-class SeedreamV4_5Node:
+class SeedreamV4_5Node(IO.ComfyNode):
     """
     ByteDance Seedream-V4.5 Image Generator Node
 
@@ -25,86 +25,47 @@ class SeedreamV4_5Node:
     """
 
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "prompt": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "Text description of the image to generate",
-                    },
-                ),
-                "size_preset": (
-                    list(SEEDREAM_V4_5_SIZE_PRESETS.keys()),
-                    {
-                        "default": "Custom",
-                        "tooltip": "Recommended resolution presets. Select 'Custom' to use manual width/height.",
-                    },
-                ),
-            },
-            "optional": {
-                "client": ("WAVESPEED_AI_API_CLIENT", {"tooltip": "WaveSpeed API client (optional if API key is configured in Settings)"}),
-                "width": (
-                    "INT",
-                    {
-                        "default": 2048,
-                        "min": 1024,
-                        "max": 4096,
-                        "step": 8,
-                        "display": "number",
-                        "tooltip": "Custom width (only used when size_preset is 'Custom')",
-                    },
-                ),
-                "height": (
-                    "INT",
-                    {
-                        "default": 2048,
-                        "min": 1024,
-                        "max": 4096,
-                        "step": 8,
-                        "display": "number",
-                        "tooltip": "Custom height (only used when size_preset is 'Custom')",
-                    },
-                ),
-                "show_aspect_ratio": (
-                    "BOOLEAN",
-                    {
-                        "default": True,
-                        "tooltip": "Show aspect ratio in node title",
-                    },
-                ),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
-
-    CATEGORY = "ERPK/WaveSpeedAI"
-    FUNCTION = "execute"
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="SeedreamV4_5Node",
+            display_name="Bytedance Seedream V4.5",
+            category="ERPK/WaveSpeedAI",
+            inputs=[
+                IO.String.Input("prompt", multiline=True, default="",
+                                tooltip="Text description of the image to generate"),
+                IO.Combo.Input("size_preset",
+                               options=list(SEEDREAM_V4_5_SIZE_PRESETS.keys()),
+                               default="Custom",
+                               tooltip="Recommended resolution presets. Select 'Custom' to use manual width/height."),
+                IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
+                    tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
+                IO.Int.Input("width", optional=True, default=2048, min=1024, max=4096, step=8,
+                             tooltip="Custom width (only used when size_preset is 'Custom')"),
+                IO.Int.Input("height", optional=True, default=2048, min=1024, max=4096, step=8,
+                             tooltip="Custom height (only used when size_preset is 'Custom')"),
+                IO.Boolean.Input("show_aspect_ratio", optional=True, default=True,
+                                 tooltip="Show aspect ratio in node title"),
+            ],
+            outputs=[
+                IO.Image.Output("image"),
+            ],
+            not_idempotent=True,
+        )
 
     @classmethod
-    def IS_CHANGED(cls, **kwargs):
-        return float("nan")
+    def execute(cls, prompt, size_preset, client=None, width=2048, height=2048,
+                show_aspect_ratio=True, **kwargs):
+        from .wavespeed_api.client import WaveSpeedClient
+        from .wavespeed_api.utils import imageurl2tensor
+        from .wavespeed_api.requests.seedream_v4_5 import SeedreamV4_5
 
-    def execute(
-        self,
-        prompt,
-        size_preset,
-        client=None,
-        width=2048,
-        height=2048,
-        show_aspect_ratio=True,
-    ):
         if client is None:
             from .nodes import WaveSpeedAIAPIClient
-            client = WaveSpeedAIAPIClient().create_client()[0]
+            client = WaveSpeedAIAPIClient.execute()[0]
 
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        # Get dimensions from preset or use custom values
         preset_dims = SEEDREAM_V4_5_SIZE_PRESETS.get(size_preset)
         if preset_dims:
             width, height = preset_dims
@@ -118,17 +79,9 @@ class SeedreamV4_5Node:
         waveSpeedClient = WaveSpeedClient(client["api_key"])
         response = waveSpeedClient.send_request(request, True, 1)
 
-        # Download and process images
         image_urls = response.get("outputs", [])
         if not image_urls:
             raise ValueError("No image URLs in the generated result")
 
         images = imageurl2tensor(image_urls)
-        return (images,)
-
-
-NODE_CLASS_MAPPINGS = {"WaveSpeed Custom SeedreamV4_5": SeedreamV4_5Node}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "WaveSpeed Custom SeedreamV4_5": "Bytedance Seedream V4.5 (Custom)"
-}
+        return IO.NodeOutput(images)

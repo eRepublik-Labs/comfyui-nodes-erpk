@@ -1,25 +1,10 @@
-# ABOUTME: ComfyUI nodes for background removal using BiRefNet via HuggingFace transformers.
-# ABOUTME: Supports 17 model variants, dtype/device selection, local loading, and foreground refinement.
+# ABOUTME: ComfyUI V3 nodes for background removal using BiRefNet via HuggingFace transformers.
+# ABOUTME: Supports 17 model variants, dtype/device selection, local loading, and mask extraction.
 
-"""
-BiRefNet Backend Nodes for ComfyUI
-
-Uses BiRefNet directly via HuggingFace transformers.
-Highest quality results, MIT licensed for commercial use.
-
-Nodes:
-- Remove Background (BiRefNet): Full background removal with all options
-- Get Mask (BiRefNet): Mask-only output
-- Foreground Refinement (BlurFusion): Clean foreground edges
-"""
-
-from typing import Dict, Any, Tuple, List, Optional
+from typing import Tuple
 from pathlib import Path
-from tqdm import tqdm
-import numpy as np
-from PIL import Image
 
-from .utils import tensor_to_pil, pil_rgba_to_tensor, pil_to_tensor, extract_mask_from_rgba
+from comfy_api.latest import IO
 
 # All available BiRefNet variants on HuggingFace (17 models)
 BIREFNET_VARIANTS = [
@@ -47,26 +32,26 @@ BIREFNET_VARIANTS = [
 ]
 
 VARIANT_NAMES = [name for name, _ in BIREFNET_VARIANTS]
-VARIANT_DISPLAY = {name: display for name, display in BIREFNET_VARIANTS}
 
-# Device options
+# Device and dtype options
 DEVICE_OPTIONS = ["auto", "cuda", "cpu", "mps"]
-
-# Dtype options
 DTYPE_OPTIONS = ["float32", "float16"]
 
-# Upscale methods for resizing
+# Upscale method names for dropdown
 UPSCALE_METHODS = ["bilinear", "bicubic", "lanczos", "nearest", "nearest-exact", "area"]
 
-# Map upscale method names to PIL resampling constants
-UPSCALE_TO_PIL = {
-    "bilinear": Image.Resampling.BILINEAR,
-    "bicubic": Image.Resampling.BICUBIC,
-    "lanczos": Image.Resampling.LANCZOS,
-    "nearest": Image.Resampling.NEAREST,
-    "nearest-exact": Image.Resampling.NEAREST,  # PIL uses NEAREST for both
-    "area": Image.Resampling.BOX,  # PIL doesn't have AREA, BOX is closest
-}
+
+def _get_upscale_to_pil():
+    """Build PIL resampling constant map lazily to avoid module-level PIL import."""
+    from PIL import Image
+    return {
+        "bilinear": Image.Resampling.BILINEAR,
+        "bicubic": Image.Resampling.BICUBIC,
+        "lanczos": Image.Resampling.LANCZOS,
+        "nearest": Image.Resampling.NEAREST,
+        "nearest-exact": Image.Resampling.NEAREST,
+        "area": Image.Resampling.BOX,
+    }
 
 
 def hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
@@ -112,7 +97,7 @@ def get_comfyui_models_path() -> Path:
         return Path("models") / "BiRefNet"
 
 
-def list_local_models() -> List[str]:
+def list_local_models():
     """List available local BiRefNet models."""
     models_path = get_comfyui_models_path()
     if not models_path.exists():
@@ -124,7 +109,7 @@ def list_local_models() -> List[str]:
     return sorted(models)
 
 
-class BiRefNetRemoveBackground:
+class BiRefNetRemoveBackground(IO.ComfyNode):
     """
     Remove background using BiRefNet via HuggingFace transformers.
 
@@ -139,95 +124,43 @@ class BiRefNetRemoveBackground:
     """
 
     # Cache models by (variant, device, dtype) key
-    _models: Dict[str, Any] = {}
-
-    def __init__(self):
-        pass
+    _models = {}
 
     @classmethod
-    def INPUT_TYPES(cls) -> Dict[str, Any]:
+    def define_schema(cls):
         local_models = list_local_models()
         variant_choices = VARIANT_NAMES + ([f"local:{m}" for m in local_models] if local_models else [])
 
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "variant": (variant_choices, {"default": "ZhengPeng7/BiRefNet"}),
-            },
-            "optional": {
-                "width": (
-                    "INT",
-                    {
-                        "default": 1024,
-                        "min": 256,
-                        "max": 2560,
-                        "step": 64,
-                        "tooltip": "Processing width. HR variants work best at 2048+, Lite variants at 512-1024.",
-                    },
-                ),
-                "height": (
-                    "INT",
-                    {
-                        "default": 1024,
-                        "min": 256,
-                        "max": 2560,
-                        "step": 64,
-                        "tooltip": "Processing height. HR variants work best at 2048+, Lite variants at 512-1024.",
-                    },
-                ),
-                "upscale_method": (
-                    UPSCALE_METHODS,
-                    {
-                        "default": "bilinear",
-                        "tooltip": "Interpolation method for resizing.",
-                    },
-                ),
-                "device": (
-                    DEVICE_OPTIONS,
-                    {
-                        "default": "auto",
-                        "tooltip": "Processing device. Auto selects best available (CUDA > MPS > CPU).",
-                    },
-                ),
-                "dtype": (
-                    DTYPE_OPTIONS,
-                    {
-                        "default": "float32",
-                        "tooltip": "Data type. float16 uses ~50% less VRAM but may have slight quality differences.",
-                    },
-                ),
-                "fill_background": (
-                    "BOOLEAN",
-                    {
-                        "default": False,
-                        "tooltip": "Fill background with solid color instead of transparent.",
-                    },
-                ),
-                "background_color": (
-                    "STRING",
-                    {
-                        "default": "#000000",
-                        "tooltip": "Hex color for background fill (e.g., #00FF00 for green).",
-                    },
-                ),
-                "mask_threshold": (
-                    "FLOAT",
-                    {
-                        "default": 0.0,
-                        "min": 0.0,
-                        "max": 1.0,
-                        "step": 0.001,
-                        "tooltip": "Soft threshold for noise removal. Removes values below threshold while preserving gradients. Try 0.004 for noise removal.",
-                    },
-                ),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE", "MASK")
-    RETURN_NAMES = ("image", "mask")
-    FUNCTION = "remove_background"
-    CATEGORY = "ERPK/Background Removal"
-    DESCRIPTION = "Remove background using BiRefNet. 17 model variants, dtype/device selection. MIT licensed."
+        return IO.Schema(
+            node_id="BiRefNetRemoveBackground",
+            display_name="Remove Background (BiRefNet)",
+            category="ERPK/Background Removal",
+            description="Remove background using BiRefNet. 17 model variants, dtype/device selection. MIT licensed.",
+            inputs=[
+                IO.Image.Input("image"),
+                IO.Combo.Input("variant", options=variant_choices, default="ZhengPeng7/BiRefNet"),
+                IO.Int.Input("width", default=1024, min=256, max=2560, step=64, optional=True,
+                             tooltip="Processing width. HR variants work best at 2048+, Lite variants at 512-1024."),
+                IO.Int.Input("height", default=1024, min=256, max=2560, step=64, optional=True,
+                             tooltip="Processing height. HR variants work best at 2048+, Lite variants at 512-1024."),
+                IO.Combo.Input("upscale_method", options=UPSCALE_METHODS, default="bilinear", optional=True,
+                               tooltip="Interpolation method for resizing."),
+                IO.Combo.Input("device", options=DEVICE_OPTIONS, default="auto", optional=True,
+                               tooltip="Processing device. Auto selects best available (CUDA > MPS > CPU)."),
+                IO.Combo.Input("dtype", options=DTYPE_OPTIONS, default="float32", optional=True,
+                               tooltip="Data type. float16 uses ~50% less VRAM but may have slight quality differences."),
+                IO.Boolean.Input("fill_background", default=False, optional=True,
+                                 tooltip="Fill background with solid color instead of transparent."),
+                IO.String.Input("background_color", default="#000000", optional=True,
+                                tooltip="Hex color for background fill (e.g., #00FF00 for green)."),
+                IO.Float.Input("mask_threshold", default=0.0, min=0.0, max=1.0, step=0.001, optional=True,
+                               tooltip="Soft threshold for noise removal. Removes values below threshold while preserving gradients. Try 0.004 for noise removal."),
+            ],
+            outputs=[
+                IO.Image.Output("image"),
+                IO.Mask.Output("mask"),
+            ],
+        )
 
     @classmethod
     def _get_model(cls, variant: str, device: str, dtype):
@@ -269,39 +202,46 @@ class BiRefNetRemoveBackground:
 
             # Move to device and set dtype
             model = model.to(device=device, dtype=dtype)
-            model.eval()
+            model.train(False)
             cls._models[cache_key] = model
 
             print(f"[BGRemoval] BiRefNet loaded on {device} ({dtype})")
 
         return cls._models[cache_key]
 
-    def remove_background(
-        self,
+    @classmethod
+    def execute(
+        cls,
         image,
-        variant: str,
-        width: int = 1024,
-        height: int = 1024,
-        upscale_method: str = "bilinear",
-        device: str = "auto",
-        dtype: str = "float32",
-        fill_background: bool = False,
-        background_color: str = "#000000",
-        mask_threshold: float = 0.0,
-    ) -> Tuple:
-        """Remove background from images using BiRefNet."""
+        variant="ZhengPeng7/BiRefNet",
+        width=1024,
+        height=1024,
+        upscale_method="bilinear",
+        device="auto",
+        dtype="float32",
+        fill_background=False,
+        background_color="#000000",
+        mask_threshold=0.0,
+        **kwargs,
+    ):
+        import numpy as np
         import torch
+        from PIL import Image
         from torchvision import transforms
+        from tqdm import tqdm
+        from .utils import tensor_to_pil, pil_rgba_to_tensor, pil_to_tensor
+
+        upscale_to_pil = _get_upscale_to_pil()
 
         # Resolve device and dtype
         actual_device = get_device(device)
         actual_dtype = get_dtype(dtype)
 
         # Get cached model
-        model = self._get_model(variant, actual_device, actual_dtype)
+        model = cls._get_model(variant, actual_device, actual_dtype)
 
         # Get PIL resampling method
-        resample_method = UPSCALE_TO_PIL.get(upscale_method, Image.Resampling.BILINEAR)
+        resample_method = upscale_to_pil.get(upscale_method, Image.Resampling.BILINEAR)
 
         # Preprocessing transform
         transform = transforms.Compose([
@@ -312,8 +252,8 @@ class BiRefNetRemoveBackground:
 
         # Convert tensor to PIL images
         pil_images = tensor_to_pil(image)
-        result_images: List[Image.Image] = []
-        result_masks: List[Image.Image] = []
+        result_images = []
+        result_masks = []
 
         # Get background color if filling
         bg_color = hex_to_rgb(background_color) if fill_background else None
@@ -362,113 +302,80 @@ class BiRefNetRemoveBackground:
         else:
             image_tensor = pil_rgba_to_tensor(result_images)
 
-        mask_tensor = self._masks_to_tensor(result_masks)
+        mask_tensor = _masks_to_tensor(result_masks)
 
-        return (image_tensor, mask_tensor)
-
-    def _masks_to_tensor(self, masks: List[Image.Image]):
-        """Convert PIL masks to tensor."""
-        import torch
-        tensors = []
-        for mask in masks:
-            mask_np = np.array(mask).astype(np.float32) / 255.0
-            tensors.append(torch.from_numpy(mask_np))
-        return torch.stack(tensors)
+        return IO.NodeOutput(image_tensor, mask_tensor)
 
 
-class BiRefNetGetMask:
+class BiRefNetGetMask(IO.ComfyNode):
     """
     Get segmentation mask only using BiRefNet.
 
     Useful when you only need the mask for compositing or other operations.
     """
 
-    def __init__(self):
-        pass
-
     @classmethod
-    def INPUT_TYPES(cls) -> Dict[str, Any]:
+    def define_schema(cls):
         local_models = list_local_models()
         variant_choices = VARIANT_NAMES + ([f"local:{m}" for m in local_models] if local_models else [])
 
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "variant": (variant_choices, {"default": "ZhengPeng7/BiRefNet"}),
-            },
-            "optional": {
-                "width": (
-                    "INT",
-                    {
-                        "default": 1024,
-                        "min": 256,
-                        "max": 2560,
-                        "step": 64,
-                        "tooltip": "Processing width. HR variants work best at 2048+, Lite variants at 512-1024.",
-                    },
-                ),
-                "height": (
-                    "INT",
-                    {
-                        "default": 1024,
-                        "min": 256,
-                        "max": 2560,
-                        "step": 64,
-                        "tooltip": "Processing height. HR variants work best at 2048+, Lite variants at 512-1024.",
-                    },
-                ),
-                "upscale_method": (
-                    UPSCALE_METHODS,
-                    {
-                        "default": "bilinear",
-                        "tooltip": "Interpolation method for resizing.",
-                    },
-                ),
-                "device": (DEVICE_OPTIONS, {"default": "auto"}),
-                "dtype": (DTYPE_OPTIONS, {"default": "float32"}),
-                "mask_threshold": (
-                    "FLOAT",
-                    {
-                        "default": 0.0,
-                        "min": 0.0,
-                        "max": 1.0,
-                        "step": 0.001,
-                        "tooltip": "Soft threshold for noise removal. Removes values below threshold while preserving gradients. Try 0.004 for noise removal.",
-                    },
-                ),
-            },
-        }
+        return IO.Schema(
+            node_id="BiRefNetGetMask",
+            display_name="Get Mask (BiRefNet)",
+            category="ERPK/Background Removal",
+            description="Get segmentation mask using BiRefNet. Mask-only output for compositing.",
+            inputs=[
+                IO.Image.Input("image"),
+                IO.Combo.Input("variant", options=variant_choices, default="ZhengPeng7/BiRefNet"),
+                IO.Int.Input("width", default=1024, min=256, max=2560, step=64, optional=True,
+                             tooltip="Processing width. HR variants work best at 2048+, Lite variants at 512-1024."),
+                IO.Int.Input("height", default=1024, min=256, max=2560, step=64, optional=True,
+                             tooltip="Processing height. HR variants work best at 2048+, Lite variants at 512-1024."),
+                IO.Combo.Input("upscale_method", options=UPSCALE_METHODS, default="bilinear", optional=True,
+                               tooltip="Interpolation method for resizing."),
+                IO.Combo.Input("device", options=DEVICE_OPTIONS, default="auto", optional=True,
+                               tooltip="Processing device. Auto selects best available (CUDA > MPS > CPU)."),
+                IO.Combo.Input("dtype", options=DTYPE_OPTIONS, default="float32", optional=True,
+                               tooltip="Data type. float16 uses ~50% less VRAM but may have slight quality differences."),
+                IO.Float.Input("mask_threshold", default=0.0, min=0.0, max=1.0, step=0.001, optional=True,
+                               tooltip="Soft threshold for noise removal. Removes values below threshold while preserving gradients. Try 0.004 for noise removal."),
+            ],
+            outputs=[
+                IO.Mask.Output("mask"),
+            ],
+        )
 
-    RETURN_TYPES = ("MASK",)
-    RETURN_NAMES = ("mask",)
-    FUNCTION = "get_mask"
-    CATEGORY = "ERPK/Background Removal"
-    DESCRIPTION = "Get segmentation mask using BiRefNet. Mask-only output for compositing."
-
-    def get_mask(
-        self,
+    @classmethod
+    def execute(
+        cls,
         image,
-        variant: str,
-        width: int = 1024,
-        height: int = 1024,
-        upscale_method: str = "bilinear",
-        device: str = "auto",
-        dtype: str = "float32",
-        mask_threshold: float = 0.0,
-    ) -> Tuple:
-        """Get mask from images using BiRefNet."""
+        variant="ZhengPeng7/BiRefNet",
+        width=1024,
+        height=1024,
+        upscale_method="bilinear",
+        device="auto",
+        dtype="float32",
+        mask_threshold=0.0,
+        **kwargs,
+    ):
+        import numpy as np
         import torch
+        from PIL import Image
         from torchvision import transforms
+        from tqdm import tqdm
+        from .utils import tensor_to_pil
+
+        upscale_to_pil = _get_upscale_to_pil()
 
         # Resolve device and dtype
         actual_device = get_device(device)
         actual_dtype = get_dtype(dtype)
 
-        # Get cached model (reuse from main class)
+        # Get cached model (reuse from BiRefNetRemoveBackground)
         model = BiRefNetRemoveBackground._get_model(variant, actual_device, actual_dtype)
 
         # Get PIL resampling method
-        resample_method = UPSCALE_TO_PIL.get(upscale_method, Image.Resampling.BILINEAR)
+        resample_method = upscale_to_pil.get(upscale_method, Image.Resampling.BILINEAR)
 
         # Preprocessing transform
         transform = transforms.Compose([
@@ -509,200 +416,15 @@ class BiRefNetGetMask:
             mask_resized = np.array(mask_pil).astype(np.float32) / 255.0
             masks.append(torch.from_numpy(mask_resized))
 
-        return (torch.stack(masks),)
+        return IO.NodeOutput(torch.stack(masks))
 
 
-class BlurFusionForegroundEstimation:
-    """
-    Refine foreground edges using blur-based color estimation.
-
-    Uses fast-foreground-estimation method to produce cleaner foregrounds
-    by estimating true foreground colors at semi-transparent edges.
-    Reduces color bleeding from background.
-
-    Reference: https://github.com/Photoroom/fast-foreground-estimation
-    """
-
-    def __init__(self):
-        pass
-
-    @classmethod
-    def INPUT_TYPES(cls) -> Dict[str, Any]:
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "mask": ("MASK",),
-            },
-            "optional": {
-                "blur_radius": (
-                    "INT",
-                    {
-                        "default": 90,
-                        "min": 1,
-                        "max": 255,
-                        "step": 1,
-                        "tooltip": "Primary blur radius for foreground estimation.",
-                    },
-                ),
-                "blur_radius_secondary": (
-                    "INT",
-                    {
-                        "default": 6,
-                        "min": 1,
-                        "max": 255,
-                        "step": 1,
-                        "tooltip": "Secondary blur radius for edge refinement.",
-                    },
-                ),
-                "fill_background": (
-                    "BOOLEAN",
-                    {
-                        "default": False,
-                        "tooltip": "Fill background with solid color instead of transparent.",
-                    },
-                ),
-                "background_color": (
-                    "STRING",
-                    {
-                        "default": "#000000",
-                        "tooltip": "Hex color for background fill (e.g., #00FF00 for green).",
-                    },
-                ),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE", "MASK")
-    RETURN_NAMES = ("image", "mask")
-    FUNCTION = "refine_foreground"
-    CATEGORY = "ERPK/Background Removal"
-    DESCRIPTION = "Refine foreground edges using blur-based color estimation. Reduces color bleeding."
-
-    def refine_foreground(
-        self,
-        image,
-        mask,
-        blur_radius: int = 90,
-        blur_radius_secondary: int = 6,
-        fill_background: bool = False,
-        background_color: str = "#000000",
-    ) -> Tuple:
-        """Refine foreground using blur fusion estimation."""
-        import torch
-        import cv2
-
-        # Convert inputs
-        pil_images = tensor_to_pil(image)
-
-        # Handle mask dimensions
-        if mask.dim() == 2:
-            mask = mask.unsqueeze(0)
-
-        result_images = []
-
-        for i, pil_img in enumerate(tqdm(pil_images, desc="[BGRemoval] BlurFusion")):
-            # Get corresponding mask
-            mask_idx = min(i, mask.shape[0] - 1)
-            mask_np = (mask[mask_idx].cpu().numpy() * 255).astype(np.uint8)
-
-            # Resize mask if needed
-            if mask_np.shape[:2] != (pil_img.height, pil_img.width):
-                mask_np = cv2.resize(mask_np, (pil_img.width, pil_img.height), interpolation=cv2.INTER_LINEAR)
-
-            # Convert image to numpy
-            img_np = np.array(pil_img).astype(np.float32)
-
-            # Estimate foreground using blur fusion
-            foreground = self._blur_fusion_foreground(
-                img_np, mask_np, blur_radius, blur_radius_secondary
-            )
-
-            # Create output
-            if fill_background:
-                # Parse hex color
-                bg_rgb = hex_to_rgb(background_color)
-                # Composite onto background
-                alpha = mask_np.astype(np.float32) / 255.0
-                alpha = alpha[:, :, np.newaxis]
-                bg = np.full_like(foreground, bg_rgb, dtype=np.float32)
-                result = foreground * alpha + bg * (1 - alpha)
-                result_pil = Image.fromarray(result.astype(np.uint8), mode="RGB")
-            else:
-                # RGBA output
-                result_pil = Image.fromarray(foreground.astype(np.uint8), mode="RGB")
-                result_pil.putalpha(Image.fromarray(mask_np, mode="L"))
-
-            result_images.append(result_pil)
-
-        # Convert back to tensors
-        if fill_background:
-            image_tensor = pil_to_tensor(result_images)
-        else:
-            image_tensor = pil_rgba_to_tensor(result_images)
-
-        # Return original mask
-        return (image_tensor, mask)
-
-    def _blur_fusion_foreground(
-        self,
-        image: np.ndarray,
-        mask: np.ndarray,
-        blur_radius: int,
-        blur_radius_secondary: int,
-    ) -> np.ndarray:
-        """
-        Estimate foreground using blur fusion method.
-
-        This reduces color bleeding at edges by estimating true foreground colors.
-        """
-        import cv2
-
-        # Ensure odd kernel sizes
-        blur_radius = blur_radius if blur_radius % 2 == 1 else blur_radius + 1
-        blur_radius_secondary = blur_radius_secondary if blur_radius_secondary % 2 == 1 else blur_radius_secondary + 1
-
-        # Normalize mask to 0-1
-        alpha = mask.astype(np.float32) / 255.0
-        alpha_3d = alpha[:, :, np.newaxis]
-
-        # Blur the image weighted by alpha
-        weighted_img = image * alpha_3d
-        blurred_weighted = cv2.GaussianBlur(weighted_img, (blur_radius, blur_radius), 0)
-        blurred_alpha = cv2.GaussianBlur(alpha, (blur_radius, blur_radius), 0)
-
-        # Avoid division by zero
-        blurred_alpha = np.maximum(blurred_alpha, 1e-6)
-
-        # Estimate foreground
-        foreground_estimate = blurred_weighted / blurred_alpha[:, :, np.newaxis]
-
-        # Secondary refinement pass
-        refined_weighted = foreground_estimate * alpha_3d
-        blurred_refined = cv2.GaussianBlur(refined_weighted, (blur_radius_secondary, blur_radius_secondary), 0)
-        blurred_alpha_secondary = cv2.GaussianBlur(alpha, (blur_radius_secondary, blur_radius_secondary), 0)
-        blurred_alpha_secondary = np.maximum(blurred_alpha_secondary, 1e-6)
-
-        foreground_refined = blurred_refined / blurred_alpha_secondary[:, :, np.newaxis]
-
-        # Blend based on alpha
-        # Use original image where alpha is high, estimated where alpha is low
-        blend_factor = alpha_3d ** 2  # Quadratic blend for smoother transition
-        result = image * blend_factor + foreground_refined * (1 - blend_factor)
-
-        # Clip to valid range
-        result = np.clip(result, 0, 255)
-
-        return result
-
-
-# Node registration
-NODE_CLASS_MAPPINGS = {
-    "ERPK Remove Background (BiRefNet)": BiRefNetRemoveBackground,
-    "ERPK Get Mask (BiRefNet)": BiRefNetGetMask,
-    "ERPK Foreground Refinement (BlurFusion)": BlurFusionForegroundEstimation,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "ERPK Remove Background (BiRefNet)": "Remove Background (BiRefNet)",
-    "ERPK Get Mask (BiRefNet)": "Get Mask (BiRefNet)",
-    "ERPK Foreground Refinement (BlurFusion)": "Foreground Refinement (BlurFusion)",
-}
+def _masks_to_tensor(masks):
+    """Convert PIL masks to tensor."""
+    import numpy as np
+    import torch
+    tensors = []
+    for mask in masks:
+        mask_np = np.array(mask).astype(np.float32) / 255.0
+        tensors.append(torch.from_numpy(mask_np))
+    return torch.stack(tensors)
