@@ -1,5 +1,5 @@
 # ABOUTME: Documentation for background removal nodes package.
-# ABOUTME: Covers all three backends: rembg, InSPyReNet, and BiRefNet.
+# ABOUTME: Covers all four backends: rembg, InSPyReNet, BiRefNet, and BEN2.
 
 # Background Removal - ComfyUI Custom Nodes
 
@@ -22,6 +22,7 @@ Background removal nodes with multiple backend options for different quality/spe
 | **Remove Background (rembg)** | ONNX | CPU/GPU | Fast | Good | Low-Med |
 | **Remove Background (InSPyReNet)** | PyTorch | GPU | Medium | Very Good | Medium |
 | **Remove Background (BiRefNet)** | PyTorch/HF | GPU | Slower | Excellent | High |
+| **Remove Background (BEN2)** | PyTorch/HF | GPU | Medium | Excellent | High |
 | **Get Mask (BiRefNet)** | PyTorch/HF | GPU | Slower | Excellent | High |
 | **Foreground Refinement (BlurFusion)** | OpenCV | CPU | Fast | - | Low |
 
@@ -95,9 +96,23 @@ PyTorch-based via transparent-background package. Good balance of quality and sp
 **Options:**
 - `torchscript_jit`: Enable TorchScript JIT for faster inference after first run
 
+### Remove Background (BEN2)
+
+Background Erase Network 2 with confidence-guided matting (CGM). Targets pixels where the base model has low confidence, producing more accurate alpha mattes at fine edges like hair and fur.
+
+**Options:**
+- `refine_foreground`: Enable built-in blur-fusion foreground refinement for cleaner edges. Slower but better for hair/fur detail.
+- `device`: Processing device selection (`auto`, `cuda`, `cpu`, `mps`). Auto selects best available.
+
+**Notes:**
+- Processes internally at 1024x1024, auto-resizes mask back to original dimensions
+- Auto dtype: float16 on CUDA, float32 on CPU
+- Single model variant (BEN_Base, SwinTransformer backbone)
+- Requires separate install: `pip install git+https://github.com/PramaLLC/BEN2.git`
+
 ### Remove Background (BiRefNet)
 
-HuggingFace transformers-based. Highest quality dichotomous image segmentation with 15 model variants.
+HuggingFace transformers-based. Highest quality dichotomous image segmentation with 17 model variants.
 
 **Model Variants:**
 
@@ -106,6 +121,7 @@ HuggingFace transformers-based. Highest quality dichotomous image segmentation w
 | `ZhengPeng7/BiRefNet` | General (default) | Most use cases |
 | `ZhengPeng7/BiRefNet_HR` | High resolution (2048x2048) | Large images |
 | `ZhengPeng7/BiRefNet_T` | General Lite (fast) | Speed-critical workflows |
+| `ZhengPeng7/BiRefNet_lite` | Lite (44M params) | Lightweight general use |
 | `ZhengPeng7/BiRefNet_lite-2K` | Lite 2K resolution | Fast + high-res |
 | `ZhengPeng7/BiRefNet_dynamic` | Dynamic resolution | Variable input sizes |
 | `ZhengPeng7/BiRefNet_512x512` | 512x512 (fastest) | Maximum speed |
@@ -114,6 +130,7 @@ HuggingFace transformers-based. Highest quality dichotomous image segmentation w
 | `ZhengPeng7/BiRefNet-matting` | Alpha matting | Soft edges, hair |
 | `ZhengPeng7/BiRefNet_HR-matting` | HR matting | High-res soft edges |
 | `ZhengPeng7/BiRefNet_lite-matting` | Lite matting | Fast soft edges |
+| `ZhengPeng7/BiRefNet_dynamic-matting` | Dynamic matting | Variable-res soft edges |
 | `ZhengPeng7/BiRefNet-DIS5K` | DIS (dichotomous) | Binary segmentation |
 | `ZhengPeng7/BiRefNet-HRSOD` | HRSOD (salient object) | Object detection |
 | `ZhengPeng7/BiRefNet-COD` | COD (camouflaged) | Hidden objects |
@@ -206,11 +223,17 @@ pip install transparent-background>=1.2.0
 pip install transformers>=4.36.0 torchvision>=0.16.0
 ```
 
+**BEN2 (Background Erase Network 2):**
+```bash
+pip install git+https://github.com/PramaLLC/BEN2.git
+```
+
 ### GPU Acceleration
 
 - **rembg**: The `[gpu]` extra installs `onnxruntime-gpu` for CUDA acceleration on Windows/Linux. macOS users get CPU-only `onnxruntime` automatically.
 - **InSPyReNet**: Automatically uses CUDA if available
 - **BiRefNet**: Automatically uses CUDA or MPS (Apple Silicon) if available. Use `device` option to override.
+- **BEN2**: Automatically uses CUDA if available (float16). Falls back to CPU (float32). Use `device` option to override.
 
 ## Usage
 
@@ -234,8 +257,13 @@ pip install transformers>=4.36.0 torchvision>=0.16.0
 - You have GPU available
 - You want TorchScript optimization
 
+**Use BEN2 when:**
+- You need accurate alpha mattes at fine edges (hair, fur)
+- You want built-in foreground refinement in one step
+- You want a single high-quality model without choosing variants
+
 **Use BiRefNet when:**
-- You need the highest quality
+- You need the highest quality with variant selection
 - You're working with high-resolution images (use HR variant)
 - You need specialized detection (camouflaged objects, matting)
 - You want VRAM efficiency (use float16 dtype)
@@ -257,6 +285,7 @@ For best results with complex subjects (hair, fur, transparent materials):
 python -c "import rembg; print('rembg OK')"
 python -c "from transparent_background import Remover; print('InSPyReNet OK')"
 python -c "from transformers import AutoModelForImageSegmentation; print('BiRefNet OK')"
+python -c "from ben2 import BEN_Base; print('BEN2 OK')"
 ```
 
 2. Check ComfyUI console for import errors
@@ -268,6 +297,7 @@ python -c "from transformers import AutoModelForImageSegmentation; print('BiRefN
 - **rembg**: Models download automatically on first use to `~/.u2net/`
 - **InSPyReNet**: Models download automatically on first use
 - **BiRefNet**: Models download from HuggingFace on first use
+- **BEN2**: Model downloads from HuggingFace on first use
 
 ### Memory Issues
 
@@ -285,11 +315,12 @@ python -c "from transformers import AutoModelForImageSegmentation; print('BiRefN
 
 ## License
 
-MIT License - All backends (rembg, transparent-background, BiRefNet) are MIT licensed.
+MIT License - All backends (rembg, transparent-background, BiRefNet, BEN2) are MIT licensed.
 
 ## References
 
 - [rembg](https://github.com/danielgatis/rembg) - ONNX-based background removal
 - [transparent-background](https://github.com/plemeri/transparent-background) - InSPyReNet wrapper
 - [BiRefNet](https://github.com/ZhengPeng7/BiRefNet) - Bilateral Reference Network
+- [BEN2](https://github.com/PramaLLC/BEN2) - Background Erase Network 2
 - [fast-foreground-estimation](https://github.com/Photoroom/fast-foreground-estimation) - BlurFusion method
