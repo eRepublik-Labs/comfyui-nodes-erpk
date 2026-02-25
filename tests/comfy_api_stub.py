@@ -255,6 +255,67 @@ class ComfyNode(ABC):
         ...
 
 
+# --- NodeReplace ---
+
+class NodeReplace:
+    """Defines a node replacement mapping from an old node ID to a new one."""
+    def __init__(self,
+        new_node_id: str,
+        old_node_id: str,
+        old_widget_ids: list = None,
+        input_mapping: list = None,
+        output_mapping: list = None,
+    ):
+        self.new_node_id = new_node_id
+        self.old_node_id = old_node_id
+        self.old_widget_ids = old_widget_ids
+        self.input_mapping = input_mapping
+        self.output_mapping = output_mapping
+
+    def as_dict(self):
+        return {
+            "new_node_id": self.new_node_id,
+            "old_node_id": self.old_node_id,
+            "old_widget_ids": self.old_widget_ids,
+            "input_mapping": list(self.input_mapping) if self.input_mapping else None,
+            "output_mapping": list(self.output_mapping) if self.output_mapping else None,
+        }
+
+
+# --- ComfyAPI ---
+
+class _NodeReplacementAPI:
+    """Test stub for ComfyAPI.node_replacement."""
+    def __init__(self):
+        self._registered: list[NodeReplace] = []
+
+    async def register(self, node_replace: NodeReplace) -> None:
+        self._registered.append(node_replace)
+
+    def get_registered(self) -> list[NodeReplace]:
+        return list(self._registered)
+
+    def clear(self):
+        self._registered.clear()
+
+
+class ComfyAPI:
+    """Test stub for comfy_api.latest.ComfyAPI."""
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.node_replacement = _NodeReplacementAPI()
+        return cls._instance
+
+    @classmethod
+    def _reset(cls):
+        """Reset singleton for test isolation."""
+        if cls._instance is not None:
+            cls._instance.node_replacement.clear()
+
+
 # --- ComfyExtension ---
 
 class ComfyExtension(ABC):

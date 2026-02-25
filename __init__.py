@@ -8,14 +8,54 @@ A collection of custom ComfyUI nodes from ERPK, including WaveSpeed AI, Claude A
 Gemini API integrations, background removal utilities, and Apple ML models.
 """
 
-from comfy_api.latest import ComfyExtension, IO
+from comfy_api.latest import ComfyExtension, ComfyAPI, IO
 
 # Web directory for frontend extensions
 WEB_DIRECTORY = "./web"
 
+# V1→V3 node ID replacements for backward compatibility with saved workflows.
+# Only nodes whose class_type changed during the V3 migration need entries here.
+_NODE_REPLACEMENTS = {
+    # WaveSpeed
+    "WaveSpeed Custom Client": "WaveSpeedAIAPIClient",
+    "WaveSpeed Custom Preview Video": "PreviewVideo",
+    "WaveSpeed Custom Save Audio": "SaveAudio",
+    "WaveSpeed Custom Upload Image": "UploadImage",
+    "WaveSpeed Custom SeedreamV4": "SeedreamV4Node",
+    "WaveSpeed Custom SeedreamV4Edit": "SeedreamV4EditNode",
+    "WaveSpeed Custom SeedreamV4Sequential": "SeedreamV4SequentialNode",
+    "WaveSpeed Custom SeedreamV4EditSequential": "SeedreamV4EditSequentialNode",
+    "WaveSpeed Custom SeedreamV4_5": "SeedreamV4_5Node",
+    "WaveSpeed Custom SeedreamV4_5Edit": "SeedreamV4_5EditNode",
+    "WaveSpeed Custom SeedreamV4_5Sequential": "SeedreamV4_5SequentialNode",
+    "WaveSpeed Custom SeedreamV4_5EditSequential": "SeedreamV4_5EditSequentialNode",
+    "WaveSpeed Custom QwenImageT2I": "QwenImageTextToImageNode",
+    "WaveSpeed Custom QwenImageEdit": "QwenImageEditNode",
+    "WaveSpeed Custom QwenImageEditPlus": "QwenImageEditPlusNode",
+    # Background Removal
+    "ERPK Remove Background (rembg)": "RembgRemoveBackground",
+    "ERPK Remove Background (InSPyReNet)": "InSPyReNetRemoveBackground",
+    "ERPK Remove Background (BiRefNet)": "BiRefNetRemoveBackground",
+    "ERPK Get Mask (BiRefNet)": "BiRefNetGetMask",
+    "ERPK Foreground Refinement (BlurFusion)": "BlurFusionForegroundEstimation",
+    "ERPK Remove Background (BEN2)": "BEN2RemoveBackground",
+    # Apple ML
+    "ERPK SHARP Predict": "SHARPPredict",
+    "ERPK SHARP Render Views": "SHARPRenderViews",
+    "ERPK SHARP Render Video": "SHARPRenderVideo",
+}
+
 
 class ERPKExtension(ComfyExtension):
     """V3 extension that aggregates all ERPK node classes."""
+
+    async def on_load(self) -> None:
+        api = ComfyAPI()
+        for old_id, new_id in _NODE_REPLACEMENTS.items():
+            await api.node_replacement.register(
+                IO.NodeReplace(new_node_id=new_id, old_node_id=old_id)
+            )
+        print(f"[ERPK] Registered {len(_NODE_REPLACEMENTS)} node replacements")
 
     async def get_node_list(self) -> list[type[IO.ComfyNode]]:
         nodes: list[type[IO.ComfyNode]] = []

@@ -11,11 +11,6 @@ from typing import Optional, Dict, Any
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-try:
-    import PIL.Image
-except ImportError:
-    from PIL import Image as PIL
-
 from .utils import BaseRequest
 
 
@@ -321,7 +316,7 @@ class WaveSpeedClient:
 
         return task_result
 
-    def upload_file(self, image: PIL.Image.Image) -> str:
+    def upload_file(self, image) -> str:
         """
         Upload an image file to WaveSpeed AI API.
 

@@ -23,6 +23,8 @@ if "comfy_api" not in sys.modules:
     comfy_api_latest = types.ModuleType("comfy_api.latest")
     comfy_api_latest.IO = stub
     comfy_api_latest.ComfyExtension = stub.ComfyExtension
+    comfy_api_latest.ComfyAPI = stub.ComfyAPI
+    comfy_api_latest.io = stub  # nodes_replacements.py uses `from comfy_api.latest import io`
 
     comfy_api_pkg.latest = comfy_api_latest
 

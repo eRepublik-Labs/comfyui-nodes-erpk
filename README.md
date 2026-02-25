@@ -38,7 +38,9 @@ ComfyUI-Custom-Nodes/
 │   ├── utils.py                   # Shared tensor/PIL conversion utilities
 │   ├── rembg_node.py              # rembg backend (14+ ONNX models)
 │   ├── inspyrenet_node.py         # InSPyReNet backend (PyTorch)
-│   └── birefnet_node.py           # BiRefNet backend (HuggingFace)
+│   ├── birefnet_node.py           # BiRefNet backend (HuggingFace)
+│   ├── ben2_node.py               # BEN2 backend (HuggingFace)
+│   └── blur_fusion_node.py        # BlurFusion foreground refinement
 ├── apple/                         # Apple ML models integration
 │   ├── README.md                  # Package documentation
 │   └── sharp_nodes.py             # SHARP view synthesis nodes
@@ -363,6 +365,10 @@ Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishe
    - **Apple/SHARP:** No API keys required. Install with: `pip install git+https://github.com/apple/ml-sharp.git`
 
 2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, `ERPK/Gemini`, `ERPK/OpenAI`, `ERPK/Background Removal`, `ERPK/Apple/SHARP`, and `ERPK/utils`
+
+## Backward Compatibility
+
+This package uses the ComfyUI V3 node API. Saved workflows that reference older node IDs (e.g. `"WaveSpeed Custom SeedreamV4"`, `"ERPK Remove Background (rembg)"`, `"ERPK SHARP Predict"`) are automatically migrated to the current node IDs at load time via ComfyUI's NodeReplace system. No manual workflow editing is required.
 
 ## ComfyUI API Integration
 

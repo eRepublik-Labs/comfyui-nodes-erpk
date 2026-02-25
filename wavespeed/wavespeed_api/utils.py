@@ -5,25 +5,9 @@ Utility functions for WaveSpeed API integration
 import base64
 import io
 import requests
-import numpy
 from typing import List, Optional, Union
 from collections.abc import Iterable
 from pydantic import BaseModel
-
-# Import torch with proper error handling for ComfyUI
-try:
-    import torch
-except ImportError:
-    # This might happen during module discovery or outside ComfyUI
-    # We'll try to import it later when actually needed
-    torch = None
-    import sys
-    print("[WaveSpeed] Warning: torch not found during initial import. This is normal if not running in ComfyUI.", file=sys.stderr)
-
-try:
-    import PIL.Image
-except ImportError:
-    from PIL import Image as PIL
 
 
 def imageurl2tensor(image_urls: List[str]):
@@ -36,24 +20,19 @@ def imageurl2tensor(image_urls: List[str]):
     Returns:
         torch.Tensor: Batch of images as tensors (B, H, W, C)
     """
-    # Late import of torch if not already imported
-    global torch
-    if torch is None:
-        import torch
+    import torch
+    import PIL.Image
 
     images = []
     if not image_urls:
-        # Return a minimal valid tensor if no images
         return torch.zeros((1, 1, 1, 3))
 
     for url in image_urls:
         try:
-            # Download image
             response = requests.get(url, stream=True, timeout=30)
             response.raise_for_status()
             image_data = response.content
 
-            # Decode image
             with io.BytesIO(image_data) as bytes_io:
                 img = PIL.Image.open(bytes_io)
                 img = img.convert('RGB')
@@ -63,14 +42,12 @@ def imageurl2tensor(image_urls: List[str]):
             continue
 
     if not images:
-        # Return minimal tensor if all downloads failed
         return torch.zeros((1, 1, 1, 3))
 
-    # Convert images to tensor
     return images2tensor(images)
 
 
-def images2tensor(images: Union[List[PIL.Image.Image], PIL.Image.Image]):
+def images2tensor(images):
     """
     Convert PIL images to ComfyUI tensor format.
 
@@ -80,10 +57,9 @@ def images2tensor(images: Union[List[PIL.Image.Image], PIL.Image.Image]):
     Returns:
         torch.Tensor: Images as tensor (B, H, W, C) normalized to [0, 1]
     """
-    # Late import of torch if not already imported
-    global torch
-    if torch is None:
-        import torch
+    import numpy
+    import torch
+    import PIL.Image
 
     if isinstance(images, PIL.Image.Image):
         images = [images]
@@ -91,22 +67,17 @@ def images2tensor(images: Union[List[PIL.Image.Image], PIL.Image.Image]):
     if not isinstance(images, Iterable):
         raise ValueError("images must be a PIL Image or iterable of PIL Images")
 
-    # Convert each image to tensor
     tensors = []
     for img in images:
-        # Convert to numpy array
         np_img = numpy.array(img, dtype=numpy.float32)
-        # Normalize to [0, 1]
         np_img = np_img / 255.0
-        # Convert to tensor
         tensor = torch.from_numpy(np_img)
         tensors.append(tensor)
 
-    # Stack into batch
     return torch.stack(tensors)
 
 
-def tensor2images(tensor) -> List[PIL.Image.Image]:
+def tensor2images(tensor):
     """
     Convert ComfyUI tensor to PIL images.
 
@@ -114,25 +85,21 @@ def tensor2images(tensor) -> List[PIL.Image.Image]:
         tensor: ComfyUI image tensor (B, H, W, C)
 
     Returns:
-        List[PIL.Image.Image]: List of PIL images
+        list: List of PIL images
     """
-    # Late import of torch if not already imported
-    global torch
-    if torch is None:
-        import torch
+    import numpy
+    import PIL.Image
 
     # Handle both (B, H, W, C) and (H, W, C) formats
     if len(tensor.shape) == 3:
         tensor = tensor.unsqueeze(0)
 
-    # Convert to numpy and denormalize
     np_imgs = numpy.clip(tensor.cpu().numpy() * 255.0, 0.0, 255.0).astype(numpy.uint8)
 
-    # Convert each image to PIL
     return [PIL.Image.fromarray(np_img) for np_img in np_imgs]
 
 
-def encode_image(img: PIL.Image.Image, mask: Optional[PIL.Image.Image] = None) -> bytes:
+def encode_image(img, mask=None) -> bytes:
     """
     Encode PIL image to bytes.
 
@@ -157,7 +124,7 @@ def encode_image(img: PIL.Image.Image, mask: Optional[PIL.Image.Image] = None) -
     return data_bytes
 
 
-def image_to_base64(image: Union[PIL.Image.Image, object]) -> Optional[str]:
+def image_to_base64(image) -> Optional[str]:
     """
     Convert image to base64 string.
 
@@ -167,32 +134,22 @@ def image_to_base64(image: Union[PIL.Image.Image, object]) -> Optional[str]:
     Returns:
         str: Base64 encoded image string
     """
-    # Late import of torch if not already imported
-    global torch
-    if torch is None:
-        try:
-            import torch
-        except ImportError:
-            # If we can't import torch and the image is a tensor, we can't process it
-            if not isinstance(image, PIL.Image.Image):
-                raise ImportError("torch is required to process tensor images")
+    import torch
+    import PIL.Image
 
     if image is None:
         return None
 
-    # Convert tensor to PIL if needed
-    if torch and isinstance(image, torch.Tensor):
+    if isinstance(image, torch.Tensor):
         pil_images = tensor2images(image)
         if not pil_images:
             return None
         pil_image = pil_images[0]
     elif not isinstance(image, PIL.Image.Image):
-        # If torch isn't available and this isn't a PIL image, we can't process it
-        raise ValueError(f"Cannot process image of type {type(image)} without torch")
+        raise ValueError(f"Cannot process image of type {type(image)}")
     else:
         pil_image = image
 
-    # Encode to base64
     image_bytes = encode_image(pil_image)
     return base64.b64encode(image_bytes).decode("utf-8")
 
