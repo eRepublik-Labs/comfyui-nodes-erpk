@@ -2,12 +2,12 @@
 
 Complete Claude API integration providing text generation, prompt enhancement, vision analysis, and conversational AI capabilities for ComfyUI workflows.
 
-**Version:** 2026.2.11
+**Version:** 2026.2.15
 **Category in ComfyUI:** `ERPK/Claude`
 
 ## Features
 
-- **Prompt Enhancement** - Transform simple prompts into detailed descriptions with 50+ artistic styles
+- **Prompt Enhancement** - Transform simple prompts into detailed descriptions with 51 artistic styles
 - **Vision Analysis** - Analyze images with Claude's multimodal capabilities (up to 20 images)
 - **Text Generation** - General-purpose text completion and generation
 - **Conversations** - Multi-turn dialogues with context preservation
@@ -94,7 +94,7 @@ Initializes the Claude API client. Optional if API key is configured in ComfyUI 
 **Inputs:**
 - `client`: Claude API client (optional)
 - `prompt`: Simple prompt (e.g., "a cat")
-- `style`: 50+ styles (photorealistic, cinematic, fantasy, cyberpunk, anime, etc.)
+- `style`: 51 styles (photorealistic, cinematic, fantasy, cyberpunk, anime, etc.)
 - `detail_level`: minimal, moderate, detailed, ultra-detailed
 - `temperature`: 0.0-1.0 (creativity level)
 - `max_tokens`: 256-4096 (output length)
@@ -256,7 +256,7 @@ Forces Claude to respond with structured JSON matching your tool schema. Uses An
 
 ## Prompt Enhancement Styles
 
-The Claude Prompt Enhancer supports 50+ artistic styles:
+The Claude Prompt Enhancer supports 51 artistic styles:
 
 **Photography:**
 - photorealistic, cinematic, portrait, landscape, street_photography, macro_photography, fashion_photography, architectural
@@ -293,7 +293,7 @@ Enabled by default. Caches system prompts to reduce costs by up to 90% for repea
 - Subsequent requests with same system prompt read from cache
 - Cache read tokens cost 0.1x of regular input tokens
 
-**Pricing (Claude Sonnet 4.5):**
+**Pricing (Claude Sonnet 4.6):**
 - Input: $3 / million tokens
 - Output: $15 / million tokens
 - Cache Read: $0.30 / million tokens (90% savings)
@@ -305,7 +305,7 @@ Enabled by default. Caches system prompts to reduce costs by up to 90% for repea
 
 ### Model Selection
 - **Claude Haiku 4.5**: $1/1M in, $5/1M out - Fastest, cheapest for simple tasks
-- **Claude Sonnet 4.5**: $3/1M in, $15/1M out - Best balance (default)
+- **Claude Sonnet 4.6**: $3/1M in, $15/1M out - Best balance (default)
 - **Claude Opus 4.6**: $5/1M in, $25/1M out - Most intelligent, best for agents and coding
 
 ## Workflow Examples
@@ -411,5 +411,5 @@ MIT License
 
 For issues, questions, or contributions, please visit the repository or contact the maintainers.
 
-**Version:** 2026.2.11
+**Version:** 2026.2.15
 **Last Updated:** February 2026

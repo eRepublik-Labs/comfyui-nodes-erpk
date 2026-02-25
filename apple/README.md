@@ -3,8 +3,8 @@
 
 # Apple ML Models - ComfyUI Custom Nodes
 
-**Version:** 2026.1.6 (CalVer)
-**Category:** ERPK/Apple
+**Version:** 2026.2.15 (CalVer)
+**Category:** ERPK/Apple/SHARP
 **Namespace:** ERPK Organization Custom Nodes
 
 Part of the [ERPK Custom Nodes Collection](../README.md) for ComfyUI.
@@ -26,7 +26,7 @@ SHARP converts a single photograph into a 3D Gaussian splat representation that 
 
 | Node | Description | Requirements |
 |------|-------------|--------------|
-| **SHARP Predict** | Convert image to 3D Gaussian splat (.ply) | GPU recommended |
+| **SHARP Predict (Image to 3D Gaussian)** | Convert image to 3D Gaussian splat (.ply) | GPU recommended |
 | **SHARP Render Views** | Render novel views from .ply | CUDA required |
 | **SHARP Render Video** | Render orbit video from .ply | CUDA required |
 
@@ -53,7 +53,7 @@ Renders multiple novel views from a 3D Gaussian splat.
 - `ply_path` - Path to .ply file from SHARP Predict
 - `num_views` - Number of views to render (1-64)
 - `resolution` - Output image resolution (256-2048)
-- `orbit_radius` - Camera orbit radius (0.05-2.0)
+- `max_disparity` - Maximum camera disparity for view synthesis (0.01-0.5)
 
 **Outputs:**
 - `images` - Batch of rendered images

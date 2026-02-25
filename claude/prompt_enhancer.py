@@ -1,5 +1,5 @@
 # ABOUTME: ComfyUI V3 node for enhancing simple prompts with rich detail and style using Claude.
-# ABOUTME: Supports 50 enhancement styles and configurable detail levels for image generation prompts.
+# ABOUTME: Supports 51 enhancement styles and configurable detail levels for image generation prompts.
 
 from comfy_api.latest import IO
 

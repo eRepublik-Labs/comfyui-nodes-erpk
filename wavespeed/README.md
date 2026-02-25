@@ -1,6 +1,6 @@
 # WaveSpeed AI - ComfyUI Custom Nodes
 
-**Version:** 2025.10.0 (CalVer)
+**Version:** 2026.2.15 (CalVer)
 **Category:** ERPK/WaveSpeedAI
 **Namespace:** ERPK Organization Custom Nodes
 
@@ -65,7 +65,7 @@ Enhanced typography and text rendering for posters, logos, UI, and marketing lay
 
 **✅ Standalone Implementation:** This package is completely self-contained and does NOT require the official WaveSpeed AI ComfyUI nodes. All necessary API client functionality is included.
 
-**🔧 Node Name Compatibility:** All custom nodes use unique prefixed names ("WaveSpeed Custom") to avoid conflicts with the official WaveSpeed ComfyUI nodes if both are installed.
+**🔧 Node Name Compatibility:** All custom nodes use unique node IDs to avoid conflicts with the official WaveSpeed ComfyUI nodes if both are installed.
 
 ### Manual Installation
 
@@ -291,13 +291,10 @@ pip install -r requirements.txt
 
 4. **Check Console for Errors**: Look for any error messages in the ComfyUI console when it starts
 
-5. **Verify Import**: Test if the module imports correctly:
-```python
-# Run this from ComfyUI directory
-python -c "import sys; sys.path.insert(0, 'custom_nodes'); from erpk import wavespeed; print('Loaded', len(wavespeed.NODE_CLASS_MAPPINGS), 'nodes')"
+5. **Verify Import**: Check the ComfyUI console output on startup for:
 ```
-
-You should see: `Loaded 15 nodes`
+[ERPK] Loaded 15 V3 nodes
+```
 
 ### Common Issues
 
@@ -315,27 +312,27 @@ All WaveSpeed nodes are located under the **ERPK/WaveSpeedAI** category:
 4. Select your desired node
 
 **Available nodes (15 total):**
-- WaveSpeed Client (Custom)
-- WaveSpeed Preview Video (Custom)
-- WaveSpeed Save Audio (Custom)
-- WaveSpeed Upload Image (Custom)
-- Bytedance Seedream V4 (Custom)
-- Bytedance Seedream V4 Sequential (Custom)
-- Bytedance Seedream V4 Edit (Custom)
-- Bytedance Seedream V4 Edit Sequential (Custom)
-- Bytedance Seedream V4.5 (Custom)
-- Bytedance Seedream V4.5 Sequential (Custom)
-- Bytedance Seedream V4.5 Edit (Custom)
-- Bytedance Seedream V4.5 Edit Sequential (Custom)
-- Qwen Image Text-to-Image (Custom)
-- Qwen Image Edit (Custom)
-- Qwen Image Edit Plus (Custom)
+- WaveSpeed Client
+- WaveSpeed Preview Video
+- WaveSpeed Save Audio
+- WaveSpeed Upload Image
+- Bytedance Seedream V4
+- Bytedance Seedream V4 Sequential
+- Bytedance Seedream V4 Edit
+- Bytedance Seedream V4 Edit Sequential
+- Bytedance Seedream V4.5
+- Bytedance Seedream V4.5 Sequential
+- Bytedance Seedream V4.5 Edit
+- Bytedance Seedream V4.5 Edit Sequential
+- Qwen Image Text-to-Image
+- Qwen Image Edit
+- Qwen Image Edit Plus
 
 ## Versioning
 
 This package follows **Calendar Versioning (CalVer)**: `YYYY.MM.PATCH`
 
-**Current Version:** 2025.10.0
+**Current Version:** 2026.2.15
 
 - Major changes are released monthly
 - Patch releases for bug fixes within the month

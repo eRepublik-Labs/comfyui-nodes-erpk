@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2026.2.11 (CalVer)
+**Current Version:** 2026.2.15 (CalVer)
 
 ## Repository Structure
 
@@ -64,7 +64,7 @@ ComfyUI-Custom-Nodes/
 Custom nodes for WaveSpeed AI's image generation and editing APIs.
 
 **Category in ComfyUI:** `ERPK/WaveSpeedAI`
-**Version:** 2026.1.18
+**Version:** 2026.2.15
 
 #### ByteDance Seedream V4 Models
 
@@ -95,7 +95,7 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 Claude API integration for text generation, prompt enhancement, vision analysis, and conversational AI.
 
 **Category in ComfyUI:** `ERPK/Claude`
-**Version:** 2026.2.11
+**Version:** 2026.2.15
 
 #### Nodes
 
@@ -104,6 +104,9 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 - **Claude Vision Analysis** - Analyze images with Claude's multimodal capabilities (up to 20 images simultaneously)
 - **Claude Text Generation** - General-purpose text completion and generation
 - **Claude Conversation** - Multi-turn dialogues with context preservation and automatic memory management
+- **Claude Conversation Info** - Display conversation statistics and token usage
+- **Claude Tool Definition** - Build Anthropic tool definitions for structured output (chainable)
+- **Claude Structured Output** - Force Claude to respond with structured JSON matching a tool schema
 - **Claude Token Counter** - Count tokens and estimate API costs before making requests
 - **Claude Usage Stats** - Track cumulative token usage and costs across all Claude nodes
 
@@ -122,12 +125,12 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 Google Gemini API integration for text generation, vision analysis, multi-turn conversations, image generation, image editing, and **Veo video generation**.
 
 **Category in ComfyUI:** `ERPK/Gemini` and `ERPK/Gemini/Veo`
-**Version:** 2026.2.11
+**Version:** 2026.2.15
 
 #### Nodes
 
 - **Gemini API Config** - Initialize Gemini API connection (API key configuration). Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- Gemini nodes can run standalone.
-- **Gemini Text Generation** - General-purpose text generation with model selection (Gemini 3.1 Pro, 3 Pro, 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite)
+- **Gemini Text Generation** - General-purpose text generation with model selection (Gemini 3.1 Pro, 3 Pro, 3 Flash, 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite)
 - **Gemini Chat** - Multi-turn conversations with automatic context preservation
 - **Gemini Vision** - Analyze images with multimodal capabilities
 - **Gemini Image Generation** - Generate images from text descriptions (standalone node with dedicated image gen models)
@@ -141,7 +144,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Veo Image to Video** - Generate videos from an input image and optional text prompt
 
 **Key Benefits:**
-- Support for Gemini 3.1 Pro, 3 Pro, and Gemini 2.5 models
+- Support for Gemini 3.1 Pro, 3 Pro, 3 Flash, and Gemini 2.5 models
 - **Thinking level** control for Gemini 3+ models (none/low/medium/high reasoning depth)
 - **Veo video generation** with text-to-video and image-to-video (Veo 3 includes audio)
 - Each node selects its own model for maximum flexibility
@@ -160,7 +163,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 OpenAI API integration for text generation, vision analysis, multi-turn conversations, image generation, and image editing.
 
 **Category in ComfyUI:** `ERPK/OpenAI`
-**Version:** 2026.2.11
+**Version:** 2026.2.15
 
 #### Nodes
 
@@ -246,7 +249,7 @@ All nodes output:
 Apple ML models integration, currently featuring SHARP for single-image 3D view synthesis.
 
 **Category in ComfyUI:** `ERPK/Apple/SHARP`
-**Version:** 2026.1.18
+**Version:** 2026.2.15
 
 #### SHARP Nodes
 

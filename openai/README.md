@@ -2,7 +2,7 @@
 
 Complete OpenAI API integration providing text generation, vision analysis, multi-turn conversations, and image generation/editing for ComfyUI workflows.
 
-**Version:** 2026.2.11
+**Version:** 2026.2.15
 **Category in ComfyUI:** `ERPK/OpenAI`
 
 ## Features
@@ -143,7 +143,7 @@ Analyze images with questions or instructions.
 - `client`: OpenAI API client
 - `image`: ComfyUI image tensor (supports batches)
 - `prompt`: Question or instruction about the image(s)
-- `model`: gpt-5.2 (default), gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini
+- `model`: gpt-4o (default), gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o-mini
 - `detail`: Image analysis detail level - "auto" (default), "low" (faster/cheaper), "high" (more detailed)
 - `max_tokens`: 256-16384 (default: 4096)
 - `temperature`: 0.0-2.0 (default: 0.4, lower for more factual)
