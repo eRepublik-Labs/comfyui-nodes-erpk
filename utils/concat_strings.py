@@ -1,54 +1,46 @@
-# ABOUTME: ComfyUI node for concatenating multiple string inputs with configurable delimiters.
+# ABOUTME: ComfyUI V3 node for concatenating multiple string inputs with configurable delimiters.
 # ABOUTME: Supports up to 10 connectable text inputs, optional labels, and escape sequences.
+
+from comfy_api.latest import IO
 
 MAX_INPUTS = 10
 
 
-class ConcatenateStrings:
-    """
-    Concatenate multiple string inputs with configurable delimiter.
-    Each input slot accepts connections from other nodes or manual text entry.
-    """
+class ConcatenateStrings(IO.ComfyNode):
+    """Concatenate multiple string inputs with configurable delimiter."""
 
     @classmethod
-    def INPUT_TYPES(cls):
-        inputs = {
-            "required": {},
-            "optional": {
-                "Delimiter": ("STRING", {"default": "\\n", "multiline": False}),
-                "Include Labels": ("BOOLEAN", {"default": False}),
-                "Label on Same Line": ("BOOLEAN", {"default": True}),
-                "_inputs_header": ("STRING", {"default": ""}),
-            },
-        }
+    def define_schema(cls):
+        inputs = [
+            IO.String.Input("Delimiter", default="\\n", optional=True,
+                            tooltip="Separator between texts. Use \\\\n for newlines, \\\\t for tabs."),
+            IO.Boolean.Input("Include Labels", default=False, optional=True,
+                             tooltip="Prefix each text with its label."),
+            IO.Boolean.Input("Label on Same Line", default=True, optional=True,
+                             tooltip="Place label on same line as text, or on a separate line."),
+        ]
 
-        # Add label and text input pairs (label first so it appears on top)
         for i in range(1, MAX_INPUTS + 1):
-            inputs["optional"][f"Label {i}"] = ("STRING", {
-                "default": "",
-                "multiline": False,
-            })
-            inputs["optional"][f"Text {i}"] = ("STRING", {
-                "default": "",
-                "multiline": True,
-            })
+            inputs.append(IO.String.Input(f"Label {i}", default="", optional=True))
+            inputs.append(IO.String.Input(f"Text {i}", default="", multiline=True, optional=True))
 
-        return inputs
+        return IO.Schema(
+            node_id="ERPK_ConcatenateStrings",
+            display_name="Concatenate Strings (ERPK)",
+            category="ERPK/utils",
+            description=(
+                "Concatenate multiple text inputs into a single output. "
+                "Connect STRING outputs from other nodes to Text 1, Text 2, etc. "
+                "Set delimiter to control joining (use \\\\n for newlines, \\\\t for tabs)."
+            ),
+            inputs=inputs,
+            outputs=[
+                IO.String.Output(display_name="STRING"),
+            ],
+        )
 
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("STRING",)
-    FUNCTION = "concatenate"
-    CATEGORY = "ERPK/utils"
-    DESCRIPTION = """
-Concatenate multiple text inputs into a single output.
-
-- Connect STRING outputs from other nodes to text_1, text_2, etc.
-- Optionally set labels for each input (label_1, label_2, etc.)
-- Enable **include_labels** to prefix values with their labels
-- Set **delimiter** to control how values are joined (use \\n for newlines, \\t for tabs)
-"""
-
-    def concatenate(self, **kwargs):
+    @classmethod
+    def execute(cls, **kwargs) -> IO.NodeOutput:
         # Handle escape sequences in delimiter (\n, \t, etc.)
         delimiter = kwargs.get("Delimiter", "\\n")
         try:
@@ -77,13 +69,4 @@ Concatenate multiple text inputs into a single output.
             else:
                 parts.append(text)
 
-        return (delimiter.join(parts),)
-
-
-NODE_CLASS_MAPPINGS = {
-    "ERPK_ConcatenateStrings": ConcatenateStrings,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "ERPK_ConcatenateStrings": "Concatenate Strings (ERPK)",
-}
+        return IO.NodeOutput(delimiter.join(parts))

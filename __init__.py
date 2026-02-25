@@ -1,3 +1,6 @@
+# ABOUTME: V3 entrypoint for ERPK ComfyUI Custom Nodes.
+# ABOUTME: Registers all nodes via ComfyExtension and aiohttp routes for settings/workflows.
+
 """
 ERPK ComfyUI Custom Nodes
 
@@ -5,92 +8,52 @@ A collection of custom ComfyUI nodes from ERPK, including WaveSpeed AI, Claude A
 Gemini API integrations, background removal utilities, and Apple ML models.
 """
 
-# Initialize combined mappings
-NODE_CLASS_MAPPINGS = {}
-NODE_DISPLAY_NAME_MAPPINGS = {}
+from comfy_api.latest import ComfyExtension, IO
 
 # Web directory for frontend extensions
 WEB_DIRECTORY = "./web"
 
-# Import and register WaveSpeed nodes
-try:
-    from .wavespeed import (
-        NODE_CLASS_MAPPINGS as WAVESPEED_NODE_CLASS_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as WAVESPEED_NODE_DISPLAY_NAME_MAPPINGS,
-    )
-    NODE_CLASS_MAPPINGS.update(WAVESPEED_NODE_CLASS_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(WAVESPEED_NODE_DISPLAY_NAME_MAPPINGS)
-except ImportError as e:
-    print(f"[ERPK] Warning: Could not load WaveSpeed nodes: {e}")
 
-# Import and register Claude nodes
-try:
-    from .claude import (
-        NODE_CLASS_MAPPINGS as CLAUDE_NODE_CLASS_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as CLAUDE_NODE_DISPLAY_NAME_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(CLAUDE_NODE_CLASS_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(CLAUDE_NODE_DISPLAY_NAME_MAPPINGS)
-except ImportError as e:
-    print(f"[ERPK] Warning: Could not load Claude nodes: {e}")
+class ERPKExtension(ComfyExtension):
+    """V3 extension that aggregates all ERPK node classes."""
 
-# Import and register Gemini nodes
-try:
-    from .gemini import (
-        NODE_CLASS_MAPPINGS as GEMINI_NODE_CLASS_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as GEMINI_NODE_DISPLAY_NAME_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(GEMINI_NODE_CLASS_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(GEMINI_NODE_DISPLAY_NAME_MAPPINGS)
-except ImportError as e:
-    print(f"[ERPK] Warning: Could not load Gemini nodes: {e}")
+    async def get_node_list(self) -> list[type[IO.ComfyNode]]:
+        nodes: list[type[IO.ComfyNode]] = []
 
-# Import and register OpenAI nodes
-try:
-    from .openai import (
-        NODE_CLASS_MAPPINGS as OPENAI_NODE_CLASS_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as OPENAI_NODE_DISPLAY_NAME_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(OPENAI_NODE_CLASS_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(OPENAI_NODE_DISPLAY_NAME_MAPPINGS)
-except ImportError as e:
-    print(f"[ERPK] Warning: Could not load OpenAI nodes: {e}")
+        # Collect V3 nodes from each provider
+        _providers = [
+            (".utils", "utility"),
+            # Providers below will be added as they're converted to V3:
+            # (".claude", "Claude"),
+            # (".gemini", "Gemini"),
+            # (".openai", "OpenAI"),
+            # (".wavespeed", "WaveSpeed"),
+            # (".bgremoval", "Background Removal"),
+            # (".apple", "Apple ML"),
+        ]
 
-# Import and register Background Removal nodes
-try:
-    from .bgremoval import (
-        NODE_CLASS_MAPPINGS as BGREMOVAL_NODE_CLASS_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as BGREMOVAL_NODE_DISPLAY_NAME_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(BGREMOVAL_NODE_CLASS_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(BGREMOVAL_NODE_DISPLAY_NAME_MAPPINGS)
-except ImportError as e:
-    print(f"[ERPK] Warning: Could not load Background Removal nodes: {e}")
+        for module_path, label in _providers:
+            try:
+                import importlib
+                try:
+                    mod = importlib.import_module(module_path, package=__package__)
+                except TypeError:
+                    # __package__ is None in test environment — use absolute import
+                    mod = importlib.import_module(module_path.lstrip("."))
+                provider_nodes = getattr(mod, "NODES", [])
+                nodes.extend(provider_nodes)
+            except ImportError as e:
+                print(f"[ERPK] Warning: Could not load {label} nodes: {e}")
 
-# Import and register Apple ML nodes
-try:
-    from .apple import (
-        NODE_CLASS_MAPPINGS as APPLE_NODE_CLASS_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as APPLE_NODE_DISPLAY_NAME_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(APPLE_NODE_CLASS_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(APPLE_NODE_DISPLAY_NAME_MAPPINGS)
-except ImportError as e:
-    print(f"[ERPK] Warning: Could not load Apple ML nodes: {e}")
+        print(f"[ERPK] Loaded {len(nodes)} V3 nodes")
+        return nodes
 
-# Import and register utility nodes
-try:
-    from .utils import (
-        NODE_CLASS_MAPPINGS as UTILS_NODE_CLASS_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as UTILS_NODE_DISPLAY_NAME_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(UTILS_NODE_CLASS_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(UTILS_NODE_DISPLAY_NAME_MAPPINGS)
-except ImportError as e:
-    print(f"[ERPK] Warning: Could not load utility nodes: {e}")
 
-# Print loaded nodes summary
-print(f"[ERPK] Loaded {len(NODE_CLASS_MAPPINGS)} total nodes")
+async def comfy_entrypoint() -> ERPKExtension:
+    return ERPKExtension()
+
+
+# --- API Routes (independent of V1/V3 node registration) ---
 
 # Register multi-user API route for settings resolution
 try:
@@ -195,5 +158,4 @@ try:
 except Exception as e:
     print(f"[ERPK] Warning: Could not register shared workflows routes: {e}")
 
-# Export for ComfyUI
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
+__all__ = ["comfy_entrypoint", "WEB_DIRECTORY"]
