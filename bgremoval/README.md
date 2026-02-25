@@ -3,7 +3,7 @@
 
 # Background Removal - ComfyUI Custom Nodes
 
-**Version:** 2026.2.13 (CalVer)
+**Version:** 2026.2.14 (CalVer)
 **Category:** ERPK/Background Removal
 **Namespace:** ERPK Organization Custom Nodes
 
