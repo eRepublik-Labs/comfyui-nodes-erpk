@@ -3,7 +3,7 @@
 
 import json
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
 
 
 def _make_tool_use_block(name="extract", input_data=None):
@@ -58,26 +58,24 @@ class TestStructuredOutputExtraction:
     def test_extracts_json_from_tool_use_response(self):
         from claude.structured_output import ClaudeStructuredOutput
 
-        node = ClaudeStructuredOutput()
         client = Mock()
         tool_data = {"name": "Alice", "age": 30}
         client.send_request.return_value = _make_response(
             [_make_tool_use_block("extract", tool_data)]
         )
 
-        (json_output, thinking) = node.extract(
+        result = ClaudeStructuredOutput.execute(
             client=client,
             prompt="Extract the person info",
             tool=_make_tool_list("extract"),
         )
 
-        parsed = json.loads(json_output)
+        parsed = json.loads(result[0])
         assert parsed == {"name": "Alice", "age": 30}
 
     def test_extracts_thinking_text(self):
         from claude.structured_output import ClaudeStructuredOutput
 
-        node = ClaudeStructuredOutput()
         client = Mock()
         client.send_request.return_value = _make_response([
             _make_text_block("Let me analyze this..."),
@@ -85,26 +83,28 @@ class TestStructuredOutputExtraction:
             _make_tool_use_block("extract", {"name": "Bob"}),
         ])
 
-        (json_output, thinking) = node.extract(
+        result = ClaudeStructuredOutput.execute(
             client=client,
             prompt="Extract person",
             tool=_make_tool_list("extract"),
         )
 
+        thinking = result[1]
         assert "Let me analyze this..." in thinking
         assert "The text mentions a person." in thinking
 
     def test_passes_tools_and_tool_choice_to_client(self):
         from claude.structured_output import ClaudeStructuredOutput
 
-        node = ClaudeStructuredOutput()
         client = Mock()
         client.send_request.return_value = _make_response(
             [_make_tool_use_block("extract", {"x": 1})]
         )
         tools = _make_tool_list("extract")
 
-        node.extract(client=client, prompt="Test prompt", tool=tools)
+        ClaudeStructuredOutput.execute(
+            client=client, prompt="Test prompt", tool=tools
+        )
 
         call_kwargs = client.send_request.call_args
         assert call_kwargs.kwargs["tools"] == tools
@@ -113,13 +113,12 @@ class TestStructuredOutputExtraction:
     def test_passes_optional_parameters(self):
         from claude.structured_output import ClaudeStructuredOutput
 
-        node = ClaudeStructuredOutput()
         client = Mock()
         client.send_request.return_value = _make_response(
             [_make_tool_use_block("extract", {"x": 1})]
         )
 
-        node.extract(
+        ClaudeStructuredOutput.execute(
             client=client,
             prompt="Test",
             tool=_make_tool_list("extract"),
@@ -136,19 +135,18 @@ class TestStructuredOutputExtraction:
     def test_empty_thinking_when_no_text_blocks(self):
         from claude.structured_output import ClaudeStructuredOutput
 
-        node = ClaudeStructuredOutput()
         client = Mock()
         client.send_request.return_value = _make_response(
             [_make_tool_use_block("extract", {"result": True})]
         )
 
-        (json_output, thinking) = node.extract(
+        result = ClaudeStructuredOutput.execute(
             client=client,
             prompt="Test",
             tool=_make_tool_list("extract"),
         )
 
-        assert thinking == ""
+        assert result[1] == ""
 
 
 class TestStructuredOutputValidation:
@@ -157,45 +155,49 @@ class TestStructuredOutputValidation:
     def test_rejects_multiple_tools(self):
         from claude.structured_output import ClaudeStructuredOutput
 
-        node = ClaudeStructuredOutput()
         client = Mock()
         two_tools = _make_tool_list("tool_a") + _make_tool_list("tool_b")
 
         with pytest.raises(ValueError, match="exactly 1 tool"):
-            node.extract(client=client, prompt="Test", tool=two_tools)
+            ClaudeStructuredOutput.execute(
+                client=client, prompt="Test", tool=two_tools
+            )
 
         client.send_request.assert_not_called()
 
     def test_rejects_empty_tools(self):
         from claude.structured_output import ClaudeStructuredOutput
 
-        node = ClaudeStructuredOutput()
         client = Mock()
 
         with pytest.raises(ValueError, match="exactly 1 tool"):
-            node.extract(client=client, prompt="Test", tool=[])
+            ClaudeStructuredOutput.execute(
+                client=client, prompt="Test", tool=[]
+            )
 
         client.send_request.assert_not_called()
 
     def test_rejects_empty_prompt(self):
         from claude.structured_output import ClaudeStructuredOutput
 
-        node = ClaudeStructuredOutput()
         client = Mock()
 
         with pytest.raises(ValueError, match="[Pp]rompt"):
-            node.extract(client=client, prompt="", tool=_make_tool_list())
+            ClaudeStructuredOutput.execute(
+                client=client, prompt="", tool=_make_tool_list()
+            )
 
         client.send_request.assert_not_called()
 
     def test_rejects_whitespace_prompt(self):
         from claude.structured_output import ClaudeStructuredOutput
 
-        node = ClaudeStructuredOutput()
         client = Mock()
 
         with pytest.raises(ValueError, match="[Pp]rompt"):
-            node.extract(client=client, prompt="   \n  ", tool=_make_tool_list())
+            ClaudeStructuredOutput.execute(
+                client=client, prompt="   \n  ", tool=_make_tool_list()
+            )
 
 
 class TestStructuredOutputErrors:
@@ -204,12 +206,11 @@ class TestStructuredOutputErrors:
     def test_propagates_api_errors(self):
         from claude.structured_output import ClaudeStructuredOutput
 
-        node = ClaudeStructuredOutput()
         client = Mock()
         client.send_request.side_effect = Exception("API connection failed")
 
         with pytest.raises(Exception, match="API connection failed"):
-            node.extract(
+            ClaudeStructuredOutput.execute(
                 client=client,
                 prompt="Test prompt",
                 tool=_make_tool_list(),
@@ -217,32 +218,37 @@ class TestStructuredOutputErrors:
 
 
 class TestStructuredOutputNodeMeta:
-    """Verify the ComfyUI node contract (INPUT_TYPES, RETURN_TYPES, etc.)."""
+    """Verify the V3 node contract (schema, inputs, outputs)."""
 
-    def test_input_types_structure(self):
+    def test_schema_structure(self):
         from claude.structured_output import ClaudeStructuredOutput
 
-        input_types = ClaudeStructuredOutput.INPUT_TYPES()
-        assert "prompt" in input_types["required"]
-        assert "tool" in input_types["required"]
-        assert input_types["required"]["tool"][0] == "CLAUDE_TOOLS"
-        assert "client" in input_types["optional"]
-        assert input_types["optional"]["client"][0] == "CLAUDE_API_CLIENT"
+        schema = ClaudeStructuredOutput.define_schema()
+        input_ids = [i.id for i in schema.inputs]
+        assert "prompt" in input_ids
+        assert "tool" in input_ids
+        tool_input = [i for i in schema.inputs if i.id == "tool"][0]
+        assert tool_input.io_type == "CLAUDE_TOOLS"
+        assert "client" in input_ids
+        client_input = [i for i in schema.inputs if i.id == "client"][0]
+        assert client_input.io_type == "CLAUDE_API_CLIENT"
 
-    def test_return_types(self):
+    def test_output_types(self):
         from claude.structured_output import ClaudeStructuredOutput
 
-        assert ClaudeStructuredOutput.RETURN_TYPES == ("STRING", "STRING")
-        assert ClaudeStructuredOutput.RETURN_NAMES == ("json_output", "thinking")
+        schema = ClaudeStructuredOutput.define_schema()
+        assert len(schema.outputs) == 2
+        assert schema.outputs[0].io_type == "STRING"
+        assert schema.outputs[1].io_type == "STRING"
 
     def test_category(self):
         from claude.structured_output import ClaudeStructuredOutput
 
-        assert ClaudeStructuredOutput.CATEGORY == "ERPK/Claude/Tools"
+        schema = ClaudeStructuredOutput.define_schema()
+        assert schema.category == "ERPK/Claude/Tools"
 
-    def test_is_changed_disables_caching(self):
+    def test_not_idempotent(self):
         from claude.structured_output import ClaudeStructuredOutput
-        import math
 
-        result = ClaudeStructuredOutput.IS_CHANGED()
-        assert math.isnan(result)
+        schema = ClaudeStructuredOutput.define_schema()
+        assert schema.not_idempotent is True

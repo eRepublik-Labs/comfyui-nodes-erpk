@@ -23,8 +23,8 @@ class ERPKExtension(ComfyExtension):
         # Collect V3 nodes from each provider
         _providers = [
             (".utils", "utility"),
+            (".claude", "Claude"),
             # Providers below will be added as they're converted to V3:
-            # (".claude", "Claude"),
             # (".gemini", "Gemini"),
             # (".openai", "OpenAI"),
             # (".wavespeed", "WaveSpeed"),

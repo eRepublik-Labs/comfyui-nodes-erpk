@@ -1,23 +1,11 @@
-"""
-Claude Prompt Enhancement Node
+# ABOUTME: ComfyUI V3 node for enhancing simple prompts with rich detail and style using Claude.
+# ABOUTME: Supports 50 enhancement styles and configurable detail levels for image generation prompts.
 
-Enhances simple prompts with rich detail and style using Claude's language understanding.
-Primary feature of the Claude integration package.
-"""
-
-from .claude_api.client import ClaudeClient
+from comfy_api.latest import IO
 
 
-class ClaudePromptEnhancer:
-    """
-    Claude Prompt Enhancer Node
-
-    Takes a simple prompt and elaborates it with rich detail, atmosphere,
-    and style based on the selected enhancement mode.
-
-    Primary use case: Transform "a cat" into detailed, styled descriptions
-    suitable for high-quality image generation.
-    """
+class ClaudePromptEnhancer(IO.ComfyNode):
+    """Enhances simple prompts with rich detail, atmosphere, and style."""
 
     # Enhancement style system prompts
     STYLE_PROMPTS = {
@@ -227,105 +215,81 @@ Emphasize architectural beauty and structural design."""
     }
 
     @classmethod
-    def INPUT_TYPES(cls):
-        # Get sorted style list for the dropdown
+    def define_schema(cls):
         style_options = sorted(list(cls.STYLE_PROMPTS.keys()))
 
-        return {
-            "required": {
-                "prompt": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "Simple prompt to enhance (e.g., 'a cat')"
-                    }
+        return IO.Schema(
+            node_id="ClaudePromptEnhancer",
+            display_name="Claude Prompt Enhancer",
+            category="ERPK/Claude",
+            description="Enhance simple prompts with rich detail and style for image generation.",
+            not_idempotent=True,
+            inputs=[
+                IO.String.Input(
+                    "prompt",
+                    multiline=True,
+                    default="",
+                    tooltip="Simple prompt to enhance (e.g., 'a cat')",
                 ),
-                "style": (
-                    style_options,
-                    {
-                        "default": "photorealistic",
-                        "tooltip": "Enhancement style to apply"
-                    }
+                IO.Combo.Input(
+                    "style",
+                    options=style_options,
+                    default="photorealistic",
+                    tooltip="Enhancement style to apply",
                 ),
-                "detail_level": (
-                    ["minimal", "moderate", "detailed", "ultra-detailed"],
-                    {
-                        "default": "detailed",
-                        "tooltip": "How much detail to add to the prompt"
-                    }
+                IO.Combo.Input(
+                    "detail_level",
+                    options=["minimal", "moderate", "detailed", "ultra-detailed"],
+                    default="detailed",
+                    tooltip="How much detail to add to the prompt",
                 ),
-            },
-            "optional": {
-                "client": (
-                    "CLAUDE_API_CLIENT",
-                    {"tooltip": "Claude API client (optional if API key is configured in Settings)"}
+                IO.Custom("CLAUDE_API_CLIENT").Input(
+                    "client",
+                    optional=True,
+                    tooltip="Claude API client (optional if API key is configured in Settings)",
                 ),
-                "temperature": (
-                    "FLOAT",
-                    {
-                        "default": 0.7,
-                        "min": 0.0,
-                        "max": 1.0,
-                        "step": 0.05,
-                        "tooltip": "Creativity level (0.0=focused, 1.0=creative)"
-                    }
+                IO.Float.Input(
+                    "temperature",
+                    default=0.7,
+                    min=0.0,
+                    max=1.0,
+                    step=0.05,
+                    optional=True,
+                    tooltip="Creativity level (0.0=focused, 1.0=creative)",
                 ),
-                "max_tokens": (
-                    "INT",
-                    {
-                        "default": 1024,
-                        "min": 256,
-                        "max": 4096,
-                        "step": 128,
-                        "tooltip": "Maximum length of enhanced prompt"
-                    }
+                IO.Int.Input(
+                    "max_tokens",
+                    default=1024,
+                    min=256,
+                    max=4096,
+                    step=128,
+                    optional=True,
+                    tooltip="Maximum length of enhanced prompt",
                 ),
-                "use_streaming": (
-                    "BOOLEAN",
-                    {
-                        "default": False,
-                        "tooltip": "Enable streaming (may not display in real-time in ComfyUI)"
-                    }
+                IO.Boolean.Input(
+                    "use_streaming",
+                    default=False,
+                    optional=True,
+                    tooltip="Enable streaming (may not display in real-time in ComfyUI)",
                 ),
-            }
-        }
-
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("enhanced_prompt",)
-    FUNCTION = "enhance_prompt"
-    CATEGORY = "ERPK/Claude"
+            ],
+            outputs=[
+                IO.String.Output("enhanced_prompt"),
+            ],
+        )
 
     @classmethod
-    def IS_CHANGED(cls, **kwargs):
-        # Always regenerate - disable caching for prompt enhancement
-        return float("nan")
+    def execute(cls, **kwargs) -> IO.NodeOutput:
+        from .claude_api.client import ClaudeClient
 
-    def enhance_prompt(
-        self,
-        prompt: str,
-        style: str,
-        detail_level: str,
-        client: ClaudeClient = None,
-        temperature: float = 0.7,
-        max_tokens: int = 1024,
-        use_streaming: bool = False
-    ):
-        """
-        Enhance a simple prompt with rich detail and style.
+        prompt = kwargs.get("prompt", "")
+        style = kwargs.get("style", "photorealistic")
+        detail_level = kwargs.get("detail_level", "detailed")
+        client = kwargs.get("client")
+        temperature = kwargs.get("temperature", 0.7)
+        max_tokens = kwargs.get("max_tokens", 1024)
+        use_streaming = kwargs.get("use_streaming", False)
 
-        Args:
-            prompt: Simple prompt to enhance
-            style: Enhancement style
-            detail_level: Detail level
-            client: Claude API client (optional if API key is configured in Settings)
-            temperature: Creativity level
-            max_tokens: Max output tokens
-            use_streaming: Enable streaming
-
-        Returns:
-            Tuple containing enhanced prompt
-        """
         if client is None:
             client = ClaudeClient(api_key=None)
 
@@ -333,60 +297,40 @@ Emphasize architectural beauty and structural design."""
             raise ValueError("Prompt cannot be empty")
 
         try:
-            # Build system prompt with style and detail instructions
-            system_prompt = self._build_system_prompt(style, detail_level)
-
-            # Build user message
+            system_prompt = cls._build_system_prompt(style, detail_level)
             user_message = f"Enhance this prompt: {prompt}"
+            messages = [{"role": "user", "content": user_message}]
 
-            # Build messages
-            messages = [
-                {"role": "user", "content": user_message}
-            ]
-
-            # Send request (streaming or standard)
             if use_streaming and client.enable_streaming:
-                enhanced = self._generate_streaming(client, messages, system_prompt, temperature, max_tokens)
+                enhanced = cls._generate_streaming(client, messages, system_prompt, temperature, max_tokens)
             else:
-                enhanced = self._generate_standard(client, messages, system_prompt, temperature, max_tokens)
+                enhanced = cls._generate_standard(client, messages, system_prompt, temperature, max_tokens)
 
             print(f"[Claude] Prompt enhanced successfully")
             print(f"[Claude] Original: {prompt[:100]}...")
             print(f"[Claude] Enhanced: {enhanced[:100]}...")
 
-            return (enhanced,)
+            return IO.NodeOutput(enhanced)
 
         except Exception as e:
             error_msg = f"Failed to enhance prompt: {str(e)}"
             print(f"[Claude] Error: {error_msg}")
             raise ValueError(error_msg)
 
-    def _build_system_prompt(self, style: str, detail_level: str) -> str:
-        """
-        Build system prompt with style and detail level instructions.
+    @classmethod
+    def _build_system_prompt(cls, style, detail_level):
+        """Build system prompt with style and detail level instructions."""
+        style_instructions = cls.STYLE_PROMPTS.get(style, cls.STYLE_PROMPTS["photorealistic"])
 
-        Args:
-            style: Enhancement style
-            detail_level: Detail level
-
-        Returns:
-            Complete system prompt
-        """
-        # Get style-specific instructions
-        style_instructions = self.STYLE_PROMPTS.get(style, self.STYLE_PROMPTS["photorealistic"])
-
-        # Add detail level instructions
         detail_instructions = {
             "minimal": "Add just essential details. Keep it concise and focused.",
             "moderate": "Add good detail and atmosphere. Balance detail with readability.",
             "detailed": "Add rich detail, atmosphere, and context. Be descriptive and vivid.",
-            "ultra-detailed": "Add maximum detail, nuance, and specificity. Be extremely descriptive."
+            "ultra-detailed": "Add maximum detail, nuance, and specificity. Be extremely descriptive.",
         }
-
         detail_instruction = detail_instructions.get(detail_level, detail_instructions["detailed"])
 
-        # Combine into full system prompt
-        system_prompt = f"""{style_instructions}
+        return f"""{style_instructions}
 
 Detail Level: {detail_instruction}
 
@@ -398,80 +342,29 @@ Guidelines:
 - Don't add irrelevant elements
 - Output ONLY the enhanced prompt, no explanation or preamble"""
 
-        return system_prompt
-
-    def _generate_standard(
-        self,
-        client: ClaudeClient,
-        messages: list,
-        system: str,
-        temperature: float,
-        max_tokens: int
-    ) -> str:
-        """
-        Generate using standard (non-streaming) mode.
-
-        Args:
-            client: Claude client
-            messages: Message list
-            system: System prompt
-            temperature: Temperature
-            max_tokens: Max tokens
-
-        Returns:
-            Generated text
-        """
+    @classmethod
+    def _generate_standard(cls, client, messages, system, temperature, max_tokens):
+        """Generate using standard (non-streaming) mode."""
         response = client.send_request(
             messages=messages,
             system=system,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
         )
-
-        # Extract text from response
         if hasattr(response, 'content') and len(response.content) > 0:
             return response.content[0].text
         else:
             raise ValueError("Invalid response format from Claude API")
 
-    def _generate_streaming(
-        self,
-        client: ClaudeClient,
-        messages: list,
-        system: str,
-        temperature: float,
-        max_tokens: int
-    ) -> str:
-        """
-        Generate using streaming mode.
-
-        Args:
-            client: Claude client
-            messages: Message list
-            system: System prompt
-            temperature: Temperature
-            max_tokens: Max tokens
-
-        Returns:
-            Complete generated text
-        """
+    @classmethod
+    def _generate_streaming(cls, client, messages, system, temperature, max_tokens):
+        """Generate using streaming mode."""
         chunks = []
         for chunk in client.send_request_streaming(
             messages=messages,
             system=system,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
         ):
             chunks.append(chunk)
-
         return "".join(chunks)
-
-
-# Node registration
-NODE_CLASS_MAPPINGS = {
-    "ClaudePromptEnhancer": ClaudePromptEnhancer,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "ClaudePromptEnhancer": "Claude Prompt Enhancer",
-}

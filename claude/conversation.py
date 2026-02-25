@@ -1,131 +1,95 @@
-"""
-Claude Conversation Node
+# ABOUTME: ComfyUI V3 nodes for multi-turn Claude conversations with message history.
+# ABOUTME: ClaudeConversation manages chat state; ClaudeConversationInfo displays conversation details.
 
-Maintains multi-turn conversations with message history.
-"""
-
-from .claude_api.client import ClaudeClient
-from .claude_api.utils import TokenManager
+from comfy_api.latest import IO
 
 
-class ClaudeConversation:
-    """
-    Claude Conversation Node
-
-    Maintains a multi-turn conversation with Claude, preserving message history
-    across multiple node executions.
-
-    Features:
-    - Message history management
-    - Automatic context window trimming
-    - Conversation state preservation
-    - Token usage tracking
-    """
+class ClaudeConversation(IO.ComfyNode):
+    """Maintains a multi-turn conversation with Claude, preserving message history."""
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "prompt": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "Your message in the conversation"
-                    }
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="ClaudeConversation",
+            display_name="Claude Conversation",
+            category="ERPK/Claude",
+            description="Multi-turn conversation with Claude, preserving message history across executions.",
+            not_idempotent=True,
+            inputs=[
+                IO.String.Input(
+                    "prompt",
+                    multiline=True,
+                    default="",
+                    tooltip="Your message in the conversation",
                 ),
-            },
-            "optional": {
-                "client": (
-                    "CLAUDE_API_CLIENT",
-                    {"tooltip": "Claude API client (optional if API key is configured in Settings)"}
+                IO.Custom("CLAUDE_API_CLIENT").Input(
+                    "client",
+                    optional=True,
+                    tooltip="Claude API client (optional if API key is configured in Settings)",
                 ),
-                "conversation_history": (
-                    "CLAUDE_CONVERSATION",
-                    {"tooltip": "Previous conversation state (connect from previous conversation node)"}
+                IO.Custom("CLAUDE_CONVERSATION").Input(
+                    "conversation_history",
+                    optional=True,
+                    tooltip="Previous conversation state (connect from previous conversation node)",
                 ),
-                "system_prompt": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "Optional system prompt (only used for new conversations)"
-                    }
+                IO.String.Input(
+                    "system_prompt",
+                    multiline=True,
+                    default="",
+                    optional=True,
+                    tooltip="Optional system prompt (only used for new conversations)",
                 ),
-                "auto_trim": (
-                    "BOOLEAN",
-                    {
-                        "default": True,
-                        "tooltip": "Automatically trim old messages to fit context window"
-                    }
+                IO.Boolean.Input(
+                    "auto_trim",
+                    default=True,
+                    optional=True,
+                    tooltip="Automatically trim old messages to fit context window",
                 ),
-                "reset_conversation": (
-                    "BOOLEAN",
-                    {
-                        "default": False,
-                        "tooltip": "Start a new conversation, discarding history"
-                    }
+                IO.Boolean.Input(
+                    "reset_conversation",
+                    default=False,
+                    optional=True,
+                    tooltip="Start a new conversation, discarding history",
                 ),
-                "temperature": (
-                    "FLOAT",
-                    {
-                        "default": 0.7,
-                        "min": 0.0,
-                        "max": 1.0,
-                        "step": 0.05,
-                        "tooltip": "Creativity level"
-                    }
+                IO.Float.Input(
+                    "temperature",
+                    default=0.7,
+                    min=0.0,
+                    max=1.0,
+                    step=0.05,
+                    optional=True,
+                    tooltip="Creativity level",
                 ),
-                "max_tokens": (
-                    "INT",
-                    {
-                        "default": 2048,
-                        "min": 256,
-                        "max": 4096,
-                        "step": 128,
-                        "tooltip": "Maximum length of response"
-                    }
+                IO.Int.Input(
+                    "max_tokens",
+                    default=2048,
+                    min=256,
+                    max=4096,
+                    step=128,
+                    optional=True,
+                    tooltip="Maximum length of response",
                 ),
-            }
-        }
-
-    RETURN_TYPES = ("STRING", "CLAUDE_CONVERSATION")
-    RETURN_NAMES = ("response", "conversation_history")
-    FUNCTION = "chat"
-    CATEGORY = "ERPK/Claude"
+            ],
+            outputs=[
+                IO.String.Output("response"),
+                IO.Custom("CLAUDE_CONVERSATION").Output("conversation_history"),
+            ],
+        )
 
     @classmethod
-    def IS_CHANGED(cls, **kwargs):
-        # Always regenerate - disable caching for conversation
-        return float("nan")
+    def execute(cls, **kwargs) -> IO.NodeOutput:
+        from .claude_api.client import ClaudeClient
+        from .claude_api.utils import TokenManager
 
-    def chat(
-        self,
-        prompt: str,
-        client: ClaudeClient = None,
-        conversation_history=None,
-        system_prompt: str = "",
-        auto_trim: bool = True,
-        reset_conversation: bool = False,
-        temperature: float = 0.7,
-        max_tokens: int = 2048
-    ):
-        """
-        Continue or start a conversation with Claude.
+        prompt = kwargs.get("prompt", "")
+        client = kwargs.get("client")
+        conversation_history = kwargs.get("conversation_history")
+        system_prompt = kwargs.get("system_prompt", "")
+        auto_trim = kwargs.get("auto_trim", True)
+        reset_conversation = kwargs.get("reset_conversation", False)
+        temperature = kwargs.get("temperature", 0.7)
+        max_tokens = kwargs.get("max_tokens", 2048)
 
-        Args:
-            prompt: User message
-            client: Claude API client (optional if API key is configured in Settings)
-            conversation_history: Previous conversation state
-            system_prompt: Optional system prompt (for new conversations)
-            auto_trim: Auto-trim to context window
-            reset_conversation: Start new conversation
-            temperature: Creativity level
-            max_tokens: Max output tokens
-
-        Returns:
-            Tuple of (response_text, updated_conversation_state)
-        """
         if client is None:
             client = ClaudeClient(api_key=None)
 
@@ -133,7 +97,6 @@ class ClaudeConversation:
             raise ValueError("Prompt cannot be empty")
 
         try:
-            # Initialize or continue conversation
             if reset_conversation or conversation_history is None:
                 messages = []
                 system = system_prompt.strip() if system_prompt and system_prompt.strip() else None
@@ -143,59 +106,49 @@ class ClaudeConversation:
                 system = conversation_history.get("system")
                 print(f"[Claude] Continuing conversation ({len(messages)} messages in history)")
 
-            # Add user message
             messages.append({"role": "user", "content": prompt.strip()})
 
-            # Trim messages if needed
             if auto_trim:
                 token_manager = TokenManager(model=client.model)
                 messages, removed_count = token_manager.trim_messages_to_fit(
                     messages=messages,
                     system=system,
-                    reserve_tokens=max_tokens + 1000  # Reserve space for response + buffer
+                    reserve_tokens=max_tokens + 1000,
                 )
                 if removed_count > 0:
                     print(f"[Claude] Trimmed {removed_count} old messages to fit context window")
 
-            # Consolidate consecutive messages from same role
             token_manager = TokenManager(model=client.model)
             messages = token_manager.consolidate_consecutive_messages(messages)
 
-            # Validate messages
             if not token_manager.validate_message_roles(messages):
                 print("[Claude] Warning: Message role pattern may be invalid, attempting to fix...")
-                # Ensure it starts with user and consolidate
                 if messages[0].get("role") != "user":
-                    # Prepend a user message if needed
                     messages = [{"role": "user", "content": "(Continuing conversation)"}] + messages
                 messages = token_manager.consolidate_consecutive_messages(messages)
 
-            # Send request
             response = client.send_request(
                 messages=messages,
                 system=system,
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
             )
 
-            # Extract response text
             if hasattr(response, 'content') and len(response.content) > 0:
                 response_text = response.content[0].text
             else:
                 raise ValueError("Invalid response format from Claude API")
 
-            # Add assistant response to history
             messages.append({"role": "assistant", "content": response_text})
 
-            # Build updated conversation state
             updated_state = {
                 "messages": messages,
-                "system": system
+                "system": system,
             }
 
             print(f"[Claude] Response generated ({len(response_text)} characters, {len(messages)} messages in history)")
 
-            return (response_text, updated_state)
+            return IO.NodeOutput(response_text, updated_state)
 
         except Exception as e:
             error_msg = f"Failed in conversation: {str(e)}"
@@ -203,49 +156,41 @@ class ClaudeConversation:
             raise ValueError(error_msg)
 
 
-class ClaudeConversationInfo:
-    """
-    Claude Conversation Info Node
-
-    Displays information about a conversation's state.
-    """
+class ClaudeConversationInfo(IO.ComfyNode):
+    """Displays information about a conversation's state."""
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "conversation_history": (
-                    "CLAUDE_CONVERSATION",
-                    {"tooltip": "Conversation state to inspect"}
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="ClaudeConversationInfo",
+            display_name="Claude Conversation Info",
+            category="ERPK/Claude",
+            description="Display information about a conversation's state and token usage.",
+            is_output_node=True,
+            inputs=[
+                IO.Custom("CLAUDE_CONVERSATION").Input(
+                    "conversation_history",
+                    tooltip="Conversation state to inspect",
                 ),
-            }
-        }
+            ],
+            outputs=[
+                IO.String.Output("info"),
+            ],
+        )
 
-    RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("info",)
-    FUNCTION = "get_info"
-    CATEGORY = "ERPK/Claude"
-    OUTPUT_NODE = True
+    @classmethod
+    def execute(cls, **kwargs) -> IO.NodeOutput:
+        from .claude_api.utils import TokenManager
 
-    def get_info(self, conversation_history):
-        """
-        Get information about conversation state.
+        conversation_history = kwargs.get("conversation_history")
 
-        Args:
-            conversation_history: Conversation state
-
-        Returns:
-            Tuple containing formatted info string
-        """
         try:
             messages = conversation_history.get("messages", [])
             system = conversation_history.get("system")
 
-            # Count messages by role
             user_count = sum(1 for msg in messages if msg.get("role") == "user")
             assistant_count = sum(1 for msg in messages if msg.get("role") == "assistant")
 
-            # Estimate tokens
             token_manager = TokenManager()
             total_tokens = token_manager.estimate_message_tokens(messages)
             if system:
@@ -269,22 +214,9 @@ Context Usage:
 ━━━━━━━━━━━━━━━━━━━━━━━━"""
 
             print(f"\n{info_str}\n")
-
-            return (info_str,)
+            return IO.NodeOutput(info_str)
 
         except Exception as e:
             error_msg = f"Failed to get conversation info: {str(e)}"
             print(f"[Claude] Error: {error_msg}")
-            return (error_msg,)
-
-
-# Node registration
-NODE_CLASS_MAPPINGS = {
-    "ClaudeConversation": ClaudeConversation,
-    "ClaudeConversationInfo": ClaudeConversationInfo,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "ClaudeConversation": "Claude Conversation",
-    "ClaudeConversationInfo": "Claude Conversation Info",
-}
+            return IO.NodeOutput(error_msg)

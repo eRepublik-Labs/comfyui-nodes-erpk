@@ -191,6 +191,11 @@ Mask = _make_io_type('Mask', 'MASK', None)
 Combo = _make_io_type('Combo', 'COMBO', str, _ComboInput, _ComboOutput)
 
 
+def Custom(io_type: str):
+    """Create a ComfyTypeIO for a custom io_type string."""
+    return _make_io_type(f'Custom_{io_type}', io_type, None)
+
+
 # --- Schema ---
 
 @dataclass
@@ -207,6 +212,9 @@ class Schema:
     is_output_node: bool = False
     is_deprecated: bool = False
     is_experimental: bool = False
+    not_idempotent: bool = False
+    is_api_node: bool = False
+    accept_all_inputs: bool = False
 
 
 # --- NodeOutput ---

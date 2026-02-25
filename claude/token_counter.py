@@ -1,66 +1,51 @@
-"""
-Claude Token Counter Node
-
-Utility for counting tokens and estimating costs.
-"""
+# ABOUTME: ComfyUI V3 node for counting tokens and estimating Claude API costs.
+# ABOUTME: Supports API-based accurate counting or estimation, with pricing from pricing.json.
 
 import os
 import json
-from .claude_api.client import ClaudeClient
-from .claude_api.utils import TokenManager
+from comfy_api.latest import IO
 
 
-class ClaudeTokenCounter:
-    """
-    Claude Token Counter Node
-
-    Counts tokens in text and provides cost estimates for Claude API usage.
-
-    Useful for:
-    - Checking if text fits in context window
-    - Estimating API costs before requests
-    - Optimizing prompt lengths
-    """
+class ClaudeTokenCounter(IO.ComfyNode):
+    """Counts tokens in text and provides cost estimates for Claude API usage."""
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "text": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "Text to count tokens for"
-                    }
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="ClaudeTokenCounter",
+            display_name="Claude Token Counter",
+            category="ERPK/Claude",
+            description="Count tokens and estimate API costs for Claude models.",
+            is_output_node=True,
+            inputs=[
+                IO.String.Input(
+                    "text",
+                    multiline=True,
+                    default="",
+                    tooltip="Text to count tokens for",
                 ),
-                "model": (
-                    [
+                IO.Combo.Input(
+                    "model",
+                    options=[
                         "claude-sonnet-4-6",
                         "claude-opus-4-6",
                         "claude-haiku-4-5-20251001",
                         "claude-sonnet-4-5-20250929",
                     ],
-                    {
-                        "default": "claude-sonnet-4-6",
-                        "tooltip": "Model for token counting and cost estimation"
-                    }
+                    default="claude-sonnet-4-6",
+                    tooltip="Model for token counting and cost estimation",
                 ),
-            },
-            "optional": {
-                "client": (
-                    "CLAUDE_API_CLIENT",
-                    {"tooltip": "Optional: Connect client for accurate API-based counting (otherwise uses ~4 chars/token estimation)"}
+                IO.Custom("CLAUDE_API_CLIENT").Input(
+                    "client",
+                    optional=True,
+                    tooltip="Optional: Connect client for accurate API-based counting (otherwise uses ~4 chars/token estimation)",
                 ),
-            }
-        }
-
-    RETURN_TYPES = ("INT", "STRING")
-    RETURN_NAMES = ("token_count", "summary")
-    FUNCTION = "count_tokens"
-    CATEGORY = "ERPK/Claude"
-    OUTPUT_NODE = True
-    OUTPUT_IS_LIST = (False, False)
+            ],
+            outputs=[
+                IO.Int.Output("token_count"),
+                IO.String.Output("summary"),
+            ],
+        )
 
     @classmethod
     def load_pricing(cls):
@@ -70,18 +55,16 @@ class ClaudeTokenCounter:
             with open(pricing_file, 'r') as f:
                 pricing_data = json.load(f)
 
-            # Convert to simple dict format
             pricing = {}
             for model_id, model_data in pricing_data.get("models", {}).items():
                 pricing[model_id] = {
                     "input": model_data.get("input_price_per_mtok", 0),
-                    "output": model_data.get("output_price_per_mtok", 0)
+                    "output": model_data.get("output_price_per_mtok", 0),
                 }
 
             return pricing, pricing_data.get("_last_updated", "Unknown")
         except Exception as e:
             print(f"[Claude] Warning: Could not load pricing.json, using fallback: {e}")
-            # Fallback pricing
             return {
                 "claude-sonnet-4-6": {"input": 3.0, "output": 15.0},
                 "claude-opus-4-6": {"input": 5.0, "output": 25.0},
@@ -89,28 +72,18 @@ class ClaudeTokenCounter:
                 "claude-sonnet-4-5-20250929": {"input": 3.0, "output": 15.0},
             }, "2026-02-20"
 
-    def count_tokens(
-        self,
-        text: str,
-        model: str,
-        client: ClaudeClient = None
-    ):
-        """
-        Count tokens in text and provide cost estimates.
+    @classmethod
+    def execute(cls, **kwargs) -> IO.NodeOutput:
+        from .claude_api.utils import TokenManager
 
-        Args:
-            text: Text to count
-            model: Model to use for pricing
-            client: Optional client for accurate counting
+        text = kwargs.get("text", "")
+        model = kwargs.get("model", "claude-sonnet-4-6")
+        client = kwargs.get("client")
 
-        Returns:
-            Tuple of (token_count, formatted_summary)
-        """
         if not text:
-            return (0, "No text provided")
+            return IO.NodeOutput(0, "No text provided")
 
         try:
-            # Count tokens (accurate with Anthropic API if client provided, estimated otherwise)
             if client:
                 token_count = client.count_tokens([{"role": "user", "content": text}])
                 counting_method = "Anthropic API (accurate)"
@@ -119,22 +92,17 @@ class ClaudeTokenCounter:
                 token_count = token_manager.estimate_tokens(text)
                 counting_method = "Estimation (~4 chars/token)"
 
-            # Get context window size
             token_manager = TokenManager(model=model)
             context_window = token_manager.context_window
 
-            # Calculate percentages
             context_percentage = (token_count / context_window) * 100
 
-            # Load pricing
-            pricing_data, last_updated = self.load_pricing()
+            pricing_data, last_updated = cls.load_pricing()
             pricing = pricing_data.get(model, pricing_data.get("claude-sonnet-4-6", {"input": 3.0, "output": 15.0}))
 
-            # Calculate costs
             input_cost_per_1k = (token_count / 1_000_000) * pricing["input"]
             output_cost_per_1k = (token_count / 1_000_000) * pricing["output"]
 
-            # Build summary
             summary = f"""Token Count Analysis:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Text Length:      {len(text):,} characters
@@ -157,27 +125,15 @@ Pricing last updated: {last_updated}
 Source: anthropic.com/pricing
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
 
-            # Warnings
             if context_percentage > 90:
-                summary += "\n\n⚠️  WARNING: Using >90% of context window!"
+                summary += "\n\nWARNING: Using >90% of context window!"
             elif context_percentage > 75:
-                summary += "\n\n⚠️  CAUTION: Using >75% of context window"
+                summary += "\n\nCAUTION: Using >75% of context window"
 
             print(f"\n{summary}\n")
-
-            return (token_count, summary)
+            return IO.NodeOutput(token_count, summary)
 
         except Exception as e:
             error_msg = f"Failed to count tokens: {str(e)}"
             print(f"[Claude] Error: {error_msg}")
-            return (0, error_msg)
-
-
-# Node registration
-NODE_CLASS_MAPPINGS = {
-    "ClaudeTokenCounter": ClaudeTokenCounter,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "ClaudeTokenCounter": "Claude Token Counter",
-}
+            return IO.NodeOutput(0, error_msg)

@@ -1,122 +1,26 @@
-"""
-Claude ComfyUI Custom Nodes
+# ABOUTME: Claude provider nodes for ComfyUI V3 API.
+# ABOUTME: Exports all Claude node classes for registration via comfy_entrypoint.
 
-Complete Claude API integration for ComfyUI including:
-- Prompt enhancement with 50+ styles
-- Text generation
-- Vision analysis
-- Multi-turn conversations
-- Token counting utilities
-- Tool definitions and structured JSON output
-"""
+from .nodes import ClaudeAPIClient, ClaudeUsageStats
+from .text_generation import ClaudeTextGeneration
+from .prompt_enhancer import ClaudePromptEnhancer
+from .vision_analysis import ClaudeVisionAnalysis
+from .conversation import ClaudeConversation, ClaudeConversationInfo
+from .token_counter import ClaudeTokenCounter
+from .tool_definition import ClaudeToolDefinition
+from .structured_output import ClaudeStructuredOutput
 
-import os
-import sys
+NODES = [
+    ClaudeAPIClient,
+    ClaudeUsageStats,
+    ClaudeTextGeneration,
+    ClaudePromptEnhancer,
+    ClaudeVisionAnalysis,
+    ClaudeConversation,
+    ClaudeConversationInfo,
+    ClaudeTokenCounter,
+    ClaudeToolDefinition,
+    ClaudeStructuredOutput,
+]
 
-# Add current directory to path for imports
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
-
-# Initialize combined mappings
-NODE_CLASS_MAPPINGS = {}
-NODE_DISPLAY_NAME_MAPPINGS = {}
-
-# Import and register core nodes
-try:
-    from .nodes import (
-        NODE_CLASS_MAPPINGS as CORE_NODE_CLASS_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as CORE_NODE_DISPLAY_NAME_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(CORE_NODE_CLASS_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(CORE_NODE_DISPLAY_NAME_MAPPINGS)
-except ImportError as e:
-    print(f"[Claude] Warning: Could not load core nodes: {e}")
-
-# Import and register prompt enhancer node
-try:
-    from .prompt_enhancer import (
-        NODE_CLASS_MAPPINGS as PROMPT_ENHANCER_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as PROMPT_ENHANCER_DISPLAY_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(PROMPT_ENHANCER_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(PROMPT_ENHANCER_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[Claude] Warning: Could not load prompt enhancer node: {e}")
-
-# Import and register text generation node
-try:
-    from .text_generation import (
-        NODE_CLASS_MAPPINGS as TEXT_GEN_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as TEXT_GEN_DISPLAY_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(TEXT_GEN_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(TEXT_GEN_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[Claude] Warning: Could not load text generation node: {e}")
-
-# Import and register vision analysis node
-try:
-    from .vision_analysis import (
-        NODE_CLASS_MAPPINGS as VISION_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as VISION_DISPLAY_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(VISION_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(VISION_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[Claude] Warning: Could not load vision analysis node: {e}")
-
-# Import and register conversation nodes
-try:
-    from .conversation import (
-        NODE_CLASS_MAPPINGS as CONVERSATION_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as CONVERSATION_DISPLAY_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(CONVERSATION_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(CONVERSATION_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[Claude] Warning: Could not load conversation nodes: {e}")
-
-# Import and register token counter node
-try:
-    from .token_counter import (
-        NODE_CLASS_MAPPINGS as TOKEN_COUNTER_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as TOKEN_COUNTER_DISPLAY_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(TOKEN_COUNTER_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(TOKEN_COUNTER_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[Claude] Warning: Could not load token counter node: {e}")
-
-# Import and register tool definition node
-try:
-    from .tool_definition import (
-        NODE_CLASS_MAPPINGS as TOOL_DEF_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as TOOL_DEF_DISPLAY_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(TOOL_DEF_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(TOOL_DEF_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[Claude] Warning: Could not load tool definition node: {e}")
-
-# Import and register structured output node
-try:
-    from .structured_output import (
-        NODE_CLASS_MAPPINGS as STRUCTURED_OUTPUT_MAPPINGS,
-        NODE_DISPLAY_NAME_MAPPINGS as STRUCTURED_OUTPUT_DISPLAY_MAPPINGS
-    )
-    NODE_CLASS_MAPPINGS.update(STRUCTURED_OUTPUT_MAPPINGS)
-    NODE_DISPLAY_NAME_MAPPINGS.update(STRUCTURED_OUTPUT_DISPLAY_MAPPINGS)
-except ImportError as e:
-    print(f"[Claude] Warning: Could not load structured output node: {e}")
-
-# Print loaded nodes for debugging
-print(f"[Claude] Loaded {len(NODE_CLASS_MAPPINGS)} nodes:")
-for node_name in sorted(NODE_CLASS_MAPPINGS.keys()):
-    print(f"  - {node_name}")
-
-# Web directory for frontend extensions (if any)
-WEB_DIRECTORY = "./web"
-
-# Export for ComfyUI
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
+__all__ = ["NODES"]

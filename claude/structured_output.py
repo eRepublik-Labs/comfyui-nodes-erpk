@@ -1,84 +1,78 @@
-# ABOUTME: ComfyUI node that uses forced tool use to get guaranteed structured JSON from Claude.
+# ABOUTME: ComfyUI V3 node that uses forced tool use to get guaranteed structured JSON from Claude.
 # ABOUTME: Accepts a single CLAUDE_TOOLS definition and returns the extracted JSON plus any thinking text.
 
 import json
+from comfy_api.latest import IO
 
 
-class ClaudeStructuredOutput:
+class ClaudeStructuredOutput(IO.ComfyNode):
     """Forces Claude to respond with structured JSON via the tool use API."""
 
     @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "prompt": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "Prompt describing what to extract or generate"
-                    }
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="ClaudeStructuredOutput",
+            display_name="Claude Structured Output",
+            category="ERPK/Claude/Tools",
+            description="Force Claude to respond with structured JSON via tool use.",
+            not_idempotent=True,
+            inputs=[
+                IO.String.Input(
+                    "prompt",
+                    multiline=True,
+                    default="",
+                    tooltip="Prompt describing what to extract or generate",
                 ),
-                "tool": (
-                    "CLAUDE_TOOLS",
-                    {"tooltip": "Tool definition (must contain exactly 1 tool)"}
+                IO.Custom("CLAUDE_TOOLS").Input(
+                    "tool",
+                    tooltip="Tool definition (must contain exactly 1 tool)",
                 ),
-            },
-            "optional": {
-                "client": (
-                    "CLAUDE_API_CLIENT",
-                    {"tooltip": "Claude API client (optional if API key is configured in Settings)"}
+                IO.Custom("CLAUDE_API_CLIENT").Input(
+                    "client",
+                    optional=True,
+                    tooltip="Claude API client (optional if API key is configured in Settings)",
                 ),
-                "system_prompt": (
-                    "STRING",
-                    {
-                        "multiline": True,
-                        "default": "",
-                        "tooltip": "Optional system prompt to guide extraction behavior"
-                    }
+                IO.String.Input(
+                    "system_prompt",
+                    multiline=True,
+                    default="",
+                    optional=True,
+                    tooltip="Optional system prompt to guide extraction behavior",
                 ),
-                "temperature": (
-                    "FLOAT",
-                    {
-                        "default": 0.0,
-                        "min": 0.0,
-                        "max": 1.0,
-                        "step": 0.05,
-                        "tooltip": "Low values for consistent output (0.0 recommended)"
-                    }
+                IO.Float.Input(
+                    "temperature",
+                    default=0.0,
+                    min=0.0,
+                    max=1.0,
+                    step=0.05,
+                    optional=True,
+                    tooltip="Low values for consistent output (0.0 recommended)",
                 ),
-                "max_tokens": (
-                    "INT",
-                    {
-                        "default": 4096,
-                        "min": 256,
-                        "max": 8192,
-                        "step": 128,
-                        "tooltip": "Maximum tokens for the response"
-                    }
+                IO.Int.Input(
+                    "max_tokens",
+                    default=4096,
+                    min=256,
+                    max=8192,
+                    step=128,
+                    optional=True,
+                    tooltip="Maximum tokens for the response",
                 ),
-            }
-        }
-
-    RETURN_TYPES = ("STRING", "STRING")
-    RETURN_NAMES = ("json_output", "thinking")
-    FUNCTION = "extract"
-    CATEGORY = "ERPK/Claude/Tools"
+            ],
+            outputs=[
+                IO.String.Output("json_output"),
+                IO.String.Output("thinking"),
+            ],
+        )
 
     @classmethod
-    def IS_CHANGED(cls, **kwargs):
-        return float("nan")
+    def execute(cls, **kwargs) -> IO.NodeOutput:
+        prompt = kwargs.get("prompt", "")
+        tool = kwargs.get("tool")
+        client = kwargs.get("client")
+        system_prompt = kwargs.get("system_prompt", "")
+        temperature = kwargs.get("temperature", 0.0)
+        max_tokens = kwargs.get("max_tokens", 4096)
 
-    def extract(
-        self,
-        prompt,
-        tool,
-        client=None,
-        system_prompt="",
-        temperature=0.0,
-        max_tokens=4096,
-    ):
-        """Call Claude with forced tool use and extract the structured JSON result."""
         if client is None:
             from .claude_api.client import ClaudeClient
             client = ClaudeClient(api_key=None)
@@ -123,13 +117,4 @@ class ClaudeStructuredOutput:
 
         print(f"[Claude] Structured output extracted ({len(json_output)} chars JSON)")
 
-        return (json_output, thinking)
-
-
-NODE_CLASS_MAPPINGS = {
-    "ClaudeStructuredOutput": ClaudeStructuredOutput,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "ClaudeStructuredOutput": "Claude Structured Output",
-}
+        return IO.NodeOutput(json_output, thinking)
