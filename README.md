@@ -190,7 +190,8 @@ Background removal utilities with multiple backend options for different quality
 
 - **Remove Background (rembg)** - ONNX-based with 14+ models including u2net, isnet, birefnet variants. Best for versatility and CPU support.
 - **Remove Background (InSPyReNet)** - PyTorch-based via transparent-background. Supports TorchScript JIT for faster inference.
-- **Remove Background (BiRefNet)** - HuggingFace transformers integration. Highest quality, supports HR images (2048x2048).
+- **Remove Background (BEN2)** - Confidence-guided matting for accurate alpha mattes at fine edges (hair, fur). Built-in foreground refinement.
+- **Remove Background (BiRefNet)** - HuggingFace transformers integration. 17 model variants, supports HR images (2048x2048).
 
 #### Backend Comparison
 
@@ -198,6 +199,7 @@ Background removal utilities with multiple backend options for different quality
 |---------|---------|-------|---------|--------|---------|
 | **rembg** | ONNX | Fast | Good | Low-Med | MIT |
 | **InSPyReNet** | PyTorch | Medium | Very Good | Medium | MIT |
+| **BEN2** | PyTorch/HF | Medium | Excellent | High | MIT |
 | **BiRefNet** | PyTorch/HF | Slower | Excellent | High | MIT |
 
 #### Available Models

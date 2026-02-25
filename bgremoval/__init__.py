@@ -1,5 +1,5 @@
 # ABOUTME: Background removal nodes for ComfyUI with multiple backend support.
-# ABOUTME: Supports rembg (14+ models), InSPyReNet, and BiRefNet backends.
+# ABOUTME: Supports rembg (14+ models), InSPyReNet, BiRefNet, and BEN2 backends.
 
 """
 Background Removal ComfyUI Custom Nodes
@@ -8,6 +8,7 @@ This package provides ComfyUI nodes for background removal using multiple backen
 - rembg: ONNX-based, 14+ specialized models (u2net, isnet, birefnet variants, etc.)
 - InSPyReNet: PyTorch-based via transparent-background package
 - BiRefNet: Direct HuggingFace transformers integration for highest quality
+- BEN2: Confidence-guided matting for accurate alpha mattes at edges
 """
 
 import os
@@ -54,6 +55,17 @@ try:
     NODE_DISPLAY_NAME_MAPPINGS.update(BIREFNET_NODE_DISPLAY_NAME_MAPPINGS)
 except ImportError as e:
     print(f"[BGRemoval] Warning: Could not load BiRefNet nodes: {e}")
+
+# Import BEN2 backend nodes
+try:
+    from .ben2_node import (
+        NODE_CLASS_MAPPINGS as BEN2_NODE_CLASS_MAPPINGS,
+        NODE_DISPLAY_NAME_MAPPINGS as BEN2_NODE_DISPLAY_NAME_MAPPINGS,
+    )
+    NODE_CLASS_MAPPINGS.update(BEN2_NODE_CLASS_MAPPINGS)
+    NODE_DISPLAY_NAME_MAPPINGS.update(BEN2_NODE_DISPLAY_NAME_MAPPINGS)
+except ImportError as e:
+    print(f"[BGRemoval] Warning: Could not load BEN2 nodes: {e}")
 
 # Print loaded nodes for debugging
 if NODE_CLASS_MAPPINGS:
