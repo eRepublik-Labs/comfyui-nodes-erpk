@@ -40,11 +40,11 @@ Enhanced typography and text rendering for posters, logos, UI, and marketing lay
 
 ### Qwen Image Models
 
-| Node | Description | Dimensions | Input Images | Language | Output | Pricing | API Docs |
-|------|-------------|------------|--------------|----------|--------|---------|----------|
-| **Qwen Image Text-to-Image** | Bilingual text-to-image generation | 256-1536px (step 8)<br>Default: 1024×1024 | N/A | 🇨🇳 🇬🇧 | Single image<br>~5-8 sec | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-text-to-image) |
-| **Qwen Image Edit** | Low-level & high-level semantic editing | 256-1536px (step 8) | 1 required | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit) |
-| **Qwen Image Edit Plus** | Advanced multi-image context editing | 256-1536px (step 8) | Up to 3 required | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-plus) |
+| Node | Models | Description | Dimensions | Input Images | Language | Output | Pricing | API Docs |
+|------|--------|-------------|------------|--------------|----------|--------|---------|----------|
+| **Qwen Image Text-to-Image** | Qwen Image (20B MMDiT),<br>Qwen Image 2512 (7B) | Bilingual text-to-image generation | 256-1536px (step 8)<br>Default: 1024×1024 | N/A | 🇨🇳 🇬🇧 | Single image<br>~5-8 sec | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-text-to-image) |
+| **Qwen Image Edit** | Qwen Edit | Low-level & high-level semantic editing | 256-1536px (step 8) | 1 required | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit) |
+| **Qwen Image Edit Plus** | Qwen Edit Plus,<br>Qwen Edit 2511 | Advanced multi-image context editing | 256-1536px (step 8) | Up to 3 required | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-plus) |
 
 **Common Features (All Seedream Nodes):**
 - Size preset dropdown with recommended resolutions
@@ -54,6 +54,7 @@ Enhanced typography and text rendering for posters, logos, UI, and marketing lay
 - Base64 output option
 
 **Common Features (All Qwen Nodes):**
+- Model variant selector (where applicable) for choosing between model versions
 - Seed control for reproducibility
 - Multiple output formats (jpeg, png, webp)
 - Sync mode (wait for completion)
@@ -126,8 +127,10 @@ ComfyUI/
             seedream_v4_5_edit.py
             seedream_v4_5_edit_sequential.py
             qwen_image_text_to_image.py
+            qwen_image_text_to_image_2512.py
             qwen_image_edit.py
             qwen_image_edit_plus.py
+            qwen_image_edit_2511.py
       web/
         aspect_ratio.js
 ```
@@ -202,11 +205,12 @@ Optional if API key is configured via ComfyUI Settings, environment variable, or
 ### Qwen Image Text-to-Image Node
 
 1. Add the "WaveSpeedAI Qwen Image Text-to-Image" node to your workflow
-2. Connect your WaveSpeed AI API client
-3. Enter your text prompt (supports Chinese and English)
-4. Configure dimensions (optional, default 1024x1024)
-5. Set seed, output format, and other options (optional)
-6. Execute the workflow to generate images
+2. Select the model variant: **Qwen Image** (20B MMDiT) or **Qwen Image 2512** (7B, better text rendering)
+3. Connect your WaveSpeed AI API client
+4. Enter your text prompt (supports Chinese and English)
+5. Configure dimensions (optional, default 1024x1024)
+6. Set seed, output format, and other options (optional)
+7. Execute the workflow to generate images
 
 ### Qwen Image Edit Node
 
@@ -220,11 +224,12 @@ Optional if API key is configured via ComfyUI Settings, environment variable, or
 ### Qwen Image Edit Plus Node
 
 1. Add the "WaveSpeedAI Qwen Image Edit Plus" node to your workflow
-2. Connect your WaveSpeed AI API client
-3. Provide up to 3 reference images (comma-separated URLs or paths)
-4. Enter your editing prompt (supports Chinese and English)
-5. Configure dimensions and options (optional)
-6. Execute the workflow to generate edited images
+2. Select the model variant: **Qwen Edit Plus** or **Qwen Edit 2511** (multi-person editing, improved consistency)
+3. Connect your WaveSpeed AI API client
+4. Provide up to 3 reference images (comma-separated URLs or paths)
+5. Enter your editing prompt (supports Chinese and English)
+6. Configure dimensions and options (optional)
+7. Execute the workflow to generate edited images
 
 ## API Configuration
 
@@ -270,8 +275,10 @@ For detailed API reference and parameters:
 - [Bytedance Seedream V4 Edit API Documentation](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-edit)
 - [Bytedance Seedream V4 Edit Sequential API Documentation](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-edit-sequential)
 - [Qwen Image Text-to-Image API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-text-to-image)
+- [Qwen Image Text-to-Image 2512 API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-text-to-image-2512)
 - [Qwen Image Edit API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit)
 - [Qwen Image Edit Plus API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-plus)
+- [Qwen Image Edit 2511 API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-2511)
 
 ## Troubleshooting
 

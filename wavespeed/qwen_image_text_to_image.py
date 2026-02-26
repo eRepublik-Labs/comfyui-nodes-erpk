@@ -12,6 +12,8 @@ class QwenImageTextToImageNode(IO.ComfyNode):
     Supports bilingual (Chinese and English) prompts.
     """
 
+    MODELS = ["Qwen Image", "Qwen Image 2512"]
+
     @classmethod
     def define_schema(cls):
         return IO.Schema(
@@ -19,6 +21,9 @@ class QwenImageTextToImageNode(IO.ComfyNode):
             display_name="Qwen Image Text-to-Image",
             category="ERPK/WaveSpeedAI",
             inputs=[
+                IO.Combo.Input("model", options=cls.MODELS,
+                               default="Qwen Image",
+                               tooltip="Model variant: Qwen Image (20B MMDiT) or Qwen Image 2512 (7B, better text rendering)"),
                 IO.String.Input("prompt", multiline=True, default="",
                                 tooltip="Text description of the image to generate (Chinese or English)"),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
@@ -49,12 +54,13 @@ class QwenImageTextToImageNode(IO.ComfyNode):
         return float("NaN")
 
     @classmethod
-    def execute(cls, prompt, client=None, width=1024, height=1024, seed=-1,
-                output_format="jpeg", enable_sync_mode=False, enable_base64_output=False,
-                **kwargs):
+    def execute(cls, model="Qwen Image", prompt="", client=None, width=1024, height=1024,
+                seed=-1, output_format="jpeg", enable_sync_mode=False,
+                enable_base64_output=False, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.utils import imageurl2tensor
         from .wavespeed_api.requests.qwen_image_text_to_image import QwenImageTextToImage
+        from .wavespeed_api.requests.qwen_image_text_to_image_2512 import QwenImageTextToImage2512
 
         if client is None:
             from .nodes import WaveSpeedAIAPIClient
@@ -63,7 +69,9 @@ class QwenImageTextToImageNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        request = QwenImageTextToImage(
+        request_cls = QwenImageTextToImage2512 if model == "Qwen Image 2512" else QwenImageTextToImage
+
+        request = request_cls(
             prompt=prompt,
             size=f"{width}*{height}",
             seed=seed,

@@ -12,6 +12,8 @@ class QwenImageEditPlusNode(IO.ComfyNode):
     Accepts up to 3 reference images and supports bilingual (Chinese and English) text prompts.
     """
 
+    MODELS = ["Qwen Edit Plus", "Qwen Edit 2511"]
+
     @classmethod
     def define_schema(cls):
         return IO.Schema(
@@ -19,6 +21,9 @@ class QwenImageEditPlusNode(IO.ComfyNode):
             display_name="Qwen Image Edit Plus",
             category="ERPK/WaveSpeedAI",
             inputs=[
+                IO.Combo.Input("model", options=cls.MODELS,
+                               default="Qwen Edit Plus",
+                               tooltip="Model variant: Qwen Edit Plus or Qwen Edit 2511 (multi-person editing, improved consistency)"),
                 IO.String.Input("prompt", multiline=True, default="",
                                 tooltip="Text description of the desired image modifications (Chinese or English)"),
                 IO.String.Input("images",
@@ -51,12 +56,13 @@ class QwenImageEditPlusNode(IO.ComfyNode):
         return float("NaN")
 
     @classmethod
-    def execute(cls, prompt, images, client=None, width=1024, height=1024, seed=-1,
-                output_format="jpeg", enable_sync_mode=False, enable_base64_output=False,
-                **kwargs):
+    def execute(cls, model="Qwen Edit Plus", prompt="", images="", client=None,
+                width=1024, height=1024, seed=-1, output_format="jpeg",
+                enable_sync_mode=False, enable_base64_output=False, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.utils import imageurl2tensor
         from .wavespeed_api.requests.qwen_image_edit_plus import QwenImageEditPlus
+        from .wavespeed_api.requests.qwen_image_edit_2511 import QwenImageEdit2511
 
         if client is None:
             from .nodes import WaveSpeedAIAPIClient
@@ -80,7 +86,9 @@ class QwenImageEditPlusNode(IO.ComfyNode):
 
         size = f"{width}*{height}" if width and height else None
 
-        request = QwenImageEditPlus(
+        request_cls = QwenImageEdit2511 if model == "Qwen Edit 2511" else QwenImageEditPlus
+
+        request = request_cls(
             prompt=prompt,
             images=images_param,
             size=size,
