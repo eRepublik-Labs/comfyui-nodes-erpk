@@ -53,6 +53,7 @@ ComfyUI-Custom-Nodes/
 └── web/                           # Frontend extensions
     ├── erpk_settings.js           # API key settings in ComfyUI Settings UI
     ├── shared_workflows.js        # Browse/save/delete shared workflows UI
+    ├── node_migration.js          # V1→V3 node type rewriting for old workflows
     ├── aspect_ratio.js            # Aspect ratio display in node titles
     └── concat_strings.js          # Dynamic UI for concat strings node
 ```
