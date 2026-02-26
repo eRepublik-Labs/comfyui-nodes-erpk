@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2026.2.15 (CalVer)
+**Current Version:** 2026.2.20 (CalVer)
 
 ## Repository Structure
 
@@ -313,6 +313,14 @@ In multi-user ComfyUI (`--multi-user`), each user's workflows are sandboxed. Sha
 | `/erpk/shared_workflows/{name}` | GET | Get a single workflow by name |
 | `/erpk/shared_workflows` | POST | Save a workflow (`{name, workflow}`); records user as author |
 | `/erpk/shared_workflows/{name}` | DELETE | Delete a workflow by name |
+
+### SaveImage Metadata Toggle
+
+Adds a **strip_metadata** toggle to ComfyUI's built-in SaveImage node (and PreviewImage, which inherits it). When enabled, both the workflow JSON and prompt data are stripped from saved PNG files, producing clean images with no embedded ComfyUI metadata.
+
+- **Per-node control** - Each SaveImage node gets its own boolean toggle; no global setting needed
+- **Off by default** - Existing workflows are unaffected
+- **Prompt metadata also stripped** - Both `extra_pnginfo` (workflow graph) and `prompt` (API-format node data) are removed
 
 ## Installation
 
