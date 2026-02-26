@@ -1,6 +1,6 @@
 # WaveSpeed AI - ComfyUI Custom Nodes
 
-**Version:** 2026.2.15 (CalVer)
+**Version:** 2026.2.19 (CalVer)
 **Category:** ERPK/WaveSpeedAI
 **Namespace:** ERPK Organization Custom Nodes
 
@@ -383,7 +383,7 @@ All WaveSpeed nodes are located under the **ERPK/WaveSpeedAI** category:
 
 This package follows **Calendar Versioning (CalVer)**: `YYYY.MM.PATCH`
 
-**Current Version:** 2026.2.15
+**Current Version:** 2026.2.19
 
 - Major changes are released monthly
 - Patch releases for bug fixes within the month
