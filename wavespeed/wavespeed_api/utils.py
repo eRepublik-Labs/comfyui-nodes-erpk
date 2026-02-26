@@ -47,6 +47,51 @@ def imageurl2tensor(image_urls: List[str]):
     return images2tensor(images)
 
 
+def imageurl2tensor_rgba(image_urls: List[str]):
+    """
+    Download RGBA images from URLs and split into RGB + alpha tensors.
+
+    Args:
+        image_urls: List of image URLs (expected to contain transparency)
+
+    Returns:
+        tuple: (rgb_tensor (B, H, W, 3), alpha_tensor (B, H, W))
+    """
+    import numpy
+    import torch
+    import PIL.Image
+
+    rgb_images = []
+    alpha_masks = []
+
+    if not image_urls:
+        return torch.zeros((1, 1, 1, 3)), torch.zeros((1, 1, 1))
+
+    for url in image_urls:
+        try:
+            response = requests.get(url, stream=True, timeout=30)
+            response.raise_for_status()
+            image_data = response.content
+
+            with io.BytesIO(image_data) as bytes_io:
+                img = PIL.Image.open(bytes_io)
+                img = img.convert('RGBA')
+                r, g, b, a = img.split()
+                rgb_images.append(PIL.Image.merge('RGB', (r, g, b)))
+                alpha_np = numpy.array(a, dtype=numpy.float32) / 255.0
+                alpha_masks.append(torch.from_numpy(alpha_np))
+        except Exception as e:
+            print(f"[WaveSpeed] Error downloading/processing RGBA image from {url}: {e}")
+            continue
+
+    if not rgb_images:
+        return torch.zeros((1, 1, 1, 3)), torch.zeros((1, 1, 1))
+
+    rgb_tensor = images2tensor(rgb_images)
+    alpha_tensor = torch.stack(alpha_masks)
+    return rgb_tensor, alpha_tensor
+
+
 def images2tensor(images):
     """
     Convert PIL images to ComfyUI tensor format.

@@ -45,6 +45,9 @@ Enhanced typography and text rendering for posters, logos, UI, and marketing lay
 | **Qwen Image Text-to-Image** | Qwen Image (20B MMDiT),<br>Qwen Image 2512 (7B) | Bilingual text-to-image generation | 256-1536px (step 8)<br>Default: 1024×1024 | N/A | 🇨🇳 🇬🇧 | Single image<br>~5-8 sec | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-text-to-image) |
 | **Qwen Image Edit** | Qwen Edit | Low-level & high-level semantic editing | 256-1536px (step 8) | 1 required | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit) |
 | **Qwen Image Edit Plus** | Qwen Edit Plus,<br>Qwen Edit 2511 | Advanced multi-image context editing | 256-1536px (step 8) | Up to 3 required | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-plus) |
+| **Qwen Image Multiple Angles** | Qwen Edit 2509 | Angle-based image transformation | 256-1536px (step 8)<br>Default: 1024×1024 | 1-3 required | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-2509-multiple-angles) |
+| **Qwen Image LoRA** | Qwen LoRA | Text-to-image with LoRA model influences | 256-1024px (step 8)<br>Default: 1024×1024 | N/A | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-text-to-image-lora) |
+| **Qwen Image Layered** | Qwen Layered | Image decomposition into RGBA layers | N/A | 1 required | 🇨🇳 🇬🇧 | 2-8 RGBA layers | $0.025/layer | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-layered) |
 
 **Common Features (All Seedream Nodes):**
 - Size preset dropdown with recommended resolutions
@@ -113,6 +116,9 @@ ComfyUI/
         qwen_image_text_to_image.py
         qwen_image_edit.py
         qwen_image_edit_plus.py
+        qwen_image_multiple_angles.py
+        qwen_image_lora.py
+        qwen_image_layered.py
         wavespeed_api/
           __init__.py
           client.py
@@ -131,6 +137,9 @@ ComfyUI/
             qwen_image_edit.py
             qwen_image_edit_plus.py
             qwen_image_edit_2511.py
+            qwen_image_multiple_angles.py
+            qwen_image_lora.py
+            qwen_image_layered.py
       web/
         aspect_ratio.js
 ```
@@ -231,6 +240,35 @@ Optional if API key is configured via ComfyUI Settings, environment variable, or
 6. Configure dimensions and options (optional)
 7. Execute the workflow to generate edited images
 
+### Qwen Image Multiple Angles Node
+
+1. Add the "WaveSpeedAI Qwen Image Multiple Angles" node to your workflow
+2. Connect your WaveSpeed AI API client
+3. Provide 1-3 reference images (comma-separated URLs or paths)
+4. Adjust angle parameters: horizontal (-90 to 90), vertical (-30 to 60), distance (0 to 2)
+5. Optionally enter a text prompt to guide the transformation
+6. Configure dimensions and options (optional)
+7. Execute the workflow to generate angle-adjusted images
+
+### Qwen Image LoRA Node
+
+1. Add the "WaveSpeedAI Qwen Image LoRA" node to your workflow
+2. Connect your WaveSpeed AI API client
+3. Enter your text prompt (supports Chinese and English)
+4. Provide the URL to your first LoRA model file and set its scale (0.0 to 4.0)
+5. Optionally add up to 2 more LoRA models with individual scale settings
+6. Configure dimensions (max 1024x1024) and options (optional)
+7. Execute the workflow to generate LoRA-guided images
+
+### Qwen Image Layered Node
+
+1. Add the "WaveSpeedAI Qwen Image Layered" node to your workflow
+2. Connect your WaveSpeed AI API client
+3. Provide the image to decompose (URL or path)
+4. Set the number of layers (2-8, default 4)
+5. Optionally enter a prompt to guide layer decomposition
+6. Execute the workflow to receive RGB image layers and their alpha masks
+
 ## API Configuration
 
 You'll need a WaveSpeed AI API key to use these nodes. There are four ways to provide your API key, checked in this priority order (Settings highest, config.ini lowest):
@@ -279,6 +317,9 @@ For detailed API reference and parameters:
 - [Qwen Image Edit API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit)
 - [Qwen Image Edit Plus API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-plus)
 - [Qwen Image Edit 2511 API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-2511)
+- [Qwen Image Multiple Angles API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-2509-multiple-angles)
+- [Qwen Image LoRA API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-text-to-image-lora)
+- [Qwen Image Layered API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-layered)
 
 ## Troubleshooting
 
@@ -300,7 +341,7 @@ pip install -r requirements.txt
 
 5. **Verify Import**: Check the ComfyUI console output on startup for:
 ```
-[ERPK] Loaded 15 V3 nodes
+[ERPK] Loaded 18 V3 nodes
 ```
 
 ### Common Issues
@@ -318,7 +359,7 @@ All WaveSpeed nodes are located under the **ERPK/WaveSpeedAI** category:
 3. Navigate to: **ERPK → WaveSpeedAI**
 4. Select your desired node
 
-**Available nodes (15 total):**
+**Available nodes (18 total):**
 - WaveSpeed Client
 - WaveSpeed Preview Video
 - WaveSpeed Save Audio
@@ -334,6 +375,9 @@ All WaveSpeed nodes are located under the **ERPK/WaveSpeedAI** category:
 - Qwen Image Text-to-Image
 - Qwen Image Edit
 - Qwen Image Edit Plus
+- Qwen Image Multiple Angles
+- Qwen Image LoRA
+- Qwen Image Layered
 
 ## Versioning
 
