@@ -319,7 +319,7 @@ In multi-user ComfyUI (`--multi-user`), each user's workflows are sandboxed. Sha
 Adds a **strip_metadata** toggle to ComfyUI's built-in SaveImage node (and PreviewImage, which inherits it). When enabled, both the workflow JSON and prompt data are stripped from saved PNG files, producing clean images with no embedded ComfyUI metadata.
 
 - **Per-node control** - Each SaveImage node gets its own boolean toggle; no global setting needed
-- **Off by default** - Existing workflows are unaffected
+- **On by default** - New SaveImage nodes strip metadata automatically; toggle off to embed metadata
 - **Prompt metadata also stripped** - Both `extra_pnginfo` (workflow graph) and `prompt` (API-format node data) are removed
 
 ## Installation

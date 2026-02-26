@@ -51,15 +51,15 @@ class TestMetadataFilterWrapper:
         assert calls[0]["prompt"] is None
         assert calls[0]["extra_pnginfo"] is None
 
-    def test_default_is_off(self):
+    def test_default_is_on(self):
         wrapped, calls = self._make_wrapper()
         workflow = {"workflow": {"nodes": []}}
         prompt_data = {"1": {"class_type": "SaveImage"}}
 
         wrapped(None, "images", "prefix", prompt=prompt_data, extra_pnginfo=workflow)
 
-        assert calls[0]["prompt"] == prompt_data
-        assert calls[0]["extra_pnginfo"] == workflow
+        assert calls[0]["prompt"] is None
+        assert calls[0]["extra_pnginfo"] is None
 
 
 class TestInputTypesPatch:
@@ -89,7 +89,7 @@ class TestInputTypesPatch:
         assert "strip_metadata" in result["optional"]
         toggle_spec = result["optional"]["strip_metadata"]
         assert toggle_spec[0] == "BOOLEAN"
-        assert toggle_spec[1]["default"] is False
+        assert toggle_spec[1]["default"] is True
 
     def test_preserves_existing_optional(self):
         from metadata_filter import make_patched_input_types
