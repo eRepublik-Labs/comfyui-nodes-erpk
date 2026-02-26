@@ -77,6 +77,10 @@ class ClaudeConversation(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("NaN")
+
+    @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
         from .claude_api.client import ClaudeClient
         from .claude_api.utils import TokenManager

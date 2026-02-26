@@ -180,6 +180,10 @@ class GeminiTextGeneration(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("NaN")
+
+    @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
         prompt = kwargs.get("prompt", "")
         client = kwargs.get("client")
@@ -356,6 +360,10 @@ class GeminiChat(IO.ComfyNode):
                 IO.Custom("GEMINI_CHAT_SESSION").Output("chat_session"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("NaN")
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
@@ -540,6 +548,10 @@ class GeminiVision(IO.ComfyNode):
                 IO.String.Output("analysis"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("NaN")
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
@@ -832,6 +844,10 @@ class GeminiImageGeneration(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("NaN")
+
+    @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
         from .gemini_api.utils import ImageConverter
 
@@ -1049,6 +1065,10 @@ class GeminiImageEdit(IO.ComfyNode):
                 IO.String.Output("description"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("NaN")
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:

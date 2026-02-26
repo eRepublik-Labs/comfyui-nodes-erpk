@@ -47,6 +47,10 @@ class SeedreamV4_5SequentialNode(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("NaN")
+
+    @classmethod
     def execute(cls, prompt, max_images, size_preset, client=None, width=2048, height=2048,
                 show_aspect_ratio=True, enable_sync_mode=False, enable_base64_output=False,
                 **kwargs):

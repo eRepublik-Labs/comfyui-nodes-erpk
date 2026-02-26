@@ -127,6 +127,10 @@ class OpenAITextGeneration(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("NaN")
+
+    @classmethod
     def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
         client = kwargs.get("client")
         model = kwargs.get("model")
@@ -271,6 +275,10 @@ class OpenAIChat(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("NaN")
+
+    @classmethod
     def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
         client = kwargs.get("client")
         model = kwargs.get("model")
@@ -402,6 +410,10 @@ class OpenAIVision(IO.ComfyNode):
                 IO.String.Output("analysis"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("NaN")
 
     @classmethod
     def execute(cls, image, prompt, **kwargs) -> IO.NodeOutput:

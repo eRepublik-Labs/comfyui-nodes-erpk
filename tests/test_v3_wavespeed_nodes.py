@@ -58,11 +58,11 @@ WAVESPEED_NODES = [
      "Bytedance Seedream V4.5 Edit Sequential", "ERPK/WaveSpeedAI", True, False),
     # Qwen Image nodes
     ("qwen_image_text_to_image", "QwenImageTextToImageNode", "QwenImageTextToImageNode",
-     "Qwen Image Text-to-Image", "ERPK/WaveSpeedAI", False, False),
+     "Qwen Image Text-to-Image", "ERPK/WaveSpeedAI", True, False),
     ("qwen_image_edit", "QwenImageEditNode", "QwenImageEditNode",
-     "Qwen Image Edit", "ERPK/WaveSpeedAI", False, False),
+     "Qwen Image Edit", "ERPK/WaveSpeedAI", True, False),
     ("qwen_image_edit_plus", "QwenImageEditPlusNode", "QwenImageEditPlusNode",
-     "Qwen Image Edit Plus", "ERPK/WaveSpeedAI", False, False),
+     "Qwen Image Edit Plus", "ERPK/WaveSpeedAI", True, False),
 ]
 
 

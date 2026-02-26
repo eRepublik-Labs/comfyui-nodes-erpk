@@ -44,7 +44,12 @@ class QwenImageEditNode(IO.ComfyNode):
             outputs=[
                 IO.Image.Output("image"),
             ],
+            not_idempotent=True,
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("NaN")
 
     @classmethod
     def execute(cls, prompt, image, client=None, width=1024, height=1024, seed=-1,

@@ -106,6 +106,10 @@ class VeoTextToVideo(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("NaN")
+
+    @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
         from .gemini_api.client import GeminiClient
 
@@ -302,6 +306,10 @@ class VeoImageToVideo(IO.ComfyNode):
                 IO.String.Output("video_path"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return float("NaN")
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
