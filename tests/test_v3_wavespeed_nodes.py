@@ -1,8 +1,8 @@
 # ABOUTME: V3 structural and behavioral tests for all WaveSpeed provider nodes.
-# ABOUTME: Validates V3 compliance, custom types, size presets, and provider export (20 nodes).
+# ABOUTME: Validates V3 compliance, custom types, size presets, and provider export (29 nodes).
 
 """
-V3 tests for WaveSpeed provider nodes (20 nodes total).
+V3 tests for WaveSpeed provider nodes (29 nodes total).
 
 Validates:
 - All classes inherit from IO.ComfyNode
@@ -73,6 +73,28 @@ WAVESPEED_NODES = [
      "Qwen Image Edit Plus LoRA", "ERPK/WaveSpeedAI", True, False),
     ("qwen_image_layered", "QwenImageLayeredNode", "QwenImageLayeredNode",
      "Qwen Image Layered", "ERPK/WaveSpeedAI", True, False),
+    # Seedream V5.0 Lite nodes
+    ("seedream_v5_lite", "SeedreamV5LiteNode", "SeedreamV5LiteNode",
+     "Bytedance Seedream V5.0 Lite", "ERPK/WaveSpeedAI", True, False),
+    ("seedream_v5_lite_edit", "SeedreamV5LiteEditNode", "SeedreamV5LiteEditNode",
+     "Bytedance Seedream V5.0 Lite Edit", "ERPK/WaveSpeedAI", True, False),
+    ("seedream_v5_lite_sequential", "SeedreamV5LiteSequentialNode", "SeedreamV5LiteSequentialNode",
+     "Bytedance Seedream V5.0 Lite Sequential", "ERPK/WaveSpeedAI", True, False),
+    ("seedream_v5_lite_edit_sequential", "SeedreamV5LiteEditSequentialNode", "SeedreamV5LiteEditSequentialNode",
+     "Bytedance Seedream V5.0 Lite Edit Sequential", "ERPK/WaveSpeedAI", True, False),
+    # Qwen Image Max nodes
+    ("qwen_image_max", "QwenImageMaxNode", "QwenImageMaxNode",
+     "Qwen Image Max", "ERPK/WaveSpeedAI", True, False),
+    ("qwen_image_max_edit", "QwenImageMaxEditNode", "QwenImageMaxEditNode",
+     "Qwen Image Max Edit", "ERPK/WaveSpeedAI", True, False),
+    # JibMix Qwen Image node
+    ("jibmix_qwen_image", "JibMixQwenImageNode", "JibMixQwenImageNode",
+     "JibMix Qwen Image", "ERPK/WaveSpeedAI", True, False),
+    # Dreamina nodes
+    ("dreamina_text_to_image", "DreaminaTextToImageNode", "DreaminaTextToImageNode",
+     "Bytedance Dreamina Text-to-Image", "ERPK/WaveSpeedAI", True, False),
+    ("dreamina_edit", "DreaminaEditNode", "DreaminaEditNode",
+     "Bytedance Dreamina Edit", "ERPK/WaveSpeedAI", True, False),
 ]
 
 
@@ -246,7 +268,7 @@ class TestWaveSpeedProviderExport:
     def test_nodes_list_has_all_classes(self):
         import importlib
         mod = importlib.import_module("wavespeed")
-        assert len(mod.NODES) == 20, f"Expected 20 WaveSpeed nodes, got {len(mod.NODES)}"
+        assert len(mod.NODES) == 29, f"Expected 29 WaveSpeed nodes, got {len(mod.NODES)}"
 
     def test_nodes_list_all_comfy_nodes(self):
         import importlib

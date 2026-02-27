@@ -1,5 +1,5 @@
 # ABOUTME: WaveSpeed AI provider package for ComfyUI V3.
-# ABOUTME: Exports flat NODES list of all 20 WaveSpeed node classes for ERPKExtension.
+# ABOUTME: Exports flat NODES list of all 29 WaveSpeed node classes for ERPKExtension.
 
 from .nodes import WaveSpeedAIAPIClient, PreviewVideo, SaveAudio, UploadImage
 from .seedream_v4 import SeedreamV4Node
@@ -18,6 +18,15 @@ from .qwen_image_lora import QwenImageLoraNode
 from .qwen_image_edit_lora import QwenImageEditLoraNode
 from .qwen_image_edit_plus_lora import QwenImageEditPlusLoraNode
 from .qwen_image_layered import QwenImageLayeredNode
+from .seedream_v5_lite import SeedreamV5LiteNode
+from .seedream_v5_lite_edit import SeedreamV5LiteEditNode
+from .seedream_v5_lite_sequential import SeedreamV5LiteSequentialNode
+from .seedream_v5_lite_edit_sequential import SeedreamV5LiteEditSequentialNode
+from .qwen_image_max import QwenImageMaxNode
+from .qwen_image_max_edit import QwenImageMaxEditNode
+from .jibmix_qwen_image import JibMixQwenImageNode
+from .dreamina_text_to_image import DreaminaTextToImageNode
+from .dreamina_edit import DreaminaEditNode
 
 NODES = [
     WaveSpeedAIAPIClient,
@@ -40,6 +49,15 @@ NODES = [
     QwenImageEditLoraNode,
     QwenImageEditPlusLoraNode,
     QwenImageLayeredNode,
+    SeedreamV5LiteNode,
+    SeedreamV5LiteEditNode,
+    SeedreamV5LiteSequentialNode,
+    SeedreamV5LiteEditSequentialNode,
+    QwenImageMaxNode,
+    QwenImageMaxEditNode,
+    JibMixQwenImageNode,
+    DreaminaTextToImageNode,
+    DreaminaEditNode,
 ]
 
 __all__ = ["NODES"]

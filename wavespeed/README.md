@@ -38,6 +38,17 @@ Enhanced typography and text rendering for posters, logos, UI, and marketing lay
 | **Seedream V4.5 Edit** | Image editing with enhanced typography | 1024-4096px (step 8) | Up to 10 | Single image | Standard | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-5-edit) |
 | **Seedream V4.5 Edit Sequential** | Multi-image editing with typography | 1024-4096px (step 8) | Up to 10 (optional) | 1-15 images | $0.027/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-5-edit-sequential) |
 
+### ByteDance Seedream V5.0 Lite Models
+
+Same capabilities as V4.5 with higher minimum resolution (1440px) at a lower price point.
+
+| Node | Description | Dimensions | Input Images | Output | Pricing | API Docs |
+|------|-------------|------------|--------------|--------|---------|----------|
+| **Seedream V5.0 Lite** | Text-to-image with higher minimum resolution | 1440-4096px (step 8)<br>Default: 2048x2048 | N/A | Single image | $0.035/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite) |
+| **Seedream V5.0 Lite Sequential** | Multi-image generation at higher resolution | 1440-4096px (step 8)<br>Default: 2048x2048 | N/A | 1-15 images | $0.035/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite-sequential) |
+| **Seedream V5.0 Lite Edit** | Image editing at higher resolution | 1440-4096px (step 8) | Up to 10 | Single image | $0.035/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite-edit) |
+| **Seedream V5.0 Lite Edit Sequential** | Multi-image editing at higher resolution | 1440-4096px (step 8) | Up to 10 (optional) | 1-15 images | $0.035/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite-edit-sequential) |
+
 ### Qwen Image Models
 
 | Node | Models | Description | Dimensions | Input Images | Language | Output | Pricing | API Docs |
@@ -50,6 +61,16 @@ Enhanced typography and text rendering for posters, logos, UI, and marketing lay
 | **Qwen Image Edit LoRA** | Qwen Edit LoRA | Single-image editing with LoRA influences | 256-1536px (step 8)<br>Default: 1024×1024 | 1 required | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-lora) |
 | **Qwen Image Edit Plus LoRA** | Qwen Edit Plus LoRA,<br>Qwen Edit 2511 LoRA | Multi-image editing with LoRA influences | 256-1536px (step 8)<br>Default: 1024×1024 | Up to 3 required | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-plus-lora) |
 | **Qwen Image Layered** | Qwen Layered | Image decomposition into RGBA layers | N/A | 1 required | 🇨🇳 🇬🇧 | 2-8 RGBA layers | $0.025/layer | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-layered) |
+| **Qwen Image Max** | Qwen Image Max | Premium 20B text-to-image generation | 256-1536px (step 8)<br>Default: 1024x1024 | N/A | 🇨🇳 🇬🇧 | Single image | $0.07/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-max-text-to-image) |
+| **Qwen Image Max Edit** | Qwen Image Max | Premium 20B multi-reference editing | 256-1536px (step 8) | Up to 6 required | 🇨🇳 🇬🇧 | Single image | $0.07/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-max-edit) |
+| **JibMix Qwen Image** | JibMix Qwen | Portrait-optimized text-to-image | 256-1536px (step 8)<br>Default: 1024x1024 | N/A | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/jib-mix-qwen-image-text-to-image) |
+
+### ByteDance Dreamina Models
+
+| Node | Models | Description | Dimensions | Input Images | Output | Pricing | API Docs |
+|------|--------|-------------|------------|--------------|--------|---------|----------|
+| **Dreamina Text-to-Image** | Dreamina V3.0,<br>Dreamina V3.1 | Text-to-image with optional prompt expansion | 512-2048px (step 8)<br>Default: 1328×1328 | N/A | Single image | $0.027/image | [V3.0](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-dreamina-v3-text-to-image) / [V3.1](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-dreamina-v3-1-text-to-image) |
+| **Dreamina Edit** | Dreamina V3.0 | Single-image editing | 512-2048px (step 8)<br>Default: 1328×1328 | 1 required | Single image | $0.027/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-dreamina-v3-edit) |
 
 **Common Features (All Seedream Nodes):**
 - Size preset dropdown with recommended resolutions
@@ -123,6 +144,15 @@ ComfyUI/
         qwen_image_edit_lora.py
         qwen_image_edit_plus_lora.py
         qwen_image_layered.py
+        seedream_v5_lite.py
+        seedream_v5_lite_sequential.py
+        seedream_v5_lite_edit.py
+        seedream_v5_lite_edit_sequential.py
+        qwen_image_max.py
+        qwen_image_max_edit.py
+        jibmix_qwen_image.py
+        dreamina_text_to_image.py
+        dreamina_edit.py
         wavespeed_api/
           __init__.py
           client.py
@@ -148,6 +178,16 @@ ComfyUI/
             qwen_image_edit_2511_lora.py
             qwen_image_text_to_image_2512_lora.py
             qwen_image_layered.py
+            seedream_v5_lite.py
+            seedream_v5_lite_sequential.py
+            seedream_v5_lite_edit.py
+            seedream_v5_lite_edit_sequential.py
+            qwen_image_max.py
+            qwen_image_max_edit.py
+            jibmix_qwen_image.py
+            dreamina_v3_text_to_image.py
+            dreamina_v3_1_text_to_image.py
+            dreamina_v3_edit.py
       web/
         aspect_ratio.js
 ```
@@ -292,6 +332,65 @@ Optional if API key is configured via ComfyUI Settings, environment variable, or
 8. Configure dimensions and options (optional)
 9. Execute the workflow to generate LoRA-guided edited images
 
+### Bytedance Seedream V5.0 Lite Node
+
+Same usage as Seedream V4.5, with higher minimum resolution (1440px) at a lower price point ($0.035/image).
+
+1. Add the "Bytedance Seedream V5.0 Lite" node to your workflow
+2. Connect your WaveSpeed AI API client (optional if key is in Settings)
+3. Enter your text prompt
+4. Select a size preset or use custom width/height (1440-4096px)
+5. Execute the workflow to generate images
+
+**Note:** Sequential, Edit, and Edit Sequential variants follow the same patterns as their V4.5 counterparts.
+
+### Qwen Image Max Node
+
+1. Add the "Qwen Image Max" node to your workflow
+2. Connect your WaveSpeed AI API client (optional if key is in Settings)
+3. Enter your text prompt (max 800 characters)
+4. Configure dimensions (optional, default 1024x1024, range 256-1536)
+5. Set seed for reproducibility (optional)
+6. Execute the workflow to generate images
+
+**Note:** Qwen Image Max has a simplified parameter set — no output format, sync mode, or base64 output options.
+
+### Qwen Image Max Edit Node
+
+1. Add the "Qwen Image Max Edit" node to your workflow
+2. Connect your WaveSpeed AI API client (optional if key is in Settings)
+3. Provide up to 6 reference images (comma-separated URLs)
+4. Enter your editing prompt
+5. Configure dimensions and seed (optional)
+6. Execute the workflow to edit images
+
+### JibMix Qwen Image Node
+
+1. Add the "JibMix Qwen Image" node to your workflow
+2. Connect your WaveSpeed AI API client (optional if key is in Settings)
+3. Enter your text prompt (optimized for portrait generation)
+4. Configure dimensions, seed, and output format (optional)
+5. Execute the workflow to generate images
+
+### Bytedance Dreamina Text-to-Image Node
+
+1. Add the "Bytedance Dreamina Text-to-Image" node to your workflow
+2. Select the model variant: **Dreamina V3.1** (default) or **Dreamina V3.0**
+3. Connect your WaveSpeed AI API client (optional if key is in Settings)
+4. Enter your text prompt
+5. Configure dimensions (optional, default 1328x1328, range 512-2048)
+6. Set seed and prompt expansion options (optional)
+7. Execute the workflow to generate images
+
+### Bytedance Dreamina Edit Node
+
+1. Add the "Bytedance Dreamina Edit" node to your workflow
+2. Connect your WaveSpeed AI API client (optional if key is in Settings)
+3. Provide a single image URL to edit
+4. Enter your editing prompt
+5. Configure dimensions and seed (optional)
+6. Execute the workflow to edit the image
+
 ### Qwen Image Layered Node
 
 1. Add the "WaveSpeedAI Qwen Image Layered" node to your workflow
@@ -356,6 +455,16 @@ For detailed API reference and parameters:
 - [Qwen Image Edit Plus LoRA API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-plus-lora)
 - [Qwen Image Edit 2511 LoRA API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-2511-lora)
 - [Qwen Image Layered API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-layered)
+- [Bytedance Seedream V5.0 Lite API Documentation](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite)
+- [Bytedance Seedream V5.0 Lite Sequential API Documentation](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite-sequential)
+- [Bytedance Seedream V5.0 Lite Edit API Documentation](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite-edit)
+- [Bytedance Seedream V5.0 Lite Edit Sequential API Documentation](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite-edit-sequential)
+- [Qwen Image Max Text-to-Image API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-max-text-to-image)
+- [Qwen Image Max Edit API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-max-edit)
+- [JibMix Qwen Image Text-to-Image API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/jib-mix-qwen-image-text-to-image)
+- [Bytedance Dreamina V3.0 Text-to-Image API Documentation](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-dreamina-v3-text-to-image)
+- [Bytedance Dreamina V3.1 Text-to-Image API Documentation](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-dreamina-v3-1-text-to-image)
+- [Bytedance Dreamina V3.0 Edit API Documentation](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-dreamina-v3-edit)
 
 ## Troubleshooting
 
@@ -377,7 +486,7 @@ pip install -r requirements.txt
 
 5. **Verify Import**: Check the ComfyUI console output on startup for:
 ```
-[ERPK] Loaded 20 V3 nodes
+[ERPK] Loaded 29 V3 nodes
 ```
 
 ### Common Issues
@@ -395,7 +504,7 @@ All WaveSpeed nodes are located under the **ERPK/WaveSpeedAI** category:
 3. Navigate to: **ERPK → WaveSpeedAI**
 4. Select your desired node
 
-**Available nodes (20 total):**
+**Available nodes (29 total):**
 - WaveSpeed Client
 - WaveSpeed Preview Video
 - WaveSpeed Save Audio
@@ -416,6 +525,15 @@ All WaveSpeed nodes are located under the **ERPK/WaveSpeedAI** category:
 - Qwen Image Edit LoRA
 - Qwen Image Edit Plus LoRA
 - Qwen Image Layered
+- Qwen Image Max
+- Qwen Image Max Edit
+- JibMix Qwen Image
+- Bytedance Seedream V5.0 Lite
+- Bytedance Seedream V5.0 Lite Sequential
+- Bytedance Seedream V5.0 Lite Edit
+- Bytedance Seedream V5.0 Lite Edit Sequential
+- Bytedance Dreamina Text-to-Image
+- Bytedance Dreamina Edit
 
 ## Versioning
 
