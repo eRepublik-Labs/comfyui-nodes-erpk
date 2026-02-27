@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2026.2.21 (CalVer)
+**Current Version:** 2026.2.22 (CalVer)
 
 ## Repository Structure
 
