@@ -10,7 +10,6 @@ class QwenImageLora(BaseRequest):
     """
     Qwen Image LoRA text-to-image generation.
     Applies up to 3 LoRA models to guide image generation style and content.
-    Max resolution: 1024x1024.
     """
 
     prompt: str = Field(..., description="The positive prompt for the generation.")
@@ -21,7 +20,7 @@ class QwenImageLora(BaseRequest):
     )
     size: Optional[str] = Field(
         default="1024*1024",
-        description="Image dimensions (width*height). Max: 1024x1024.",
+        description="Image dimensions in pixels (width*height format).",
     )
     seed: Optional[int] = Field(
         default=-1,

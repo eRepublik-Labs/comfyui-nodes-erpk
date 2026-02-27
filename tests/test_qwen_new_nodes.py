@@ -191,13 +191,13 @@ class TestQwenLoraNode:
         assert lora_2_path.optional is True
         assert lora_3_path.optional is True
 
-    def test_max_dimensions_1024(self):
+    def test_max_dimensions_1536(self):
         cls = _import_node("qwen_image_lora", "QwenImageLoraNode")
         schema = cls.define_schema()
         width_input = next(i for i in schema.inputs if i.id == "width")
         height_input = next(i for i in schema.inputs if i.id == "height")
-        assert width_input.max == 1024
-        assert height_input.max == 1024
+        assert width_input.max == 1536
+        assert height_input.max == 1536
 
     def test_node_id(self):
         cls = _import_node("qwen_image_lora", "QwenImageLoraNode")

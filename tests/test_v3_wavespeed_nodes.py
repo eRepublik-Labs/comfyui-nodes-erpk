@@ -1,8 +1,8 @@
 # ABOUTME: V3 structural and behavioral tests for all WaveSpeed provider nodes.
-# ABOUTME: Validates V3 compliance, custom types, size presets, and provider export.
+# ABOUTME: Validates V3 compliance, custom types, size presets, and provider export (20 nodes).
 
 """
-V3 tests for WaveSpeed provider nodes (18 nodes total).
+V3 tests for WaveSpeed provider nodes (20 nodes total).
 
 Validates:
 - All classes inherit from IO.ComfyNode
@@ -67,6 +67,10 @@ WAVESPEED_NODES = [
      "Qwen Image Multiple Angles", "ERPK/WaveSpeedAI", True, False),
     ("qwen_image_lora", "QwenImageLoraNode", "QwenImageLoraNode",
      "Qwen Image LoRA", "ERPK/WaveSpeedAI", True, False),
+    ("qwen_image_edit_lora", "QwenImageEditLoraNode", "QwenImageEditLoraNode",
+     "Qwen Image Edit LoRA", "ERPK/WaveSpeedAI", True, False),
+    ("qwen_image_edit_plus_lora", "QwenImageEditPlusLoraNode", "QwenImageEditPlusLoraNode",
+     "Qwen Image Edit Plus LoRA", "ERPK/WaveSpeedAI", True, False),
     ("qwen_image_layered", "QwenImageLayeredNode", "QwenImageLayeredNode",
      "Qwen Image Layered", "ERPK/WaveSpeedAI", True, False),
 ]
@@ -242,7 +246,7 @@ class TestWaveSpeedProviderExport:
     def test_nodes_list_has_all_classes(self):
         import importlib
         mod = importlib.import_module("wavespeed")
-        assert len(mod.NODES) == 18, f"Expected 18 WaveSpeed nodes, got {len(mod.NODES)}"
+        assert len(mod.NODES) == 20, f"Expected 20 WaveSpeed nodes, got {len(mod.NODES)}"
 
     def test_nodes_list_all_comfy_nodes(self):
         import importlib

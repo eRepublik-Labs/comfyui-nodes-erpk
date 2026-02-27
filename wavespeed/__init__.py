@@ -1,5 +1,5 @@
 # ABOUTME: WaveSpeed AI provider package for ComfyUI V3.
-# ABOUTME: Exports flat NODES list of all 18 WaveSpeed node classes for ERPKExtension.
+# ABOUTME: Exports flat NODES list of all 20 WaveSpeed node classes for ERPKExtension.
 
 from .nodes import WaveSpeedAIAPIClient, PreviewVideo, SaveAudio, UploadImage
 from .seedream_v4 import SeedreamV4Node
@@ -15,6 +15,8 @@ from .qwen_image_edit import QwenImageEditNode
 from .qwen_image_edit_plus import QwenImageEditPlusNode
 from .qwen_image_multiple_angles import QwenImageMultipleAnglesNode
 from .qwen_image_lora import QwenImageLoraNode
+from .qwen_image_edit_lora import QwenImageEditLoraNode
+from .qwen_image_edit_plus_lora import QwenImageEditPlusLoraNode
 from .qwen_image_layered import QwenImageLayeredNode
 
 NODES = [
@@ -35,6 +37,8 @@ NODES = [
     QwenImageEditPlusNode,
     QwenImageMultipleAnglesNode,
     QwenImageLoraNode,
+    QwenImageEditLoraNode,
+    QwenImageEditPlusLoraNode,
     QwenImageLayeredNode,
 ]
 

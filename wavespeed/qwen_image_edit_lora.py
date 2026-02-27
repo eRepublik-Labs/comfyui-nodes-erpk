@@ -1,32 +1,28 @@
-# ABOUTME: Qwen Image LoRA text-to-image node for WaveSpeed AI.
-# ABOUTME: Generates images guided by up to 3 LoRA models with configurable scales.
+# ABOUTME: Qwen Image Edit LoRA node for single-image editing via WaveSpeed AI.
+# ABOUTME: Combines image editing with up to 3 LoRA models for style-guided edits.
 
 from comfy_api.latest import IO
 
 
-class QwenImageLoraNode(IO.ComfyNode):
+class QwenImageEditLoraNode(IO.ComfyNode):
     """
-    Qwen Image LoRA Text-to-Image Node
+    Qwen Image Edit LoRA Node
 
-    Generates images from text prompts with up to 3 LoRA model influences.
+    Edits images based on text prompts with up to 3 LoRA model influences.
     Each LoRA accepts a URL path and a scale factor (0.0 to 4.0).
-    Supports Qwen Image and Qwen Image 2512 (7B) model variants.
     """
-
-    MODELS = ["Qwen Image", "Qwen Image 2512"]
 
     @classmethod
     def define_schema(cls):
         return IO.Schema(
-            node_id="QwenImageLoraNode",
-            display_name="Qwen Image LoRA",
+            node_id="QwenImageEditLoraNode",
+            display_name="Qwen Image Edit LoRA",
             category="ERPK/WaveSpeedAI",
             inputs=[
-                IO.Combo.Input("model", options=cls.MODELS,
-                               default="Qwen Image",
-                               tooltip="Model variant: Qwen Image (20B MMDiT) or Qwen Image 2512 (7B, better text rendering)"),
                 IO.String.Input("prompt", multiline=True, default="",
-                                tooltip="Text description of the image to generate (Chinese or English)"),
+                                tooltip="Text description of the desired image modifications (Chinese or English)"),
+                IO.String.Input("image",
+                                tooltip="The image to edit (URL or path)"),
                 IO.String.Input("lora_1_path",
                                 tooltip="URL to first LoRA model file (required)"),
                 IO.Float.Input("lora_1_scale", default=1.0, min=0.0, max=4.0, step=0.1,
@@ -67,15 +63,14 @@ class QwenImageLoraNode(IO.ComfyNode):
         return float("NaN")
 
     @classmethod
-    def execute(cls, model="Qwen Image", prompt="", lora_1_path="", lora_1_scale=1.0,
+    def execute(cls, prompt="", image="", lora_1_path="", lora_1_scale=1.0,
                 lora_2_path="", lora_2_scale=1.0, lora_3_path="", lora_3_scale=1.0,
                 client=None, width=1024, height=1024, seed=-1,
                 output_format="jpeg", enable_sync_mode=False,
                 enable_base64_output=False, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.utils import imageurl2tensor
-        from .wavespeed_api.requests.qwen_image_lora import QwenImageLora
-        from .wavespeed_api.requests.qwen_image_text_to_image_2512_lora import QwenImageTextToImage2512Lora
+        from .wavespeed_api.requests.qwen_image_edit_lora import QwenImageEditLora
 
         if client is None:
             from .nodes import WaveSpeedAIAPIClient
@@ -83,6 +78,9 @@ class QwenImageLoraNode(IO.ComfyNode):
 
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
+
+        if image is None or image == "":
+            raise ValueError("Image must be provided")
 
         if not lora_1_path or not lora_1_path.strip():
             raise ValueError("At least one LoRA path is required")
@@ -93,12 +91,13 @@ class QwenImageLoraNode(IO.ComfyNode):
         if lora_3_path and lora_3_path.strip():
             loras.append({"path": lora_3_path.strip(), "scale": lora_3_scale})
 
-        request_cls = QwenImageTextToImage2512Lora if model == "Qwen Image 2512" else QwenImageLora
+        size = f"{width}*{height}" if width and height else None
 
-        request = request_cls(
+        request = QwenImageEditLora(
             prompt=prompt,
+            image=image,
             loras=loras,
-            size=f"{width}*{height}",
+            size=size,
             seed=seed,
             output_format=output_format,
             enable_sync_mode=enable_sync_mode,
