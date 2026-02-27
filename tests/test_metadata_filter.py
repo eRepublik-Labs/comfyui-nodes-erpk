@@ -1,4 +1,4 @@
-# ABOUTME: Tests for the SaveImage metadata filter monkey-patch.
+# ABOUTME: Tests for the SaveImage/PreviewImage metadata filter monkey-patch.
 # ABOUTME: Validates that both prompt and extra_pnginfo are stripped when the per-node toggle is enabled.
 
 """
@@ -106,3 +106,65 @@ class TestInputTypesPatch:
 
         assert "existing" in result["optional"]
         assert "strip_metadata" in result["optional"]
+
+    def test_patches_preview_image_input_types(self):
+        """PreviewImage has its own INPUT_TYPES; verify the patch adds toggle to it too."""
+        from metadata_filter import make_patched_input_types
+
+        @classmethod
+        def preview_input_types(s):
+            return {
+                "required": {"images": ("IMAGE",)},
+                "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
+            }
+
+        patched = make_patched_input_types(preview_input_types)
+        result = patched.__func__(None)
+
+        assert "optional" in result
+        assert "strip_metadata" in result["optional"]
+
+
+class TestInstall:
+    """install() patches both SaveImage and PreviewImage."""
+
+    def test_patches_both_classes(self):
+        from metadata_filter import install, make_patched_input_types, make_filtered_save_images
+        import types
+
+        class FakeSaveImage:
+            @classmethod
+            def INPUT_TYPES(s):
+                return {"required": {"images": ("IMAGE",)},
+                        "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"}}
+
+            def save_images(self, images, filename_prefix="ComfyUI", prompt=None, extra_pnginfo=None):
+                pass
+
+        class FakePreviewImage(FakeSaveImage):
+            @classmethod
+            def INPUT_TYPES(s):
+                return {"required": {"images": ("IMAGE",)},
+                        "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"}}
+
+        # Simulate the module
+        fake_nodes = types.ModuleType("nodes")
+        fake_nodes.SaveImage = FakeSaveImage
+        fake_nodes.PreviewImage = FakePreviewImage
+
+        import sys
+        old_nodes = sys.modules.get("nodes")
+        sys.modules["nodes"] = fake_nodes
+        try:
+            install()
+            # SaveImage should have the toggle
+            save_result = FakeSaveImage.INPUT_TYPES()
+            assert "strip_metadata" in save_result.get("optional", {})
+            # PreviewImage should also have the toggle
+            preview_result = FakePreviewImage.INPUT_TYPES()
+            assert "strip_metadata" in preview_result.get("optional", {})
+        finally:
+            if old_nodes is None:
+                del sys.modules["nodes"]
+            else:
+                sys.modules["nodes"] = old_nodes

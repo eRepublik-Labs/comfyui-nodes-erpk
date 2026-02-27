@@ -1,4 +1,4 @@
-# ABOUTME: Monkey-patches SaveImage to add a per-node toggle for metadata stripping.
+# ABOUTME: Monkey-patches SaveImage and PreviewImage to add a per-node toggle for metadata stripping.
 # ABOUTME: Strips both prompt and extra_pnginfo (workflow JSON) from PNGs when the toggle is enabled.
 
 
@@ -36,13 +36,14 @@ def make_patched_input_types(original_fn):
 
 
 def install():
-    """Apply the SaveImage monkey-patches. Call once at import time."""
+    """Apply the SaveImage/PreviewImage monkey-patches. Call once at import time."""
     try:
         import nodes
         nodes.SaveImage.save_images = make_filtered_save_images(nodes.SaveImage.save_images)
         nodes.SaveImage.INPUT_TYPES = make_patched_input_types(nodes.SaveImage.INPUT_TYPES)
-        print("[ERPK] Installed SaveImage metadata toggle")
+        nodes.PreviewImage.INPUT_TYPES = make_patched_input_types(nodes.PreviewImage.INPUT_TYPES)
+        print("[ERPK] Installed SaveImage/PreviewImage metadata toggle")
     except ImportError:
         pass
     except Exception as e:
-        print(f"[ERPK] Warning: Could not install SaveImage metadata toggle: {e}")
+        print(f"[ERPK] Warning: Could not install metadata toggle: {e}")
