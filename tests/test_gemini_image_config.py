@@ -16,21 +16,14 @@ def test_image_config_params_with_unsupported_image_size():
     image_config_params = {}
     aspect_ratio = "16:9"
     image_size = "4K"
-    model = "gemini-3-pro-image-preview"
+    model = "gemini-3.1-flash-image-preview"
 
-    # Current code logic (should fail with old SDK)
     if aspect_ratio != "default":
         image_config_params["aspect_ratio"] = aspect_ratio
 
-    # This is what the current code does - it would fail
-    # if image_size != "default" and model == "gemini-3-pro-image-preview":
-    #     image_config_params["image_size"] = image_size
-
-    # This is what the fixed code should do
-    if image_size != "default" and model == "gemini-3-pro-image-preview":
+    if image_size != "default" and model != "gemini-2.5-flash-image":
         if "image_size" in mock_model_fields:
             image_config_params["image_size"] = image_size
-        # else: skip silently or warn
 
     # With old SDK, image_size should NOT be in params
     assert "image_size" not in image_config_params
@@ -47,13 +40,12 @@ def test_image_config_params_with_supported_image_size():
     image_config_params = {}
     aspect_ratio = "16:9"
     image_size = "4K"
-    model = "gemini-3-pro-image-preview"
+    model = "gemini-3.1-flash-image-preview"
 
     if aspect_ratio != "default":
         image_config_params["aspect_ratio"] = aspect_ratio
 
-    # Fixed code logic - check SDK support at runtime
-    if image_size != "default" and model == "gemini-3-pro-image-preview":
+    if image_size != "default" and model != "gemini-2.5-flash-image":
         if "image_size" in types.ImageConfig.model_fields:
             image_config_params["image_size"] = image_size
 

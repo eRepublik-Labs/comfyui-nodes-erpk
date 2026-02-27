@@ -790,7 +790,7 @@ class GeminiImageGeneration(IO.ComfyNode):
                 IO.Combo.Input(
                     "model",
                     options=IMAGE_MODELS,
-                    default="gemini-3-pro-image-preview",
+                    default="gemini-3.1-flash-image-preview",
                     optional=True,
                     tooltip="Image generation model (overrides client model)",
                 ),
@@ -805,17 +805,18 @@ class GeminiImageGeneration(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "aspect_ratio",
-                    options=["default", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"],
+                    options=["default", "1:1", "1:4", "1:8", "2:3", "3:2", "3:4",
+                             "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"],
                     default="default",
                     optional=True,
-                    tooltip="Image aspect ratio (default uses model's default)",
+                    tooltip="Image aspect ratio (all 14 ratios for 3.1 Flash; 10 for 3 Pro and 2.5 Flash)",
                 ),
                 IO.Combo.Input(
                     "image_size",
-                    options=["default", "1K", "2K", "4K"],
+                    options=["default", "512px", "1K", "2K", "4K"],
                     default="default",
                     optional=True,
-                    tooltip="Image resolution (only for gemini-3-pro-image-preview; 2.5-flash always uses 1024px)",
+                    tooltip="Image resolution (512px-4K for 3.1 Flash, 1K-4K for 3 Pro; 2.5 Flash fixed at 1024px)",
                 ),
                 IO.Combo.Input(
                     "response_modalities",
@@ -828,7 +829,7 @@ class GeminiImageGeneration(IO.ComfyNode):
                     "enable_google_search",
                     default=False,
                     optional=True,
-                    tooltip="Enable Google Search grounding (only for gemini-3-pro-image-preview)",
+                    tooltip="Enable Google Search grounding (Gemini 3 models only, not 2.5 Flash)",
                 ),
                 IO.String.Input(
                     "api_key",
@@ -853,7 +854,7 @@ class GeminiImageGeneration(IO.ComfyNode):
 
         prompt = kwargs.get("prompt", "")
         client = kwargs.get("client")
-        model = kwargs.get("model", "gemini-3-pro-image-preview")
+        model = kwargs.get("model", "gemini-3.1-flash-image-preview")
         temperature = kwargs.get("temperature", 1.0)
         aspect_ratio = kwargs.get("aspect_ratio", "default")
         image_size = kwargs.get("image_size", "default")
@@ -898,14 +899,14 @@ class GeminiImageGeneration(IO.ComfyNode):
             else:
                 config.response_modalities = ["IMAGE"]
 
-            if enable_google_search and model == "gemini-3-pro-image-preview":
+            if enable_google_search and model != "gemini-2.5-flash-image":
                 config.tools = [{"google_search": {}}]
                 print(f"[Gemini] Google Search grounding enabled")
 
             image_config_params = {}
             if aspect_ratio != "default":
                 image_config_params["aspect_ratio"] = aspect_ratio
-            if image_size != "default" and model == "gemini-3-pro-image-preview":
+            if image_size != "default" and model != "gemini-2.5-flash-image":
                 if "image_size" in types.ImageConfig.model_fields:
                     image_config_params["image_size"] = image_size
                 else:
@@ -1008,7 +1009,7 @@ class GeminiImageEdit(IO.ComfyNode):
                 IO.Combo.Input(
                     "model",
                     options=IMAGE_MODELS,
-                    default="gemini-3-pro-image-preview",
+                    default="gemini-3.1-flash-image-preview",
                     optional=True,
                     tooltip="Image generation model (overrides client model)",
                 ),
@@ -1023,17 +1024,18 @@ class GeminiImageEdit(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "aspect_ratio",
-                    options=["default", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"],
+                    options=["default", "1:1", "1:4", "1:8", "2:3", "3:2", "3:4",
+                             "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"],
                     default="default",
                     optional=True,
-                    tooltip="Image aspect ratio (default uses model's default)",
+                    tooltip="Image aspect ratio (all 14 ratios for 3.1 Flash; 10 for 3 Pro and 2.5 Flash)",
                 ),
                 IO.Combo.Input(
                     "image_size",
-                    options=["default", "1K", "2K", "4K"],
+                    options=["default", "512px", "1K", "2K", "4K"],
                     default="default",
                     optional=True,
-                    tooltip="Image resolution (only for gemini-3-pro-image-preview; 2.5-flash always uses 1024px)",
+                    tooltip="Image resolution (512px-4K for 3.1 Flash, 1K-4K for 3 Pro; 2.5 Flash fixed at 1024px)",
                 ),
                 IO.Combo.Input(
                     "response_modalities",
@@ -1046,7 +1048,7 @@ class GeminiImageEdit(IO.ComfyNode):
                     "enable_google_search",
                     default=False,
                     optional=True,
-                    tooltip="Enable Google Search grounding (only for gemini-3-pro-image-preview)",
+                    tooltip="Enable Google Search grounding (Gemini 3 models only, not 2.5 Flash)",
                 ),
                 IO.Image.Input(
                     "additional_images",
@@ -1077,7 +1079,7 @@ class GeminiImageEdit(IO.ComfyNode):
         image = kwargs.get("image")
         prompt = kwargs.get("prompt", "")
         client = kwargs.get("client")
-        model = kwargs.get("model", "gemini-3-pro-image-preview")
+        model = kwargs.get("model", "gemini-3.1-flash-image-preview")
         temperature = kwargs.get("temperature", 1.0)
         aspect_ratio = kwargs.get("aspect_ratio", "default")
         image_size = kwargs.get("image_size", "default")
@@ -1132,14 +1134,14 @@ class GeminiImageEdit(IO.ComfyNode):
             else:
                 config.response_modalities = ["IMAGE"]
 
-            if enable_google_search and model == "gemini-3-pro-image-preview":
+            if enable_google_search and model != "gemini-2.5-flash-image":
                 config.tools = [{"google_search": {}}]
                 print(f"[Gemini] Google Search grounding enabled")
 
             image_config_params = {}
             if aspect_ratio != "default":
                 image_config_params["aspect_ratio"] = aspect_ratio
-            if image_size != "default" and model == "gemini-3-pro-image-preview":
+            if image_size != "default" and model != "gemini-2.5-flash-image":
                 if "image_size" in types.ImageConfig.model_fields:
                     image_config_params["image_size"] = image_size
                 else:

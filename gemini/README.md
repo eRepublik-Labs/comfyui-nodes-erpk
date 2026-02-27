@@ -181,12 +181,12 @@ Generate images from text descriptions using Gemini's image generation models.
 **Inputs:**
 - `prompt`: Text description of the image to generate
 - `client`: Optional Gemini API client (from Gemini API Config node)
-- `model`: gemini-3-pro-image-preview (default, best quality) or gemini-2.5-flash-image (fast)
+- `model`: gemini-3.1-flash-image-preview (default, recommended), gemini-3-pro-image-preview (professional), or gemini-2.5-flash-image (fast)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
-- `aspect_ratio`: Image dimensions - "default", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"
-- `image_size`: Resolution - "default", "1K", "2K", "4K" (only for gemini-3-pro-image-preview, 2.5-flash always 1024px)
+- `aspect_ratio`: Image dimensions - 14 ratios for 3.1 Flash (including 1:4, 4:1, 1:8, 8:1), 10 ratios for others
+- `image_size`: Resolution - "default", "512px", "1K", "2K", "4K" (512px-4K for 3.1 Flash, 1K-4K for 3 Pro; 2.5 Flash fixed at 1024px)
 - `response_modalities`: "IMAGE" (image only) or "TEXT+IMAGE" (image + text description)
-- `enable_google_search`: Enable Google Search grounding (only for gemini-3-pro-image-preview)
+- `enable_google_search`: Enable Google Search grounding (Gemini 3 models only)
 - `api_key`: Optional API key (only needed if not using client input)
 
 **Outputs:**
@@ -196,10 +196,10 @@ Generate images from text descriptions using Gemini's image generation models.
 **Features:**
 - Works with Gemini API Config node or standalone with API key
 - Direct image output compatible with all ComfyUI image nodes
-- Model selector for different image generation models
+- Three image models: 3.1 Flash (best balance), 3 Pro (professional quality), 2.5 Flash (speed)
 - Configurable creativity with temperature
-- Full aspect ratio support (10 options)
-- Resolution control with gemini-3-pro (1K/2K/4K)
+- Full aspect ratio support (up to 14 options)
+- Resolution control from 512px to 4K
 - Google Search grounding for factually accurate images
 
 **Example Prompts:**
@@ -218,12 +218,12 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 - `image`: Input image(s) to edit (up to 14 reference images). Use ComfyUI's **Batch Images** node to combine multiple images.
 - `prompt`: Text description of how to modify the image(s)
 - `client`: Optional Gemini API client (from Gemini API Config node)
-- `model`: gemini-3-pro-image-preview (default, best quality) or gemini-2.5-flash-image (fast)
+- `model`: gemini-3.1-flash-image-preview (default, recommended), gemini-3-pro-image-preview (professional), or gemini-2.5-flash-image (fast)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
-- `aspect_ratio`: Image dimensions - "default", "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"
-- `image_size`: Resolution - "default", "1K", "2K", "4K" (only for gemini-3-pro-image-preview, 2.5-flash always 1024px)
+- `aspect_ratio`: Image dimensions - 14 ratios for 3.1 Flash (including 1:4, 4:1, 1:8, 8:1), 10 ratios for others
+- `image_size`: Resolution - "default", "512px", "1K", "2K", "4K" (512px-4K for 3.1 Flash, 1K-4K for 3 Pro; 2.5 Flash fixed at 1024px)
 - `response_modalities`: "IMAGE" (image only) or "TEXT+IMAGE" (image + text description)
-- `enable_google_search`: Enable Google Search grounding (only for gemini-3-pro-image-preview)
+- `enable_google_search`: Enable Google Search grounding (Gemini 3 models only)
 - `additional_images`: Optional additional reference images (combined with primary image input, up to 14 total)
 - `api_key`: Optional API key (only needed if not using client input)
 
@@ -233,11 +233,11 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 
 **Features:**
 - Works with Gemini API Config node or standalone with API key
-- Gemini 3 Pro supports up to 14 reference images (up to 6 objects, up to 5 humans)
+- Gemini 3 models support up to 14 reference images (up to 6 objects, up to 5 humans)
 - Image-to-image editing with natural language instructions
 - Compatible with all ComfyUI image nodes
-- Full aspect ratio support (10 options)
-- Resolution control with gemini-3-pro (1K/2K/4K)
+- Full aspect ratio support (up to 14 options)
+- Resolution control from 512px to 4K
 - Google Search grounding for factual accuracy in edits
 
 **Example Use Cases:**
