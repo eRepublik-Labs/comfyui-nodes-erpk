@@ -322,6 +322,14 @@ Adds a **strip_metadata** toggle to ComfyUI's built-in SaveImage node (and Previ
 - **On by default** - New SaveImage nodes strip metadata automatically; toggle off to embed metadata
 - **Prompt metadata also stripped** - Both `extra_pnginfo` (workflow graph) and `prompt` (API-format node data) are removed
 
+### Auto-Clear Job History
+
+Automatically removes completed jobs from the history panel after each run. Prevents the UI from slowing down during long sessions with many queued generations.
+
+- **Off by default** - Enable via **Settings > ERPK > General > Auto-Clear Job History**
+- **Delayed cleanup** - Waits 5 seconds after job completion so the frontend can fetch results before the history entry is removed
+- **No restart needed** - Toggling the setting takes effect on the next completed job
+
 ## Installation
 
 ### Method 1: ComfyUI Manager (Recommended)

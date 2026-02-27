@@ -1,4 +1,4 @@
-// ABOUTME: Registers ERPK API key settings in ComfyUI Settings UI
+// ABOUTME: Registers ERPK settings (API keys, general toggles) in ComfyUI Settings UI
 // ABOUTME: Handles multi-user client registration and read-only api_key widgets
 
 import { app } from "../../scripts/app.js";
@@ -135,8 +135,19 @@ function observeSettingsDialog(displayName) {
     observer.observe(document.body, { childList: true, subtree: true });
 }
 
+const GENERAL_SETTINGS = [
+    {
+        id: "ERPK.AUTO_CLEAR_HISTORY",
+        name: "Auto-Clear Job History",
+        type: "boolean",
+        defaultValue: false,
+        category: ["ERPK", "General", "Auto-Clear Job History"],
+        tooltip: "Automatically remove completed jobs from history. Reduces UI slowdown with large workflows.",
+    },
+];
+
 function buildSettings() {
-    return API_KEY_SETTINGS.map((entry) => ({
+    const apiKeySettings = API_KEY_SETTINGS.map((entry) => ({
         id: entry.id,
         name: entry.name,
         type: "text",
@@ -144,6 +155,7 @@ function buildSettings() {
         category: ["ERPK", "API Keys", entry.name],
         tooltip: `${entry.name}. Leave empty to use environment variable or config.ini.`,
     }));
+    return [...apiKeySettings, ...GENERAL_SETTINGS];
 }
 
 app.registerExtension({

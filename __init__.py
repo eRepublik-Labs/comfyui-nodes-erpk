@@ -197,11 +197,18 @@ try:
 except Exception as e:
     print(f"[ERPK] Warning: Could not register shared workflows routes: {e}")
 
-# Install SaveImage metadata toggle (adds per-node strip_workflow_metadata widget)
+# --- Monkey-patches (independent of V1/V3 node registration) ---
+
 try:
     from . import metadata_filter
     metadata_filter.install()
 except Exception as e:
     print(f"[ERPK] Warning: Could not install metadata filter: {e}")
+
+try:
+    from . import history_cleaner
+    history_cleaner.install()
+except Exception as e:
+    print(f"[ERPK] Warning: Could not install history cleaner: {e}")
 
 __all__ = ["comfy_entrypoint", "WEB_DIRECTORY"]
