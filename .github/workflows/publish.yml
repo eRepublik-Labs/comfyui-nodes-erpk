@@ -29,8 +29,6 @@ jobs:
           personal_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
 
       - name: Update Registry Changelog
-        # NOTE: This step fails with 401 until Comfy-Org/registry-backend#168 is fixed
-        # The PUT endpoint doesn't accept PAT auth yet (same token works for publishing)
         env:
           REGISTRY_TOKEN: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
           GH_TOKEN: ${{ github.token }}
@@ -52,15 +50,26 @@ jobs:
             exit 0
           fi
 
+          # Look up the version UUID from the registry API
+          # The PUT endpoint requires the database UUID, not the version string
+          VERSION_ID=$(curl -s "https://api.comfy.org/nodes/comfyui-nodes-erpk/versions?limit=5" \
+            | jq -r --arg v "$VERSION" '.[] | select(.version == $v) | .id')
+
+          if [ -z "$VERSION_ID" ]; then
+            echo "Warning: Could not find version UUID for $VERSION, skipping changelog update"
+            exit 0
+          fi
+          echo "Version UUID: $VERSION_ID"
+
           # Escape JSON special characters (write to file first to preserve formatting)
           echo "$RELEASE_BODY" > release_notes.txt
           ESCAPED_BODY=$(cat release_notes.txt | jq -Rs .)
 
-          # Update changelog via registry API
-          echo "Updating changelog for version $VERSION..."
+          # Update changelog via registry API using the version UUID
+          echo "Updating changelog for version $VERSION ($VERSION_ID)..."
 
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            -X PUT "https://api.comfy.org/publishers/erpk/nodes/comfyui-nodes-erpk/versions/$VERSION" \
+            -X PUT "https://api.comfy.org/publishers/erpk/nodes/comfyui-nodes-erpk/versions/$VERSION_ID" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${REGISTRY_TOKEN}" \
             -d "{\"changelog\": $ESCAPED_BODY}")
