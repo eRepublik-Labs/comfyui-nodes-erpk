@@ -236,15 +236,9 @@ async function showBrowseDialog() {
 
             actions.appendChild(
                 createButton("Load", PRIMARY_BUTTON_STYLE, async () => {
-                    if (
-                        !confirm(
-                            "This will replace your current workflow. Continue?"
-                        )
-                    )
-                        return;
                     const data = await getSharedWorkflow(wf.name);
                     if (data) {
-                        await app.loadGraphData(data);
+                        await app.loadGraphData(data, true, true, wf.name + ".json");
                         linkedSharedWorkflowName = wf.name;
                         overlay.remove();
                         showToast(`Loaded "${wf.name}"`);
@@ -410,15 +404,9 @@ function createSettingsWorkflowList() {
 
             actions.appendChild(
                 createButton("Load", PRIMARY_BUTTON_STYLE, async () => {
-                    if (
-                        !confirm(
-                            "This will replace your current workflow. Continue?"
-                        )
-                    )
-                        return;
                     const data = await getSharedWorkflow(wf.name);
                     if (data) {
-                        await app.loadGraphData(data);
+                        await app.loadGraphData(data, true, true, wf.name + ".json");
                         linkedSharedWorkflowName = wf.name;
                         showToast(`Loaded "${wf.name}"`);
                     }
