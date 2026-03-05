@@ -92,7 +92,7 @@ General-purpose text generation and completion.
 **Inputs:**
 - `client`: Gemini API client (optional)
 - `prompt`: Text prompt
-- `model`: gemini-3-flash-preview (default), gemini-3.1-pro-preview, gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+- `model`: gemini-3-flash-preview (default), gemini-3.1-pro-preview, gemini-3-pro-preview, gemini-3.1-flash-lite-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
 - `temperature`: 0.0-2.0 (creativity level, default: 0.7)
 - `max_tokens`: 256-65536 (output length, default: 8192)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
@@ -121,7 +121,7 @@ Multi-turn conversation with message history preservation.
 **Inputs:**
 - `client`: Gemini API client (optional)
 - `prompt`: Your message
-- `model`: gemini-3-flash-preview (default), gemini-3.1-pro-preview, gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+- `model`: gemini-3-flash-preview (default), gemini-3.1-pro-preview, gemini-3-pro-preview, gemini-3.1-flash-lite-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
 - `temperature`: 0.0-2.0 (default: 0.7)
@@ -152,7 +152,7 @@ Analyze images with questions or instructions.
 - `client`: Gemini API client (optional)
 - `image`: ComfyUI image tensor (supports batches)
 - `prompt`: Question or instruction about the image(s)
-- `model`: gemini-3-flash-preview (default), gemini-3.1-pro-preview, gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+- `model`: gemini-3-flash-preview (default), gemini-3.1-pro-preview, gemini-3-pro-preview, gemini-3.1-flash-lite-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
 - `max_tokens`: 256-65536 (default: 8192)
 - `temperature`: 0.0-2.0 (default: 0.4, lower for more factual)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
@@ -372,6 +372,7 @@ Generate videos from an input image and optional text prompt.
 | **gemini-3.1-pro-preview** | Most advanced reasoning | 1M tokens | Supports thinking levels |
 | **gemini-3-pro-preview** | Most intelligent, best reasoning | 1M tokens | Flagship model |
 | **gemini-3-flash-preview** | Balanced speed and intelligence | 1M tokens | Balanced model |
+| **gemini-3.1-flash-lite-preview** | High-volume, low-latency tasks | 1M tokens | Fastest, most cost-efficient |
 | **gemini-2.5-pro** | Complex reasoning, thinking | 1M tokens | Stable, production-ready |
 | **gemini-2.5-flash** | Best price-performance | 1M tokens | Recommended default |
 | **gemini-2.5-flash-lite** | High-speed, cost-efficient | 1M tokens | Fastest, lowest cost |
