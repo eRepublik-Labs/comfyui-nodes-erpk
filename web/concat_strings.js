@@ -62,6 +62,18 @@ app.registerExtension({
 
             const result = onConfigure?.apply(this, arguments);
 
+            // Fix widget position mismatch from _inputs_header era (v2026.1.32–v2026.2.14).
+            // Those versions had a serialized _inputs_header widget at position 3 (24 total).
+            // The V3 migration removed it, so LiteGraph assigns values with a +1 offset
+            // from position 3 onward, swapping labels and texts.
+            if (info.widgets_values?.length === 24 && this.widgets?.length === 23) {
+                const values = info.widgets_values;
+                for (let i = 3; i < this.widgets.length; i++) {
+                    this.widgets[i].value = values[i + 1];
+                }
+                console.log("[ERPK] Migrated ConcatenateStrings: fixed _inputs_header widget offset");
+            }
+
             if (info.properties?.activeInputCount) {
                 this.activeInputCount = info.properties.activeInputCount;
             }
