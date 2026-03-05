@@ -7,6 +7,7 @@ Tests for SaveImage metadata stripping.
 Validates:
 - Wrapper passes through all metadata when toggle is off (default)
 - Wrapper strips both prompt and extra_pnginfo when toggle is on
+- Default is off (metadata preserved)
 - INPUT_TYPES patch adds the boolean toggle as optional input
 """
 
@@ -51,15 +52,15 @@ class TestMetadataFilterWrapper:
         assert calls[0]["prompt"] is None
         assert calls[0]["extra_pnginfo"] is None
 
-    def test_default_is_on(self):
+    def test_default_is_off(self):
         wrapped, calls = self._make_wrapper()
         workflow = {"workflow": {"nodes": []}}
         prompt_data = {"1": {"class_type": "SaveImage"}}
 
         wrapped(None, "images", "prefix", prompt=prompt_data, extra_pnginfo=workflow)
 
-        assert calls[0]["prompt"] is None
-        assert calls[0]["extra_pnginfo"] is None
+        assert calls[0]["prompt"] == prompt_data
+        assert calls[0]["extra_pnginfo"] == workflow
 
 
 class TestInputTypesPatch:
@@ -89,7 +90,7 @@ class TestInputTypesPatch:
         assert "strip_metadata" in result["optional"]
         toggle_spec = result["optional"]["strip_metadata"]
         assert toggle_spec[0] == "BOOLEAN"
-        assert toggle_spec[1]["default"] is True
+        assert toggle_spec[1]["default"] is False
 
     def test_preserves_existing_optional(self):
         from metadata_filter import make_patched_input_types

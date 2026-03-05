@@ -7,7 +7,7 @@ def make_filtered_save_images(original_fn):
 
     def filtered_save_images(self, images, filename_prefix="ComfyUI",
                              prompt=None, extra_pnginfo=None,
-                             strip_metadata=True):
+                             strip_metadata=False):
         if strip_metadata:
             prompt = None
             extra_pnginfo = None
@@ -26,7 +26,7 @@ def make_patched_input_types(original_fn):
         types["optional"]["strip_metadata"] = (
             "BOOLEAN",
             {
-                "default": True,
+                "default": False,
                 "tooltip": "Strip all metadata (prompt and workflow) from saved PNG files",
             },
         )
