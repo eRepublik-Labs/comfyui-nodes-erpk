@@ -3,7 +3,7 @@
 
 [project]
 name = "comfyui-nodes-erpk"
-description = "ERPK custom nodes for ComfyUI: WaveSpeed AI, Claude API, Google Gemini API, OpenAI API, Background Removal, and Apple SHARP 3D view synthesis."
+description = "ERPK custom nodes for ComfyUI: WaveSpeed AI, Claude API, Google Gemini API, OpenAI API, and Apple SHARP 3D view synthesis."
 version = "2026.3.2"
 license = { file = "LICENSE" }
 dependencies = [
@@ -15,19 +15,6 @@ dependencies = [
     "openai>=1.0.0",
     "urllib3>=1.26.0",
     "cryptography>=46.0.5",
-    # Background removal
-    "tqdm>=4.65.0",
-    "opencv-contrib-python>=4.8.0",
-    "rembg[gpu]>=2.0.70",
-    "numba>=0.61.0",
-    "onnxruntime>=1.16.0; sys_platform == 'darwin'",
-    "transparent-background>=1.2.0",
-    "transformers>=4.36.0",
-    "torchvision>=0.16.0",
-    "safetensors>=0.4.0",
-    "huggingface-hub>=0.20.0",
-    "einops>=0.6.0",
-    "timm>=1.0.10",
 ]
 classifiers = [
     "Operating System :: OS Independent",

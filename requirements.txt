@@ -16,23 +16,5 @@ google-genai>=1.49.0
 # OpenAI API integration
 openai>=1.0.0
 
-# Background Removal - Core (required for progress bars)
-tqdm>=4.65.0
-
-# Background Removal - rembg backend (ONNX-based, 14+ models)
-# The [gpu] extra installs onnxruntime-gpu for CUDA acceleration
-# macOS fallback: onnxruntime-gpu doesn't support darwin, so we add CPU runtime
-rembg[gpu]>=2.0.70
-onnxruntime>=1.16.0; sys_platform == "darwin"
-
-# Background Removal - InSPyReNet backend (PyTorch-based)
-# opencv-contrib-python provides full OpenCV with all CV_ constants (fixes albucore compatibility)
-opencv-contrib-python>=4.8.0
-transparent-background>=1.2.0
-
-# Background Removal - BiRefNet backend (HuggingFace transformers)
-transformers>=4.36.0
-torchvision>=0.16.0
-
 # Apple SHARP - Single-image to 3D Gaussian view synthesis
 sharp @ git+https://github.com/apple/ml-sharp.git

@@ -34,13 +34,6 @@ ComfyUI-Custom-Nodes/
 │   ├── nodes.py                   # Core nodes (Config, Text, Vision, Chat)
 │   ├── image_nodes.py             # Image generation/editing nodes
 │   └── openai_api/                # API integration layer
-├── bgremoval/                     # Background removal utilities
-│   ├── utils.py                   # Shared tensor/PIL conversion utilities
-│   ├── rembg_node.py              # rembg backend (14+ ONNX models)
-│   ├── inspyrenet_node.py         # InSPyReNet backend (PyTorch)
-│   ├── birefnet_node.py           # BiRefNet backend (HuggingFace)
-│   ├── ben2_node.py               # BEN2 backend (HuggingFace)
-│   └── blur_fusion_node.py        # BlurFusion foreground refinement
 ├── apple/                         # Apple ML models integration
 │   ├── README.md                  # Package documentation
 │   └── sharp_nodes.py             # SHARP view synthesis nodes
@@ -186,64 +179,9 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 
 **Installation & Documentation:** See [openai/README.md](openai/README.md)
 
-### ERPK/Background Removal
+### Background Removal (Removed)
 
-Background removal utilities with multiple backend options for different quality/speed/memory tradeoffs.
-
-**Category in ComfyUI:** `ERPK/Background Removal`
-
-#### Nodes
-
-- **Remove Background (rembg)** - ONNX-based with 14+ models including u2net, isnet, birefnet variants. Best for versatility and CPU support.
-- **Remove Background (InSPyReNet)** - PyTorch-based via transparent-background. Supports TorchScript JIT for faster inference.
-- **Remove Background (BEN2)** - Confidence-guided matting for accurate alpha mattes at fine edges (hair, fur). Built-in foreground refinement.
-- **Remove Background (BiRefNet)** - HuggingFace transformers integration. 17 model variants, supports HR images (2048x2048).
-
-#### Backend Comparison
-
-| Backend | Runtime | Speed | Quality | Memory | License |
-|---------|---------|-------|---------|--------|---------|
-| **rembg** | ONNX | Fast | Good | Low-Med | MIT |
-| **InSPyReNet** | PyTorch | Medium | Very Good | Medium | MIT |
-| **BEN2** | PyTorch/HF | Medium | Excellent | High | MIT |
-| **BiRefNet** | PyTorch/HF | Slower | Excellent | High | MIT |
-
-#### Available Models
-
-**rembg (14+ models):**
-- `u2net` - General purpose (default)
-- `u2netp` - Lightweight, faster
-- `u2net_human_seg` - Human segmentation
-- `u2net_cloth_seg` - Clothing parsing
-- `silueta` - Compact u2net (43MB)
-- `isnet-general-use` - General purpose ISNet
-- `isnet-anime` - Anime characters
-- `sam` - Segment Anything Model
-- `birefnet-general`, `birefnet-general-lite`, `birefnet-portrait`, `birefnet-dis`, `birefnet-hrsod`, `birefnet-cod`, `birefnet-massive`
-
-**BiRefNet variants:**
-- `ZhengPeng7/BiRefNet` - Default
-- `ZhengPeng7/BiRefNet_HR` - High resolution (2048x2048)
-- `ZhengPeng7/BiRefNet-matting` - Alpha matting
-- `ZhengPeng7/BiRefNet_HR-matting` - HR alpha matting
-- `ZhengPeng7/BiRefNet-COD` - Camouflaged object detection
-- `ZhengPeng7/BiRefNet_512x512` - Fast (lower resolution)
-
-#### Node Outputs
-
-All nodes output:
-- `IMAGE` - RGB image (background removed, composited on black)
-- `MASK` - Alpha mask for further compositing
-
-#### Features
-
-- Batch processing with progress display
-- Alpha matting refinement (rembg only)
-- Model caching to avoid reloading
-- GPU acceleration where available
-- Graceful fallback when dependencies missing
-
-**Installation & Documentation:** See [bgremoval/README.md](bgremoval/README.md)
+Background removal nodes have been removed from this package. For background removal in ComfyUI, use [ComfyUI-RMBG](https://github.com/1038lab/ComfyUI-RMBG) instead.
 
 ### ERPK/Apple
 
@@ -381,14 +319,13 @@ Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishe
    - **Claude:** See [claude/README.md](claude/README.md#installation)
    - **Gemini:** See [gemini/README.md](gemini/README.md#installation)
    - **OpenAI:** See [openai/README.md](openai/README.md#installation)
-   - **Background Removal:** No API keys required, models download automatically on first use
    - **Apple/SHARP:** No API keys required. Install with: `pip install git+https://github.com/apple/ml-sharp.git`
 
-2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, `ERPK/Gemini`, `ERPK/OpenAI`, `ERPK/Background Removal`, `ERPK/Apple/SHARP`, and `ERPK/utils`
+2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, `ERPK/Gemini`, `ERPK/OpenAI`, `ERPK/Apple/SHARP`, and `ERPK/utils`
 
 ## Backward Compatibility
 
-This package uses the ComfyUI V3 node API. Saved workflows that reference older node IDs (e.g. `"WaveSpeed Custom SeedreamV4"`, `"ERPK Remove Background (rembg)"`, `"ERPK SHARP Predict"`) are automatically migrated to the current node IDs at load time via ComfyUI's NodeReplace system. No manual workflow editing is required.
+This package uses the ComfyUI V3 node API. Saved workflows that reference older node IDs (e.g. `"WaveSpeed Custom SeedreamV4"`, `"ERPK SHARP Predict"`) are automatically migrated to the current node IDs at load time via ComfyUI's NodeReplace system. No manual workflow editing is required.
 
 ## ComfyUI API Integration
 

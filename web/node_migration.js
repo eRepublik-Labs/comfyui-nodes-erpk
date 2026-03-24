@@ -21,13 +21,6 @@ const NODE_REPLACEMENTS = {
     "WaveSpeed Custom QwenImageT2I": "QwenImageTextToImageNode",
     "WaveSpeed Custom QwenImageEdit": "QwenImageEditNode",
     "WaveSpeed Custom QwenImageEditPlus": "QwenImageEditPlusNode",
-    // Background Removal
-    "ERPK Remove Background (rembg)": "RembgRemoveBackground",
-    "ERPK Remove Background (InSPyReNet)": "InSPyReNetRemoveBackground",
-    "ERPK Remove Background (BiRefNet)": "BiRefNetRemoveBackground",
-    "ERPK Get Mask (BiRefNet)": "BiRefNetGetMask",
-    "ERPK Foreground Refinement (BlurFusion)": "BlurFusionForegroundEstimation",
-    "ERPK Remove Background (BEN2)": "BEN2RemoveBackground",
     // Apple ML
     "ERPK SHARP Predict": "SHARPPredict",
     "ERPK SHARP Render Views": "SHARPRenderViews",
