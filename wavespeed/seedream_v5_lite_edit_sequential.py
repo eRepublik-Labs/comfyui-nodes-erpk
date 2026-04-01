@@ -41,6 +41,9 @@ class SeedreamV5LiteEditSequentialNode(IO.ComfyNode):
                                  tooltip="Wait for result generation before returning response"),
                 IO.Boolean.Input("enable_base64_output", optional=True, default=False,
                                  tooltip="Return BASE64 encoded output instead of URLs"),
+                IO.Int.Input("seed", default=0, min=0, max=2**31 - 1,
+                             control_after_generate="randomize",
+                             tooltip="Seed for cache control. Randomizes by default."),
             ],
             outputs=[
                 IO.Image.Output("images"),
@@ -48,9 +51,6 @@ class SeedreamV5LiteEditSequentialNode(IO.ComfyNode):
             not_idempotent=True,
         )
 
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, prompt, max_images, size_preset, client=None, image_url=None,

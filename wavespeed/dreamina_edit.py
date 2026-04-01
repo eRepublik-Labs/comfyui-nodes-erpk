@@ -28,7 +28,7 @@ class DreaminaEditNode(IO.ComfyNode):
                              tooltip="Image width (512 to 2048)"),
                 IO.Int.Input("height", optional=True, default=1328, min=512, max=2048, step=8,
                              tooltip="Image height (512 to 2048)"),
-                IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647,
+                IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647, control_after_generate="randomize",
                              tooltip="Random seed for reproducibility (-1 for random)"),
                 IO.Boolean.Input("enable_sync_mode", optional=True, default=False,
                                  tooltip="Wait for completion before returning response"),
@@ -41,9 +41,6 @@ class DreaminaEditNode(IO.ComfyNode):
             not_idempotent=True,
         )
 
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, prompt="", image_url="", client=None, width=1328, height=1328,

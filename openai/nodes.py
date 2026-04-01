@@ -120,15 +120,19 @@ class OpenAITextGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip="Output format (use json_object for JSON mode)",
                 ),
+                IO.Int.Input(
+                    "seed",
+                    default=0,
+                    min=0,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip="Seed for reproducible outputs (best-effort). Randomizes by default.",
+                ),
             ],
             outputs=[
                 IO.String.Output("response"),
             ],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
@@ -139,6 +143,7 @@ class OpenAITextGeneration(IO.ComfyNode):
         top_p = kwargs.get("top_p", 1.0)
         stop_sequences = kwargs.get("stop_sequences", "")
         response_format = kwargs.get("response_format", "default")
+        seed = kwargs.get("seed", 0)
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -167,7 +172,8 @@ class OpenAITextGeneration(IO.ComfyNode):
                 model=model,
                 top_p=top_p if top_p < 1.0 else None,
                 stop_sequences=stop_seq_list,
-                response_format=resp_format
+                response_format=resp_format,
+                seed=seed,
             )
 
             if response.get("blocked", False):
@@ -267,16 +273,20 @@ class OpenAIChat(IO.ComfyNode):
                     optional=True,
                     tooltip="Output format (use json_object for JSON mode)",
                 ),
+                IO.Int.Input(
+                    "seed",
+                    default=0,
+                    min=0,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip="Seed for reproducible outputs (best-effort). Randomizes by default.",
+                ),
             ],
             outputs=[
                 IO.String.Output("response"),
                 IO.Custom("OPENAI_CHAT_SESSION").Output("chat_session"),
             ],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
@@ -289,6 +299,7 @@ class OpenAIChat(IO.ComfyNode):
         top_p = kwargs.get("top_p", 1.0)
         stop_sequences = kwargs.get("stop_sequences", "")
         response_format = kwargs.get("response_format", "default")
+        seed = kwargs.get("seed", 0)
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -329,7 +340,8 @@ class OpenAIChat(IO.ComfyNode):
                 model=model,
                 top_p=top_p if top_p < 1.0 else None,
                 stop_sequences=stop_seq_list,
-                response_format=resp_format
+                response_format=resp_format,
+                seed=seed,
             )
 
             text = response.get("text", "")
@@ -405,15 +417,19 @@ class OpenAIVision(IO.ComfyNode):
                     optional=True,
                     tooltip="Creativity level (lower=more factual)",
                 ),
+                IO.Int.Input(
+                    "seed",
+                    default=0,
+                    min=0,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip="Seed for reproducible outputs (best-effort). Randomizes by default.",
+                ),
             ],
             outputs=[
                 IO.String.Output("analysis"),
             ],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, image, prompt, **kwargs) -> IO.NodeOutput:
@@ -424,6 +440,7 @@ class OpenAIVision(IO.ComfyNode):
         detail = kwargs.get("detail", "auto")
         max_tokens = kwargs.get("max_tokens", 4096)
         temperature = kwargs.get("temperature", 0.4)
+        seed = kwargs.get("seed", 0)
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -443,6 +460,7 @@ class OpenAIVision(IO.ComfyNode):
                 max_tokens=max_tokens,
                 temperature=temperature,
                 model=model,
+                seed=seed,
             )
 
             if response.get("blocked", False):

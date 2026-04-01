@@ -82,16 +82,20 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip="OpenAI API key (only needed if not using client input)",
                 ),
+                IO.Int.Input(
+                    "seed",
+                    default=0,
+                    min=0,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip="Seed for reproducible outputs (best-effort). Randomizes by default.",
+                ),
             ],
             outputs=[
                 IO.Image.Output("image"),
                 IO.String.Output("revised_prompt"),
             ],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
@@ -224,15 +228,19 @@ class OpenAIImageEdit(IO.ComfyNode):
                     optional=True,
                     tooltip="OpenAI API key (only needed if not using client input)",
                 ),
+                IO.Int.Input(
+                    "seed",
+                    default=0,
+                    min=0,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip="Seed for reproducible outputs (best-effort). Randomizes by default.",
+                ),
             ],
             outputs=[
                 IO.Image.Output("image"),
             ],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, image, prompt, **kwargs) -> IO.NodeOutput:

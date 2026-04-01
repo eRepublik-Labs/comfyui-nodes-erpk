@@ -167,6 +167,7 @@ class OpenAIClient:
         top_p: Optional[float] = None,
         stop_sequences: Optional[List[str]] = None,
         response_format: Optional[Dict] = None,
+        seed: Optional[int] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -239,6 +240,9 @@ class OpenAIClient:
         if response_format:
             params["response_format"] = response_format
 
+        if seed is not None:
+            params["seed"] = seed
+
         # Retry logic with exponential backoff
         retry_delay = self.INITIAL_RETRY_DELAY
         last_exception = None
@@ -302,6 +306,7 @@ class OpenAIClient:
         top_p: Optional[float] = None,
         stop_sequences: Optional[List[str]] = None,
         response_format: Optional[Dict] = None,
+        seed: Optional[int] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -356,6 +361,9 @@ class OpenAIClient:
 
         if response_format:
             params["response_format"] = response_format
+
+        if seed is not None:
+            params["seed"] = seed
 
         # Retry logic
         retry_delay = self.INITIAL_RETRY_DELAY

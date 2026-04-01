@@ -69,16 +69,20 @@ class ClaudeConversation(IO.ComfyNode):
                     optional=True,
                     tooltip="Maximum length of response",
                 ),
+                IO.Int.Input(
+                    "seed",
+                    default=0,
+                    min=0,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip="Seed for cache control. Randomizes by default to ensure fresh results each run.",
+                ),
             ],
             outputs=[
                 IO.String.Output("response"),
                 IO.Custom("CLAUDE_CONVERSATION").Output("conversation_history"),
             ],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:

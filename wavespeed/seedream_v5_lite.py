@@ -45,6 +45,9 @@ class SeedreamV5LiteNode(IO.ComfyNode):
                              tooltip="Custom height (only used when size_preset is 'Custom')"),
                 IO.Boolean.Input("show_aspect_ratio", optional=True, default=True,
                                  tooltip="Show aspect ratio in node title"),
+                IO.Int.Input("seed", default=0, min=0, max=2**31 - 1,
+                             control_after_generate="randomize",
+                             tooltip="Seed for cache control. Randomizes by default."),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -52,9 +55,6 @@ class SeedreamV5LiteNode(IO.ComfyNode):
             not_idempotent=True,
         )
 
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, prompt, size_preset, client=None, width=2048, height=2048,

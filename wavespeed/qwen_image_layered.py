@@ -32,6 +32,9 @@ class QwenImageLayeredNode(IO.ComfyNode):
                                  tooltip="Wait for completion before returning response"),
                 IO.Boolean.Input("enable_base64_output", optional=True, default=False,
                                  tooltip="Return BASE64-encoded output instead of URL"),
+                IO.Int.Input("seed", default=0, min=0, max=2**31 - 1,
+                             control_after_generate="randomize",
+                             tooltip="Seed for cache control. Randomizes by default."),
             ],
             outputs=[
                 IO.Image.Output("images"),
@@ -40,9 +43,6 @@ class QwenImageLayeredNode(IO.ComfyNode):
             not_idempotent=True,
         )
 
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, image="", prompt="", client=None, num_layers=4,

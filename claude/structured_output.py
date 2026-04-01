@@ -57,16 +57,20 @@ class ClaudeStructuredOutput(IO.ComfyNode):
                     optional=True,
                     tooltip="Maximum tokens for the response",
                 ),
+                IO.Int.Input(
+                    "seed",
+                    default=0,
+                    min=0,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip="Seed for cache control. Randomizes by default to ensure fresh results each run.",
+                ),
             ],
             outputs=[
                 IO.String.Output("json_output"),
                 IO.String.Output("thinking"),
             ],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:

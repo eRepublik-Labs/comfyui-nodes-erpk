@@ -46,7 +46,7 @@ class QwenImageEditPlusLoraNode(IO.ComfyNode):
                              tooltip="Image width (256 to 1536)"),
                 IO.Int.Input("height", optional=True, default=1024, min=256, max=1536, step=8,
                              tooltip="Image height (256 to 1536)"),
-                IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647,
+                IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647, control_after_generate="randomize",
                              tooltip="Random seed for reproducibility (-1 for random)"),
                 IO.Combo.Input("output_format", optional=True,
                                options=["jpeg", "png", "webp"],
@@ -63,9 +63,6 @@ class QwenImageEditPlusLoraNode(IO.ComfyNode):
             not_idempotent=True,
         )
 
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, model="Qwen Edit Plus LoRA", prompt="", images="",

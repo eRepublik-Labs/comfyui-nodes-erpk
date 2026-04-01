@@ -272,15 +272,19 @@ Emphasize architectural beauty and structural design."""
                     optional=True,
                     tooltip="Enable streaming (may not display in real-time in ComfyUI)",
                 ),
+                IO.Int.Input(
+                    "seed",
+                    default=0,
+                    min=0,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip="Seed for cache control. Randomizes by default to ensure fresh results each run.",
+                ),
             ],
             outputs=[
                 IO.String.Output("enhanced_prompt"),
             ],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:

@@ -290,11 +290,11 @@ class TestQwenLayeredNode:
         prompt_input = next(i for i in schema.inputs if i.id == "prompt")
         assert prompt_input.optional is True
 
-    def test_no_seed_input(self):
+    def test_has_seed_input(self):
         cls = _import_node("qwen_image_layered", "QwenImageLayeredNode")
         schema = cls.define_schema()
         input_ids = [i.id for i in schema.inputs]
-        assert "seed" not in input_ids
+        assert "seed" in input_ids
 
     def test_no_output_format_input(self):
         cls = _import_node("qwen_image_layered", "QwenImageLayeredNode")

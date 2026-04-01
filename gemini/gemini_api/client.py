@@ -179,6 +179,7 @@ class GeminiClient:
         response_mime_type: Optional[str] = None,
         response_schema: Optional[Dict] = None,
         thinking_config: Optional[Any] = None,
+        seed: Optional[int] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -223,6 +224,9 @@ class GeminiClient:
             config_params["response_mime_type"] = response_mime_type
         if response_schema is not None:
             config_params["response_schema"] = response_schema
+
+        if seed is not None:
+            config_params["seed"] = seed
 
         config = types.GenerateContentConfig(**config_params)
 

@@ -173,15 +173,19 @@ class GeminiTextGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip="Reasoning depth (Gemini 3+ only). Higher = better quality, more tokens.",
                 ),
+                IO.Int.Input(
+                    "seed",
+                    default=0,
+                    min=0,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip="Seed for reproducible outputs. Randomizes by default.",
+                ),
             ],
             outputs=[
                 IO.String.Output("response"),
             ],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
@@ -196,6 +200,7 @@ class GeminiTextGeneration(IO.ComfyNode):
         response_mime_type = kwargs.get("response_mime_type", "default")
         response_schema = kwargs.get("response_schema", "")
         thinking_level = kwargs.get("thinking_level", "none")
+        seed = kwargs.get("seed", 0)
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -230,6 +235,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                 response_mime_type=response_mime_type if response_mime_type != "default" else None,
                 response_schema=schema_obj,
                 thinking_config=thinking_cfg,
+                seed=seed,
             )
 
             if response.get("blocked", False):
@@ -354,16 +360,20 @@ class GeminiChat(IO.ComfyNode):
                     optional=True,
                     tooltip="Reasoning depth (Gemini 3+ only). Higher = better quality, more tokens.",
                 ),
+                IO.Int.Input(
+                    "seed",
+                    default=0,
+                    min=0,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip="Seed for reproducible outputs. Randomizes by default.",
+                ),
             ],
             outputs=[
                 IO.String.Output("response"),
                 IO.Custom("GEMINI_CHAT_SESSION").Output("chat_session"),
             ],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
@@ -380,6 +390,7 @@ class GeminiChat(IO.ComfyNode):
         response_mime_type = kwargs.get("response_mime_type", "default")
         response_schema = kwargs.get("response_schema", "")
         thinking_level = kwargs.get("thinking_level", "none")
+        seed = kwargs.get("seed", 0)
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -414,6 +425,7 @@ class GeminiChat(IO.ComfyNode):
             config_params = {
                 "max_output_tokens": max_tokens,
                 "temperature": temperature,
+                "seed": seed,
             }
             if top_p > 0.0:
                 config_params["top_p"] = top_p
@@ -543,15 +555,19 @@ class GeminiVision(IO.ComfyNode):
                     optional=True,
                     tooltip="Reasoning depth (Gemini 3+ only). Higher = better quality, more tokens.",
                 ),
+                IO.Int.Input(
+                    "seed",
+                    default=0,
+                    min=0,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip="Seed for reproducible outputs. Randomizes by default.",
+                ),
             ],
             outputs=[
                 IO.String.Output("analysis"),
             ],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
@@ -569,6 +585,7 @@ class GeminiVision(IO.ComfyNode):
         response_mime_type = kwargs.get("response_mime_type", "default")
         response_schema = kwargs.get("response_schema", "")
         thinking_level = kwargs.get("thinking_level", "none")
+        seed = kwargs.get("seed", 0)
 
         if model is None:
             model = GeminiClient.DEFAULT_MODEL
@@ -606,6 +623,7 @@ class GeminiVision(IO.ComfyNode):
                 response_mime_type=response_mime_type if response_mime_type != "default" else None,
                 response_schema=schema_obj,
                 thinking_config=thinking_cfg,
+                seed=seed,
             )
 
             if response.get("blocked", False):
@@ -837,16 +855,20 @@ class GeminiImageGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip="Google API key (only needed if not using client input)",
                 ),
+                IO.Int.Input(
+                    "seed",
+                    default=0,
+                    min=0,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip="Seed for reproducible outputs. Randomizes by default.",
+                ),
             ],
             outputs=[
                 IO.Image.Output("image"),
                 IO.String.Output("description"),
             ],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
@@ -861,6 +883,7 @@ class GeminiImageGeneration(IO.ComfyNode):
         response_modalities = kwargs.get("response_modalities", "IMAGE")
         enable_google_search = kwargs.get("enable_google_search", False)
         api_key = kwargs.get("api_key", "")
+        seed = kwargs.get("seed", 0)
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -892,6 +915,7 @@ class GeminiImageGeneration(IO.ComfyNode):
 
             config = types.GenerateContentConfig(
                 temperature=temperature,
+                seed=seed,
             )
 
             if response_modalities == "TEXT+IMAGE":
@@ -1061,16 +1085,20 @@ class GeminiImageEdit(IO.ComfyNode):
                     optional=True,
                     tooltip="Google API key (only needed if not using client input)",
                 ),
+                IO.Int.Input(
+                    "seed",
+                    default=0,
+                    min=0,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip="Seed for reproducible outputs. Randomizes by default.",
+                ),
             ],
             outputs=[
                 IO.Image.Output("image"),
                 IO.String.Output("description"),
             ],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
@@ -1087,6 +1115,7 @@ class GeminiImageEdit(IO.ComfyNode):
         enable_google_search = kwargs.get("enable_google_search", False)
         additional_images = kwargs.get("additional_images")
         api_key = kwargs.get("api_key", "")
+        seed = kwargs.get("seed", 0)
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -1127,6 +1156,7 @@ class GeminiImageEdit(IO.ComfyNode):
 
             config = types.GenerateContentConfig(
                 temperature=temperature,
+                seed=seed,
             )
 
             if response_modalities == "TEXT+IMAGE":
