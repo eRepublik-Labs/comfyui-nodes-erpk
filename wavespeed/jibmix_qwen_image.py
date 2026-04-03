@@ -46,6 +46,10 @@ class JibMixQwenImageNode(IO.ComfyNode):
 
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, prompt="", client=None, width=1024, height=1024,
                 seed=-1, output_format="jpeg", enable_sync_mode=False,
                 enable_base64_output=False, **kwargs):

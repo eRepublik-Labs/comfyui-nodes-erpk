@@ -73,6 +73,10 @@ class ClaudeStructuredOutput(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
         prompt = kwargs.get("prompt", "")
         tool = kwargs.get("tool")

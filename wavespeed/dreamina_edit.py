@@ -43,6 +43,10 @@ class DreaminaEditNode(IO.ComfyNode):
 
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, prompt="", image_url="", client=None, width=1328, height=1328,
                 seed=-1, enable_sync_mode=False, enable_base64_output=False, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient

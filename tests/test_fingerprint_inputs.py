@@ -1,5 +1,5 @@
-# ABOUTME: Tests that all API-calling nodes have a seed input for cache-busting.
-# ABOUTME: Ensures re-queuing a prompt re-executes generation nodes via seed randomization.
+# ABOUTME: Tests that all API-calling nodes have seed + fingerprint_inputs for cache-busting.
+# ABOUTME: Ensures re-queuing a prompt always re-executes generation nodes.
 
 """
 Validates that every node with not_idempotent=True has a seed input with
@@ -96,4 +96,14 @@ class TestCacheBusting:
         seed_input = next(i for i in schema.inputs if i.id == "seed")
         assert seed_input.control_after_generate is not None, (
             f"{class_name} seed input must have control_after_generate set"
+        )
+
+    def test_fingerprint_inputs_returns_seed(self, module_path, class_name):
+        cls = _load_class(module_path, class_name)
+        assert hasattr(cls, "fingerprint_inputs"), (
+            f"{class_name} must define fingerprint_inputs for cache control"
+        )
+        result = cls.fingerprint_inputs(seed=42)
+        assert result == 42, (
+            f"{class_name}.fingerprint_inputs(seed=42) should return 42, got {result!r}"
         )

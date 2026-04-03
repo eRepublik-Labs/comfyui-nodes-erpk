@@ -51,6 +51,10 @@ class SeedreamV4EditNode(IO.ComfyNode):
 
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, prompt, image_url, size_preset, client=None, width=1408, height=1408,
                 show_aspect_ratio=True, enable_sync_mode=False, enable_base64_output=False,
                 **kwargs):

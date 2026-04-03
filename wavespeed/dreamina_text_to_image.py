@@ -48,6 +48,10 @@ class DreaminaTextToImageNode(IO.ComfyNode):
 
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, model="Dreamina V3.1", prompt="", client=None, width=1328, height=1328,
                 seed=-1, enable_prompt_expansion=True, enable_sync_mode=False,
                 enable_base64_output=False, **kwargs):

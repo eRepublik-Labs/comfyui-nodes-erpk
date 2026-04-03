@@ -73,6 +73,10 @@ class ClaudeTextGeneration(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
         from .claude_api.client import ClaudeClient
 

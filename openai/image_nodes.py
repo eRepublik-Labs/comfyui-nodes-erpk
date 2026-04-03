@@ -98,6 +98,10 @@ class OpenAIImageGeneration(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
         from .openai_api.utils import ImageConverter
 
@@ -241,6 +245,10 @@ class OpenAIImageEdit(IO.ComfyNode):
                 IO.Image.Output("image"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
 
     @classmethod
     def execute(cls, image, prompt, **kwargs) -> IO.NodeOutput:

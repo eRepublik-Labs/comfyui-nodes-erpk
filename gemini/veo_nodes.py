@@ -108,6 +108,10 @@ class VeoTextToVideo(IO.ComfyNode):
 
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
         from .gemini_api.client import GeminiClient
 
@@ -306,6 +310,10 @@ class VeoImageToVideo(IO.ComfyNode):
             ],
         )
 
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:

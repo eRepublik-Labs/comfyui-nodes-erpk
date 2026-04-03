@@ -57,6 +57,10 @@ class SeedreamV5LiteNode(IO.ComfyNode):
 
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, prompt, size_preset, client=None, width=2048, height=2048,
                 show_aspect_ratio=True, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient

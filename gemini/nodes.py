@@ -62,6 +62,10 @@ class GeminiAPIConfig(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
         api_key = kwargs.get("api_key", "")
 
@@ -186,6 +190,10 @@ class GeminiTextGeneration(IO.ComfyNode):
                 IO.String.Output("response"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
@@ -374,6 +382,10 @@ class GeminiChat(IO.ComfyNode):
                 IO.Custom("GEMINI_CHAT_SESSION").Output("chat_session"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
@@ -570,6 +582,10 @@ class GeminiVision(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
         from .gemini_api.utils import ImageConverter
 
@@ -670,6 +686,10 @@ class GeminiSystemInstruction(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
         client = kwargs.get("client")
         system_instruction = kwargs.get("system_instruction", "")
@@ -747,6 +767,10 @@ class GeminiSafetySettings(IO.ComfyNode):
                 IO.Custom("GEMINI_API_CLIENT").Output("client"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
@@ -869,6 +893,10 @@ class GeminiImageGeneration(IO.ComfyNode):
                 IO.String.Output("description"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
@@ -1099,6 +1127,10 @@ class GeminiImageEdit(IO.ComfyNode):
                 IO.String.Output("description"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:

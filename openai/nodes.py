@@ -32,6 +32,10 @@ class OpenAIAPIConfig(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
         api_key = kwargs.get("api_key", "")
 
@@ -133,6 +137,10 @@ class OpenAITextGeneration(IO.ComfyNode):
                 IO.String.Output("response"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
 
     @classmethod
     def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
@@ -289,6 +297,10 @@ class OpenAIChat(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
         client = kwargs.get("client")
         model = kwargs.get("model")
@@ -432,6 +444,10 @@ class OpenAIVision(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, image, prompt, **kwargs) -> IO.NodeOutput:
         from .openai_api.utils import ImageConverter
 
@@ -504,6 +520,10 @@ class OpenAISystemInstruction(IO.ComfyNode):
                 IO.Custom("OPENAI_API_CLIENT").Output("client"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
 
     @classmethod
     def execute(cls, client, system_instruction, **kwargs) -> IO.NodeOutput:

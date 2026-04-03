@@ -45,6 +45,10 @@ class QwenImageLayeredNode(IO.ComfyNode):
 
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return kwargs.get("seed", 0)
+
+    @classmethod
     def execute(cls, image="", prompt="", client=None, num_layers=4,
                 enable_sync_mode=False, enable_base64_output=False, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
