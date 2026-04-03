@@ -63,7 +63,7 @@ class ClaudeTextGeneration(IO.ComfyNode):
                     default=0,
                     min=0,
                     max=2**31 - 1,
-                    control_after_generate=True,
+                    control_after_generate="randomize",
                     tooltip="Seed for cache control. Randomizes by default to ensure fresh results each run.",
                 ),
             ],

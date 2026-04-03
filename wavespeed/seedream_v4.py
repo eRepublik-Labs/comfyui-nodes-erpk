@@ -56,7 +56,7 @@ class SeedreamV4Node(IO.ComfyNode):
                 IO.Boolean.Input("show_aspect_ratio", optional=True, default=True,
                                  tooltip="Show aspect ratio in node title"),
                 IO.Int.Input("seed", default=0, min=0, max=2**31 - 1,
-                             control_after_generate=True,
+                             control_after_generate="randomize",
                              tooltip="Seed for cache control. Randomizes by default."),
             ],
             outputs=[

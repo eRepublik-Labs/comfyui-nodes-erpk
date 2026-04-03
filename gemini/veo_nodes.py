@@ -91,7 +91,7 @@ class VeoTextToVideo(IO.ComfyNode):
                     min=-1,
                     max=0xffffffff,
                     optional=True,
-                    control_after_generate=True,
+                    control_after_generate="randomize",
                     tooltip="Random seed for reproducibility. -1 for random.",
                 ),
                 IO.String.Input(
@@ -291,7 +291,7 @@ class VeoImageToVideo(IO.ComfyNode):
                     min=-1,
                     max=0xffffffff,
                     optional=True,
-                    control_after_generate=True,
+                    control_after_generate="randomize",
                     tooltip="Random seed for reproducibility. -1 for random.",
                 ),
                 IO.String.Input(
