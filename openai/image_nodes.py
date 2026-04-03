@@ -84,8 +84,8 @@ class OpenAIImageGeneration(IO.ComfyNode):
                 ),
                 IO.Int.Input(
                     "seed",
-                    default=0,
-                    min=0,
+                    default=-1,
+                    min=-1,
                     max=2**31 - 1,
                     control_after_generate="randomize",
                     tooltip="Seed for reproducible outputs (best-effort). Randomizes by default.",
@@ -99,7 +99,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return kwargs.get("seed", 0)
+        return kwargs.get("seed", -1)
 
     @classmethod
     def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
@@ -234,8 +234,8 @@ class OpenAIImageEdit(IO.ComfyNode):
                 ),
                 IO.Int.Input(
                     "seed",
-                    default=0,
-                    min=0,
+                    default=-1,
+                    min=-1,
                     max=2**31 - 1,
                     control_after_generate="randomize",
                     tooltip="Seed for reproducible outputs (best-effort). Randomizes by default.",
@@ -248,7 +248,7 @@ class OpenAIImageEdit(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return kwargs.get("seed", 0)
+        return kwargs.get("seed", -1)
 
     @classmethod
     def execute(cls, image, prompt, **kwargs) -> IO.NodeOutput:

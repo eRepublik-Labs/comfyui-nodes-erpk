@@ -109,7 +109,7 @@ class VeoTextToVideo(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return kwargs.get("seed", 0)
+        return kwargs.get("seed", -1)
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
@@ -313,7 +313,7 @@ class VeoImageToVideo(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return kwargs.get("seed", 0)
+        return kwargs.get("seed", -1)
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:

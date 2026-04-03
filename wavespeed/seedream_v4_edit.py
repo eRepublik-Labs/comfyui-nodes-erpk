@@ -39,7 +39,7 @@ class SeedreamV4EditNode(IO.ComfyNode):
                                  tooltip="If set to true, the function will wait for the result to be generated and uploaded before returning the response. It allows you to get the result directly in the response. This property is only available through the API."),
                 IO.Boolean.Input("enable_base64_output", optional=True, default=False,
                                  tooltip="If enabled, the output will be encoded into a BASE64 string instead of a URL. This property is only available through the API."),
-                IO.Int.Input("seed", default=0, min=0, max=2**31 - 1,
+                IO.Int.Input("seed", default=-1, min=-1, max=2**31 - 1,
                              control_after_generate="randomize",
                              tooltip="Seed for cache control. Randomizes by default."),
             ],
@@ -52,7 +52,7 @@ class SeedreamV4EditNode(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return kwargs.get("seed", 0)
+        return kwargs.get("seed", -1)
 
     @classmethod
     def execute(cls, prompt, image_url, size_preset, client=None, width=1408, height=1408,

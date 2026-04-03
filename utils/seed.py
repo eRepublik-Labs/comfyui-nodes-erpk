@@ -21,8 +21,8 @@ class Seed(IO.ComfyNode):
             inputs=[
                 IO.Int.Input(
                     "seed",
-                    default=0,
-                    min=0,
+                    default=-1,
+                    min=-1,
                     max=2**31 - 1,
                     control_after_generate="randomize",
                     tooltip="Seed value. Use the control dropdown to randomize, increment, decrement, or fix.",

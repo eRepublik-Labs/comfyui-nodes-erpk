@@ -274,8 +274,8 @@ Emphasize architectural beauty and structural design."""
                 ),
                 IO.Int.Input(
                     "seed",
-                    default=0,
-                    min=0,
+                    default=-1,
+                    min=-1,
                     max=2**31 - 1,
                     control_after_generate="randomize",
                     tooltip="Seed for cache control. Randomizes by default to ensure fresh results each run.",
@@ -288,7 +288,7 @@ Emphasize architectural beauty and structural design."""
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return kwargs.get("seed", 0)
+        return kwargs.get("seed", -1)
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
