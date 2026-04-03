@@ -41,7 +41,7 @@ class SeedreamV4SequentialNode(IO.ComfyNode):
                 IO.Boolean.Input("enable_base64_output", optional=True, default=False,
                                  tooltip="Return BASE64 encoded output instead of URLs"),
                 IO.Int.Input("seed", default=0, min=0, max=2**31 - 1,
-                             control_after_generate="randomize",
+                             control_after_generate=True,
                              tooltip="Seed for cache control. Randomizes by default."),
             ],
             outputs=[

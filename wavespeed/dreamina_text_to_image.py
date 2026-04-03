@@ -31,7 +31,7 @@ class DreaminaTextToImageNode(IO.ComfyNode):
                              tooltip="Image width (512 to 2048)"),
                 IO.Int.Input("height", optional=True, default=1328, min=512, max=2048, step=8,
                              tooltip="Image height (512 to 2048)"),
-                IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647, control_after_generate="randomize",
+                IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647, control_after_generate=True,
                              tooltip="Random seed for reproducibility (-1 for random)"),
                 IO.Boolean.Input("enable_prompt_expansion", optional=True, default=True,
                                  tooltip="Automatically expand and enhance the prompt for better results"),
