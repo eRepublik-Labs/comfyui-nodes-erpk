@@ -98,11 +98,19 @@ class TestCacheBusting:
             f"{class_name} seed input must have control_after_generate set"
         )
 
-    def test_fingerprint_inputs_returns_seed(self, module_path, class_name):
+    def test_fingerprint_returns_nan_for_random_seed(self, module_path, class_name):
         cls = _load_class(module_path, class_name)
         assert hasattr(cls, "fingerprint_inputs"), (
             f"{class_name} must define fingerprint_inputs for cache control"
         )
+        import math
+        result = cls.fingerprint_inputs(seed=-1)
+        assert isinstance(result, float) and math.isnan(result), (
+            f"{class_name}.fingerprint_inputs(seed=-1) should return NaN, got {result!r}"
+        )
+
+    def test_fingerprint_returns_seed_for_fixed_seed(self, module_path, class_name):
+        cls = _load_class(module_path, class_name)
         result = cls.fingerprint_inputs(seed=42)
         assert result == 42, (
             f"{class_name}.fingerprint_inputs(seed=42) should return 42, got {result!r}"

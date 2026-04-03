@@ -58,7 +58,8 @@ class SeedreamV5LiteNode(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return kwargs.get("seed", -1)
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     def execute(cls, prompt, size_preset, client=None, width=2048, height=2048,

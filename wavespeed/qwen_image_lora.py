@@ -65,7 +65,8 @@ class QwenImageLoraNode(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return kwargs.get("seed", 0)
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     def execute(cls, model="Qwen Image", prompt="", lora_1_path="", lora_1_scale=1.0,

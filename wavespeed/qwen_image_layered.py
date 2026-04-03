@@ -46,7 +46,8 @@ class QwenImageLayeredNode(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return kwargs.get("seed", -1)
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     def execute(cls, image="", prompt="", client=None, num_layers=4,

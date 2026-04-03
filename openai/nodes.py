@@ -33,7 +33,8 @@ class OpenAIAPIConfig(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return kwargs.get("seed", -1)
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
@@ -140,7 +141,8 @@ class OpenAITextGeneration(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return kwargs.get("seed", -1)
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
@@ -298,7 +300,8 @@ class OpenAIChat(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return kwargs.get("seed", -1)
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
@@ -445,7 +448,8 @@ class OpenAIVision(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return kwargs.get("seed", -1)
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     def execute(cls, image, prompt, **kwargs) -> IO.NodeOutput:
@@ -523,7 +527,8 @@ class OpenAISystemInstruction(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return kwargs.get("seed", -1)
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     def execute(cls, client, system_instruction, **kwargs) -> IO.NodeOutput:

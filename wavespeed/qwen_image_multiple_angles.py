@@ -56,7 +56,8 @@ class QwenImageMultipleAnglesNode(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return kwargs.get("seed", 0)
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     def execute(cls, images="", prompt="", client=None, horizontal_angle=0,
