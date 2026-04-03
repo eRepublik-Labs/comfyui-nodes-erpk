@@ -2,7 +2,8 @@
 # ABOUTME: Exports V3 node classes for registration via comfy_entrypoint.
 
 from .concat_strings import ConcatenateStrings
+from .seed import Seed
 
-NODES = [ConcatenateStrings]
+NODES = [ConcatenateStrings, Seed]
 
 __all__ = ["NODES"]
