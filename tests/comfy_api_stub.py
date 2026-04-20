@@ -189,6 +189,7 @@ Boolean = _make_io_type('Boolean', 'BOOLEAN', bool, _BooleanInput)
 Image = _make_io_type('Image', 'IMAGE', None)
 Mask = _make_io_type('Mask', 'MASK', None)
 Combo = _make_io_type('Combo', 'COMBO', str, _ComboInput, _ComboOutput)
+AnyType = _make_io_type('AnyType', '*', object)
 
 
 def Custom(io_type: str):

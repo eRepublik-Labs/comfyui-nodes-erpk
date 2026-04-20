@@ -215,14 +215,23 @@ String manipulation and general utility nodes.
 #### Nodes
 
 - **Concatenate Strings** - Combine multiple text inputs with configurable delimiters. Supports up to 10 connectable inputs - drag STRING outputs from other nodes or enter text directly.
+- **Seed** - Generate a seed value with optional min/max range clamping. Connect the output to any node's seed input to share a single seed.
+- **Preview Anything** - Preview any value: text, markdown, image/video/audio/gif URLs, IMAGE tensors, and AUDIO dicts. Includes a Download button that saves the rendered content to your computer.
 
-**Key Features:**
+**Concatenate Strings features:**
 - 10 connectable text inputs (Text 1 through Text 10)
 - Optional labels for each input (Label 1 through Label 10)
 - Configurable delimiter with escape sequence support (\n, \t)
 - Label placement options (same line or new line)
 - Add/Remove buttons to dynamically manage inputs
 - Visual separators between configuration and input sections
+
+**Preview Anything features:**
+- Accepts any value via a wildcard input
+- Auto-detects type (image/video/audio by URL extension, markdown by syntax, IMAGE tensor, AUDIO dict)
+- Optional `display_type` dropdown to force a specific renderer
+- Download button saves content as `.txt`, `.md`, or the original media format
+- Last rendered content persists across workflow reloads
 
 ### Shared Workflows (Multi-User)
 
