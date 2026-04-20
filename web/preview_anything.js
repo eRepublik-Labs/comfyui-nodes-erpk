@@ -265,14 +265,17 @@ function buildContainer() {
     root.style.padding = "6px";
     root.style.boxSizing = "border-box";
     root.style.width = "100%";
-    root.style.minHeight = "80px";
+    root.style.height = "100%";
+    root.style.minHeight = "120px";
     root.style.overflow = "hidden";
 
     const content = document.createElement("div");
     content.className = "erpk-preview-anything-content";
-    content.style.flex = "0 0 auto";  // shrink to content; let aspect-ratio drive height
+    // flex: 1 1 0 lets content fill available space; min-height: 0 allows
+    // flex-shrink below its intrinsic size so the toolbar is never pushed out.
+    content.style.flex = "1 1 0";
+    content.style.minHeight = "0";
     content.style.width = "100%";
-    content.style.minHeight = "60px";
     content.style.overflow = "auto";
     content.style.boxSizing = "border-box";
     content.style.background = "var(--comfy-input-bg, #1a1a1a)";
@@ -287,7 +290,9 @@ function buildContainer() {
     const toolbar = document.createElement("div");
     toolbar.style.display = "flex";
     toolbar.style.gap = "6px";
-    toolbar.style.flexShrink = "0";
+    // flex: 0 0 auto keeps the toolbar at its natural height — it never
+    // shrinks, so the Download button stays visible even when content overflows.
+    toolbar.style.flex = "0 0 auto";
     toolbar.style.width = "100%";
 
     ensureStyles();
@@ -322,23 +327,36 @@ function clearChildren(el) {
     while (el.firstChild) el.removeChild(el.firstChild);
 }
 
-// Grow the node height to match the current content's natural size.
-// LiteGraph keeps node widths under user control, so we only adjust height.
-// We never shrink below the user's current size.
+// Grow the node height so the widget's content fits fully inside its
+// current rendered rect. Rather than guessing the full node-chrome
+// (header + other widgets + padding), we compute the delta between the
+// content's natural height and its current rendered height, and add
+// that delta to the node's size. Width is left to the user.
 function resizeNodeToContent(node) {
     if (!node || typeof node.setSize !== "function") return;
-    const minW = Math.max(node.size?.[0] || 320, 320);
-    const minH = node.size?.[1] || 260;
 
-    // Let the DOM settle first so scrollHeight reflects the new content.
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-            const root = node._erpkPreview?.root;
-            if (!root) return;
-            const target = root.scrollHeight + 24; // padding + node chrome
-            const newH = Math.max(minH, target);
-            if (Math.abs(newH - minH) > 2) {
-                node.setSize([minW, newH]);
+            const preview = node._erpkPreview;
+            if (!preview?.root) return;
+
+            const contentEl = preview.content;
+            const toolbarEl = preview.root.querySelector("button")?.parentElement;
+
+            // Natural height needed: content's intrinsic height + toolbar height +
+            // flex gap (6px) + root padding (6*2 = 12px).
+            const contentNaturalH = contentEl.scrollHeight;
+            const toolbarH = toolbarEl ? toolbarEl.getBoundingClientRect().height : 0;
+            const gap = 6;
+            const rootPadding = 12;
+            const naturalRootH = contentNaturalH + toolbarH + gap + rootPadding;
+
+            const currentRootH = preview.root.getBoundingClientRect().height;
+            const delta = naturalRootH - currentRootH;
+
+            if (delta > 2) {
+                const newH = (node.size?.[1] || 260) + delta;
+                node.setSize([node.size?.[0] || 320, newH]);
                 node.setDirtyCanvas?.(true, true);
             }
         });
