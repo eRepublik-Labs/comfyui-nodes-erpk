@@ -99,6 +99,27 @@ WAVESPEED_NODES = [
      "Bytedance Dreamina Text-to-Image", "ERPK/WaveSpeedAI", True, False),
     ("dreamina_edit", "DreaminaEditNode", "DreaminaEditNode",
      "Bytedance Dreamina Edit", "ERPK/WaveSpeedAI", True, False),
+    # Video nodes
+    ("seedance_2_0_text_to_video", "Seedance20TextToVideoNode", "Seedance20TextToVideoNode",
+     "Bytedance Seedance 2.0 Text-to-Video", "ERPK/WaveSpeedAI", True, False),
+    ("seedance_2_0_image_to_video", "Seedance20ImageToVideoNode", "Seedance20ImageToVideoNode",
+     "Bytedance Seedance 2.0 Image-to-Video", "ERPK/WaveSpeedAI", True, False),
+    ("wan_2_7_text_to_video", "Wan27TextToVideoNode", "Wan27TextToVideoNode",
+     "Alibaba WAN 2.7 Text-to-Video", "ERPK/WaveSpeedAI", True, False),
+    ("wan_2_7_image_to_video", "Wan27ImageToVideoNode", "Wan27ImageToVideoNode",
+     "Alibaba WAN 2.7 Image-to-Video", "ERPK/WaveSpeedAI", True, False),
+    ("wan_2_7_video_extend", "Wan27VideoExtendNode", "Wan27VideoExtendNode",
+     "Alibaba WAN 2.7 Video Extend", "ERPK/WaveSpeedAI", True, False),
+    ("wavespeed_veo_3_1_text_to_video", "WaveSpeedVeo31TextToVideoNode", "WaveSpeedVeo31TextToVideoNode",
+     "WaveSpeed Veo 3.1 Text-to-Video", "ERPK/WaveSpeedAI", True, False),
+    ("wavespeed_veo_3_1_image_to_video", "WaveSpeedVeo31ImageToVideoNode", "WaveSpeedVeo31ImageToVideoNode",
+     "WaveSpeed Veo 3.1 Image-to-Video", "ERPK/WaveSpeedAI", True, False),
+    ("kling_v3_image_to_video", "KlingV3ImageToVideoNode", "KlingV3ImageToVideoNode",
+     "Kling 3.0 Image-to-Video", "ERPK/WaveSpeedAI", True, False),
+    ("kling_o3_text_to_video", "KlingO3TextToVideoNode", "KlingO3TextToVideoNode",
+     "Kling O3 Text-to-Video", "ERPK/WaveSpeedAI", True, False),
+    ("kling_o3_image_to_video", "KlingO3ImageToVideoNode", "KlingO3ImageToVideoNode",
+     "Kling O3 Image-to-Video", "ERPK/WaveSpeedAI", True, False),
 ]
 
 
@@ -272,7 +293,7 @@ class TestWaveSpeedProviderExport:
     def test_nodes_list_has_all_classes(self):
         import importlib
         mod = importlib.import_module("wavespeed")
-        assert len(mod.NODES) == 31, f"Expected 31 WaveSpeed nodes, got {len(mod.NODES)}"
+        assert len(mod.NODES) == 41, f"Expected 41 WaveSpeed nodes, got {len(mod.NODES)}"
 
     def test_nodes_list_all_comfy_nodes(self):
         import importlib

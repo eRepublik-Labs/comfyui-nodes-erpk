@@ -1,5 +1,5 @@
 # ABOUTME: WaveSpeed AI provider package for ComfyUI V3.
-# ABOUTME: Exports flat NODES list of all 31 WaveSpeed node classes for ERPKExtension.
+# ABOUTME: Exports flat NODES list of all 41 WaveSpeed node classes for ERPKExtension.
 
 from .nodes import WaveSpeedAIAPIClient, PreviewVideo, SaveAudio, UploadImage
 from .seedream_v4 import SeedreamV4Node
@@ -29,6 +29,16 @@ from .qwen_image_max_edit import QwenImageMaxEditNode
 from .jibmix_qwen_image import JibMixQwenImageNode
 from .dreamina_text_to_image import DreaminaTextToImageNode
 from .dreamina_edit import DreaminaEditNode
+from .seedance_2_0_text_to_video import Seedance20TextToVideoNode
+from .seedance_2_0_image_to_video import Seedance20ImageToVideoNode
+from .wan_2_7_text_to_video import Wan27TextToVideoNode
+from .wan_2_7_image_to_video import Wan27ImageToVideoNode
+from .wan_2_7_video_extend import Wan27VideoExtendNode
+from .wavespeed_veo_3_1_text_to_video import WaveSpeedVeo31TextToVideoNode
+from .wavespeed_veo_3_1_image_to_video import WaveSpeedVeo31ImageToVideoNode
+from .kling_v3_image_to_video import KlingV3ImageToVideoNode
+from .kling_o3_text_to_video import KlingO3TextToVideoNode
+from .kling_o3_image_to_video import KlingO3ImageToVideoNode
 
 NODES = [
     WaveSpeedAIAPIClient,
@@ -62,6 +72,16 @@ NODES = [
     JibMixQwenImageNode,
     DreaminaTextToImageNode,
     DreaminaEditNode,
+    Seedance20TextToVideoNode,
+    Seedance20ImageToVideoNode,
+    Wan27TextToVideoNode,
+    Wan27ImageToVideoNode,
+    Wan27VideoExtendNode,
+    WaveSpeedVeo31TextToVideoNode,
+    WaveSpeedVeo31ImageToVideoNode,
+    KlingV3ImageToVideoNode,
+    KlingO3TextToVideoNode,
+    KlingO3ImageToVideoNode,
 ]
 
 __all__ = ["NODES"]

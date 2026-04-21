@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2026.4.6 (CalVer)
+**Current Version:** 2026.4.7 (CalVer)
 
 ## Repository Structure
 
@@ -81,6 +81,16 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 - **Qwen Image Edit Plus** - Advanced editing with up to 3 reference images ($0.02/image)
 - **Qwen Image 2.0 Text-to-Image** - Next-gen Qwen with Standard and Pro quality tiers
 - **Qwen Image 2.0 Edit** - Next-gen Qwen editing with up to 3 reference images, Standard and Pro tiers
+
+#### Video Generation
+
+Video nodes return a STRING URL that works directly with the **Preview Anything** node for preview/download. Longer polling (10s interval, 15-minute timeout) handles multi-minute generation runs.
+
+- **Bytedance Seedance 2.0 Text-to-Video** / **Image-to-Video** - Native audio-visual generation with Regular/Fast/Turbo speed tiers
+- **Alibaba WAN 2.7 Text-to-Video** / **Image-to-Video** / **Video Extend** - WAN 2.7 with extension support for continuing existing clips
+- **WaveSpeed Veo 3.1 Text-to-Video** / **Image-to-Video** - Google Veo 3.1 via WaveSpeed billing (distinct from the Gemini-direct Veo nodes under `ERPK/Gemini/Veo`)
+- **Kling 3.0 Image-to-Video** - Kling v3.0 i2v with Standard and Pro quality tiers
+- **Kling O3 Text-to-Video** / **Image-to-Video** - Kling's flagship O3 with Standard and Pro tiers
 
 **Installation & Documentation:** See [wavespeed/README.md](wavespeed/README.md)
 
