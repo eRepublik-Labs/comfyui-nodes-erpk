@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2026.4.8 (CalVer)
+**Current Version:** 2026.4.9 (CalVer)
 
 ## Repository Structure
 
@@ -91,6 +91,10 @@ Video nodes return a STRING URL that works directly with the **Preview Anything*
 - **WaveSpeed Veo 3.1 Text-to-Video** / **Image-to-Video** - Google Veo 3.1 via WaveSpeed billing (distinct from the Gemini-direct Veo nodes under `ERPK/Gemini/Veo`)
 - **Kling 3.0 Image-to-Video** - Kling v3.0 i2v with Standard and Pro quality tiers
 - **Kling O3 Text-to-Video** / **Image-to-Video** - Kling's flagship O3 with Standard and Pro tiers
+- **Lightricks LTX 2 Pro Text-to-Video** / **Image-to-Video** - LTX 2 Pro with enum durations (6/8/10s) and optional audio
+- **WaveSpeed LTX 2.3 Text-to-Video** / **Image-to-Video** - LTX 2.3 with 480p/720p/1080p resolution, 5-20s duration, and seed control
+
+LTX 2 Pro and LTX 2.3 are separate nodes (not a unified dropdown) because their APIs take different parameters — LTX 2 Pro has `generate_audio`, LTX 2.3 has `resolution`/`aspect_ratio`/`seed`.
 
 **Installation & Documentation:** See [wavespeed/README.md](wavespeed/README.md)
 

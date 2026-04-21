@@ -1,5 +1,5 @@
 # ABOUTME: WaveSpeed AI provider package for ComfyUI V3.
-# ABOUTME: Exports flat NODES list of all 41 WaveSpeed node classes for ERPKExtension.
+# ABOUTME: Exports flat NODES list of all 45 WaveSpeed node classes for ERPKExtension.
 
 from .nodes import WaveSpeedAIAPIClient, PreviewVideo, SaveAudio, UploadImage
 from .seedream_v4 import SeedreamV4Node
@@ -39,6 +39,10 @@ from .wavespeed_veo_3_1_image_to_video import WaveSpeedVeo31ImageToVideoNode
 from .kling_v3_image_to_video import KlingV3ImageToVideoNode
 from .kling_o3_text_to_video import KlingO3TextToVideoNode
 from .kling_o3_image_to_video import KlingO3ImageToVideoNode
+from .ltx_2_pro_text_to_video import Ltx2ProTextToVideoNode
+from .ltx_2_pro_image_to_video import Ltx2ProImageToVideoNode
+from .ltx_2_3_text_to_video import Ltx23TextToVideoNode
+from .ltx_2_3_image_to_video import Ltx23ImageToVideoNode
 
 NODES = [
     WaveSpeedAIAPIClient,
@@ -82,6 +86,10 @@ NODES = [
     KlingV3ImageToVideoNode,
     KlingO3TextToVideoNode,
     KlingO3ImageToVideoNode,
+    Ltx2ProTextToVideoNode,
+    Ltx2ProImageToVideoNode,
+    Ltx23TextToVideoNode,
+    Ltx23ImageToVideoNode,
 ]
 
 __all__ = ["NODES"]

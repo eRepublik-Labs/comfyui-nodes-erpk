@@ -120,6 +120,14 @@ WAVESPEED_NODES = [
      "Kling O3 Text-to-Video", "ERPK/WaveSpeedAI", True, False),
     ("kling_o3_image_to_video", "KlingO3ImageToVideoNode", "KlingO3ImageToVideoNode",
      "Kling O3 Image-to-Video", "ERPK/WaveSpeedAI", True, False),
+    ("ltx_2_pro_text_to_video", "Ltx2ProTextToVideoNode", "Ltx2ProTextToVideoNode",
+     "Lightricks LTX 2 Pro Text-to-Video", "ERPK/WaveSpeedAI", True, False),
+    ("ltx_2_pro_image_to_video", "Ltx2ProImageToVideoNode", "Ltx2ProImageToVideoNode",
+     "Lightricks LTX 2 Pro Image-to-Video", "ERPK/WaveSpeedAI", True, False),
+    ("ltx_2_3_text_to_video", "Ltx23TextToVideoNode", "Ltx23TextToVideoNode",
+     "WaveSpeed LTX 2.3 Text-to-Video", "ERPK/WaveSpeedAI", True, False),
+    ("ltx_2_3_image_to_video", "Ltx23ImageToVideoNode", "Ltx23ImageToVideoNode",
+     "WaveSpeed LTX 2.3 Image-to-Video", "ERPK/WaveSpeedAI", True, False),
 ]
 
 
@@ -293,7 +301,7 @@ class TestWaveSpeedProviderExport:
     def test_nodes_list_has_all_classes(self):
         import importlib
         mod = importlib.import_module("wavespeed")
-        assert len(mod.NODES) == 41, f"Expected 41 WaveSpeed nodes, got {len(mod.NODES)}"
+        assert len(mod.NODES) == 45, f"Expected 45 WaveSpeed nodes, got {len(mod.NODES)}"
 
     def test_nodes_list_all_comfy_nodes(self):
         import importlib
