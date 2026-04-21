@@ -5,8 +5,13 @@ from comfy_api.latest import IO
 from .openai_api.client import OpenAIClient
 
 TEXT_MODELS = list(OpenAIClient.MODELS.keys())
-VISION_MODELS = ["gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-mini",
-                 "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4o", "gpt-4o-mini"]
+VISION_MODELS = [m for m in TEXT_MODELS if not m.startswith("o")]
+
+REASONING_EFFORT_OPTIONS = ["none", "minimal", "low", "medium", "high", "xhigh"]
+REASONING_EFFORT_TOOLTIP = (
+    "Reasoning depth for o-series and gpt-5.x reasoning models. "
+    "Ignored by non-reasoning models."
+)
 
 
 class OpenAIAPIConfig(IO.ComfyNode):
@@ -125,6 +130,13 @@ class OpenAITextGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip="Output format (use json_object for JSON mode)",
                 ),
+                IO.Combo.Input(
+                    "reasoning_effort",
+                    options=REASONING_EFFORT_OPTIONS,
+                    default="none",
+                    optional=True,
+                    tooltip=REASONING_EFFORT_TOOLTIP,
+                ),
                 IO.Int.Input(
                     "seed",
                     default=-1,
@@ -153,6 +165,7 @@ class OpenAITextGeneration(IO.ComfyNode):
         top_p = kwargs.get("top_p", 1.0)
         stop_sequences = kwargs.get("stop_sequences", "")
         response_format = kwargs.get("response_format", "default")
+        reasoning_effort = kwargs.get("reasoning_effort", "none")
         seed = kwargs.get("seed", -1)
 
         if not prompt or not prompt.strip():
@@ -174,6 +187,8 @@ class OpenAITextGeneration(IO.ComfyNode):
         if response_format == "json_object":
             resp_format = {"type": "json_object"}
 
+        effort = reasoning_effort if reasoning_effort and reasoning_effort != "none" else None
+
         try:
             response = client.generate_content(
                 prompt=prompt.strip(),
@@ -184,6 +199,7 @@ class OpenAITextGeneration(IO.ComfyNode):
                 stop_sequences=stop_seq_list,
                 response_format=resp_format,
                 seed=seed if seed != -1 else None,
+                reasoning_effort=effort,
             )
 
             if response.get("blocked", False):
@@ -283,6 +299,13 @@ class OpenAIChat(IO.ComfyNode):
                     optional=True,
                     tooltip="Output format (use json_object for JSON mode)",
                 ),
+                IO.Combo.Input(
+                    "reasoning_effort",
+                    options=REASONING_EFFORT_OPTIONS,
+                    default="none",
+                    optional=True,
+                    tooltip=REASONING_EFFORT_TOOLTIP,
+                ),
                 IO.Int.Input(
                     "seed",
                     default=-1,
@@ -314,6 +337,7 @@ class OpenAIChat(IO.ComfyNode):
         top_p = kwargs.get("top_p", 1.0)
         stop_sequences = kwargs.get("stop_sequences", "")
         response_format = kwargs.get("response_format", "default")
+        reasoning_effort = kwargs.get("reasoning_effort", "none")
         seed = kwargs.get("seed", -1)
 
         if not prompt or not prompt.strip():
@@ -347,6 +371,8 @@ class OpenAIChat(IO.ComfyNode):
             if response_format == "json_object":
                 resp_format = {"type": "json_object"}
 
+            effort = reasoning_effort if reasoning_effort and reasoning_effort != "none" else None
+
             # Send chat request
             response = client.chat(
                 messages=messages,
@@ -357,6 +383,7 @@ class OpenAIChat(IO.ComfyNode):
                 stop_sequences=stop_seq_list,
                 response_format=resp_format,
                 seed=seed if seed != -1 else None,
+                reasoning_effort=effort,
             )
 
             text = response.get("text", "")
@@ -432,6 +459,13 @@ class OpenAIVision(IO.ComfyNode):
                     optional=True,
                     tooltip="Creativity level (lower=more factual)",
                 ),
+                IO.Combo.Input(
+                    "reasoning_effort",
+                    options=REASONING_EFFORT_OPTIONS,
+                    default="none",
+                    optional=True,
+                    tooltip=REASONING_EFFORT_TOOLTIP,
+                ),
                 IO.Int.Input(
                     "seed",
                     default=-1,
@@ -460,6 +494,7 @@ class OpenAIVision(IO.ComfyNode):
         detail = kwargs.get("detail", "auto")
         max_tokens = kwargs.get("max_tokens", 4096)
         temperature = kwargs.get("temperature", 0.4)
+        reasoning_effort = kwargs.get("reasoning_effort", "none")
         seed = kwargs.get("seed", -1)
 
         if not prompt or not prompt.strip():
@@ -473,6 +508,8 @@ class OpenAIVision(IO.ComfyNode):
             image_content = ImageConverter.tensors_to_vision_content(image, detail=detail)
             print(f"[OpenAI] Analyzing {len(image_content)} image(s)")
 
+            effort = reasoning_effort if reasoning_effort and reasoning_effort != "none" else None
+
             # Generate content with images
             response = client.generate_content(
                 prompt=prompt.strip(),
@@ -481,6 +518,7 @@ class OpenAIVision(IO.ComfyNode):
                 temperature=temperature,
                 model=model,
                 seed=seed if seed != -1 else None,
+                reasoning_effort=effort,
             )
 
             if response.get("blocked", False):

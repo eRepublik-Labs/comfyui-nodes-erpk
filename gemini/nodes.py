@@ -22,15 +22,31 @@ def _parse_stop_sequences(text):
     return sequences
 
 
-def _build_thinking_config(thinking_level):
-    """Build a ThinkingConfig if SDK supports it and level is not 'none'."""
+def _is_gemini_3x(model: str) -> bool:
+    """Return True when the model string belongs to the Gemini 3.x generation."""
+    return model.startswith("gemini-3")
+
+
+def _build_thinking_config(thinking_level, model):
+    """Build a ThinkingConfig tailored to the model's generation.
+
+    Gemini 3.x accepts the semantic enum (thinking_level). Gemini 2.5 expects
+    an integer thinking_budget, so the enum is mapped to an approximate budget.
+    Pro 2.5 cannot disable thinking, so minimal is clamped up to a 128 minimum.
+    """
     if thinking_level == "none":
         return None
     from google.genai import types as genai_types
-    if hasattr(genai_types, 'ThinkingConfig') and 'thinking_level' in genai_types.ThinkingConfig.model_fields:
+    if not hasattr(genai_types, 'ThinkingConfig'):
+        print("[Gemini] Warning: ThinkingConfig not supported by SDK, ignoring")
+        return None
+    if _is_gemini_3x(model):
         return genai_types.ThinkingConfig(thinking_level=thinking_level.upper())
-    print("[Gemini] Warning: thinking_level not supported by SDK, ignoring")
-    return None
+    budget_map = {"minimal": 0, "low": 512, "medium": 4096, "high": 16384}
+    budget = budget_map.get(thinking_level, 0)
+    if model == "gemini-2.5-pro" and budget < 128:
+        budget = 128
+    return genai_types.ThinkingConfig(thinking_budget=budget)
 
 
 # --- Model lists for COMBO inputs ---
@@ -173,10 +189,10 @@ class GeminiTextGeneration(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "thinking_level",
-                    options=["none", "low", "medium", "high"],
+                    options=["none", "minimal", "low", "medium", "high"],
                     default="none",
                     optional=True,
-                    tooltip="Reasoning depth (Gemini 3+ only). Higher = better quality, more tokens.",
+                    tooltip="Reasoning depth. Works on Gemini 2.5 and 3.x; the node translates to thinking_budget (2.5) or thinking_level enum (3.x) automatically.",
                 ),
                 IO.Int.Input(
                     "seed",
@@ -231,7 +247,7 @@ class GeminiTextGeneration(IO.ComfyNode):
             except json.JSONDecodeError as e:
                 raise ValueError(f"Invalid JSON schema: {str(e)}")
 
-        thinking_cfg = _build_thinking_config(thinking_level)
+        thinking_cfg = _build_thinking_config(thinking_level, model)
 
         try:
             response = client.generate_content(
@@ -365,10 +381,10 @@ class GeminiChat(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "thinking_level",
-                    options=["none", "low", "medium", "high"],
+                    options=["none", "minimal", "low", "medium", "high"],
                     default="none",
                     optional=True,
-                    tooltip="Reasoning depth (Gemini 3+ only). Higher = better quality, more tokens.",
+                    tooltip="Reasoning depth. Works on Gemini 2.5 and 3.x; the node translates to thinking_budget (2.5) or thinking_level enum (3.x) automatically.",
                 ),
                 IO.Int.Input(
                     "seed",
@@ -416,7 +432,7 @@ class GeminiChat(IO.ComfyNode):
         if model is None:
             model = GeminiClient.DEFAULT_MODEL
 
-        thinking_cfg = _build_thinking_config(thinking_level)
+        thinking_cfg = _build_thinking_config(thinking_level, model)
 
         try:
             if reset_conversation or chat_session is None:
@@ -566,10 +582,10 @@ class GeminiVision(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "thinking_level",
-                    options=["none", "low", "medium", "high"],
+                    options=["none", "minimal", "low", "medium", "high"],
                     default="none",
                     optional=True,
-                    tooltip="Reasoning depth (Gemini 3+ only). Higher = better quality, more tokens.",
+                    tooltip="Reasoning depth. Works on Gemini 2.5 and 3.x; the node translates to thinking_budget (2.5) or thinking_level enum (3.x) automatically.",
                 ),
                 IO.Int.Input(
                     "seed",
@@ -630,7 +646,7 @@ class GeminiVision(IO.ComfyNode):
                 except json.JSONDecodeError as e:
                     raise ValueError(f"Invalid JSON schema: {str(e)}")
 
-            thinking_cfg = _build_thinking_config(thinking_level)
+            thinking_cfg = _build_thinking_config(thinking_level, model)
 
             response = client.generate_content(
                 prompt=prompt.strip(),

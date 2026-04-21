@@ -20,6 +20,10 @@ class OpenAIClient:
 
     # Available text/vision models
     MODELS = {
+        "gpt-5.4": "GPT-5.4 (Latest flagship, 1M context)",
+        "gpt-5.4-pro": "GPT-5.4 Pro (Extended compute, Responses API)",
+        "gpt-5.4-mini": "GPT-5.4 Mini (Fast, cost-efficient, 400K context)",
+        "gpt-5.4-nano": "GPT-5.4 Nano (Fastest, lowest cost, 400K context)",
         "gpt-5.2": "GPT-5.2 (Latest flagship, best for coding/agents)",
         "gpt-5.2-pro": "GPT-5.2 Pro (Smarter, more precise responses)",
         "gpt-5.1": "GPT-5.1 (Coding/agents with configurable reasoning)",
@@ -53,10 +57,17 @@ class OpenAIClient:
     INITIAL_RETRY_DELAY = 1.0
 
     # Models that use max_completion_tokens instead of max_tokens
-    NEW_TOKEN_PARAM_MODELS = {"gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano", "o3", "o3-mini", "o3-pro", "o4-mini"}
+    NEW_TOKEN_PARAM_MODELS = {
+        "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
+        "gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano",
+        "o3", "o3-mini", "o3-pro", "o4-mini",
+    }
 
-    # Reasoning models that don't support temperature, top_p, or stop
-    REASONING_MODELS = {"o3", "o3-mini", "o3-pro", "o4-mini"}
+    # Reasoning models that support reasoning_effort parameter
+    REASONING_MODELS = {
+        "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
+        "o3", "o3-mini", "o3-pro", "o4-mini",
+    }
 
     def __init__(
         self,
@@ -168,6 +179,7 @@ class OpenAIClient:
         stop_sequences: Optional[List[str]] = None,
         response_format: Optional[Dict] = None,
         seed: Optional[int] = None,
+        reasoning_effort: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -182,6 +194,8 @@ class OpenAIClient:
             top_p: Nucleus sampling threshold (None to disable)
             stop_sequences: List of sequences where generation stops
             response_format: Output format (e.g., {"type": "json_object"})
+            reasoning_effort: Reasoning depth for reasoning models
+                (minimal/low/medium/high/xhigh). Silently dropped for non-reasoning models.
             **kwargs: Additional parameters
 
         Returns:
@@ -236,6 +250,9 @@ class OpenAIClient:
                 params["top_p"] = top_p
             if stop_sequences:
                 params["stop"] = stop_sequences
+
+        if reasoning_effort and is_reasoning:
+            params["reasoning_effort"] = reasoning_effort
 
         if response_format:
             params["response_format"] = response_format
@@ -307,6 +324,7 @@ class OpenAIClient:
         stop_sequences: Optional[List[str]] = None,
         response_format: Optional[Dict] = None,
         seed: Optional[int] = None,
+        reasoning_effort: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -320,6 +338,8 @@ class OpenAIClient:
             top_p: Nucleus sampling threshold
             stop_sequences: List of stop sequences
             response_format: Output format specification
+            reasoning_effort: Reasoning depth for reasoning models
+                (minimal/low/medium/high/xhigh). Silently dropped for non-reasoning models.
             **kwargs: Additional parameters
 
         Returns:
@@ -358,6 +378,9 @@ class OpenAIClient:
                 params["top_p"] = top_p
             if stop_sequences:
                 params["stop"] = stop_sequences
+
+        if reasoning_effort and is_reasoning:
+            params["reasoning_effort"] = reasoning_effort
 
         if response_format:
             params["response_format"] = response_format

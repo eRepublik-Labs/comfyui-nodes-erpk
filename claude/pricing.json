@@ -10,6 +10,12 @@
       "output_price_per_mtok": 15.0,
       "cache_read_price_per_mtok": 0.3
     },
+    "claude-opus-4-7": {
+      "name": "Claude Opus 4.7",
+      "input_price_per_mtok": 15.0,
+      "output_price_per_mtok": 75.0,
+      "cache_read_price_per_mtok": 1.5
+    },
     "claude-opus-4-6": {
       "name": "Claude Opus 4.6",
       "input_price_per_mtok": 5.0,

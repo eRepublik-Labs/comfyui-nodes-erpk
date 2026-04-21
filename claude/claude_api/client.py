@@ -31,6 +31,11 @@ class ClaudeClient:
     MAX_RETRIES = 3
     INITIAL_RETRY_DELAY = 1.0  # seconds
 
+    # Models that reject sampling params (temperature/top_p/top_k) and require
+    # thinking={"type": "adaptive"}. Anthropic returns 400 if sampling params
+    # are present or if thinking uses the legacy {"type": "enabled", ...} form.
+    THINKING_ONLY_MODELS = {"claude-opus-4-7"}
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -177,6 +182,13 @@ class ClaudeClient:
 
         # Note: Prompt caching is enabled via client initialization headers
 
+        # Thinking-only models reject sampling params and require adaptive thinking.
+        if model in self.THINKING_ONLY_MODELS:
+            params.pop("temperature", None)
+            params.pop("top_p", None)
+            params.pop("top_k", None)
+            params["thinking"] = {"type": "adaptive", "display": "summarized"}
+
         # Retry logic with exponential backoff
         retry_delay = self.INITIAL_RETRY_DELAY
         last_exception = None
@@ -268,6 +280,13 @@ class ClaudeClient:
         params.update(kwargs)
 
         # Note: Prompt caching is enabled via client initialization headers
+
+        # Thinking-only models reject sampling params and require adaptive thinking.
+        if model in self.THINKING_ONLY_MODELS:
+            params.pop("temperature", None)
+            params.pop("top_p", None)
+            params.pop("top_k", None)
+            params["thinking"] = {"type": "adaptive", "display": "summarized"}
 
         try:
             with self.client.messages.stream(**params) as stream:

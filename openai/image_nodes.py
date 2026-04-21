@@ -45,7 +45,11 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     options=IMAGE_MODELS,
                     default="gpt-image-1.5",
                     optional=True,
-                    tooltip="Image generation model",
+                    tooltip=(
+                        "Image generation model. "
+                        "dall-e-3 is deprecated and will shut down on 2026-05-12 "
+                        "— prefer gpt-image-1.5 or gpt-image-1."
+                    ),
                 ),
                 IO.Combo.Input(
                     "size",

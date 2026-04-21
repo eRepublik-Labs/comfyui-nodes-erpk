@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2026.2.22 (CalVer)
+**Current Version:** 2026.4.6 (CalVer)
 
 ## Repository Structure
 
@@ -79,6 +79,8 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 - **Qwen Image Text-to-Image** - Bilingual text-to-image generation (Chinese/English, max 1536×1536, $0.02/image)
 - **Qwen Image Edit** - Single image editing with bilingual prompts (256-1536px, $0.02/image)
 - **Qwen Image Edit Plus** - Advanced editing with up to 3 reference images ($0.02/image)
+- **Qwen Image 2.0 Text-to-Image** - Next-gen Qwen with Standard and Pro quality tiers
+- **Qwen Image 2.0 Edit** - Next-gen Qwen editing with up to 3 reference images, Standard and Pro tiers
 
 **Installation & Documentation:** See [wavespeed/README.md](wavespeed/README.md)
 
@@ -93,7 +95,7 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 
 #### Nodes
 
-- **Claude API Client** - Initialize Claude API connection with model selection (Sonnet 4.6, Opus 4.6, Haiku 4.5) and configuration. Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- Claude nodes can run standalone.
+- **Claude API Client** - Initialize Claude API connection with model selection (Opus 4.7, Sonnet 4.6, Opus 4.6, Haiku 4.5) and configuration. Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- Claude nodes can run standalone.
 - **Claude Prompt Enhancer** - Transform simple prompts into detailed descriptions with 51 artistic styles (photorealistic, cinematic, fantasy, cyberpunk, anime, oil painting, watercolor, and more)
 - **Claude Vision Analysis** - Analyze images with Claude's multimodal capabilities (up to 20 images simultaneously)
 - **Claude Text Generation** - General-purpose text completion and generation
@@ -106,6 +108,7 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 
 **Key Benefits:**
 - 51 artistic styles for prompt enhancement (photorealistic, cinematic, fantasy, anime, oil painting, impressionist, cyberpunk, and more)
+- Claude Opus 4.7 support with adaptive thinking (1M context, automatic sampling-param handling)
 - Prompt caching (up to 90% cost savings)
 - Streaming support for real-time responses
 - Automatic context window management
@@ -138,8 +141,8 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Veo Image to Video** - Generate videos from an input image and optional text prompt
 
 **Key Benefits:**
-- Support for Gemini 3.1 Pro, 3 Pro, 3 Flash, and Gemini 2.5 models
-- **Thinking level** control for Gemini 3+ models (none/low/medium/high reasoning depth)
+- Support for Gemini 3.1 Pro, 3 Pro, 3 Flash, 3.1 Flash-Lite, and Gemini 2.5 models
+- **Thinking level** control across all models (none/minimal/low/medium/high) with automatic parameter translation — Gemini 3.x uses `thinking_level` enum, Gemini 2.5 uses `thinking_budget` integer behind the same UI
 - **Veo video generation** with text-to-video and image-to-video (Veo 3 includes audio)
 - Each node selects its own model for maximum flexibility
 - State-of-the-art reasoning with Gemini 3.1 Pro and 2.5 Pro
@@ -162,7 +165,7 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 #### Nodes
 
 - **OpenAI API Config** - Initialize OpenAI API connection (API key configuration). Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- OpenAI nodes can run standalone.
-- **OpenAI Text Generation** - General-purpose text generation with model selection (GPT-5.2, GPT-4o, GPT-4.1, o3, o3-mini, o3-pro)
+- **OpenAI Text Generation** - General-purpose text generation with model selection (GPT-5.4 family, GPT-5.2, GPT-4o, GPT-4.1, o3, o3-mini, o3-pro) and optional `reasoning_effort` control for reasoning-capable models
 - **OpenAI Chat** - Multi-turn conversations with automatic context preservation
 - **OpenAI Vision** - Analyze images with GPT-4 vision capabilities
 - **OpenAI System Instruction** - Set persistent system-level instructions to guide model behavior
@@ -170,8 +173,10 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 - **OpenAI Image Edit** - Edit and inpaint images with natural language prompts
 
 **Key Benefits:**
-- Support for latest GPT-5.2, GPT-4.1, GPT-4o, and o-series reasoning models
-- Image generation with GPT-Image-1.5 (best quality) and DALL-E 3
+- Support for latest GPT-5.4 family (flagship, pro, mini, nano), GPT-5.2, GPT-4.1, GPT-4o, and o-series reasoning models
+- `reasoning_effort` parameter (minimal/low/medium/high/xhigh) for reasoning-capable models; ignored silently by non-reasoning models
+- Image generation with GPT-Image-1.5 (best quality), GPT-Image-1, and GPT-Image-1-Mini (cost tier)
+- DALL-E 3 shuts down 2026-05-12 — migrate to GPT-Image models
 - Image editing with optional mask support for inpainting
 - Multi-turn conversation with session management
 - Automatic retry with exponential backoff

@@ -226,13 +226,13 @@ class TestOpenAIModelOptions:
         assert set(model_inputs[0].options) == set(OpenAIClient.MODELS.keys())
 
     def test_vision_model_options(self):
+        from openai.openai_api.client import OpenAIClient
         cls = _import_node("nodes", "OpenAIVision")
         schema = cls.define_schema()
         model_inputs = [i for i in schema.inputs if i.id == "model"]
         assert len(model_inputs) == 1
-        expected = ["gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-mini",
-                     "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", "gpt-4o", "gpt-4o-mini"]
-        assert set(model_inputs[0].options) == set(expected)
+        expected = {m for m in OpenAIClient.MODELS if not m.startswith("o")}
+        assert set(model_inputs[0].options) == expected
 
     def test_image_gen_model_options(self):
         from openai.openai_api.client import OpenAIClient
