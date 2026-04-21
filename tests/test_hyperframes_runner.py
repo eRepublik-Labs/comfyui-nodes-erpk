@@ -6,12 +6,13 @@ Tests for hyperframes.runner.
 
 Validates that:
 - preflight_check raises HyperFramesError with actionable messages when
-  Node.js or FFmpeg are missing.
-- preflight_check auto-installs the hyperframes npm package when Node is
-  present but the package is not, via `npm install -g hyperframes`.
+  Node.js, npx, or FFmpeg are missing.
+- preflight_check uses `npx --yes hyperframes --version` to resolve the
+  package (installs into npx cache on first use; no `npm` binary needed
+  on subprocess PATH).
 - render_html_to_mp4 writes HTML + assets to a temp dir, invokes
-  `npx hyperframes render` with the correct flags, and returns a path
-  inside ComfyUI's temp directory.
+  `npx --yes hyperframes render` with the correct flags, and returns a
+  path inside ComfyUI's temp directory.
 - Subprocess failures bubble up as HyperFramesError with stderr content.
 - tensor_to_png_bytes round-trips a known tensor back to the same pixels.
 """
@@ -53,12 +54,26 @@ class TestPreflightNodeMissing:
         assert "https://nodejs.org/" in str(exc_info.value)
 
 
+class TestPreflightNpxMissing:
+    def test_raises_when_npx_not_on_path(self):
+        """Node can be present but npx missing — e.g., Debian's bare nodejs apt package."""
+        from hyperframes.runner import HyperFramesError, preflight_check
+
+        def which(name):
+            return "/usr/bin/node" if name == "node" else None
+
+        with patch("hyperframes.runner.shutil.which", side_effect=which):
+            with pytest.raises(HyperFramesError) as exc_info:
+                preflight_check()
+        assert "npx" in str(exc_info.value)
+
+
 class TestPreflightFFmpegMissing:
     def test_raises_with_install_url(self):
         from hyperframes.runner import HyperFramesError, preflight_check
 
         def which(name):
-            return "/usr/bin/node" if name == "node" else None
+            return f"/usr/bin/{name}" if name in ("node", "npx") else None
 
         with patch("hyperframes.runner.shutil.which", side_effect=which):
             with pytest.raises(HyperFramesError) as exc_info:
@@ -68,79 +83,57 @@ class TestPreflightFFmpegMissing:
 
 
 class TestPreflightAllPresent:
-    def test_does_not_raise_when_hyperframes_probe_succeeds(self):
+    def test_does_not_raise_when_hyperframes_resolves(self):
         from hyperframes.runner import preflight_check
 
         def which(name):
             return f"/usr/bin/{name}"
 
         probe = subprocess.CompletedProcess(
-            args=["npx", "--no-install", "hyperframes", "--version"],
+            args=["npx", "--yes", "hyperframes", "--version"],
             returncode=0,
-            stdout="0.5.0\n",
+            stdout="0.4.11\n",
             stderr="",
         )
         with patch("hyperframes.runner.shutil.which", side_effect=which), \
              patch("hyperframes.runner.subprocess.run", return_value=probe) as run_mock:
             preflight_check()
             args = run_mock.call_args_list[0].args[0]
-            assert args[:4] == ["npx", "--no-install", "hyperframes", "--version"]
+            assert args[:4] == ["npx", "--yes", "hyperframes", "--version"]
 
 
-class TestPreflightAutoInstall:
-    def test_installs_hyperframes_when_probe_fails(self):
-        from hyperframes.runner import preflight_check
-
-        def which(name):
-            return f"/usr/bin/{name}"
-
-        probe = subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="not found")
-        install = subprocess.CompletedProcess(
-            args=["npm", "install", "-g", "hyperframes"],
-            returncode=0,
-            stdout="added",
-            stderr="",
-        )
-        calls = [probe, install]
-
-        def fake_run(*args, **kwargs):
-            return calls.pop(0)
-
-        with patch("hyperframes.runner.shutil.which", side_effect=which), \
-             patch("hyperframes.runner.subprocess.run", side_effect=fake_run) as run_mock:
-            preflight_check()
-
-        invocations = [c.args[0] for c in run_mock.call_args_list]
-        assert any(
-            cmd[:3] == ["npm", "install", "-g"] and cmd[3] == "hyperframes"
-            for cmd in invocations
-        ), f"npm install -g hyperframes not invoked; got {invocations}"
-
-
-class TestPreflightInstallFailure:
-    def test_raises_when_install_fails(self):
+class TestPreflightResolutionFailure:
+    def test_raises_when_npx_resolution_fails(self):
         from hyperframes.runner import HyperFramesError, preflight_check
 
         def which(name):
             return f"/usr/bin/{name}"
 
-        probe = subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="missing")
-        install = subprocess.CompletedProcess(
-            args=[],
+        probe = subprocess.CompletedProcess(
+            args=["npx", "--yes", "hyperframes", "--version"],
             returncode=1,
             stdout="",
-            stderr="npm ERR! EACCES",
+            stderr="npm ERR! 403 Forbidden - GET https://registry.npmjs.org/hyperframes",
         )
-        calls = [probe, install]
-
-        def fake_run(*args, **kwargs):
-            return calls.pop(0)
-
         with patch("hyperframes.runner.shutil.which", side_effect=which), \
-             patch("hyperframes.runner.subprocess.run", side_effect=fake_run):
+             patch("hyperframes.runner.subprocess.run", return_value=probe):
             with pytest.raises(HyperFramesError) as exc_info:
                 preflight_check()
-        assert "EACCES" in str(exc_info.value) or "install" in str(exc_info.value).lower()
+        msg = str(exc_info.value)
+        assert "hyperframes" in msg.lower()
+        assert "403" in msg or "Forbidden" in msg or "resolve" in msg.lower()
+
+    def test_raises_on_subprocess_filenotfound(self):
+        from hyperframes.runner import HyperFramesError, preflight_check
+
+        def which(name):
+            return f"/usr/bin/{name}"
+
+        with patch("hyperframes.runner.shutil.which", side_effect=which), \
+             patch("hyperframes.runner.subprocess.run", side_effect=FileNotFoundError("npx: No such file or directory")):
+            with pytest.raises(HyperFramesError) as exc_info:
+                preflight_check()
+        assert "npx" in str(exc_info.value).lower()
 
 
 class TestRenderRunsHyperFramesCLI:
@@ -171,7 +164,7 @@ class TestRenderRunsHyperFramesCLI:
             )
 
         cmd = captured["cmd"]
-        assert cmd[:3] == ["npx", "hyperframes", "render"]
+        assert cmd[:4] == ["npx", "--yes", "hyperframes", "render"]
         assert "--output" in cmd
         assert "--format" in cmd and cmd[cmd.index("--format") + 1] == "mp4"
         assert "--fps" in cmd and cmd[cmd.index("--fps") + 1] == "30"
