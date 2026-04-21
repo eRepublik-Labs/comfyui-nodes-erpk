@@ -61,6 +61,7 @@ class ERPKExtension(ComfyExtension):
             (".openai", "OpenAI"),
             (".wavespeed", "WaveSpeed"),
             (".apple", "Apple ML"),
+            (".hyperframes", "HyperFrames"),
         ]
 
         for module_path, label in _providers:

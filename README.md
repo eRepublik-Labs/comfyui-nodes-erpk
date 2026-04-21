@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2026.4.9 (CalVer)
+**Current Version:** 2026.4.10 (CalVer)
 
 ## Repository Structure
 
@@ -40,6 +40,11 @@ ComfyUI-Custom-Nodes/
 ├── utils/                         # String and general utilities
 │   ├── __init__.py                # Module exports
 │   └── concat_strings.py          # String concatenation node
+├── hyperframes/                   # HyperFrames local video rendering
+│   ├── __init__.py                # Module exports
+│   ├── runner.py                  # Shared subprocess + preflight helpers
+│   ├── simple_composer.py         # Image-batch -> video composition node
+│   └── custom_template.py         # Arbitrary HTML -> video render node
 ├── settings.py                    # ComfyUI settings reader for API keys
 ├── shared_workflows.py            # Shared workflows CRUD for multi-user
 ├── shared_workflows/              # Legacy storage fallback (gitignored)
@@ -253,6 +258,24 @@ String manipulation and general utility nodes.
 - **Copy button** and **character counter** appear in the toolbar for text and markdown output
 - Text and markdown stay at a fixed scrollable size (no auto-growth to canvas-swallowing heights); images, video, and audio still auto-fit to their aspect ratio
 - Last rendered content persists across workflow reloads
+
+### ERPK/HyperFrames
+
+Local HTML-to-video rendering via the [HyperFrames](https://hyperframes.heygen.com/) CLI. These nodes wrap `npx hyperframes render` as a subprocess — no HTTP API involved.
+
+**Category in ComfyUI:** `ERPK/HyperFrames`
+
+**Prerequisites (checked at runtime, not installed by pip):**
+- **Node.js >= 22** on PATH
+- **FFmpeg** on PATH
+- The `hyperframes` npm package is auto-installed globally on first use if missing but Node.js is present.
+
+#### Nodes
+
+- **HyperFrames Simple Composer** - Compose a video from a batch of scene images with optional per-scene captions, background audio, scene transitions (`cut`/`fade`/`crossfade`), and configurable stage dimensions. Outputs a `/view` URL that plugs directly into Preview Anything.
+- **HyperFrames Custom Template** - Render a user-supplied HyperFrames HTML composition. `{{image_1}}`, `{{image_2}}`, ... placeholders are substituted with connected input images (1-indexed) before the subprocess render.
+
+Both nodes output MP4 (standard), MOV (ProRes with alpha), or WebM (VP9 with alpha) at 24/30/60 fps and draft/standard/high quality. Files land in ComfyUI's temp directory and are served via `/view` URLs.
 
 ### Shared Workflows (Multi-User)
 
