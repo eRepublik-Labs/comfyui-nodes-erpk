@@ -122,6 +122,43 @@ class TestContentTypeDetection:
         kind = result.ui["preview_anything"][0]["kind"]
         assert kind in ("text", "markdown")
 
+    def test_relative_view_url_with_video_filename_is_video(self, node_class):
+        """ComfyUI /view?filename=X.mp4 URLs should auto-detect as video.
+
+        The HyperFrames nodes (and any future node that returns a ComfyUI-temp-
+        served URL) produce this shape: scheme is empty, path is /view, and the
+        actual filename with extension lives in the filename= query parameter.
+        """
+        url = "/view?filename=hyperframes_abc123.mp4&type=temp&subfolder="
+        result = node_class.execute(value=url, display_type="auto")
+        payload = result.ui["preview_anything"][0]
+        assert payload["kind"] == "video"
+        assert payload["url"] == url
+
+    def test_relative_view_url_with_image_filename_is_image(self, node_class):
+        url = "/view?filename=preview_999.png&type=temp&subfolder="
+        result = node_class.execute(value=url, display_type="auto")
+        assert result.ui["preview_anything"][0]["kind"] == "image"
+
+    def test_relative_view_url_with_audio_filename_is_audio(self, node_class):
+        url = "/view?filename=preview_xyz.wav&type=temp&subfolder="
+        result = node_class.execute(value=url, display_type="auto")
+        assert result.ui["preview_anything"][0]["kind"] == "audio"
+
+    def test_absolute_url_query_filename_also_detected(self, node_class):
+        """The query-filename fallback should work on absolute URLs too,
+        not just relative ones — in case a remote server uses the same pattern."""
+        url = "https://example.com/view?filename=clip.webm"
+        result = node_class.execute(value=url, display_type="auto")
+        assert result.ui["preview_anything"][0]["kind"] == "video"
+
+    def test_path_extension_wins_over_query_filename(self, node_class):
+        """If path has a recognized extension, it takes priority over query filename."""
+        url = "https://example.com/clip.mp4?filename=tracking.txt"
+        result = node_class.execute(value=url, display_type="auto")
+        # Path says .mp4 (video) — should win
+        assert result.ui["preview_anything"][0]["kind"] == "video"
+
     def test_display_type_override(self, node_class):
         """Explicit display_type wins over auto-detection."""
         result = node_class.execute(

@@ -118,10 +118,18 @@ def _payload_from_string(value: str, filename: str) -> dict:
 
 
 def _url_kind(value: str):
+    # Accept absolute URLs (http/https/file/data) AND server-relative paths
+    # starting with "/" — ComfyUI serves temp files via /view?filename=X.ext
+    # patterns, which urlparse reports with an empty scheme.
     parsed = urlparse(value)
-    if parsed.scheme not in ("http", "https", "file", "data"):
+    scheme_ok = parsed.scheme in ("http", "https", "file", "data")
+    relative_ok = parsed.scheme == "" and value.startswith("/")
+    if not (scheme_ok or relative_ok):
         return None
-    ext = _ext_from_url(parsed.path)
+
+    # Path extension first; fall back to query-string `filename=X.ext`
+    # (our own /view?filename= pattern doesn't put the extension in the path).
+    ext = _ext_from_url(parsed.path) or _ext_from_query(parsed.query)
     if ext in _IMAGE_EXTS:
         return "image"
     if ext in _GIF_EXTS:
@@ -138,6 +146,18 @@ def _ext_from_url(path: str) -> str:
     if "." not in base:
         return ""
     return base.rsplit(".", 1)[-1].lower()
+
+
+def _ext_from_query(query: str) -> str:
+    """Extract extension from a `filename=X.ext` query parameter, if present."""
+    if not query:
+        return ""
+    from urllib.parse import parse_qs
+    params = parse_qs(query)
+    names = params.get("filename") or []
+    if not names:
+        return ""
+    return _ext_from_url(names[0])
 
 
 def _looks_like_markdown(text: str) -> bool:
