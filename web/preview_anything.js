@@ -58,6 +58,43 @@ function ensureStyles() {
         .erpk-download-btn:disabled:hover .erpk-download-label {
             color: #8a8a8a !important;
         }
+        .erpk-copy-btn,
+        .erpk-copy-btn:hover,
+        .erpk-copy-btn:focus,
+        .erpk-copy-btn:active {
+            background: #334155 !important;
+            border: 1px solid #475569 !important;
+            color: #e2e8f0 !important;
+            text-shadow: none !important;
+            box-shadow: none !important;
+        }
+        .erpk-copy-btn:hover:not(:disabled) {
+            background: #475569 !important;
+        }
+        .erpk-copy-btn:disabled,
+        .erpk-copy-btn:disabled:hover {
+            background: #1e293b !important;
+            border-color: #334155 !important;
+            color: #64748b !important;
+            cursor: not-allowed !important;
+        }
+        .erpk-copy-btn .erpk-copy-label,
+        .erpk-copy-btn:hover .erpk-copy-label,
+        .erpk-copy-btn:focus .erpk-copy-label,
+        .erpk-copy-btn:active .erpk-copy-label {
+            color: #e2e8f0 !important;
+            text-shadow: none !important;
+            font-weight: 700 !important;
+            font-size: 13px !important;
+            letter-spacing: 0.02em !important;
+        }
+        .erpk-char-count {
+            font-size: 11px !important;
+            color: var(--input-text, #888) !important;
+            padding: 0 6px !important;
+            align-self: center !important;
+            font-variant-numeric: tabular-nums !important;
+        }
     `;
     document.head.appendChild(style);
 }
@@ -297,10 +334,32 @@ function buildContainer() {
 
     ensureStyles();
 
+    const charCount = document.createElement("span");
+    charCount.className = "erpk-char-count";
+    charCount.style.display = "none";
+    charCount.style.flex = "1 1 auto";
+    charCount.textContent = "";
+
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "erpk-copy-btn";
+    copyBtn.style.flex = "0 0 auto";
+    copyBtn.style.padding = "8px 12px";
+    copyBtn.style.borderRadius = "4px";
+    copyBtn.style.transition = "background 120ms ease";
+    copyBtn.style.display = "none";
+
+    const copyLabel = document.createElement("span");
+    copyLabel.className = "erpk-copy-label";
+    copyLabel.textContent = "Copy";
+    copyLabel.style.pointerEvents = "none";
+    copyBtn.appendChild(copyLabel);
+
     const downloadBtn = document.createElement("button");
     downloadBtn.type = "button";
     downloadBtn.className = "erpk-download-btn";
-    downloadBtn.style.width = "100%";
+    downloadBtn.style.flex = "1 1 auto";
+    downloadBtn.style.minWidth = "120px";
     downloadBtn.style.padding = "8px 12px";
     downloadBtn.style.borderRadius = "4px";
     downloadBtn.style.transition = "background 120ms ease";
@@ -315,12 +374,32 @@ function buildContainer() {
     // All visual state (including hover) is owned by the injected stylesheet,
     // keyed on :disabled / :hover pseudo-classes. No inline JS tweaking needed.
     const syncDisabledStyle = () => { /* handled by CSS via :disabled */ };
+    toolbar.appendChild(charCount);
+    toolbar.appendChild(copyBtn);
     toolbar.appendChild(downloadBtn);
 
     root.appendChild(content);
     root.appendChild(toolbar);
 
-    return { root, toolbar, content, downloadBtn, syncDisabledStyle };
+    return { root, toolbar, content, downloadBtn, copyBtn, copyLabel, charCount, syncDisabledStyle };
+}
+
+// Toggle and update toolbar state based on payload kind.
+// Text/markdown get a character count and a Copy button;
+// images/video/audio/gif hide those and let Download fill the toolbar.
+function updateToolbarForKind(preview, payload) {
+    const kind = payload?.kind;
+    const isText = kind === "text" || kind === "markdown";
+    if (isText) {
+        const text = payload?.text || "";
+        preview.charCount.style.display = "inline-flex";
+        preview.charCount.textContent = `${text.length.toLocaleString()} chars`;
+        preview.copyBtn.style.display = "inline-flex";
+        preview.copyBtn.disabled = text.length === 0;
+    } else {
+        preview.charCount.style.display = "none";
+        preview.copyBtn.style.display = "none";
+    }
 }
 
 function clearChildren(el) {
@@ -431,7 +510,8 @@ function renderInto(content, payload, onMediaReady) {
         md.style.lineHeight = "1.5";
         renderMarkdownInto(md, payload.text || "");
         content.appendChild(md);
-        notifyReady();
+        // Text/markdown does NOT resize the node — the content area already
+        // scrolls, and long text would otherwise make the node swallow the canvas.
         return;
     }
 
@@ -454,12 +534,25 @@ app.registerExtension({
         nodeType.prototype.onNodeCreated = function () {
             const r = onNodeCreated?.apply(this, arguments);
 
-            const { root, content, downloadBtn, syncDisabledStyle } = buildContainer();
-            this._erpkPreview = { root, content, downloadBtn, syncDisabledStyle, payload: null };
+            const { root, content, downloadBtn, copyBtn, copyLabel, charCount, syncDisabledStyle } = buildContainer();
+            this._erpkPreview = { root, content, downloadBtn, copyBtn, copyLabel, charCount, syncDisabledStyle, payload: null };
 
             downloadBtn.addEventListener("click", () => {
                 if (this._erpkPreview.payload) {
                     downloadPayload(this._erpkPreview.payload);
+                }
+            });
+
+            copyBtn.addEventListener("click", async () => {
+                const text = this._erpkPreview.payload?.text;
+                if (!text) return;
+                try {
+                    await navigator.clipboard.writeText(text);
+                    const original = copyLabel.textContent;
+                    copyLabel.textContent = "Copied!";
+                    setTimeout(() => { copyLabel.textContent = original; }, 1500);
+                } catch (e) {
+                    console.error("[ERPK PreviewAnything] Clipboard copy failed:", e);
                 }
             });
 
@@ -486,6 +579,7 @@ app.registerExtension({
             this._erpkPreview.payload = payload;
             this._erpkPreview.downloadBtn.disabled = false;
             this._erpkPreview.syncDisabledStyle();
+            updateToolbarForKind(this._erpkPreview, payload);
             renderInto(this._erpkPreview.content, payload, () => resizeNodeToContent(this));
 
             this.properties = this.properties || {};
@@ -503,6 +597,7 @@ app.registerExtension({
                     this._erpkPreview.payload = saved;
                     this._erpkPreview.downloadBtn.disabled = false;
                     this._erpkPreview.syncDisabledStyle();
+                    updateToolbarForKind(this._erpkPreview, saved);
                     renderInto(this._erpkPreview.content, saved, () => resizeNodeToContent(this));
                 }, 50);
             }

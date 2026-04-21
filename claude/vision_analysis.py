@@ -31,6 +31,20 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
                     optional=True,
                     tooltip="Claude API client (optional if API key is configured in Settings)",
                 ),
+                IO.Combo.Input(
+                    "model",
+                    options=[
+                        "(inherit from client)",
+                        "claude-opus-4-7",
+                        "claude-sonnet-4-6",
+                        "claude-opus-4-6",
+                        "claude-haiku-4-5-20251001",
+                        "claude-sonnet-4-5-20250929",
+                    ],
+                    default="(inherit from client)",
+                    optional=True,
+                    tooltip="Override the client's model for this vision call. Opus 4.7 supports 2576px image resolution (vs 1568px on prior models).",
+                ),
                 IO.Image.Input(
                     "additional_images",
                     optional=True,
@@ -82,6 +96,7 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
         additional_images = kwargs.get("additional_images")
         detail_level = kwargs.get("detail_level", "high")
         max_tokens = kwargs.get("max_tokens", 2048)
+        model = kwargs.get("model", "(inherit from client)")
 
         if client is None:
             client = ClaudeClient(api_key=None)
@@ -97,12 +112,16 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
             messages = [{"role": "user", "content": content}]
             system = cls._build_system_prompt(detail_level)
 
-            response = client.send_request(
-                messages=messages,
-                system=system,
-                max_tokens=max_tokens,
-                temperature=0.7,
-            )
+            send_kwargs = {
+                "messages": messages,
+                "system": system,
+                "max_tokens": max_tokens,
+                "temperature": 0.7,
+            }
+            if model and model != "(inherit from client)":
+                send_kwargs["model"] = model
+
+            response = client.send_request(**send_kwargs)
 
             if hasattr(response, 'content') and len(response.content) > 0:
                 analysis_text = response.content[0].text

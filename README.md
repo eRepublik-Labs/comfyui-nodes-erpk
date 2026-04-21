@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2026.4.7 (CalVer)
+**Current Version:** 2026.4.8 (CalVer)
 
 ## Repository Structure
 
@@ -107,7 +107,7 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 
 - **Claude API Client** - Initialize Claude API connection with model selection (Opus 4.7, Sonnet 4.6, Opus 4.6, Haiku 4.5) and configuration. Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- Claude nodes can run standalone.
 - **Claude Prompt Enhancer** - Transform simple prompts into detailed descriptions with 51 artistic styles (photorealistic, cinematic, fantasy, cyberpunk, anime, oil painting, watercolor, and more)
-- **Claude Vision Analysis** - Analyze images with Claude's multimodal capabilities (up to 20 images simultaneously)
+- **Claude Vision Analysis** - Analyze images with Claude's multimodal capabilities (up to 20 images simultaneously). Optional per-node `model` override lets you use Opus 4.7 (2576px image resolution) for vision even when your client is configured with a different model.
 - **Claude Text Generation** - General-purpose text completion and generation
 - **Claude Conversation** - Multi-turn dialogues with context preservation and automatic memory management
 - **Claude Conversation Info** - Display conversation statistics and token usage
@@ -246,6 +246,8 @@ String manipulation and general utility nodes.
 - Auto-detects type (image/video/audio by URL extension, markdown by syntax, IMAGE tensor, AUDIO dict)
 - Optional `display_type` dropdown to force a specific renderer
 - Download button saves content as `.txt`, `.md`, or the original media format
+- **Copy button** and **character counter** appear in the toolbar for text and markdown output
+- Text and markdown stay at a fixed scrollable size (no auto-growth to canvas-swallowing heights); images, video, and audio still auto-fit to their aspect ratio
 - Last rendered content persists across workflow reloads
 
 ### Shared Workflows (Multi-User)
