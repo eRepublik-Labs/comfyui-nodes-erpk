@@ -447,6 +447,7 @@ class OpenAIClient:
         size: str = "1024x1024",
         quality: str = "auto",
         background: str = "auto",
+        moderation: str = "auto",
         n: int = 1,
         **kwargs
     ) -> Dict[str, Any]:
@@ -471,6 +472,9 @@ class OpenAIClient:
         if model in self.GPT_IMAGE_2_MODELS:
             self._validate_size_for_gpt_image_2(size)
 
+        # Preflight n validation — dall-e-3 is the only model that caps at n=1.
+        self._validate_n_for_model(n, model)
+
         params = {
             "model": model,
             "prompt": prompt,
@@ -492,6 +496,8 @@ class OpenAIClient:
                     params["background"] = "opaque"
                 else:
                     params["background"] = background
+            if moderation != "auto":
+                params["moderation"] = moderation
             # GPT Image models always return base64, do not accept response_format
         elif model == "dall-e-3":
             if quality in ["hd", "standard"]:
@@ -521,6 +527,19 @@ class OpenAIClient:
                     "error": str(e)
                 }
             raise
+
+    def _validate_n_for_model(self, n: int, model: str):
+        """OpenAI's images API accepts n=1-10 for most models. dall-e-3 is the
+        sole exception (hard-capped at n=1). Called in generate_image so users
+        get a friendly preflight message instead of a raw 400.
+        Source: https://developers.openai.com/api/reference/resources/images/methods/generate
+        """
+        if model == "dall-e-3" and n is not None and n > 1:
+            raise ValueError(
+                f"dall-e-3 supports n=1 only (you requested n={n}). For multiple "
+                f"images per call, use gpt-image-2, gpt-image-1.5, gpt-image-1, "
+                f"or gpt-image-1-mini (all support n=1-10)."
+            )
 
     def _validate_size_for_gpt_image_2(self, size: str):
         """Raise ValueError with a clear, actionable message if `size` doesn't
@@ -577,6 +596,7 @@ class OpenAIClient:
         model: str = "gpt-image-2",
         size: str = "1024x1024",
         quality: str = "auto",
+        moderation: str = "auto",
         n: int = 1,
         **kwargs
     ) -> Dict[str, Any]:
@@ -639,6 +659,8 @@ class OpenAIClient:
             # GPT Image models always return base64, do not accept response_format
             if quality != "auto":
                 params["quality"] = quality
+            if moderation != "auto":
+                params["moderation"] = moderation
         else:
             params["response_format"] = "b64_json"
 

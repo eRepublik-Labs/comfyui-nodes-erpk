@@ -109,6 +109,85 @@ class TestGptImage2ModelPresence:
         assert "gpt-image-2" in OpenAIClient.GPT_IMAGE_2_MODELS
 
 
+class TestModeration:
+    """moderation parameter: pass-through for GPT Image models, skipped for others."""
+
+    @pytest.mark.parametrize("model", ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"])
+    def test_moderation_low_sent_for_gpt_image_models(self, model):
+        client, mock = _make_client_with_mock()
+        client.generate_image(
+            prompt="x", model=model, size="1024x1024", moderation="low",
+        )
+        params = mock.images.generate.call_args[1]
+        assert params.get("moderation") == "low"
+
+    def test_moderation_auto_not_sent(self):
+        """'auto' is the API default — don't send it (matches our background pattern)."""
+        client, mock = _make_client_with_mock()
+        client.generate_image(
+            prompt="x", model="gpt-image-2", size="1024x1024", moderation="auto",
+        )
+        assert "moderation" not in mock.images.generate.call_args[1]
+
+    def test_moderation_skipped_for_dalle_3(self):
+        """dall-e-3 doesn't accept moderation — skip to avoid an API error."""
+        client, mock = _make_client_with_mock()
+        client.generate_image(
+            prompt="x", model="dall-e-3", moderation="low",
+        )
+        assert "moderation" not in mock.images.generate.call_args[1]
+
+    def test_moderation_skipped_for_dalle_2(self):
+        client, mock = _make_client_with_mock()
+        client.generate_image(
+            prompt="x", model="dall-e-2", moderation="low",
+        )
+        assert "moderation" not in mock.images.generate.call_args[1]
+
+    def test_moderation_in_edit_for_gpt_image_models(self):
+        client, mock = _make_client_with_mock()
+        client.edit_image(
+            image_data=b"fakepng", prompt="edit", model="gpt-image-2", moderation="low",
+        )
+        params = mock.images.edit.call_args[1]
+        assert params.get("moderation") == "low"
+
+    def test_moderation_auto_not_sent_in_edit(self):
+        client, mock = _make_client_with_mock()
+        client.edit_image(
+            image_data=b"fakepng", prompt="edit", model="gpt-image-2", moderation="auto",
+        )
+        assert "moderation" not in mock.images.edit.call_args[1]
+
+
+class TestNValidation:
+    """dall-e-3 only supports n=1; all other models accept n=1-10."""
+
+    def test_dall_e_3_n_2_raises(self):
+        client, _ = _make_client_with_mock()
+        with pytest.raises(ValueError, match="dall-e-3 supports n=1 only"):
+            client.generate_image(prompt="x", model="dall-e-3", n=2)
+
+    def test_dall_e_3_n_10_raises(self):
+        client, _ = _make_client_with_mock()
+        with pytest.raises(ValueError, match="dall-e-3 supports n=1 only"):
+            client.generate_image(prompt="x", model="dall-e-3", n=10)
+
+    def test_dall_e_3_n_1_passes(self):
+        client, mock = _make_client_with_mock()
+        client.generate_image(prompt="x", model="dall-e-3", n=1)
+        assert mock.images.generate.called
+
+    @pytest.mark.parametrize("model", ["gpt-image-2", "gpt-image-1.5", "gpt-image-1",
+                                       "gpt-image-1-mini", "dall-e-2"])
+    def test_other_models_accept_n_up_to_10(self, model):
+        client, mock = _make_client_with_mock()
+        # gpt-image-2 needs a valid size (n validation happens after size validation)
+        client.generate_image(prompt="x", model=model, size="1024x1024", n=10)
+        assert mock.images.generate.called
+        assert mock.images.generate.call_args[1].get("n") == 10
+
+
 class TestGptImage2SizeValidation:
     """Preflight size validation before calling the OpenAI API.
     gpt-image-2 has stricter size rules than other models; validate at the

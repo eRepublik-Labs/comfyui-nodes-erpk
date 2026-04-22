@@ -95,8 +95,52 @@ function ensureStyles() {
             align-self: center !important;
             font-variant-numeric: tabular-nums !important;
         }
+        .erpk-gallery-cell {
+            transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease !important;
+        }
+        .erpk-gallery-cell:hover {
+            transform: scale(1.03) !important;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55) !important;
+            border-color: var(--p-primary-color, #5a9dff) !important;
+            z-index: 1 !important;
+        }
+        .erpk-gallery-nav-btn {
+            position: absolute !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            width: 36px !important;
+            height: 54px !important;
+            background: rgba(0, 0, 0, 0.7) !important;
+            color: #fff !important;
+            border: 1px solid rgba(255, 255, 255, 0.18) !important;
+            border-radius: 4px !important;
+            cursor: pointer !important;
+            font-size: 22px !important;
+            line-height: 1 !important;
+            font-weight: 700 !important;
+            padding: 0 !important;
+            z-index: 3 !important;
+            transition: background 120ms ease !important;
+        }
+        .erpk-gallery-nav-btn:hover:not(:disabled) {
+            background: rgba(0, 0, 0, 0.92) !important;
+        }
+        .erpk-gallery-nav-btn:disabled {
+            opacity: 0.3 !important;
+            cursor: not-allowed !important;
+        }
     `;
     document.head.appendChild(style);
+}
+
+// Pick a sensible column count for the gallery grid based on image count.
+// Matches how ComfyUI's native Preview Image lays things out — large thumbs
+// for small N, denser grid for larger N.
+function computeGalleryCols(n) {
+    if (n <= 2) return n;
+    if (n <= 4) return 2;
+    if (n <= 9) return 3;
+    return 4;
 }
 
 const SAFE_URL_SCHEMES = /^(https?:|mailto:|\/|\.\/|#)/i;
@@ -129,21 +173,49 @@ async function downloadPayload(payload) {
         return;
     }
 
-    // Image gallery: download all N images as separate files.
+    // Image gallery: download all N images as separate files. Browsers
+    // rate-limit back-to-back programmatic downloads once the user-gesture
+    // context expires (~1s after the click). To work around, we pre-fetch
+    // all blobs in parallel, then trigger the <a download> sequentially
+    // with a small delay between each — keeps each click within the
+    // browser's "allow multi-download" window.
     if (payload.kind === "image_gallery" && Array.isArray(payload.urls)) {
-        for (let i = 0; i < payload.urls.length; i++) {
-            const u = payload.urls[i];
-            try {
-                const response = await fetch(u);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const blob = await response.blob();
-                const objUrl = URL.createObjectURL(blob);
-                const derivedExt = guessExtFromUrl(u) || ".png";
-                triggerBrowserDownload(objUrl, `${base}_${i + 1}${derivedExt}`);
-                setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
-            } catch (e) {
-                console.warn("[ERPK PreviewAnything] gallery download failed for", u, e);
-                window.open(u, "_blank", "noopener,noreferrer");
+        if (payload.urls.length > 1) {
+            console.log(
+                `[ERPK PreviewAnything] downloading ${payload.urls.length} images. ` +
+                `Browsers may prompt for permission on multi-file download — click Allow.`
+            );
+        }
+        // Fetch all blobs in parallel first (fast; they're usually /view? from the same origin).
+        const fetched = await Promise.all(
+            payload.urls.map(async (u, i) => {
+                try {
+                    const response = await fetch(u);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const blob = await response.blob();
+                    return { url: u, blob, index: i, ok: true };
+                } catch (e) {
+                    console.warn("[ERPK PreviewAnything] fetch failed for", u, e);
+                    return { url: u, blob: null, index: i, ok: false };
+                }
+            })
+        );
+        // Now trigger downloads sequentially with small delays so the browser
+        // treats them as one user-gesture batch.
+        for (let i = 0; i < fetched.length; i++) {
+            const entry = fetched[i];
+            if (!entry.ok) {
+                window.open(entry.url, "_blank", "noopener,noreferrer");
+                continue;
+            }
+            const objUrl = URL.createObjectURL(entry.blob);
+            const derivedExt = guessExtFromUrl(entry.url) || ".png";
+            triggerBrowserDownload(objUrl, `${base}_${entry.index + 1}${derivedExt}`);
+            setTimeout(() => URL.revokeObjectURL(objUrl), 2000);
+            if (i < fetched.length - 1) {
+                // 180ms is empirically enough for Chrome/Firefox/Safari to
+                // queue the download before the next click arrives.
+                await new Promise((r) => setTimeout(r, 180));
             }
         }
         return;
@@ -405,11 +477,15 @@ function buildContainer() {
 }
 
 // Toggle and update toolbar state based on payload kind.
-// Text/markdown get a character count and a Copy button;
-// images/video/audio/gif hide those and let Download fill the toolbar.
+// Text/markdown get a character count and a Copy button.
+// Image galleries get an adaptive download label ("Download all (N)" in grid,
+// "Download image" when in single-image zoom — the gallery's showGrid/showSingle
+// update the label live).
+// Everything else hides the text tools and uses a plain "Download" label.
 function updateToolbarForKind(preview, payload) {
     const kind = payload?.kind;
     const isText = kind === "text" || kind === "markdown";
+    const isGallery = kind === "image_gallery";
     if (isText) {
         const text = payload?.text || "";
         preview.charCount.style.display = "inline-flex";
@@ -420,6 +496,20 @@ function updateToolbarForKind(preview, payload) {
         preview.charCount.style.display = "none";
         preview.copyBtn.style.display = "none";
     }
+
+    const dlLabel = preview.downloadBtn?.querySelector(".erpk-download-label");
+    if (dlLabel) {
+        if (isGallery) {
+            const n = Array.isArray(payload.urls) ? payload.urls.length : 0;
+            dlLabel.textContent = `Download all (${n})`;
+        } else {
+            dlLabel.textContent = "Download";
+        }
+    }
+
+    // Reset gallery state on any new payload; gallery re-sets these if relevant.
+    preview.galleryMode = null;
+    preview.galleryCurrentIdx = null;
 }
 
 function clearChildren(el) {
@@ -432,35 +522,48 @@ function clearChildren(el) {
 // button top-right and a "N/M" pagination badge bottom-right. Arrow
 // keys navigate, Escape returns to the grid. Keyboard listener is only
 // attached while the single view is active to avoid leaks.
-function buildImageGallery(urls, filenameBase, onReady) {
+function buildImageGallery(urls, filenameBase, preview) {
     const wrapper = document.createElement("div");
     wrapper.className = "erpk-gallery";
     wrapper.style.position = "relative";
     wrapper.style.width = "100%";
+    wrapper.style.height = "100%";
+    wrapper.style.display = "flex";
+    wrapper.style.flexDirection = "column";
 
     const header = document.createElement("div");
     header.className = "erpk-gallery-header";
     header.style.fontSize = "11px";
     header.style.color = "var(--input-text, #888)";
     header.style.padding = "2px 4px 6px 4px";
+    header.style.flex = "0 0 auto";
     header.textContent = `${urls.length} image${urls.length === 1 ? "" : "s"}`;
     wrapper.appendChild(header);
 
+    const cols = computeGalleryCols(urls.length);
     const gridView = document.createElement("div");
     gridView.className = "erpk-gallery-grid";
     gridView.style.display = "grid";
-    gridView.style.gridTemplateColumns = "repeat(auto-fit, minmax(140px, 1fr))";
+    gridView.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
     gridView.style.gap = "6px";
     gridView.style.width = "100%";
+    gridView.style.flex = "1 1 auto";
+    gridView.style.alignContent = "start";
 
     const singleView = document.createElement("div");
     singleView.className = "erpk-gallery-single";
     singleView.style.display = "none";
     singleView.style.position = "relative";
     singleView.style.width = "100%";
+    singleView.style.height = "100%";
+    singleView.style.flex = "1 1 auto";
 
     let currentIdx = 0;
     let keyHandler = null;
+
+    function getDownloadLabel() {
+        return preview?.downloadBtn?.querySelector(".erpk-download-label") || null;
+    }
 
     // ---- Grid thumbnails -----------------------------------------
     urls.forEach((url, idx) => {
@@ -501,7 +604,6 @@ function buildImageGallery(urls, filenameBase, onReady) {
             if (img.naturalWidth && img.naturalHeight) {
                 dims.textContent = `${img.naturalWidth} × ${img.naturalHeight}`;
             }
-            if (idx === 0 && typeof onReady === "function") onReady();
         }, { once: true });
 
         cell.addEventListener("mouseenter", () => { dims.style.opacity = "1"; });
@@ -554,10 +656,39 @@ function buildImageGallery(urls, filenameBase, onReady) {
     closeBtn.style.cursor = "pointer";
     closeBtn.style.fontSize = "18px";
     closeBtn.style.lineHeight = "1";
-    closeBtn.style.zIndex = "2";
+    closeBtn.style.zIndex = "4";
     closeBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         showGrid();
+    });
+
+    // Previous / Next navigation buttons for single view
+    const prevBtn = document.createElement("button");
+    prevBtn.type = "button";
+    prevBtn.className = "erpk-gallery-nav-btn erpk-gallery-prev";
+    prevBtn.textContent = "‹";
+    prevBtn.setAttribute("aria-label", "Previous image");
+    prevBtn.style.left = "6px";
+    prevBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (currentIdx > 0) {
+            currentIdx -= 1;
+            updateSingle();
+        }
+    });
+
+    const nextBtn = document.createElement("button");
+    nextBtn.type = "button";
+    nextBtn.className = "erpk-gallery-nav-btn erpk-gallery-next";
+    nextBtn.textContent = "›";
+    nextBtn.setAttribute("aria-label", "Next image");
+    nextBtn.style.right = "6px";
+    nextBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (currentIdx < urls.length - 1) {
+            currentIdx += 1;
+            updateSingle();
+        }
     });
 
     const pagination = document.createElement("div");
@@ -578,6 +709,8 @@ function buildImageGallery(urls, filenameBase, onReady) {
     singleView.appendChild(singleCaption);
     singleView.appendChild(closeBtn);
     singleView.appendChild(pagination);
+    singleView.appendChild(prevBtn);
+    singleView.appendChild(nextBtn);
 
     function updateSingle() {
         singleImg.src = urls[currentIdx];
@@ -588,6 +721,12 @@ function buildImageGallery(urls, filenameBase, onReady) {
                 singleCaption.textContent = `${singleImg.naturalWidth} × ${singleImg.naturalHeight}`;
             }
         }, { once: true });
+        prevBtn.disabled = currentIdx === 0;
+        nextBtn.disabled = currentIdx === urls.length - 1;
+        if (preview) {
+            preview.galleryMode = "single";
+            preview.galleryCurrentIdx = currentIdx;
+        }
     }
 
     function onKey(e) {
@@ -614,6 +753,8 @@ function buildImageGallery(urls, filenameBase, onReady) {
         gridView.style.display = "none";
         singleView.style.display = "block";
         updateSingle();
+        const dlLabel = getDownloadLabel();
+        if (dlLabel) dlLabel.textContent = "Download image";
         if (!keyHandler) {
             keyHandler = onKey;
             document.addEventListener("keydown", keyHandler);
@@ -624,10 +765,22 @@ function buildImageGallery(urls, filenameBase, onReady) {
         header.style.display = "";
         gridView.style.display = "grid";
         singleView.style.display = "none";
+        if (preview) {
+            preview.galleryMode = "grid";
+            preview.galleryCurrentIdx = null;
+        }
+        const dlLabel = getDownloadLabel();
+        if (dlLabel) dlLabel.textContent = `Download all (${urls.length})`;
         if (keyHandler) {
             document.removeEventListener("keydown", keyHandler);
             keyHandler = null;
         }
+    }
+
+    // Initialize preview state for this gallery (grid is the default view)
+    if (preview) {
+        preview.galleryMode = "grid";
+        preview.galleryCurrentIdx = null;
     }
 
     wrapper.appendChild(gridView);
@@ -671,7 +824,7 @@ function resizeNodeToContent(node) {
     });
 }
 
-function renderInto(content, payload, onMediaReady) {
+function renderInto(content, payload, onMediaReady, preview) {
     clearChildren(content);
     content.style.aspectRatio = "";
     content.style.height = "";
@@ -704,7 +857,11 @@ function renderInto(content, payload, onMediaReady) {
 
     if (kind === "image_gallery") {
         const urls = Array.isArray(payload.urls) ? payload.urls : [];
-        const gallery = buildImageGallery(urls, payload.filename, notifyReady);
+        // Pass preview so the gallery can drive the download button's label
+        // and track grid/single view state. DON'T trigger notifyReady —
+        // galleries don't auto-resize the node (would balloon it with empty
+        // space on compact grids; user controls node size manually).
+        const gallery = buildImageGallery(urls, payload.filename, preview);
         content.appendChild(gallery);
         return;
     }
@@ -774,9 +931,25 @@ app.registerExtension({
             this._erpkPreview = { root, content, downloadBtn, copyBtn, copyLabel, charCount, syncDisabledStyle, payload: null };
 
             downloadBtn.addEventListener("click", () => {
-                if (this._erpkPreview.payload) {
-                    downloadPayload(this._erpkPreview.payload);
+                const p = this._erpkPreview;
+                if (!p.payload) return;
+                // Gallery single-view: download only the focused image.
+                if (
+                    p.payload.kind === "image_gallery"
+                    && p.galleryMode === "single"
+                    && p.galleryCurrentIdx != null
+                    && Array.isArray(p.payload.urls)
+                ) {
+                    const idx = p.galleryCurrentIdx;
+                    downloadPayload({
+                        kind: "image",
+                        url: p.payload.urls[idx],
+                        filename: `${p.payload.filename || "preview"}_${idx + 1}`,
+                    });
+                    return;
                 }
+                // All other kinds (including gallery grid mode) use default behavior.
+                downloadPayload(p.payload);
             });
 
             copyBtn.addEventListener("click", async () => {
@@ -816,7 +989,7 @@ app.registerExtension({
             this._erpkPreview.downloadBtn.disabled = false;
             this._erpkPreview.syncDisabledStyle();
             updateToolbarForKind(this._erpkPreview, payload);
-            renderInto(this._erpkPreview.content, payload, () => resizeNodeToContent(this));
+            renderInto(this._erpkPreview.content, payload, () => resizeNodeToContent(this), this._erpkPreview);
 
             this.properties = this.properties || {};
             this.properties._erpkLastPayload = payload;
@@ -834,7 +1007,7 @@ app.registerExtension({
                     this._erpkPreview.downloadBtn.disabled = false;
                     this._erpkPreview.syncDisabledStyle();
                     updateToolbarForKind(this._erpkPreview, saved);
-                    renderInto(this._erpkPreview.content, saved, () => resizeNodeToContent(this));
+                    renderInto(this._erpkPreview.content, saved, () => resizeNodeToContent(this), this._erpkPreview);
                 }, 50);
             }
             return r;

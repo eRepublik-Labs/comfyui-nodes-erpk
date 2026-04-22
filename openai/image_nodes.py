@@ -84,13 +84,28 @@ class OpenAIImageGeneration(IO.ComfyNode):
                         "Use gpt-image-1.5 or earlier for true transparent output."
                     ),
                 ),
+                IO.Combo.Input(
+                    "moderation",
+                    options=["auto", "low"],
+                    default="auto",
+                    optional=True,
+                    tooltip=(
+                        "Content moderation level (GPT Image models only). "
+                        "'auto' uses OpenAI's default safety filters; 'low' relaxes "
+                        "them for permissive content. Ignored by dall-e-2 / dall-e-3."
+                    ),
+                ),
                 IO.Int.Input(
                     "n",
                     default=1,
                     min=1,
-                    max=4,
+                    max=10,
                     optional=True,
-                    tooltip="Number of images to generate (dall-e-3 only supports 1)",
+                    tooltip=(
+                        "Number of images to generate per call (OpenAI supports 1-10). "
+                        "dall-e-3 is hard-capped at n=1 by the API; picking n>1 with "
+                        "dall-e-3 will raise a clear error before the request is sent."
+                    ),
                 ),
                 IO.String.Input(
                     "api_key",
@@ -127,6 +142,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
         size = kwargs.get("size", "1024x1024")
         quality = kwargs.get("quality", "auto")
         background = kwargs.get("background", "auto")
+        moderation = kwargs.get("moderation", "auto")
         n = kwargs.get("n", 1)
         api_key = kwargs.get("api_key", "")
 
@@ -154,6 +170,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
                 size=size,
                 quality=quality,
                 background=background,
+                moderation=moderation,
                 n=n,
             )
 
@@ -256,13 +273,26 @@ class OpenAIImageEdit(IO.ComfyNode):
                     optional=True,
                     tooltip="Image quality (gpt-image-1 only)",
                 ),
+                IO.Combo.Input(
+                    "moderation",
+                    options=["auto", "low"],
+                    default="auto",
+                    optional=True,
+                    tooltip=(
+                        "Content moderation level. 'auto' uses OpenAI's default "
+                        "safety filters; 'low' relaxes them for permissive content."
+                    ),
+                ),
                 IO.Int.Input(
                     "n",
                     default=1,
                     min=1,
-                    max=4,
+                    max=10,
                     optional=True,
-                    tooltip="Number of images to generate",
+                    tooltip=(
+                        "Number of edited image variants to return per call "
+                        "(OpenAI supports 1-10 for all GPT Image models)."
+                    ),
                 ),
                 IO.String.Input(
                     "api_key",
@@ -298,6 +328,7 @@ class OpenAIImageEdit(IO.ComfyNode):
         model = kwargs.get("model", "gpt-image-2")
         size = kwargs.get("size", "1024x1024")
         quality = kwargs.get("quality", "auto")
+        moderation = kwargs.get("moderation", "auto")
         n = kwargs.get("n", 1)
         api_key = kwargs.get("api_key", "")
 
@@ -383,6 +414,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                 model=model,
                 size=size,
                 quality=quality,
+                moderation=moderation,
                 n=n,
             )
 
