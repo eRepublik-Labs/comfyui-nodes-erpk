@@ -58,6 +58,14 @@ class OpenAIClient:
     # always processes at high fidelity and rejects input_fidelity param.
     GPT_IMAGE_2_MODELS = {"gpt-image-2"}
 
+    # gpt-image-2 size constraints (from OpenAI docs):
+    # - max edge <= 3840px, both edges multiples of 16
+    # - aspect ratio (long:short) <= 3:1
+    # - total pixels between 655,360 and 8,294,400
+    GPT_IMAGE_2_MIN_PIXELS = 655_360
+    GPT_IMAGE_2_MAX_PIXELS = 8_294_400
+    GPT_IMAGE_2_MAX_EDGE = 3840
+
     # Default configuration
     DEFAULT_MODEL = "gpt-4o"
     DEFAULT_MAX_TOKENS = 4096
@@ -459,6 +467,10 @@ class OpenAIClient:
         """
         from openai import APIError
 
+        # Preflight size validation for gpt-image-2 (stricter than other models)
+        if model in self.GPT_IMAGE_2_MODELS:
+            self._validate_size_for_gpt_image_2(size)
+
         params = {
             "model": model,
             "prompt": prompt,
@@ -509,6 +521,53 @@ class OpenAIClient:
                     "error": str(e)
                 }
             raise
+
+    def _validate_size_for_gpt_image_2(self, size: str):
+        """Raise ValueError with a clear, actionable message if `size` doesn't
+        meet gpt-image-2's constraints. Called before the API call so users
+        get a friendly preflight error instead of a raw 400.
+        """
+        if size in (None, "", "auto"):
+            return  # auto means "let the model choose"; nothing to validate
+
+        try:
+            parts = size.lower().split("x")
+            width = int(parts[0])
+            height = int(parts[1])
+        except (ValueError, IndexError):
+            return  # malformed size — let the API surface its own error
+
+        if max(width, height) > self.GPT_IMAGE_2_MAX_EDGE:
+            raise ValueError(
+                f"gpt-image-2 requires max edge <= {self.GPT_IMAGE_2_MAX_EDGE}px. "
+                f"You requested {size} (max edge = {max(width, height)}px)."
+            )
+        if width % 16 != 0 or height % 16 != 0:
+            raise ValueError(
+                f"gpt-image-2 requires both edges to be multiples of 16. "
+                f"You requested {size}. Try rounding to nearest 16 "
+                f"(e.g., 1024x1024, 1536x1024)."
+            )
+        long_edge = max(width, height)
+        short_edge = min(width, height)
+        if short_edge == 0 or (long_edge / short_edge) > 3:
+            raise ValueError(
+                f"gpt-image-2 requires aspect ratio (long:short) <= 3:1. "
+                f"You requested {size} ({long_edge}:{short_edge})."
+            )
+        pixels = width * height
+        if pixels < self.GPT_IMAGE_2_MIN_PIXELS:
+            raise ValueError(
+                f"gpt-image-2 requires at least {self.GPT_IMAGE_2_MIN_PIXELS:,} "
+                f"total pixels. You requested {size} = {pixels:,} pixels. "
+                f"Pick a larger size (e.g., 1024x1024 = 1,048,576 pixels) or "
+                f"switch to gpt-image-1.5 / gpt-image-1 which support smaller images."
+            )
+        if pixels > self.GPT_IMAGE_2_MAX_PIXELS:
+            raise ValueError(
+                f"gpt-image-2 max is {self.GPT_IMAGE_2_MAX_PIXELS:,} total pixels. "
+                f"You requested {size} = {pixels:,} pixels."
+            )
 
     def edit_image(
         self,

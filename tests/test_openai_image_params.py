@@ -109,6 +109,72 @@ class TestGptImage2ModelPresence:
         assert "gpt-image-2" in OpenAIClient.GPT_IMAGE_2_MODELS
 
 
+class TestGptImage2SizeValidation:
+    """Preflight size validation before calling the OpenAI API.
+    gpt-image-2 has stricter size rules than other models; validate at the
+    client layer so users get a friendly error instead of a raw 400.
+    """
+
+    def test_below_min_pixels_raises(self):
+        client, _ = _make_client_with_mock()
+        with pytest.raises(ValueError, match="at least 655,360"):
+            client.generate_image(prompt="x", model="gpt-image-2", size="512x512")
+
+    def test_256_also_raises(self):
+        client, _ = _make_client_with_mock()
+        with pytest.raises(ValueError, match="at least 655,360"):
+            client.generate_image(prompt="x", model="gpt-image-2", size="256x256")
+
+    def test_valid_1024_passes(self):
+        client, mock = _make_client_with_mock()
+        client.generate_image(prompt="x", model="gpt-image-2", size="1024x1024")
+        assert mock.images.generate.called
+
+    def test_above_max_edge_raises(self):
+        client, _ = _make_client_with_mock()
+        with pytest.raises(ValueError, match="max edge"):
+            client.generate_image(prompt="x", model="gpt-image-2", size="4000x2160")
+
+    def test_non_multiple_of_16_raises(self):
+        client, _ = _make_client_with_mock()
+        with pytest.raises(ValueError, match="multiples of 16"):
+            client.generate_image(prompt="x", model="gpt-image-2", size="1023x1024")
+
+    def test_aspect_ratio_over_3_1_raises(self):
+        client, _ = _make_client_with_mock()
+        # 3200x800 = 2.56M pixels (above min), edges multiples of 16, but 4:1 ratio
+        with pytest.raises(ValueError, match="aspect ratio"):
+            client.generate_image(prompt="x", model="gpt-image-2", size="3200x800")
+
+    def test_above_max_pixels_raises(self):
+        client, _ = _make_client_with_mock()
+        # 3840x3200 = 12.3M pixels (above 8.3M max); edges multiples of 16 and ratio 1.2:1
+        with pytest.raises(ValueError, match=r"max is 8,294,400"):
+            client.generate_image(prompt="x", model="gpt-image-2", size="3840x3200")
+
+    def test_auto_size_skips_validation(self):
+        client, mock = _make_client_with_mock()
+        client.generate_image(prompt="x", model="gpt-image-2", size="auto")
+        assert mock.images.generate.called
+
+    def test_malformed_size_skips_validation(self):
+        """Malformed strings fall through to the API, which returns its own
+        error message. We don't try to second-guess the parser."""
+        client, mock = _make_client_with_mock()
+        client.generate_image(prompt="x", model="gpt-image-2", size="notasize")
+        assert mock.images.generate.called
+
+    def test_other_models_skip_validation(self):
+        """Small sizes are fine on gpt-image-1 / gpt-image-1.5 / dall-e-2 — the
+        gpt-image-2 validator must not reject them when a different model is chosen."""
+        client, mock = _make_client_with_mock()
+        client.generate_image(prompt="x", model="gpt-image-1", size="512x512")
+        client.generate_image(prompt="x", model="gpt-image-1.5", size="512x512")
+        client.generate_image(prompt="x", model="dall-e-2", size="512x512")
+        # Three calls, no exceptions
+        assert mock.images.generate.call_count == 3
+
+
 class TestEditImageParams:
     """Verify edit_image builds correct params per model."""
 

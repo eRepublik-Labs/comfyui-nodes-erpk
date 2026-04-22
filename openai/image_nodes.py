@@ -59,7 +59,12 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     options=GEN_SIZES,
                     default="1024x1024",
                     optional=True,
-                    tooltip="Image size (available sizes depend on model)",
+                    tooltip=(
+                        "Image size. Options auto-filter based on the selected model "
+                        "(256x256 / 512x512 only valid on dall-e-2 and gpt-image-1/-mini; "
+                        "4K options only on gpt-image-2). gpt-image-2 also requires at "
+                        "least 655,360 total pixels, so 1024x1024 is the safe minimum."
+                    ),
                 ),
                 IO.Combo.Input(
                     "quality",
@@ -238,7 +243,11 @@ class OpenAIImageEdit(IO.ComfyNode):
                     options=EDIT_SIZES,
                     default="1024x1024",
                     optional=True,
-                    tooltip="Output image size",
+                    tooltip=(
+                        "Output image size. Options auto-filter based on the "
+                        "selected model. Edit endpoint supports the 1024-series "
+                        "sizes (and auto) across all GPT Image models."
+                    ),
                 ),
                 IO.Combo.Input(
                     "quality",
