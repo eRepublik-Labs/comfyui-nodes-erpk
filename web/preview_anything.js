@@ -426,6 +426,215 @@ function clearChildren(el) {
     while (el.firstChild) el.removeChild(el.firstChild);
 }
 
+// Build a two-state gallery widget for image_gallery payloads.
+// Default: CSS-grid of thumbnails with hover-revealed "W × H" tags.
+// Click a thumbnail -> single/zoom view of that image with a close (×)
+// button top-right and a "N/M" pagination badge bottom-right. Arrow
+// keys navigate, Escape returns to the grid. Keyboard listener is only
+// attached while the single view is active to avoid leaks.
+function buildImageGallery(urls, filenameBase, onReady) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "erpk-gallery";
+    wrapper.style.position = "relative";
+    wrapper.style.width = "100%";
+
+    const header = document.createElement("div");
+    header.className = "erpk-gallery-header";
+    header.style.fontSize = "11px";
+    header.style.color = "var(--input-text, #888)";
+    header.style.padding = "2px 4px 6px 4px";
+    header.textContent = `${urls.length} image${urls.length === 1 ? "" : "s"}`;
+    wrapper.appendChild(header);
+
+    const gridView = document.createElement("div");
+    gridView.className = "erpk-gallery-grid";
+    gridView.style.display = "grid";
+    gridView.style.gridTemplateColumns = "repeat(auto-fit, minmax(140px, 1fr))";
+    gridView.style.gap = "6px";
+    gridView.style.width = "100%";
+
+    const singleView = document.createElement("div");
+    singleView.className = "erpk-gallery-single";
+    singleView.style.display = "none";
+    singleView.style.position = "relative";
+    singleView.style.width = "100%";
+
+    let currentIdx = 0;
+    let keyHandler = null;
+
+    // ---- Grid thumbnails -----------------------------------------
+    urls.forEach((url, idx) => {
+        const cell = document.createElement("div");
+        cell.className = "erpk-gallery-cell";
+        cell.style.position = "relative";
+        cell.style.aspectRatio = "1 / 1";
+        cell.style.overflow = "hidden";
+        cell.style.borderRadius = "4px";
+        cell.style.cursor = "pointer";
+        cell.style.background = "#0a0a0a";
+        cell.style.border = "1px solid var(--border-color, #333)";
+
+        const img = document.createElement("img");
+        img.src = url;
+        img.alt = `${filenameBase || "image"}_${idx + 1}`;
+        img.style.width = "100%";
+        img.style.height = "100%";
+        img.style.objectFit = "cover";
+        img.style.display = "block";
+
+        const dims = document.createElement("div");
+        dims.className = "erpk-gallery-dims";
+        dims.style.position = "absolute";
+        dims.style.bottom = "4px";
+        dims.style.right = "4px";
+        dims.style.padding = "2px 6px";
+        dims.style.background = "rgba(0, 0, 0, 0.75)";
+        dims.style.color = "#fff";
+        dims.style.fontSize = "10px";
+        dims.style.fontWeight = "600";
+        dims.style.borderRadius = "3px";
+        dims.style.opacity = "0";
+        dims.style.transition = "opacity 120ms ease";
+        dims.style.pointerEvents = "none";
+
+        img.addEventListener("load", () => {
+            if (img.naturalWidth && img.naturalHeight) {
+                dims.textContent = `${img.naturalWidth} × ${img.naturalHeight}`;
+            }
+            if (idx === 0 && typeof onReady === "function") onReady();
+        }, { once: true });
+
+        cell.addEventListener("mouseenter", () => { dims.style.opacity = "1"; });
+        cell.addEventListener("mouseleave", () => { dims.style.opacity = "0"; });
+        cell.addEventListener("click", (e) => {
+            e.stopPropagation();
+            currentIdx = idx;
+            showSingle();
+        });
+
+        cell.appendChild(img);
+        cell.appendChild(dims);
+        gridView.appendChild(cell);
+    });
+
+    // ---- Single / zoom view --------------------------------------
+    const singleImg = document.createElement("img");
+    singleImg.className = "erpk-gallery-single-img";
+    singleImg.style.width = "100%";
+    singleImg.style.height = "auto";
+    singleImg.style.maxHeight = "calc(100% - 30px)";
+    singleImg.style.objectFit = "contain";
+    singleImg.style.display = "block";
+    singleImg.style.background = "#0a0a0a";
+    singleImg.style.borderRadius = "4px";
+
+    const singleCaption = document.createElement("div");
+    singleCaption.className = "erpk-gallery-caption";
+    singleCaption.style.textAlign = "center";
+    singleCaption.style.fontSize = "11px";
+    singleCaption.style.color = "var(--input-text, #888)";
+    singleCaption.style.padding = "6px 0";
+    singleCaption.style.fontVariantNumeric = "tabular-nums";
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "erpk-gallery-close";
+    closeBtn.textContent = "×";
+    closeBtn.setAttribute("aria-label", "Close expanded view");
+    closeBtn.style.position = "absolute";
+    closeBtn.style.top = "6px";
+    closeBtn.style.right = "6px";
+    closeBtn.style.width = "28px";
+    closeBtn.style.height = "28px";
+    closeBtn.style.padding = "0";
+    closeBtn.style.background = "rgba(0, 0, 0, 0.8)";
+    closeBtn.style.color = "#fff";
+    closeBtn.style.border = "1px solid #555";
+    closeBtn.style.borderRadius = "4px";
+    closeBtn.style.cursor = "pointer";
+    closeBtn.style.fontSize = "18px";
+    closeBtn.style.lineHeight = "1";
+    closeBtn.style.zIndex = "2";
+    closeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        showGrid();
+    });
+
+    const pagination = document.createElement("div");
+    pagination.className = "erpk-gallery-pagination";
+    pagination.style.position = "absolute";
+    pagination.style.bottom = "34px";
+    pagination.style.right = "6px";
+    pagination.style.padding = "4px 10px";
+    pagination.style.background = "rgba(0, 0, 0, 0.8)";
+    pagination.style.color = "#fff";
+    pagination.style.fontSize = "12px";
+    pagination.style.fontWeight = "600";
+    pagination.style.borderRadius = "4px";
+    pagination.style.pointerEvents = "none";
+    pagination.style.fontVariantNumeric = "tabular-nums";
+
+    singleView.appendChild(singleImg);
+    singleView.appendChild(singleCaption);
+    singleView.appendChild(closeBtn);
+    singleView.appendChild(pagination);
+
+    function updateSingle() {
+        singleImg.src = urls[currentIdx];
+        pagination.textContent = `${currentIdx + 1}/${urls.length}`;
+        singleCaption.textContent = "";  // cleared until load
+        singleImg.addEventListener("load", () => {
+            if (singleImg.naturalWidth && singleImg.naturalHeight) {
+                singleCaption.textContent = `${singleImg.naturalWidth} × ${singleImg.naturalHeight}`;
+            }
+        }, { once: true });
+    }
+
+    function onKey(e) {
+        if (e.key === "Escape") {
+            e.preventDefault();
+            showGrid();
+        } else if (e.key === "ArrowLeft") {
+            if (currentIdx > 0) {
+                e.preventDefault();
+                currentIdx -= 1;
+                updateSingle();
+            }
+        } else if (e.key === "ArrowRight") {
+            if (currentIdx < urls.length - 1) {
+                e.preventDefault();
+                currentIdx += 1;
+                updateSingle();
+            }
+        }
+    }
+
+    function showSingle() {
+        header.style.display = "none";
+        gridView.style.display = "none";
+        singleView.style.display = "block";
+        updateSingle();
+        if (!keyHandler) {
+            keyHandler = onKey;
+            document.addEventListener("keydown", keyHandler);
+        }
+    }
+
+    function showGrid() {
+        header.style.display = "";
+        gridView.style.display = "grid";
+        singleView.style.display = "none";
+        if (keyHandler) {
+            document.removeEventListener("keydown", keyHandler);
+            keyHandler = null;
+        }
+    }
+
+    wrapper.appendChild(gridView);
+    wrapper.appendChild(singleView);
+    return wrapper;
+}
+
 // Grow the node height so the widget's content fits fully inside its
 // current rendered rect. Rather than guessing the full node-chrome
 // (header + other widgets + padding), we compute the delta between the
@@ -495,36 +704,8 @@ function renderInto(content, payload, onMediaReady) {
 
     if (kind === "image_gallery") {
         const urls = Array.isArray(payload.urls) ? payload.urls : [];
-        // Vertical stack of images. Content area scrolls naturally (has overflow: auto)
-        // so multi-image payloads don't balloon the node height.
-        const stack = document.createElement("div");
-        stack.style.display = "flex";
-        stack.style.flexDirection = "column";
-        stack.style.gap = "6px";
-        stack.style.width = "100%";
-
-        const header = document.createElement("div");
-        header.style.fontSize = "11px";
-        header.style.color = "var(--input-text, #888)";
-        header.style.padding = "2px 4px";
-        header.textContent = `${urls.length} image${urls.length === 1 ? "" : "s"}`;
-        stack.appendChild(header);
-
-        urls.forEach((url, idx) => {
-            const img = document.createElement("img");
-            img.src = url;
-            img.alt = `${payload.filename || "image"}_${idx + 1}`;
-            img.style.width = "100%";
-            img.style.height = "auto";
-            img.style.display = "block";
-            img.style.borderRadius = "3px";
-            if (idx === 0) {
-                img.addEventListener("load", notifyReady, { once: true });
-            }
-            stack.appendChild(img);
-        });
-
-        content.appendChild(stack);
+        const gallery = buildImageGallery(urls, payload.filename, notifyReady);
+        content.appendChild(gallery);
         return;
     }
 
