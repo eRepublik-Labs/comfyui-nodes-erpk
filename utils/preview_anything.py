@@ -84,6 +84,12 @@ def _build_payload(value, display_type: str, filename: str, strip_metadata: bool
         return _forced_payload(value, display_type, filename)
 
     if _is_image_tensor(value):
+        # Batched IMAGE tensor (N > 1): emit a gallery payload so the frontend
+        # can show all N images. Previously only the first image was saved.
+        if _is_batched_image(value):
+            urls = _save_image_tensor_batch(value, filename)
+            if urls:
+                return {"kind": "image_gallery", "urls": urls, "filename": filename}
         saved = _save_image_tensor(value, filename)
         if saved is not None:
             return {"kind": "image", "url": saved, "filename": filename}
@@ -305,6 +311,19 @@ def _is_image_tensor(value) -> bool:
         return False
 
 
+def _is_batched_image(value) -> bool:
+    """True if value is a ComfyUI IMAGE tensor with a batch size > 1."""
+    try:
+        import torch
+        return (
+            isinstance(value, torch.Tensor)
+            and value.ndim == 4
+            and value.shape[0] > 1
+        )
+    except ImportError:
+        return False
+
+
 def _is_audio_dict(value) -> bool:
     return (
         isinstance(value, dict)
@@ -334,6 +353,40 @@ def _save_image_tensor(tensor, filename: str):
     path = os.path.join(temp_dir, name)
     img.save(path)
     return _view_url(name, "", "temp")
+
+
+def _save_image_tensor_batch(tensor, filename: str):
+    """Save each image in a [N,H,W,C] batch tensor to ComfyUI's temp dir.
+
+    Returns a list of /view URLs in batch order, or None on any error.
+    """
+    try:
+        import numpy as np
+        from PIL import Image
+        import folder_paths
+    except ImportError:
+        return None
+
+    if tensor.ndim != 4 or tensor.shape[0] < 1:
+        return None
+
+    array_all = tensor.detach().cpu().numpy()
+    if array_all.dtype != np.uint8:
+        array_all = (array_all.clip(0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
+
+    temp_dir = folder_paths.get_temp_directory()
+    os.makedirs(temp_dir, exist_ok=True)
+    stem = _safe(filename)
+    ts = int(time.time() * 1000)
+
+    urls = []
+    for i in range(array_all.shape[0]):
+        img = Image.fromarray(array_all[i])
+        name = f"{stem}_{ts}_{i + 1}.png"
+        path = os.path.join(temp_dir, name)
+        img.save(path)
+        urls.append(_view_url(name, "", "temp"))
+    return urls
 
 
 def _save_audio_dict(audio, filename: str):

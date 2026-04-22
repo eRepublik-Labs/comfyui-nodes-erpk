@@ -161,9 +161,16 @@ class OpenAIImageGeneration(IO.ComfyNode):
             if not images:
                 raise ValueError("No image was generated")
 
-            # Convert first image from base64 to tensor
-            image_tensor = ImageConverter.base64_to_tensor(images[0])
-            print(f"[OpenAI] Image generated successfully: {image_tensor.shape}")
+            # Convert ALL returned images to a single batched tensor [N,H,W,C].
+            # Previously only images[0] was kept, silently dropping N-1 images
+            # the user was billed for.
+            tensors = [ImageConverter.base64_to_tensor(img) for img in images]
+            if len(tensors) == 1:
+                image_tensor = tensors[0]
+            else:
+                import torch
+                image_tensor = torch.cat(tensors, dim=0)
+            print(f"[OpenAI] Generated {len(tensors)} image(s), batch shape: {image_tensor.shape}")
 
             # Get revised prompt if available
             revised_prompt = response.get("revised_prompt", "")
@@ -379,9 +386,14 @@ class OpenAIImageEdit(IO.ComfyNode):
             if not images:
                 raise ValueError("No image was generated")
 
-            # Convert first image from base64 to tensor
-            image_tensor = ImageConverter.base64_to_tensor(images[0])
-            print(f"[OpenAI] Image edited successfully: {image_tensor.shape}")
+            # Convert ALL returned images to a single batched tensor [N,H,W,C].
+            tensors = [ImageConverter.base64_to_tensor(img) for img in images]
+            if len(tensors) == 1:
+                image_tensor = tensors[0]
+            else:
+                import torch
+                image_tensor = torch.cat(tensors, dim=0)
+            print(f"[OpenAI] Edited {len(tensors)} image(s), batch shape: {image_tensor.shape}")
 
             return IO.NodeOutput(image_tensor)
 

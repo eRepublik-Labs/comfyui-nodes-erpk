@@ -129,6 +129,26 @@ async function downloadPayload(payload) {
         return;
     }
 
+    // Image gallery: download all N images as separate files.
+    if (payload.kind === "image_gallery" && Array.isArray(payload.urls)) {
+        for (let i = 0; i < payload.urls.length; i++) {
+            const u = payload.urls[i];
+            try {
+                const response = await fetch(u);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const blob = await response.blob();
+                const objUrl = URL.createObjectURL(blob);
+                const derivedExt = guessExtFromUrl(u) || ".png";
+                triggerBrowserDownload(objUrl, `${base}_${i + 1}${derivedExt}`);
+                setTimeout(() => URL.revokeObjectURL(objUrl), 1000);
+            } catch (e) {
+                console.warn("[ERPK PreviewAnything] gallery download failed for", u, e);
+                window.open(u, "_blank", "noopener,noreferrer");
+            }
+        }
+        return;
+    }
+
     if (!payload.url) return;
 
     try {
@@ -470,6 +490,41 @@ function renderInto(content, payload, onMediaReady) {
             notifyReady();
         }, { once: true });
         content.appendChild(img);
+        return;
+    }
+
+    if (kind === "image_gallery") {
+        const urls = Array.isArray(payload.urls) ? payload.urls : [];
+        // Vertical stack of images. Content area scrolls naturally (has overflow: auto)
+        // so multi-image payloads don't balloon the node height.
+        const stack = document.createElement("div");
+        stack.style.display = "flex";
+        stack.style.flexDirection = "column";
+        stack.style.gap = "6px";
+        stack.style.width = "100%";
+
+        const header = document.createElement("div");
+        header.style.fontSize = "11px";
+        header.style.color = "var(--input-text, #888)";
+        header.style.padding = "2px 4px";
+        header.textContent = `${urls.length} image${urls.length === 1 ? "" : "s"}`;
+        stack.appendChild(header);
+
+        urls.forEach((url, idx) => {
+            const img = document.createElement("img");
+            img.src = url;
+            img.alt = `${payload.filename || "image"}_${idx + 1}`;
+            img.style.width = "100%";
+            img.style.height = "auto";
+            img.style.display = "block";
+            img.style.borderRadius = "3px";
+            if (idx === 0) {
+                img.addEventListener("load", notifyReady, { once: true });
+            }
+            stack.appendChild(img);
+        });
+
+        content.appendChild(stack);
         return;
     }
 

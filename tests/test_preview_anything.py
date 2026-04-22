@@ -198,6 +198,76 @@ class TestExecuteReturns:
         assert "some" in payload["text"]
 
 
+class TestImageGalleryBatch:
+    """Batched IMAGE tensors (N > 1) produce an image_gallery payload."""
+
+    def _make_batched_tensor(self, n, h=4, w=4):
+        import torch
+        return torch.zeros((n, h, w, 3), dtype=torch.float32)
+
+    def _install_folder_paths_stub(self, tmp_path):
+        import os as _os, sys, types
+        mod = types.ModuleType("folder_paths")
+        temp_dir = str(tmp_path / "comfy_temp")
+        _os.makedirs(temp_dir, exist_ok=True)
+        mod.get_temp_directory = lambda: temp_dir
+        sys.modules["folder_paths"] = mod
+        return temp_dir
+
+    def test_batched_tensor_produces_image_gallery_kind(self, node_class, tmp_path):
+        try:
+            import torch  # noqa: F401
+        except ImportError:
+            import pytest
+            pytest.skip("torch not installed in test env")
+
+        self._install_folder_paths_stub(tmp_path)
+        tensor = self._make_batched_tensor(n=3)
+        result = node_class.execute(value=tensor, display_type="auto")
+        payload = result.ui["preview_anything"][0]
+        assert payload["kind"] == "image_gallery"
+        assert isinstance(payload["urls"], list)
+        assert len(payload["urls"]) == 3
+
+        import sys
+        sys.modules.pop("folder_paths", None)
+
+    def test_batched_tensor_urls_are_distinct(self, node_class, tmp_path):
+        try:
+            import torch  # noqa: F401
+        except ImportError:
+            import pytest
+            pytest.skip("torch not installed in test env")
+
+        self._install_folder_paths_stub(tmp_path)
+        tensor = self._make_batched_tensor(n=4)
+        result = node_class.execute(value=tensor, display_type="auto")
+        payload = result.ui["preview_anything"][0]
+        assert len(set(payload["urls"])) == 4, "each gallery entry must have a distinct URL"
+
+        import sys
+        sys.modules.pop("folder_paths", None)
+
+    def test_single_image_tensor_still_uses_image_kind(self, node_class, tmp_path):
+        """Backwards compat: N=1 batched tensor (or 3D) uses singular image kind."""
+        try:
+            import torch
+        except ImportError:
+            import pytest
+            pytest.skip("torch not installed in test env")
+
+        self._install_folder_paths_stub(tmp_path)
+        tensor = torch.zeros((1, 4, 4, 3), dtype=torch.float32)
+        result = node_class.execute(value=tensor, display_type="auto")
+        payload = result.ui["preview_anything"][0]
+        assert payload["kind"] == "image"
+        assert "url" in payload
+        assert "urls" not in payload
+
+        import sys
+        sys.modules.pop("folder_paths", None)
+
+
 class TestStripMetadata:
     """strip_metadata re-encodes image URLs to drop EXIF / ICC / XMP."""
 
