@@ -40,7 +40,7 @@ Use **OpenAI Image Generation (Responses)** when you want:
 |---|---|---|
 | `image` | IMAGE | Generated image as a ComfyUI tensor. If the model emits multiple images in a single response, they're stacked into a batch. |
 | `revised_prompt` | STRING | The prompt after mainline-model revision. Useful for understanding how your input was interpreted. |
-| `reasoning_summary` | STRING | Human-readable summary of the mainline model's reasoning when `reasoning_effort != none`. Empty otherwise. |
+| `reasoning_summary` | STRING | Raw chain-of-thought from the mainline model when `reasoning_effort != none`. Empty otherwise. **Heads up**: OpenAI's reasoning models think about both the task *and* the response format (output channels, tool calls, message structure). The summary often mixes "how I approached this image" with "should I produce a final message alongside the tool call?" — it's genuinely what the model returned, not a curated creative rationale. If you only want the image, ignore this output. If you want the creative thinking, you may need to parse or skim past the orchestration-level chatter. |
 
 ## Notes
 

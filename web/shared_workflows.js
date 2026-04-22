@@ -169,6 +169,51 @@ function createButton(text, style, onClick) {
     return btn;
 }
 
+// Lucide-style "workflow" glyph (two blocks + connector). Built via
+// createElementNS so the SVG lives in the proper XML namespace and inherits
+// currentColor from the row for automatic theming.
+function createWorkflowIcon() {
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    const wrap = document.createElement("div");
+    wrap.style.cssText =
+        "flex-shrink:0;width:28px;height:28px;display:flex;align-items:center;justify-content:center;" +
+        "border-radius:6px;background:rgba(79,143,247,0.08);color:#8bb4f7;";
+
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("width", "16");
+    svg.setAttribute("height", "16");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "1.75");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true");
+
+    const rect1 = document.createElementNS(SVG_NS, "rect");
+    rect1.setAttribute("width", "8");
+    rect1.setAttribute("height", "8");
+    rect1.setAttribute("x", "3");
+    rect1.setAttribute("y", "3");
+    rect1.setAttribute("rx", "2");
+
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", "M7 11v4a2 2 0 0 0 2 2h4");
+
+    const rect2 = document.createElementNS(SVG_NS, "rect");
+    rect2.setAttribute("width", "8");
+    rect2.setAttribute("height", "8");
+    rect2.setAttribute("x", "13");
+    rect2.setAttribute("y", "13");
+    rect2.setAttribute("rx", "2");
+
+    svg.appendChild(rect1);
+    svg.appendChild(path);
+    svg.appendChild(rect2);
+    wrap.appendChild(svg);
+    return wrap;
+}
+
 // ── Browse Dialog ────────────────────────────────────────────────
 
 async function showBrowseDialog() {
@@ -213,6 +258,8 @@ async function showBrowseDialog() {
             row.style.cssText =
                 "display:flex;align-items:center;justify-content:space-between;padding:10px 12px;" +
                 "border-radius:6px;gap:12px;transition:background 0.15s ease;";
+
+            row.appendChild(createWorkflowIcon());
 
             const info = document.createElement("div");
             info.style.cssText = "flex:1;min-width:0;";
@@ -382,6 +429,8 @@ function createSettingsWorkflowList() {
                 "display:flex;align-items:center;justify-content:space-between;padding:8px 10px;" +
                 "border-radius:6px;gap:8px;transition:background 0.15s ease;";
 
+            row.appendChild(createWorkflowIcon());
+
             const info = document.createElement("div");
             info.style.cssText = "flex:1;min-width:0;";
             const nameEl = document.createElement("div");
@@ -492,27 +541,78 @@ function observeSettingsForWorkflows() {
 
 // ── Open ERPK Settings panel ─────────────────────────────────────
 
+// Open ComfyUI's Settings dialog and navigate to the ERPK category.
+// ComfyUI marks the dialog with data-testid="settings-dialog" and each sidebar
+// category with a stable data-nav-id attribute (the ERPK category is
+// data-nav-id="root/ERPK"). We wait for the dialog to appear, then click the
+// ERPK nav item. Text-matching and search-box filtering are kept as fallbacks
+// if ComfyUI renames those attributes upstream.
 function openErpkSettings() {
     const btn = document.querySelector(".comfy-settings-btn");
-    if (!btn) return;
+    if (!btn) {
+        console.warn("[ERPK] Could not find Comfy settings button");
+        return;
+    }
     btn.click();
+
     let attempts = 0;
-    const searchERPK = () => {
-        const input = document.querySelector(".settings-search-box input");
-        if (input) {
+    const maxAttempts = 30;
+
+    const tryNavigate = () => {
+        const dialog =
+            document.querySelector("[data-testid='settings-dialog']") ||
+            document.querySelector(".p-dialog-content") ||
+            document.querySelector(".comfy-modal-content");
+        if (!dialog) return false;
+
+        // Strategy 1: ComfyUI's stable data-nav-id attribute on the category button
+        const navItem = dialog.querySelector("[data-nav-id='root/ERPK']");
+        if (navItem) {
+            navItem.click();
+            return true;
+        }
+
+        // Strategy 2: text-match on a nav-role element whose label is "ERPK"
+        const labeled = dialog.querySelectorAll(
+            "[role='button'], [aria-label], .p-treenode-label, .p-tree-node-label"
+        );
+        for (const el of labeled) {
+            const text = (el.getAttribute("aria-label") || el.textContent || "").trim();
+            if (text === "ERPK") {
+                el.click();
+                return true;
+            }
+        }
+
+        // Strategy 3: fall back to filtering via the settings search box
+        const searchInput =
+            dialog.querySelector("input[placeholder*='Search' i]") ||
+            document.querySelector(".settings-search-box input");
+        if (searchInput) {
             const setter = Object.getOwnPropertyDescriptor(
                 HTMLInputElement.prototype,
                 "value"
             ).set;
-            setter.call(input, "ERPK");
-            input.dispatchEvent(new Event("input", { bubbles: true }));
-            return;
+            setter.call(searchInput, "ERPK");
+            searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+            return true;
         }
-        if (++attempts < 10) {
-            setTimeout(searchERPK, 100);
+
+        return false;
+    };
+
+    const poll = () => {
+        if (tryNavigate()) return;
+        if (++attempts < maxAttempts) {
+            setTimeout(poll, 100);
+        } else {
+            console.warn(
+                "[ERPK] Could not locate ERPK category or settings search " +
+                "after 3s. ComfyUI settings DOM may have changed."
+            );
         }
     };
-    setTimeout(searchERPK, 100);
+    setTimeout(poll, 100);
 }
 
 // ── Extension registration ───────────────────────────────────────

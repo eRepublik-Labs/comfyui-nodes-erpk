@@ -288,7 +288,10 @@ class OpenAIImageResponses(IO.ComfyNode):
                     tooltip=(
                         "Mainline-model reasoning depth. 'none' skips reasoning (cheapest, fastest). "
                         "'low' to 'xhigh' increase prompt-interpretation quality at token cost. "
-                        "Only supported by reasoning-capable mainline models (gpt-5.x, o3, o4-mini)."
+                        "Only supported by reasoning-capable mainline models (gpt-5.x, o3, o4-mini). "
+                        "Note: when enabled, reasoning_summary output contains the model's raw "
+                        "chain-of-thought, which often includes orchestration-level thinking "
+                        "(output channels, response format) rather than only creative rationale."
                     ),
                 ),
                 IO.Combo.Input(

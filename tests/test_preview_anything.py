@@ -132,11 +132,11 @@ class TestContentTypeDetection:
     def test_relative_view_url_with_video_filename_is_video(self, node_class):
         """ComfyUI /view?filename=X.mp4 URLs should auto-detect as video.
 
-        The HyperFrames nodes (and any future node that returns a ComfyUI-temp-
-        served URL) produce this shape: scheme is empty, path is /view, and the
-        actual filename with extension lives in the filename= query parameter.
+        Any node that returns a ComfyUI-temp-served URL produces this shape:
+        scheme is empty, path is /view, and the actual filename with extension
+        lives in the filename= query parameter.
         """
-        url = "/view?filename=hyperframes_abc123.mp4&type=temp&subfolder="
+        url = "/view?filename=rendered_abc123.mp4&type=temp&subfolder="
         result = node_class.execute(value=url, display_type="auto")
         payload = result.ui["preview_anything"][0]
         assert payload["kind"] == "video"

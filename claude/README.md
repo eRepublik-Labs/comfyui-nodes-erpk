@@ -2,7 +2,7 @@
 
 Complete Claude API integration providing text generation, prompt enhancement, vision analysis, and conversational AI capabilities for ComfyUI workflows.
 
-**Version:** 2026.2.15
+**Version:** 2026.4.21
 **Category in ComfyUI:** `ERPK/Claude`
 
 ## Features
@@ -80,7 +80,7 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 Initializes the Claude API client. Optional if API key is configured in ComfyUI Settings — generation nodes can run standalone.
 
 **Inputs:**
-- `model`: claude-sonnet-4-6 (default), claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929 (legacy)
+- `model`: claude-sonnet-4-6 (default), claude-opus-4-7, claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929 (legacy)
 - `api_key`: Optional API key (uses env/config if empty)
 - `enable_streaming`: Enable streaming responses
 - `enable_caching`: Enable prompt caching for cost savings
@@ -306,7 +306,8 @@ Enabled by default. Caches system prompts to reduce costs by up to 90% for repea
 ### Model Selection
 - **Claude Haiku 4.5**: $1/1M in, $5/1M out - Fastest, cheapest for simple tasks
 - **Claude Sonnet 4.6**: $3/1M in, $15/1M out - Best balance (default)
-- **Claude Opus 4.6**: $5/1M in, $25/1M out - Most intelligent, best for agents and coding
+- **Claude Opus 4.6**: $5/1M in, $25/1M out - Previous-gen flagship
+- **Claude Opus 4.7**: $15/1M in, $75/1M out - Current flagship (1M context, 128K output); reasoning-first model for agents, coding, and the hardest prompts
 
 ## Workflow Examples
 
@@ -387,7 +388,8 @@ export ANTHROPIC_API_KEY="your-key"
 - `CLAUDE_TOOLS`: List of Anthropic tool definitions (for structured output)
 
 ### Context Window
-- All models: 200,000 tokens
+- Most models: 200,000 tokens
+- Claude Opus 4.7: 1,000,000 tokens (1M context, reasoning-first mainline)
 - Auto-trimming reserves 20,000 tokens for responses
 - Oldest messages removed first when trimming
 
@@ -411,5 +413,5 @@ MIT License
 
 For issues, questions, or contributions, please visit the repository or contact the maintainers.
 
-**Version:** 2026.2.15
-**Last Updated:** February 2026
+**Version:** 2026.4.21
+**Last Updated:** April 2026

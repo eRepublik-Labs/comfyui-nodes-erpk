@@ -122,14 +122,139 @@ function tryInjectBanner(displayName) {
     container.prepend(createUserBanner(displayName));
 }
 
+// Mask API-key values in the settings dialog. ComfyUI's "text" setting type
+// renders a plain input showing the full value — not great for secrets. This
+// post-render pass switches our four API-key inputs to type="password" (chars
+// render as dots) and appends a small monospace preview showing the first four
+// and last four characters of the stored value so the user can tell which key
+// is configured without the full secret on screen.
+function maskApiKey(val) {
+    if (!val) return "";
+    if (val.length <= 8) return "•".repeat(val.length);
+    return `${val.slice(0, 4)}…${val.slice(-4)}`;
+}
+
+const API_KEY_LABELS = new Set([
+    "Anthropic API Key",
+    "Google API Key",
+    "OpenAI API Key",
+    "WaveSpeed API Key",
+]);
+
+function enhanceApiKeyInput(input) {
+    if (input.dataset.erpkMasked === "1") return;
+    input.dataset.erpkMasked = "1";
+    input.type = "password";
+    input.autocomplete = "off";
+    input.spellcheck = false;
+
+    // Replace the input's default display with a compact "sk-AB…xyz" preview
+    // that sits where the input used to be. Clicking the preview swaps in the
+    // real password input so the user can edit; blurring the input swaps back
+    // to the preview. Matches the AWS Console / GitHub Secrets pattern.
+    const preview = document.createElement("div");
+    preview.className = "erpk-key-preview";
+    preview.setAttribute("role", "button");
+    preview.setAttribute("tabindex", "0");
+    preview.setAttribute("aria-label", "API key — click to edit");
+    preview.style.cssText =
+        "display:flex;align-items:center;justify-content:space-between;gap:8px;" +
+        "padding:6px 12px;border:1px solid var(--border-color,#3a3a3a);" +
+        "border-radius:6px;background:var(--comfy-input-bg,transparent);" +
+        "font-family:var(--font-family-monospace,ui-monospace,Menlo,monospace);" +
+        "font-size:12px;color:var(--input-text,#ddd);cursor:text;" +
+        "min-height:32px;box-sizing:border-box;user-select:none;";
+
+    const valueSpan = document.createElement("span");
+    valueSpan.style.cssText =
+        "flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" +
+        "letter-spacing:0.02em;";
+
+    const editHint = document.createElement("span");
+    editHint.textContent = "Edit";
+    editHint.style.cssText =
+        "opacity:0.5;font-size:10px;flex:0 0 auto;" +
+        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;" +
+        "text-transform:uppercase;letter-spacing:0.08em;";
+
+    preview.appendChild(valueSpan);
+    preview.appendChild(editHint);
+
+    const updatePreview = () => {
+        const val = input.value;
+        if (!val) {
+            valueSpan.textContent = "Not set";
+            valueSpan.style.opacity = "0.5";
+        } else {
+            valueSpan.textContent = maskApiKey(val);
+            valueSpan.style.opacity = "1";
+        }
+    };
+
+    const showEditing = () => {
+        preview.style.display = "none";
+        input.style.display = "";
+        // setTimeout lets display:"" settle before focus to avoid focus loss
+        setTimeout(() => input.focus(), 0);
+    };
+    const showMasked = () => {
+        input.style.display = "none";
+        preview.style.display = "flex";
+        updatePreview();
+    };
+
+    preview.addEventListener("click", showEditing);
+    preview.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            showEditing();
+        }
+    });
+    input.addEventListener("blur", showMasked);
+    input.addEventListener("input", updatePreview);
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") input.blur();
+    });
+
+    // Insert preview where the input lives so the layout slot is identical.
+    if (input.parentElement) {
+        input.parentElement.insertBefore(preview, input);
+    }
+    updatePreview();
+    showMasked();
+}
+
+function enhanceApiKeyInputs() {
+    const labels = document.querySelectorAll(
+        ".p-dialog-content span, .p-dialog-content label, " +
+            ".comfy-modal-content span, .comfy-modal-content label"
+    );
+    for (const el of labels) {
+        const text = el.textContent?.trim();
+        if (!API_KEY_LABELS.has(text)) continue;
+        // Walk up to the row container, then find the text input inside it.
+        let container = el;
+        let input = null;
+        for (let i = 0; i < 6 && container; i++) {
+            input = container.querySelector?.(
+                "input[type='text'], input[type='password'], input:not([type])"
+            );
+            if (input) break;
+            container = container.parentElement;
+        }
+        if (input) enhanceApiKeyInput(input);
+    }
+}
+
 function observeSettingsDialog(displayName) {
-    // Watch for dialog open/close to inject the banner
+    // Watch for dialog open/close to inject the banner and mask API-key inputs.
     const observer = new MutationObserver(() => {
         const dialogOpen =
             document.querySelector(".p-dialog-content") ||
             document.querySelector(".comfy-modal-content");
         if (dialogOpen) {
             tryInjectBanner(displayName);
+            enhanceApiKeyInputs();
         }
     });
     observer.observe(document.body, { childList: true, subtree: true });

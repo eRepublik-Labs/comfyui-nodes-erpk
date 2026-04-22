@@ -2,7 +2,7 @@
 
 Complete Google Gemini API integration providing text generation, vision analysis, multi-turn conversations, image generation, image editing, **video generation (Veo)**, and safety controls for ComfyUI workflows.
 
-**Version:** 2026.2.21
+**Version:** 2026.4.21
 **Category in ComfyUI:** `ERPK/Gemini` and `ERPK/Gemini/Veo`
 
 ## Features
@@ -381,10 +381,11 @@ Generate videos from an input image and optional text prompt.
 
 | Model | Best For | Notes |
 |-------|----------|-------|
-| **gemini-3-pro-image-preview** | Highest quality images | Best quality, character consistency |
-| **gemini-2.5-flash-image** | Fast image generation | Fast, recommended for most uses |
+| **gemini-3.1-flash-image-preview** | Latest flagship image model | **Default**, Nano Banana 2, 4K output + Image Search Grounding |
+| **gemini-3-pro-image-preview** | Professional quality | Nano Banana Pro, best for character consistency (up to 14 reference images) |
+| **gemini-2.5-flash-image** | Fast image generation | Stable, lowest latency |
 
-**Note:** Image generation models output images instead of text.
+**Note:** Image generation models output images instead of text. Resolution for `gemini-3.1-flash-image-preview` ranges from 512px to 4K; `gemini-3-pro-image-preview` supports 1K to 4K; `gemini-2.5-flash-image` is fixed at 1024px.
 
 ### Video Generation Models (Veo)
 

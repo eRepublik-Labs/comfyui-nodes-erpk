@@ -40,11 +40,6 @@ ComfyUI-Custom-Nodes/
 ├── utils/                         # String and general utilities
 │   ├── __init__.py                # Module exports
 │   └── concat_strings.py          # String concatenation node
-├── hyperframes/                   # HyperFrames local video rendering
-│   ├── __init__.py                # Module exports
-│   ├── runner.py                  # Shared subprocess + preflight helpers
-│   ├── simple_composer.py         # Image-batch -> video composition node
-│   └── custom_template.py         # Arbitrary HTML -> video render node
 ├── settings.py                    # ComfyUI settings reader for API keys
 ├── shared_workflows.py            # Shared workflows CRUD for multi-user
 ├── shared_workflows/              # Legacy storage fallback (gitignored)
@@ -255,28 +250,12 @@ String manipulation and general utility nodes.
 - Auto-detects type (image/video/audio by URL extension, markdown by syntax, IMAGE tensor, AUDIO dict)
 - Optional `display_type` dropdown to force a specific renderer
 - Download button saves content as `.txt`, `.md`, or the original media format
-- **Copy button** and **character counter** appear in the toolbar for text and markdown output
+- **Copy button** in the toolbar: copies text/markdown to clipboard, or copies the current image (single-image and gallery-single views) as a PNG blob
+- **Character counter** appears in the toolbar for text and markdown output
+- **Image dimensions badge** (W × H) overlays the bottom-right of single-image previews
 - Text and markdown stay at a fixed scrollable size (no auto-growth to canvas-swallowing heights); images, video, and audio still auto-fit to their aspect ratio
 - Last rendered content persists across workflow reloads
 - Optional `strip_metadata` toggle re-encodes image URL inputs to remove EXIF / ICC / XMP (GPS, camera info, timestamps) before download. Images only; IMAGE tensor inputs are already metadata-free.
-
-### ERPK/HyperFrames
-
-Local HTML-to-video rendering via the [HyperFrames](https://hyperframes.heygen.com/) CLI. These nodes wrap `npx hyperframes render` as a subprocess — no HTTP API involved.
-
-**Category in ComfyUI:** `ERPK/HyperFrames`
-
-**Prerequisites (checked at runtime, not installed by pip):**
-- **Node.js >= 22** on PATH
-- **FFmpeg** on PATH
-- The `hyperframes` npm package is auto-installed globally on first use if missing but Node.js is present.
-
-#### Nodes
-
-- **HyperFrames Simple Composer** - Compose a video from a batch of scene images with optional per-scene captions, background audio, scene transitions (`cut`/`fade`/`crossfade`), and configurable stage dimensions. Outputs a `/view` URL that plugs directly into Preview Anything.
-- **HyperFrames Custom Template** - Render a user-supplied HyperFrames HTML composition. `{{image_1}}`, `{{image_2}}`, ... placeholders are substituted with connected input images (1-indexed) before the subprocess render.
-
-Both nodes output MP4 (standard), MOV (ProRes with alpha), or WebM (VP9 with alpha) at 24/30/60 fps and draft/standard/high quality. Files land in ComfyUI's temp directory and are served via `/view` URLs.
 
 ### Shared Workflows (Multi-User)
 
@@ -359,7 +338,7 @@ Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishe
 ### Post-Installation
 
 1. Configure API keys for the services you want to use.
-   The easiest way is via right-click on the canvas > **ERPK Settings**, or **Settings > ERPK > API Keys** in ComfyUI -- keys are stored per-user and never saved in workflows.
+   The easiest way is via right-click on the canvas > **ERPK Settings**, or **Settings > ERPK > API Keys** in ComfyUI -- keys are stored per-user and never saved in workflows. In the ERPK Settings panel, API-key fields show a masked preview (e.g. `sk-a…kgAA`) and a small **Edit** affordance; click a key to reveal the input, blur to re-mask.
 
    API keys are resolved in priority order:
    1. **ComfyUI Settings** (recommended) -- right-click canvas > ERPK Settings

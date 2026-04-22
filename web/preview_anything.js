@@ -485,15 +485,32 @@ function buildContainer() {
 function updateToolbarForKind(preview, payload) {
     const kind = payload?.kind;
     const isText = kind === "text" || kind === "markdown";
+    const isImage = kind === "image" || kind === "gif";
     const isGallery = kind === "image_gallery";
+
+    // Char count is only meaningful for text-ish content
     if (isText) {
         const text = payload?.text || "";
         preview.charCount.style.display = "inline-flex";
         preview.charCount.textContent = `${text.length.toLocaleString()} chars`;
-        preview.copyBtn.style.display = "inline-flex";
-        preview.copyBtn.disabled = text.length === 0;
     } else {
         preview.charCount.style.display = "none";
+    }
+
+    // Copy button: visible for text (copy text), single image/gif (copy image blob),
+    // and gallery — but in gallery we defer the visibility to showGrid/showSingle
+    // since the semantics change per-mode (hidden in grid, visible in single).
+    if (isText) {
+        preview.copyBtn.style.display = "inline-flex";
+        preview.copyBtn.disabled = (payload?.text || "").length === 0;
+    } else if (isImage) {
+        preview.copyBtn.style.display = "inline-flex";
+        preview.copyBtn.disabled = false;
+    } else if (isGallery) {
+        // Gallery starts in grid mode — copy button stays hidden until the user
+        // opens the single-image zoom. showSingle/showGrid flip it.
+        preview.copyBtn.style.display = "none";
+    } else {
         preview.copyBtn.style.display = "none";
     }
 
@@ -755,6 +772,11 @@ function buildImageGallery(urls, filenameBase, preview) {
         updateSingle();
         const dlLabel = getDownloadLabel();
         if (dlLabel) dlLabel.textContent = "Download image";
+        // In single/zoom mode, copy button is meaningful (copies this image).
+        if (preview?.copyBtn) {
+            preview.copyBtn.style.display = "inline-flex";
+            preview.copyBtn.disabled = false;
+        }
         if (!keyHandler) {
             keyHandler = onKey;
             document.addEventListener("keydown", keyHandler);
@@ -771,6 +793,10 @@ function buildImageGallery(urls, filenameBase, preview) {
         }
         const dlLabel = getDownloadLabel();
         if (dlLabel) dlLabel.textContent = `Download all (${urls.length})`;
+        // Grid mode has no single target to copy; hide the copy button.
+        if (preview?.copyBtn) {
+            preview.copyBtn.style.display = "none";
+        }
         if (keyHandler) {
             document.removeEventListener("keydown", keyHandler);
             keyHandler = null;
@@ -838,6 +864,10 @@ function renderInto(content, payload, onMediaReady, preview) {
     const notifyReady = () => { if (typeof onMediaReady === "function") onMediaReady(); };
 
     if (kind === "image" || kind === "gif") {
+        const wrapper = document.createElement("div");
+        wrapper.style.position = "relative";
+        wrapper.style.width = "100%";
+
         const img = document.createElement("img");
         img.src = payload.url;
         img.alt = payload.filename || "image";
@@ -845,13 +875,38 @@ function renderInto(content, payload, onMediaReady, preview) {
         img.style.height = "auto";
         img.style.display = "block";
         img.style.borderRadius = "3px";
+
+        // Dimension badge — small overlay in the bottom-right, same language
+        // the gallery uses so the whole node speaks consistently.
+        const dims = document.createElement("div");
+        dims.className = "erpk-image-dims";
+        dims.style.position = "absolute";
+        dims.style.bottom = "6px";
+        dims.style.right = "6px";
+        dims.style.padding = "3px 8px";
+        dims.style.background = "rgba(0, 0, 0, 0.75)";
+        dims.style.color = "#fff";
+        dims.style.fontSize = "11px";
+        dims.style.fontWeight = "600";
+        dims.style.borderRadius = "3px";
+        dims.style.pointerEvents = "none";
+        dims.style.fontVariantNumeric = "tabular-nums";
+        dims.style.opacity = "0";
+        dims.style.transition = "opacity 120ms ease";
+        dims.textContent = "";
+
         img.addEventListener("load", () => {
             if (img.naturalWidth && img.naturalHeight) {
                 content.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
+                dims.textContent = `${img.naturalWidth} × ${img.naturalHeight}`;
+                dims.style.opacity = "1";
             }
             notifyReady();
         }, { once: true });
-        content.appendChild(img);
+
+        wrapper.appendChild(img);
+        wrapper.appendChild(dims);
+        content.appendChild(wrapper);
         return;
     }
 
@@ -953,15 +1008,68 @@ app.registerExtension({
             });
 
             copyBtn.addEventListener("click", async () => {
-                const text = this._erpkPreview.payload?.text;
-                if (!text) return;
-                try {
-                    await navigator.clipboard.writeText(text);
+                const p = this._erpkPreview;
+                if (!p.payload) return;
+                const kind = p.payload.kind;
+
+                const flashLabel = (text) => {
                     const original = copyLabel.textContent;
-                    copyLabel.textContent = "Copied!";
+                    copyLabel.textContent = text;
                     setTimeout(() => { copyLabel.textContent = original; }, 1500);
+                };
+
+                // Text / markdown → copy the text content
+                if (kind === "text" || kind === "markdown") {
+                    const text = p.payload?.text;
+                    if (!text) return;
+                    try {
+                        await navigator.clipboard.writeText(text);
+                        flashLabel("Copied!");
+                    } catch (e) {
+                        console.error("[ERPK PreviewAnything] Text clipboard copy failed:", e);
+                    }
+                    return;
+                }
+
+                // Determine which image URL to copy based on kind + gallery state
+                let imageUrl = null;
+                if (kind === "image" || kind === "gif") {
+                    imageUrl = p.payload.url;
+                } else if (
+                    kind === "image_gallery"
+                    && p.galleryMode === "single"
+                    && p.galleryCurrentIdx != null
+                ) {
+                    imageUrl = p.payload.urls?.[p.galleryCurrentIdx];
+                }
+                if (!imageUrl) return;
+
+                // Write the image as a PNG ClipboardItem. Passing a Promise for the
+                // blob preserves Safari's user-gesture context (the clipboard.write
+                // call happens synchronously inside the click handler).
+                try {
+                    const item = new ClipboardItem({
+                        "image/png": fetch(imageUrl).then((r) => {
+                            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                            return r.blob();
+                        }),
+                    });
+                    await navigator.clipboard.write([item]);
+                    flashLabel("Copied!");
                 } catch (e) {
-                    console.error("[ERPK PreviewAnything] Clipboard copy failed:", e);
+                    console.warn(
+                        "[ERPK PreviewAnything] Image clipboard copy failed, falling back to URL:",
+                        e,
+                    );
+                    try {
+                        await navigator.clipboard.writeText(imageUrl);
+                        flashLabel("Copied URL");
+                    } catch (e2) {
+                        console.error(
+                            "[ERPK PreviewAnything] URL fallback also failed:",
+                            e2,
+                        );
+                    }
                 }
             });
 

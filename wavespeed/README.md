@@ -1,6 +1,6 @@
 # WaveSpeed AI - ComfyUI Custom Nodes
 
-**Version:** 2026.2.24 (CalVer)
+**Version:** 2026.4.21 (CalVer)
 **Category:** ERPK/WaveSpeedAI
 **Namespace:** ERPK Organization Custom Nodes
 
@@ -14,7 +14,7 @@ Part of the [ERPK Custom Nodes Collection](../../README.md) for ComfyUI.
 ## Qwen Image Nodes
 ![Qwen Nodes Preview](assets/qwen-preview.png)
 
-ComfyUI custom nodes for WaveSpeed AI integration, featuring ByteDance's Seedream V4 family of models and Qwen Image models for text-to-image generation and image editing.
+ComfyUI custom nodes for WaveSpeed AI integration. Covers image generation (ByteDance Seedream V4/V4.5/V5.0 Lite, Qwen Image family, Qwen Image 2.0, Dreamina, JibMix) and video generation (Bytedance Seedance 2.0, Alibaba WAN 2.7, Kling 3.0/O3, Lightricks LTX 2 Pro, WaveSpeed LTX 2.3, WaveSpeed Veo 3.1).
 
 ## Features
 
@@ -53,6 +53,8 @@ Same capabilities as V4.5 with higher minimum resolution (1440px) at a lower pri
 
 | Node | Models | Description | Dimensions | Input Images | Language | Output | Pricing | API Docs |
 |------|--------|-------------|------------|--------------|----------|--------|---------|----------|
+| **Qwen Image 2.0 Text-to-Image** | Qwen Image 2.0,<br>Qwen Image 2.0 Pro | Next-gen Qwen image generation (full replacement for Qwen 1.x) | 256-1536px (step 8)<br>Default: 1024×1024 | N/A | 🇨🇳 🇬🇧 | Single image | Standard / Pro pricing | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-2.0/text-to-image) |
+| **Qwen Image 2.0 Edit** | Qwen Image 2.0,<br>Qwen Image 2.0 Pro | Next-gen Qwen image editing | 256-1536px (step 8) | Up to 3 | 🇨🇳 🇬🇧 | Single image | Standard / Pro pricing | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-2.0/edit) |
 | **Qwen Image Text-to-Image** | Qwen Image (20B MMDiT),<br>Qwen Image 2512 (7B) | Bilingual text-to-image generation | 256-1536px (step 8)<br>Default: 1024×1024 | N/A | 🇨🇳 🇬🇧 | Single image<br>~5-8 sec | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-text-to-image) |
 | **Qwen Image Edit** | Qwen Edit | Low-level & high-level semantic editing | 256-1536px (step 8) | 1 required | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit) |
 | **Qwen Image Edit Plus** | Qwen Edit Plus,<br>Qwen Edit 2511 | Advanced multi-image context editing | 256-1536px (step 8) | Up to 3 required | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-plus) |
@@ -71,6 +73,31 @@ Same capabilities as V4.5 with higher minimum resolution (1440px) at a lower pri
 |------|--------|-------------|------------|--------------|--------|---------|----------|
 | **Dreamina Text-to-Image** | Dreamina V3.0,<br>Dreamina V3.1 | Text-to-image with optional prompt expansion | 512-2048px (step 8)<br>Default: 1328×1328 | N/A | Single image | $0.027/image | [V3.0](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-dreamina-v3-text-to-image) / [V3.1](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-dreamina-v3-1-text-to-image) |
 | **Dreamina Edit** | Dreamina V3.0 | Single-image editing | 512-2048px (step 8)<br>Default: 1328×1328 | 1 required | Single image | $0.027/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-dreamina-v3-edit) |
+
+### Video Generation Models
+
+Video nodes return a STRING URL (pipe to `WaveSpeed Preview Video` or the Preview Anything utility node). Long-running polling: 10s interval, 15-minute timeout.
+
+| Node | Models / Tiers | Description | Duration | Aspect / Resolution | API Docs |
+|------|----------------|-------------|----------|---------------------|----------|
+| **Bytedance Seedance 2.0 Text-to-Video** | Seedance 2.0, Fast, Turbo | Native audio-visual generation | 3-12s | 16:9/9:16/1:1 · 480p/720p/1080p | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedance-2.0-text-to-video) |
+| **Bytedance Seedance 2.0 Image-to-Video** | Seedance 2.0, Fast, Turbo | Animate source image with audio | 3-12s | Same as T2V | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedance-2.0-image-to-video) |
+| **Alibaba WAN 2.7 Text-to-Video** | WAN 2.7 | Long-form video from text | 2-15s | 16:9/9:16/1:1 · 720p/1080p | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-text-to-video) |
+| **Alibaba WAN 2.7 Image-to-Video** | WAN 2.7 | Animate a source image | 2-15s | Same as T2V | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-image-to-video) |
+| **Alibaba WAN 2.7 Video Extend** | WAN 2.7 | Continue an existing clip | Configurable | Same as T2V | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-video-extend) |
+| **Kling 3.0 Image-to-Video** | Kling v3.0 Std, Pro | Kling v3.0 i2v at std/pro tiers | Fixed | N/A | [Link](https://wavespeed.ai/docs/docs-api/kwaivgi/kling-v3.0-std-image-to-video) |
+| **Kling O3 Text-to-Video** | Kling O3 Std, Pro | Kling flagship O3 text-to-video | 3-10s | 16:9/9:16/1:1 | [Link](https://wavespeed.ai/docs/docs-api/kwaivgi/kling-video-o3-std-text-to-video) |
+| **Kling O3 Image-to-Video** | Kling O3 Std, Pro | Kling flagship O3 image-to-video | 3-10s | Inferred from image | [Link](https://wavespeed.ai/docs/docs-api/kwaivgi/kling-video-o3-std-image-to-video) |
+| **Lightricks LTX 2 Pro Text-to-Video** | LTX 2 Pro | Short-form video with optional audio | 6/8/10s | Default | [Link](https://wavespeed.ai/docs/docs-api/lightricks/lightricks-ltx-2-pro-text-to-video) |
+| **Lightricks LTX 2 Pro Image-to-Video** | LTX 2 Pro | Animate image with optional audio | 6/8/10s | Inferred from image | [Link](https://wavespeed.ai/docs/docs-api/lightricks/lightricks-ltx-2-pro-image-to-video) |
+| **WaveSpeed LTX 2.3 Text-to-Video** | LTX 2.3 | Longer silent clips with seed control | 5-20s | 16:9/9:16 · 480p/720p/1080p | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/ltx-2.3-text-to-video) |
+| **WaveSpeed LTX 2.3 Image-to-Video** | LTX 2.3 | Animate source image | 5-20s | 480p/720p/1080p · aspect inferred | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/ltx-2.3-image-to-video) |
+| **WaveSpeed Veo 3.1 Text-to-Video** | Veo 3.1 | Google Veo 3.1 via WaveSpeed billing | Varies | Per Veo specs | [Link](https://wavespeed.ai/docs/docs-api/google/google-veo-3.1-text-to-video) |
+| **WaveSpeed Veo 3.1 Image-to-Video** | Veo 3.1 | Veo 3.1 i2v via WaveSpeed billing | Varies | Per Veo specs | [Link](https://wavespeed.ai/docs/docs-api/google/google-veo-3.1-image-to-video) |
+
+**LTX note:** LTX 2.3 and LTX 2 Pro are separate nodes (not a unified dropdown) — LTX 2 Pro has `generate_audio`, LTX 2.3 has `resolution`/`aspect_ratio`/`seed`. The APIs take different parameter sets.
+
+**Kling namespace note:** Kling 3.0 lives under `kling-v3.0-*` API paths; Kling O3 lives under `kling-video-o3-*`. Despite the shared "Kling" brand they're separate model families with separate API namespaces.
 
 **Common Features (All Seedream Nodes):**
 - Size preset dropdown with recommended resolutions
@@ -484,10 +511,11 @@ pip install -r requirements.txt
 
 4. **Check Console for Errors**: Look for any error messages in the ComfyUI console when it starts
 
-5. **Verify Import**: Check the ComfyUI console output on startup for:
+5. **Verify Import**: Check the ComfyUI console output on startup for a line like:
 ```
-[ERPK] Loaded 29 V3 nodes
+[ERPK] Loaded <N> V3 nodes
 ```
+The WaveSpeed module alone contributes 45 nodes as of 2026.4.21.
 
 ### Common Issues
 
@@ -504,19 +532,22 @@ All WaveSpeed nodes are located under the **ERPK/WaveSpeedAI** category:
 3. Navigate to: **ERPK → WaveSpeedAI**
 4. Select your desired node
 
-**Available nodes (29 total):**
+**Available nodes (45 total):**
+
+Client & I/O:
 - WaveSpeed Client
 - WaveSpeed Preview Video
 - WaveSpeed Save Audio
 - WaveSpeed Upload Image
-- Bytedance Seedream V4
-- Bytedance Seedream V4 Sequential
-- Bytedance Seedream V4 Edit
-- Bytedance Seedream V4 Edit Sequential
-- Bytedance Seedream V4.5
-- Bytedance Seedream V4.5 Sequential
-- Bytedance Seedream V4.5 Edit
-- Bytedance Seedream V4.5 Edit Sequential
+
+Image (ByteDance Seedream):
+- Bytedance Seedream V4 / V4 Sequential / V4 Edit / V4 Edit Sequential
+- Bytedance Seedream V4.5 / V4.5 Sequential / V4.5 Edit / V4.5 Edit Sequential
+- Bytedance Seedream V5.0 Lite / V5.0 Lite Sequential / V5.0 Lite Edit / V5.0 Lite Edit Sequential
+
+Image (Qwen):
+- Qwen Image 2.0 Text-to-Image
+- Qwen Image 2.0 Edit
 - Qwen Image Text-to-Image
 - Qwen Image Edit
 - Qwen Image Edit Plus
@@ -528,18 +559,32 @@ All WaveSpeed nodes are located under the **ERPK/WaveSpeedAI** category:
 - Qwen Image Max
 - Qwen Image Max Edit
 - JibMix Qwen Image
-- Bytedance Seedream V5.0 Lite
-- Bytedance Seedream V5.0 Lite Sequential
-- Bytedance Seedream V5.0 Lite Edit
-- Bytedance Seedream V5.0 Lite Edit Sequential
+
+Image (ByteDance Dreamina):
 - Bytedance Dreamina Text-to-Image
 - Bytedance Dreamina Edit
+
+Video:
+- Bytedance Seedance 2.0 Text-to-Video
+- Bytedance Seedance 2.0 Image-to-Video
+- Alibaba WAN 2.7 Text-to-Video
+- Alibaba WAN 2.7 Image-to-Video
+- Alibaba WAN 2.7 Video Extend
+- Kling 3.0 Image-to-Video
+- Kling O3 Text-to-Video
+- Kling O3 Image-to-Video
+- Lightricks LTX 2 Pro Text-to-Video
+- Lightricks LTX 2 Pro Image-to-Video
+- WaveSpeed LTX 2.3 Text-to-Video
+- WaveSpeed LTX 2.3 Image-to-Video
+- WaveSpeed Veo 3.1 Text-to-Video
+- WaveSpeed Veo 3.1 Image-to-Video
 
 ## Versioning
 
 This package follows **Calendar Versioning (CalVer)**: `YYYY.MM.PATCH`
 
-**Current Version:** 2026.2.24
+**Current Version:** 2026.4.21
 
 - Major changes are released monthly
 - Patch releases for bug fixes within the month
@@ -547,13 +592,10 @@ This package follows **Calendar Versioning (CalVer)**: `YYYY.MM.PATCH`
 
 ### Version History
 
-#### 2025.10.0 (Current - October 2025)
-- ✨ Restructured to ERPK namespace
-- ✨ Changed category from "WaveSpeed Custom" to "ERPK/WaveSpeedAI"
-- ✨ Adopted Calendar Versioning (CalVer)
-- ✨ All nodes now use standardized ERPK organization structure
-- ✨ Improved installation process with ERPK folder structure
-- 📝 Updated documentation with comprehensive installation guide
+See the [project changelog on GitHub Releases](https://github.com/eRepublik-Labs/comfyui-nodes-erpk/releases) for the authoritative history. Notable WaveSpeed additions in the 2026.4.x series:
+- **Video generation** — Seedance 2.0, Alibaba WAN 2.7 (T2V/I2V/Extend), Kling 3.0 / Kling O3, WaveSpeed LTX 2.3, Lightricks LTX 2 Pro, WaveSpeed Veo 3.1
+- **Image generation** — Qwen Image 2.0 family (replaces 12 Qwen 1.x nodes long-term), Seedream V5.0 Lite family, ByteDance Dreamina V3.0/V3.1
+- **Infrastructure** — multi-user settings resolution, API-key masked preview, Preview Anything integration for all video node outputs
 
 ## License
 
