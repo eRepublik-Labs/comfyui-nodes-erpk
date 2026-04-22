@@ -512,10 +512,10 @@ class OpenAIClient:
 
     def edit_image(
         self,
-        image_data: bytes,
+        image_data,
         prompt: str,
         mask_data: Optional[bytes] = None,
-        model: str = "gpt-image-1",
+        model: str = "gpt-image-2",
         size: str = "1024x1024",
         quality: str = "auto",
         n: int = 1,
@@ -525,12 +525,16 @@ class OpenAIClient:
         Edit an image using OpenAI's image editing API.
 
         Args:
-            image_data: Original image as bytes (PNG format)
+            image_data: Original image(s) as PNG bytes. Accepts either a single
+                `bytes` value OR a list of `bytes` for multi-image editing
+                (gpt-image-2 supports up to 16 reference images for character
+                and scene continuity).
             prompt: Text description of desired edits
-            mask_data: Optional mask as bytes (PNG with transparency)
-            model: Image model (gpt-image-1 recommended)
+            mask_data: Optional mask as bytes (PNG with transparency). When
+                multiple images are provided, mask applies to the first image.
+            model: Image model (gpt-image-2 recommended)
             size: Output image size
-            quality: Image quality (gpt-image-1 only)
+            quality: Image quality (GPT Image models only)
             n: Number of images to generate
             **kwargs: Additional parameters
 
@@ -539,18 +543,34 @@ class OpenAIClient:
         """
         from openai import APIError
 
-        # Prepare image file
-        image_file = ("image.png", image_data, "image/png")
+        # Normalize to list for uniform handling
+        if isinstance(image_data, (bytes, bytearray)):
+            image_list = [bytes(image_data)]
+        else:
+            image_list = [bytes(b) for b in image_data]
+
+        if not image_list:
+            raise ValueError("edit_image requires at least one image")
+
+        # Single image uses singular multipart field; multi-image uses array.
+        # The OpenAI SDK accepts either shape on the `image` parameter.
+        if len(image_list) == 1:
+            image_param = ("image.png", image_list[0], "image/png")
+        else:
+            image_param = [
+                (f"image_{i}.png", data, "image/png")
+                for i, data in enumerate(image_list)
+            ]
 
         params = {
             "model": model,
-            "image": image_file,
+            "image": image_param,
             "prompt": prompt,
             "size": size,
             "n": n,
         }
 
-        # Add mask if provided
+        # Add mask if provided (applied to first image for multi-image edits)
         if mask_data:
             mask_file = ("mask.png", mask_data, "image/png")
             params["mask"] = mask_file

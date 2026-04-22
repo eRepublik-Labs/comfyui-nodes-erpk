@@ -191,7 +191,13 @@ class OpenAIImageEdit(IO.ComfyNode):
             inputs=[
                 IO.Image.Input(
                     "image",
-                    tooltip="Input image to edit",
+                    tooltip=(
+                        "Input image(s) to edit. A single image is the default. "
+                        "If you pass a batched IMAGE (e.g. from an Image Batch / "
+                        "Rebatch node), all N images are sent as reference images "
+                        "— gpt-image-2 uses this for character/scene continuity "
+                        "(up to 16 images). Mask (if provided) applies to the first."
+                    ),
                 ),
                 IO.String.Input(
                     "prompt",
@@ -295,8 +301,18 @@ class OpenAIImageEdit(IO.ComfyNode):
             print(f"[OpenAI] Editing image with model: {model}")
             print(f"[OpenAI] Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
 
-            # Convert image tensor to PNG bytes
-            image_bytes = ImageConverter.tensor_to_bytes(image, format="PNG")
+            # Convert image tensor to PNG bytes. Handle batched input: if the
+            # IMAGE tensor has N > 1 in its batch dimension, send all N as a
+            # list of reference images (gpt-image-2 multi-image edit).
+            batch_size = image.shape[0] if hasattr(image, "shape") and len(image.shape) == 4 else 1
+            if batch_size > 1:
+                image_bytes = [
+                    ImageConverter.tensor_to_bytes(image[i:i + 1], format="PNG")
+                    for i in range(batch_size)
+                ]
+                print(f"[OpenAI] Multi-image edit: sending {batch_size} reference images")
+            else:
+                image_bytes = ImageConverter.tensor_to_bytes(image, format="PNG")
 
             # Convert mask if provided
             mask_bytes = None

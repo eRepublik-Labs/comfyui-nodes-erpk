@@ -120,3 +120,66 @@ class TestEditImageParams:
         assert "response_format" not in params, (
             f"response_format must not be sent for {model}"
         )
+
+
+class TestEditImageMultiImage:
+    """edit_image accepts bytes or list[bytes] for multi-image editing."""
+
+    def test_single_bytes_sends_singular_image_param(self):
+        client, mock = _make_client_with_mock()
+        client.edit_image(image_data=b"onepng", prompt="x", model="gpt-image-2")
+        image_param = mock.images.edit.call_args[1]["image"]
+        # Singular: 3-tuple (filename, bytes, mime)
+        assert isinstance(image_param, tuple)
+        assert image_param[0] == "image.png"
+        assert image_param[1] == b"onepng"
+        assert image_param[2] == "image/png"
+
+    def test_list_of_bytes_sends_array_image_param(self):
+        client, mock = _make_client_with_mock()
+        client.edit_image(
+            image_data=[b"first", b"second", b"third"],
+            prompt="compose these",
+            model="gpt-image-2",
+        )
+        image_param = mock.images.edit.call_args[1]["image"]
+        # Multi: list of 3-tuples
+        assert isinstance(image_param, list)
+        assert len(image_param) == 3
+        for i, (fname, data, mime) in enumerate(image_param):
+            assert fname == f"image_{i}.png"
+            assert mime == "image/png"
+        assert image_param[0][1] == b"first"
+        assert image_param[1][1] == b"second"
+        assert image_param[2][1] == b"third"
+
+    def test_single_element_list_treated_as_singular(self):
+        """A list with one image should behave the same as passing bytes directly."""
+        client, mock = _make_client_with_mock()
+        client.edit_image(
+            image_data=[b"single_in_list"], prompt="x", model="gpt-image-2"
+        )
+        image_param = mock.images.edit.call_args[1]["image"]
+        # Len-1 list is collapsed to singular
+        assert isinstance(image_param, tuple)
+        assert image_param[1] == b"single_in_list"
+
+    def test_empty_list_raises(self):
+        client, _ = _make_client_with_mock()
+        with pytest.raises(ValueError, match="at least one image"):
+            client.edit_image(image_data=[], prompt="x", model="gpt-image-2")
+
+    def test_mask_still_attaches_with_multi_image(self):
+        client, mock = _make_client_with_mock()
+        client.edit_image(
+            image_data=[b"a", b"b"],
+            mask_data=b"maskbytes",
+            prompt="x",
+            model="gpt-image-2",
+        )
+        params = mock.images.edit.call_args[1]
+        assert "mask" in params
+        assert params["mask"][1] == b"maskbytes"
+        # image is still the multi-image array
+        assert isinstance(params["image"], list)
+        assert len(params["image"]) == 2
