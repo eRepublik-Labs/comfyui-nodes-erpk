@@ -9,6 +9,14 @@ from urllib.parse import urlparse
 from comfy_api.latest import IO
 
 
+_STRIP_METADATA_TOOLTIP = (
+    "Re-encode image URL inputs to strip EXIF / ICC / XMP metadata (GPS, "
+    "camera info, timestamps) before download. Only applies to image URLs; "
+    "IMAGE tensor inputs are already metadata-free. Text, video, audio, and "
+    "non-image URLs are unaffected."
+)
+
+
 _IMAGE_EXTS = {"png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif", "avif"}
 _GIF_EXTS = {"gif", "apng"}
 _VIDEO_EXTS = {"mp4", "webm", "mov", "m4v", "mkv", "ogv"}
@@ -53,18 +61,25 @@ class PreviewAnything(IO.ComfyNode):
                     optional=True,
                     tooltip="Base filename used when downloading.",
                 ),
+                IO.Boolean.Input(
+                    "strip_metadata",
+                    default=False,
+                    optional=True,
+                    tooltip=_STRIP_METADATA_TOOLTIP,
+                ),
             ],
             outputs=[],
             is_output_node=True,
         )
 
     @classmethod
-    def execute(cls, value=None, display_type="auto", filename="preview", **kwargs) -> IO.NodeOutput:
-        payload = _build_payload(value, display_type, filename)
+    def execute(cls, value=None, display_type="auto", filename="preview",
+                strip_metadata=False, **kwargs) -> IO.NodeOutput:
+        payload = _build_payload(value, display_type, filename, strip_metadata)
         return IO.NodeOutput(ui={"preview_anything": [payload]})
 
 
-def _build_payload(value, display_type: str, filename: str) -> dict:
+def _build_payload(value, display_type: str, filename: str, strip_metadata: bool = False) -> dict:
     if display_type and display_type != "auto":
         return _forced_payload(value, display_type, filename)
 
@@ -79,7 +94,7 @@ def _build_payload(value, display_type: str, filename: str) -> dict:
             return {"kind": "audio", "url": saved, "filename": filename}
 
     if isinstance(value, str):
-        return _payload_from_string(value, filename)
+        return _payload_from_string(value, filename, strip_metadata)
 
     text = _stringify(value)
     return {"kind": "text", "text": text, "filename": filename}
@@ -106,15 +121,121 @@ def _forced_payload(value, display_type: str, filename: str) -> dict:
     return {"kind": "text", "text": _stringify(value), "filename": filename}
 
 
-def _payload_from_string(value: str, filename: str) -> dict:
+def _payload_from_string(value: str, filename: str, strip_metadata: bool = False) -> dict:
     url_kind = _url_kind(value)
     if url_kind is not None:
-        return {"kind": url_kind, "url": value, "filename": filename}
+        url = value
+        # Image-only metadata stripping (EXIF/ICC/XMP). Re-encode server-side
+        # so the Download button serves the clean copy. Non-image URL kinds
+        # pass through untouched — stripping video/audio needs ffmpeg, which
+        # is out of scope for this node.
+        if strip_metadata and url_kind in ("image", "gif"):
+            stripped = _reencode_image_url_without_metadata(url, filename)
+            if stripped is not None:
+                url = stripped
+        return {"kind": url_kind, "url": url, "filename": filename}
 
     if _looks_like_markdown(value):
         return {"kind": "markdown", "text": value, "filename": filename}
 
     return {"kind": "text", "text": value, "filename": filename}
+
+
+def _reencode_image_url_without_metadata(url: str, filename: str):
+    """Fetch an image URL, re-encode with PIL to strip all metadata,
+    save to ComfyUI's temp dir, return the /view URL for the clean copy.
+
+    Returns None (caller falls back to original URL) on any error — fetch
+    failure, unsupported format, or missing dependencies. Logs a warning
+    so users can debug.
+    """
+    try:
+        import io
+        from PIL import Image
+        import folder_paths
+    except ImportError as e:
+        print(f"[PreviewAnything] strip_metadata: missing dep ({e}); passing original URL")
+        return None
+
+    raw_bytes = _fetch_url_bytes(url)
+    if raw_bytes is None:
+        return None
+
+    try:
+        original = Image.open(io.BytesIO(raw_bytes))
+        original.load()  # force decode before creating clean copy
+        # Create a fresh image containing ONLY pixel data. Paste drops
+        # EXIF / ICC profile / XMP / all format-specific metadata.
+        clean = Image.new(original.mode, original.size)
+        clean.paste(original)
+        fmt = original.format or "PNG"
+    except Exception as e:
+        print(f"[PreviewAnything] strip_metadata: PIL decode failed ({e}); passing original URL")
+        return None
+
+    temp_dir = folder_paths.get_temp_directory()
+    os.makedirs(temp_dir, exist_ok=True)
+    ext = _EXT_BY_PIL_FORMAT.get(fmt.upper(), "png")
+    name = f"{_safe(filename)}_stripped_{int(time.time() * 1000)}.{ext}"
+    path = os.path.join(temp_dir, name)
+
+    try:
+        # Preserve source format but don't pass exif= / icc_profile= / xmp=
+        if fmt.upper() in ("JPEG", "JPG"):
+            clean.save(path, format="JPEG", quality=95)
+        else:
+            clean.save(path, format=fmt)
+    except Exception as e:
+        print(f"[PreviewAnything] strip_metadata: PIL save failed ({e}); passing original URL")
+        return None
+
+    return _view_url(name, "", "temp")
+
+
+_EXT_BY_PIL_FORMAT = {
+    "JPEG": "jpg",
+    "JPG": "jpg",
+    "PNG": "png",
+    "WEBP": "webp",
+    "BMP": "bmp",
+    "GIF": "gif",
+    "TIFF": "tiff",
+}
+
+
+def _fetch_url_bytes(url: str, timeout_seconds: int = 30):
+    """Fetch URL content as bytes. Handles http(s), data:, and local /view?
+    paths (served by the same ComfyUI instance via loopback).
+
+    Returns None on any fetch error; caller should log and fall back.
+    """
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme in ("http", "https"):
+            import urllib.request
+            req = urllib.request.Request(url, headers={"User-Agent": "ERPK-PreviewAnything/1.0"})
+            with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
+                return resp.read()
+        if parsed.scheme == "data":
+            # data:<mediatype>;base64,<payload>
+            header, _, payload = url.partition(",")
+            if "base64" in header:
+                import base64
+                return base64.b64decode(payload)
+            from urllib.parse import unquote_to_bytes
+            return unquote_to_bytes(payload)
+        if parsed.scheme == "" and url.startswith("/"):
+            # ComfyUI serves /view?filename=X&type=Y; try loopback
+            import urllib.request
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:8188{url}", timeout=timeout_seconds) as resp:
+                    return resp.read()
+            except Exception:
+                return None
+        return None
+    except Exception as e:
+        print(f"[PreviewAnything] strip_metadata: URL fetch failed for {url!r} ({e})")
+        return None
 
 
 def _url_kind(value: str):

@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2026.4.13 (CalVer)
+**Current Version:** 2026.4.14 (CalVer)
 
 ## Repository Structure
 
@@ -258,6 +258,7 @@ String manipulation and general utility nodes.
 - **Copy button** and **character counter** appear in the toolbar for text and markdown output
 - Text and markdown stay at a fixed scrollable size (no auto-growth to canvas-swallowing heights); images, video, and audio still auto-fit to their aspect ratio
 - Last rendered content persists across workflow reloads
+- Optional `strip_metadata` toggle re-encodes image URL inputs to remove EXIF / ICC / XMP (GPS, camera info, timestamps) before download. Images only; IMAGE tensor inputs are already metadata-free.
 
 ### ERPK/HyperFrames
 

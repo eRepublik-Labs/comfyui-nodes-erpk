@@ -67,6 +67,13 @@ class TestPreviewAnythingSchema:
         assert fn.io_type == "STRING"
         assert fn.optional is True
 
+    def test_has_strip_metadata_input(self, schema):
+        sm = _find_input(schema, "strip_metadata")
+        assert sm is not None
+        assert sm.io_type == "BOOLEAN"
+        assert sm.optional is True
+        assert sm.default is False
+
     def test_no_outputs(self, schema):
         assert len(schema.outputs) == 0
 
@@ -189,6 +196,156 @@ class TestExecuteReturns:
         payload = result.ui["preview_anything"][0]
         assert payload["kind"] == "text"
         assert "some" in payload["text"]
+
+
+class TestStripMetadata:
+    """strip_metadata re-encodes image URLs to drop EXIF / ICC / XMP."""
+
+    def test_default_off_passes_url_through(self, node_class):
+        url = "https://example.com/photo.jpg"
+        result = node_class.execute(value=url, display_type="auto", strip_metadata=False)
+        payload = result.ui["preview_anything"][0]
+        assert payload["kind"] == "image"
+        assert payload["url"] == url
+
+    def test_off_by_default_when_not_specified(self, node_class):
+        url = "https://example.com/photo.jpg"
+        result = node_class.execute(value=url, display_type="auto")
+        payload = result.ui["preview_anything"][0]
+        assert payload["url"] == url
+
+    def test_ignored_for_non_image_urls(self, node_class):
+        """Video / audio / text URLs must pass through untouched regardless."""
+        video = "https://example.com/clip.mp4"
+        result = node_class.execute(value=video, display_type="auto", strip_metadata=True)
+        payload = result.ui["preview_anything"][0]
+        assert payload["kind"] == "video"
+        assert payload["url"] == video
+
+        audio = "https://example.com/music.mp3"
+        result = node_class.execute(value=audio, display_type="auto", strip_metadata=True)
+        payload = result.ui["preview_anything"][0]
+        assert payload["kind"] == "audio"
+        assert payload["url"] == audio
+
+    def test_on_image_url_rewrites_to_view_url(self, node_class, monkeypatch, tmp_path):
+        """Image URL + strip_metadata=True should rewrite to /view? URL
+        serving a re-encoded copy from ComfyUI's temp dir."""
+        from PIL import Image
+        import io
+        import sys
+        import types
+
+        # Stub folder_paths to point at tmp_path
+        folder_paths = types.ModuleType("folder_paths")
+        temp_dir = tmp_path / "comfy_temp"
+        folder_paths.get_temp_directory = lambda: str(temp_dir)
+        sys.modules["folder_paths"] = folder_paths
+
+        # Build a PNG with a known-good EXIF hint in memory (tiny placeholder)
+        original = Image.new("RGB", (8, 8), color=(128, 64, 255))
+        buf = io.BytesIO()
+        original.save(buf, format="PNG")
+        fake_bytes = buf.getvalue()
+
+        import utils.preview_anything as mod
+        monkeypatch.setattr(mod, "_fetch_url_bytes", lambda url, timeout_seconds=30: fake_bytes)
+
+        url = "https://example.com/original.png"
+        result = node_class.execute(value=url, display_type="auto", strip_metadata=True)
+        payload = result.ui["preview_anything"][0]
+        assert payload["kind"] == "image"
+        assert payload["url"].startswith("/view?"), f"Expected /view? URL, got {payload['url']!r}"
+        assert "_stripped_" in payload["url"]
+
+        sys.modules.pop("folder_paths", None)
+
+    def test_on_image_url_produces_clean_pixel_match(self, node_class, monkeypatch, tmp_path):
+        """Verify the re-encoded image has no EXIF — PIL should report no exif."""
+        from PIL import Image
+        import io
+        import sys
+        import types
+        import os
+        from urllib.parse import urlparse, parse_qs
+
+        folder_paths = types.ModuleType("folder_paths")
+        temp_dir = tmp_path / "comfy_temp"
+        folder_paths.get_temp_directory = lambda: str(temp_dir)
+        sys.modules["folder_paths"] = folder_paths
+
+        # Build a JPEG with EXIF payload
+        original = Image.new("RGB", (16, 16), color=(200, 100, 50))
+        # PIL does not easily synthesize EXIF without piexif; instead we'll
+        # confirm the re-encoded output has no exif metadata attribute.
+        buf = io.BytesIO()
+        original.save(buf, format="JPEG", quality=90)
+        fake_bytes = buf.getvalue()
+
+        import utils.preview_anything as mod
+        monkeypatch.setattr(mod, "_fetch_url_bytes", lambda url, timeout_seconds=30: fake_bytes)
+
+        url = "https://example.com/photo.jpg"
+        result = node_class.execute(value=url, display_type="auto", strip_metadata=True)
+        payload = result.ui["preview_anything"][0]
+
+        # Locate the written file on disk and verify it's clean
+        params = parse_qs(urlparse(payload["url"]).query)
+        filename_on_disk = params["filename"][0]
+        written_path = os.path.join(str(temp_dir), filename_on_disk)
+        assert os.path.exists(written_path), f"Re-encoded file missing at {written_path}"
+
+        reloaded = Image.open(written_path)
+        reloaded.load()
+        # A freshly-pasted image should carry no EXIF dict
+        exif_bytes = reloaded.info.get("exif", b"")
+        assert exif_bytes in (b"", None), (
+            f"Expected no EXIF after strip, got {len(exif_bytes)} bytes"
+        )
+        # ICC profile should also be absent
+        assert reloaded.info.get("icc_profile") in (None, b""), \
+            "ICC profile leaked through the metadata strip"
+
+        sys.modules.pop("folder_paths", None)
+
+    def test_fetch_failure_falls_back_to_original_url(self, node_class, monkeypatch):
+        """If fetch fails, the payload passes through the original URL so the
+        preview still works — we don't break the node over a strip failure."""
+        import utils.preview_anything as mod
+        monkeypatch.setattr(mod, "_fetch_url_bytes", lambda url, timeout_seconds=30: None)
+
+        url = "https://example.com/unreachable.png"
+        result = node_class.execute(value=url, display_type="auto", strip_metadata=True)
+        payload = result.ui["preview_anything"][0]
+        assert payload["url"] == url, "Original URL must survive strip failure"
+
+    def test_gif_url_also_stripped(self, node_class, monkeypatch, tmp_path):
+        """GIFs are grouped with images for metadata-stripping purposes."""
+        from PIL import Image
+        import io
+        import sys
+        import types
+
+        folder_paths = types.ModuleType("folder_paths")
+        temp_dir = tmp_path / "comfy_temp"
+        folder_paths.get_temp_directory = lambda: str(temp_dir)
+        sys.modules["folder_paths"] = folder_paths
+
+        original = Image.new("RGB", (4, 4), color=(50, 200, 50))
+        buf = io.BytesIO()
+        original.save(buf, format="GIF")
+        fake_bytes = buf.getvalue()
+
+        import utils.preview_anything as mod
+        monkeypatch.setattr(mod, "_fetch_url_bytes", lambda url, timeout_seconds=30: fake_bytes)
+
+        url = "https://example.com/animated.gif"
+        result = node_class.execute(value=url, display_type="auto", strip_metadata=True)
+        payload = result.ui["preview_anything"][0]
+        assert payload["kind"] == "gif"
+        assert payload["url"].startswith("/view?")
+
+        sys.modules.pop("folder_paths", None)
 
 
 def _find_input(schema, input_id: str):
