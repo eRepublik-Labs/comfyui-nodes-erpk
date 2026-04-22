@@ -247,7 +247,7 @@ class TestOpenAIModelOptions:
         schema = cls.define_schema()
         model_inputs = [i for i in schema.inputs if i.id == "model"]
         assert len(model_inputs) == 1
-        expected = ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
+        expected = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
         assert set(model_inputs[0].options) == set(expected)
 
 

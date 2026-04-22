@@ -43,11 +43,20 @@ class OpenAIClient:
 
     # Available image generation models
     IMAGE_MODELS = {
-        "gpt-image-1.5": "GPT Image 1.5 (Latest, best quality)",
+        "gpt-image-2": "GPT Image 2 (Latest flagship, 4K, multilingual text)",
+        "gpt-image-1.5": "GPT Image 1.5 (Previous flagship, 2K)",
         "gpt-image-1": "GPT Image 1 (High quality, editing support)",
         "gpt-image-1-mini": "GPT Image 1 Mini (Cost-efficient)",
-        "dall-e-3": "DALL-E 3 (Deprecated)",
+        "dall-e-3": "DALL-E 3 (Deprecated 2026-05-12)",
     }
+
+    # Image models on the GPT Image family — share parameter conventions
+    # (quality + background). dall-e-2/3 use different parameter rules.
+    GPT_IMAGE_MODELS = {"gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"}
+
+    # gpt-image-2 rejects background="transparent" (returns 400). It also
+    # always processes at high fidelity and rejects input_fidelity param.
+    GPT_IMAGE_2_MODELS = {"gpt-image-2"}
 
     # Default configuration
     DEFAULT_MODEL = "gpt-4o"
@@ -458,11 +467,19 @@ class OpenAIClient:
         }
 
         # Model-specific parameters
-        if model in ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]:
+        if model in self.GPT_IMAGE_MODELS:
             if quality != "auto":
                 params["quality"] = quality
             if background != "auto":
-                params["background"] = background
+                # gpt-image-2 rejects transparent backgrounds — coerce to opaque
+                if model in self.GPT_IMAGE_2_MODELS and background == "transparent":
+                    print(
+                        "[OpenAI] gpt-image-2 does not support background='transparent'; "
+                        "coercing to 'opaque'. Use gpt-image-1.5 or earlier for transparent."
+                    )
+                    params["background"] = "opaque"
+                else:
+                    params["background"] = background
             # GPT Image models always return base64, do not accept response_format
         elif model == "dall-e-3":
             if quality in ["hd", "standard"]:
@@ -539,7 +556,7 @@ class OpenAIClient:
             params["mask"] = mask_file
 
         # Model-specific parameters
-        if model in ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]:
+        if model in self.GPT_IMAGE_MODELS:
             # GPT Image models always return base64, do not accept response_format
             if quality != "auto":
                 params["quality"] = quality

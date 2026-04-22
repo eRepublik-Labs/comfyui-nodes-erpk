@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2026.4.12 (CalVer)
+**Current Version:** 2026.4.13 (CalVer)
 
 ## Repository Structure
 
@@ -194,7 +194,7 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 **Key Benefits:**
 - Support for latest GPT-5.4 family (flagship, pro, mini, nano), GPT-5.2, GPT-4.1, GPT-4o, and o-series reasoning models
 - `reasoning_effort` parameter (minimal/low/medium/high/xhigh) for reasoning-capable models; ignored silently by non-reasoning models
-- Image generation with GPT-Image-1.5 (best quality), GPT-Image-1, and GPT-Image-1-Mini (cost tier)
+- Image generation with GPT-Image-2 (latest flagship: 4K output, multilingual text, rebuilt architecture), GPT-Image-1.5 (still available, supports transparent background), GPT-Image-1, and GPT-Image-1-Mini (cost tier)
 - DALL-E 3 shuts down 2026-05-12 — migrate to GPT-Image models
 - Image editing with optional mask support for inpainting
 - Multi-turn conversation with session management

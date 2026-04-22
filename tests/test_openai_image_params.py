@@ -16,7 +16,7 @@ if not hasattr(_local_openai, "APIError"):
 from openai.openai_api.client import OpenAIClient
 
 
-GPT_IMAGE_MODELS = ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
+GPT_IMAGE_MODELS = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
 DALLE_MODELS = ["dall-e-3", "dall-e-2"]
 
 
@@ -55,6 +55,58 @@ class TestGenerateImageParams:
         assert params.get("response_format") == "b64_json", (
             f"response_format must be b64_json for {model}"
         )
+
+
+class TestGptImage2BackgroundCoercion:
+    """gpt-image-2 rejects background='transparent'; client must coerce to 'opaque'."""
+
+    def test_transparent_coerced_to_opaque_for_gpt_image_2(self):
+        client, mock = _make_client_with_mock()
+        client.generate_image(
+            prompt="a cat", model="gpt-image-2", background="transparent"
+        )
+        params = mock.images.generate.call_args[1]
+        assert params.get("background") == "opaque", (
+            "gpt-image-2 should coerce background='transparent' to 'opaque'"
+        )
+
+    def test_transparent_preserved_for_gpt_image_1_5(self):
+        client, mock = _make_client_with_mock()
+        client.generate_image(
+            prompt="a cat", model="gpt-image-1.5", background="transparent"
+        )
+        params = mock.images.generate.call_args[1]
+        assert params.get("background") == "transparent", (
+            "gpt-image-1.5 supports transparent — must not be coerced"
+        )
+
+    def test_opaque_passes_through_unchanged_for_gpt_image_2(self):
+        client, mock = _make_client_with_mock()
+        client.generate_image(
+            prompt="a cat", model="gpt-image-2", background="opaque"
+        )
+        assert mock.images.generate.call_args[1].get("background") == "opaque"
+
+    def test_auto_background_omitted_for_gpt_image_2(self):
+        client, mock = _make_client_with_mock()
+        client.generate_image(
+            prompt="a cat", model="gpt-image-2", background="auto"
+        )
+        # auto means "don't send the param" — matches existing behavior for other GPT image models
+        assert "background" not in mock.images.generate.call_args[1]
+
+
+class TestGptImage2ModelPresence:
+    """gpt-image-2 must be exposed via the client's model catalog."""
+
+    def test_gpt_image_2_in_image_models(self):
+        assert "gpt-image-2" in OpenAIClient.IMAGE_MODELS
+
+    def test_gpt_image_2_in_gpt_image_models_set(self):
+        assert "gpt-image-2" in OpenAIClient.GPT_IMAGE_MODELS
+
+    def test_gpt_image_2_flagged_in_gpt_image_2_models_set(self):
+        assert "gpt-image-2" in OpenAIClient.GPT_IMAGE_2_MODELS
 
 
 class TestEditImageParams:

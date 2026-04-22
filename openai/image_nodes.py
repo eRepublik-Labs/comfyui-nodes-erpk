@@ -5,11 +5,13 @@ from comfy_api.latest import IO
 from .openai_api.client import OpenAIClient
 
 IMAGE_MODELS = list(OpenAIClient.IMAGE_MODELS.keys())
-EDIT_MODELS = ["gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
+EDIT_MODELS = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
 
 GEN_SIZES = [
     "1024x1024", "1024x1536", "1536x1024",
     "512x512", "256x256", "1792x1024", "1024x1792",
+    # gpt-image-2 4K options (older GPT image models will 400 on these)
+    "2048x2048", "2048x1152", "2560x1440", "3840x2160", "2160x3840",
 ]
 
 EDIT_SIZES = [
@@ -43,12 +45,13 @@ class OpenAIImageGeneration(IO.ComfyNode):
                 IO.Combo.Input(
                     "model",
                     options=IMAGE_MODELS,
-                    default="gpt-image-1.5",
+                    default="gpt-image-2",
                     optional=True,
                     tooltip=(
                         "Image generation model. "
-                        "dall-e-3 is deprecated and will shut down on 2026-05-12 "
-                        "— prefer gpt-image-1.5 or gpt-image-1."
+                        "gpt-image-2: latest flagship, 4K output, multilingual text. "
+                        "gpt-image-1.5: previous flagship, supports transparent background. "
+                        "dall-e-3 is deprecated and will shut down on 2026-05-12."
                     ),
                 ),
                 IO.Combo.Input(
@@ -70,7 +73,11 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     options=["auto", "transparent", "opaque"],
                     default="auto",
                     optional=True,
-                    tooltip="Background type (gpt-image-1 only)",
+                    tooltip=(
+                        "Background type (GPT Image models only). "
+                        "gpt-image-2 rejects 'transparent' — it's auto-coerced to 'opaque'. "
+                        "Use gpt-image-1.5 or earlier for true transparent output."
+                    ),
                 ),
                 IO.Int.Input(
                     "n",
@@ -111,7 +118,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
         from .openai_api.utils import ImageConverter
 
         client = kwargs.get("client")
-        model = kwargs.get("model", "gpt-image-1.5")
+        model = kwargs.get("model", "gpt-image-2")
         size = kwargs.get("size", "1024x1024")
         quality = kwargs.get("quality", "auto")
         background = kwargs.get("background", "auto")
@@ -205,9 +212,13 @@ class OpenAIImageEdit(IO.ComfyNode):
                 IO.Combo.Input(
                     "model",
                     options=EDIT_MODELS,
-                    default="gpt-image-1",
+                    default="gpt-image-2",
                     optional=True,
-                    tooltip="Image editing model",
+                    tooltip=(
+                        "Image editing model. gpt-image-2 is the latest flagship "
+                        "(multilingual text, character continuity across edits). "
+                        "gpt-image-1.5 / gpt-image-1 / gpt-image-1-mini remain available."
+                    ),
                 ),
                 IO.Combo.Input(
                     "size",
@@ -262,7 +273,7 @@ class OpenAIImageEdit(IO.ComfyNode):
 
         client = kwargs.get("client")
         mask = kwargs.get("mask")
-        model = kwargs.get("model", "gpt-image-1.5")
+        model = kwargs.get("model", "gpt-image-2")
         size = kwargs.get("size", "1024x1024")
         quality = kwargs.get("quality", "auto")
         n = kwargs.get("n", 1)
