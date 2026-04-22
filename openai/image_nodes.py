@@ -7,6 +7,34 @@ from .openai_api.client import OpenAIClient
 IMAGE_MODELS = list(OpenAIClient.IMAGE_MODELS.keys())
 EDIT_MODELS = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
 
+# Mainline (text/reasoning) models accepted by Responses API when the
+# image_generation tool is attached. Full list per OpenAI's tools page.
+RESPONSES_MAINLINE_MODELS = [
+    "gpt-5.4",
+    "gpt-5.4-mini",
+    "gpt-5.4-nano",
+    "gpt-5.2",
+    "gpt-5",
+    "gpt-5-mini",
+    "gpt-5-nano",
+    "gpt-4.1",
+    "gpt-4.1-mini",
+    "gpt-4o",
+    "gpt-4o-mini",
+    "o3",
+    "o4-mini",
+]
+
+# Image models valid inside the Responses-API image_generation tool config.
+RESPONSES_IMAGE_MODELS = [
+    "gpt-image-2",
+    "gpt-image-1.5",
+    "gpt-image-1",
+    "gpt-image-1-mini",
+]
+
+REASONING_EFFORT_LEVELS = ["none", "minimal", "low", "medium", "high", "xhigh"]
+
 GEN_SIZES = [
     "1024x1024", "1024x1536", "1536x1024",
     "512x512", "256x256", "1792x1024", "1024x1792",
@@ -204,6 +232,214 @@ class OpenAIImageGeneration(IO.ComfyNode):
         except Exception as e:
             error_msg = f"Failed to generate image: {str(e)}"
             print(f"[OpenAI] Error: {error_msg}")
+            raise ValueError(error_msg)
+
+
+class OpenAIImageResponses(IO.ComfyNode):
+    """Generate images via OpenAI's Responses API with the image_generation
+    hosted tool. Offers reasoning effort, web search integration, and
+    mainline-model prompt revision — features not available on the direct
+    /v1/images/generations endpoint.
+    """
+
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="OpenAIImageResponses",
+            display_name="OpenAI Image Generation (Responses)",
+            category="ERPK/OpenAI",
+            not_idempotent=True,
+            inputs=[
+                IO.String.Input(
+                    "prompt",
+                    multiline=True,
+                    default="",
+                    tooltip="Image description. The mainline model may auto-revise it before passing to the image model.",
+                ),
+                IO.Custom("OPENAI_API_CLIENT").Input(
+                    "client",
+                    optional=True,
+                    tooltip="OpenAI API client from OpenAI API Config node",
+                ),
+                IO.Combo.Input(
+                    "mainline_model",
+                    options=RESPONSES_MAINLINE_MODELS,
+                    default="gpt-5.4",
+                    optional=True,
+                    tooltip=(
+                        "Text/reasoning model that drives the Responses API call. "
+                        "Not the image model — this picks prompt interpretation, "
+                        "reasoning, and (optionally) web search. gpt-5.4 is the "
+                        "current flagship with configurable reasoning."
+                    ),
+                ),
+                IO.Combo.Input(
+                    "image_model",
+                    options=RESPONSES_IMAGE_MODELS,
+                    default="gpt-image-2",
+                    optional=True,
+                    tooltip="Underlying GPT Image model used for pixel generation inside the tool.",
+                ),
+                IO.Combo.Input(
+                    "reasoning_effort",
+                    options=REASONING_EFFORT_LEVELS,
+                    default="none",
+                    optional=True,
+                    tooltip=(
+                        "Mainline-model reasoning depth. 'none' skips reasoning (cheapest, fastest). "
+                        "'low' to 'xhigh' increase prompt-interpretation quality at token cost. "
+                        "Only supported by reasoning-capable mainline models (gpt-5.x, o3, o4-mini)."
+                    ),
+                ),
+                IO.Combo.Input(
+                    "size",
+                    options=GEN_SIZES,
+                    default="1024x1024",
+                    optional=True,
+                    tooltip="Image size. Same constraints as direct endpoint (gpt-image-2: min 655,360 pixels).",
+                ),
+                IO.Combo.Input(
+                    "quality",
+                    options=["auto", "low", "medium", "high"],
+                    default="auto",
+                    optional=True,
+                    tooltip="Image quality tier.",
+                ),
+                IO.Combo.Input(
+                    "background",
+                    options=["auto", "transparent", "opaque"],
+                    default="auto",
+                    optional=True,
+                    tooltip=(
+                        "Background type. gpt-image-2 rejects 'transparent' — "
+                        "auto-coerced to 'opaque' with a warning log."
+                    ),
+                ),
+                IO.Combo.Input(
+                    "output_format",
+                    options=["png", "jpeg", "webp"],
+                    default="png",
+                    optional=True,
+                    tooltip="Output image format.",
+                ),
+                IO.Combo.Input(
+                    "moderation",
+                    options=["auto", "low"],
+                    default="auto",
+                    optional=True,
+                    tooltip="Content moderation level. 'low' relaxes default safety filters.",
+                ),
+                IO.Boolean.Input(
+                    "enable_web_search",
+                    default=False,
+                    optional=True,
+                    tooltip=(
+                        "Add the web_search tool alongside image_generation. The mainline "
+                        "model can decide to look up reference material before generating. "
+                        "Adds $10/1000 calls when the model actually invokes it."
+                    ),
+                ),
+                IO.String.Input(
+                    "api_key",
+                    default="",
+                    optional=True,
+                    tooltip="OpenAI API key (only needed if not using client input)",
+                ),
+                IO.Int.Input(
+                    "seed",
+                    default=-1,
+                    min=-1,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip="Cache-bust seed. Randomizes by default.",
+                ),
+            ],
+            outputs=[
+                IO.Image.Output("image"),
+                IO.String.Output("revised_prompt"),
+                IO.String.Output("reasoning_summary"),
+            ],
+        )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
+
+    @classmethod
+    def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
+        from .openai_api.utils import ImageConverter
+
+        client = kwargs.get("client")
+        mainline_model = kwargs.get("mainline_model", "gpt-5.4")
+        image_model = kwargs.get("image_model", "gpt-image-2")
+        reasoning_effort = kwargs.get("reasoning_effort", "none")
+        size = kwargs.get("size", "1024x1024")
+        quality = kwargs.get("quality", "auto")
+        background = kwargs.get("background", "auto")
+        output_format = kwargs.get("output_format", "png")
+        moderation = kwargs.get("moderation", "auto")
+        enable_web_search = kwargs.get("enable_web_search", False)
+        api_key = kwargs.get("api_key", "")
+
+        if not prompt or not prompt.strip():
+            raise ValueError("Prompt cannot be empty")
+
+        try:
+            if client is not None:
+                image_client = client
+            else:
+                image_client = OpenAIClient(
+                    api_key=api_key if api_key.strip() else None,
+                    model=mainline_model,
+                )
+
+            print(f"[OpenAI Responses] mainline={mainline_model} image={image_model} reasoning={reasoning_effort}")
+            print(f"[OpenAI Responses] prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
+
+            response = image_client.generate_image_via_responses(
+                prompt=prompt.strip(),
+                mainline_model=mainline_model,
+                image_model=image_model,
+                reasoning_effort=reasoning_effort,
+                size=size,
+                quality=quality,
+                background=background,
+                output_format=output_format,
+                moderation=moderation,
+                enable_web_search=enable_web_search,
+            )
+
+            if response.get("blocked", False):
+                raise ValueError(f"Image blocked by content filters: {response.get('error', 'Unknown')}")
+
+            images = response.get("images", [])
+            if not images:
+                raise ValueError("No image was generated")
+
+            # Stack all returned images into a batched tensor (same pattern as
+            # OpenAIImageGeneration — a single Responses call can emit multiple
+            # image_generation_call items if the mainline model decides to).
+            tensors = [ImageConverter.base64_to_tensor(img) for img in images]
+            if len(tensors) == 1:
+                image_tensor = tensors[0]
+            else:
+                import torch
+                image_tensor = torch.cat(tensors, dim=0)
+            print(f"[OpenAI Responses] Generated {len(tensors)} image(s), batch shape: {image_tensor.shape}")
+
+            revised_prompt = response.get("revised_prompt", "")
+            reasoning_summary = response.get("reasoning_summary", "")
+            if revised_prompt:
+                print(f"[OpenAI Responses] Revised prompt: {revised_prompt[:100]}...")
+            if reasoning_summary:
+                print(f"[OpenAI Responses] Reasoning summary ({len(reasoning_summary)} chars)")
+
+            return IO.NodeOutput(image_tensor, revised_prompt, reasoning_summary)
+
+        except Exception as e:
+            error_msg = f"Failed to generate image via Responses API: {str(e)}"
+            print(f"[OpenAI Responses] Error: {error_msg}")
             raise ValueError(error_msg)
 
 

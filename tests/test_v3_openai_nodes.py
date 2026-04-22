@@ -2,7 +2,7 @@
 # ABOUTME: Validates V3 compliance, custom types, model COMBO lists, and provider export.
 
 """
-V3 tests for OpenAI provider nodes (7 nodes total).
+V3 tests for OpenAI provider nodes (8 nodes total).
 
 Validates:
 - All classes inherit from IO.ComfyNode
@@ -26,7 +26,7 @@ def _import_node(module_name, class_name):
     return getattr(mod, class_name)
 
 
-# --- Parametrized structural data for all 7 nodes ---
+# --- Parametrized structural data for all 8 nodes ---
 # (module, class_name, node_id, display_name, category, not_idempotent, is_output_node)
 OPENAI_NODES = [
     ("nodes", "OpenAIAPIConfig", "OpenAIAPIConfig",
@@ -43,6 +43,8 @@ OPENAI_NODES = [
      "OpenAI Image Generation", "ERPK/OpenAI", True, False),
     ("image_nodes", "OpenAIImageEdit", "OpenAIImageEdit",
      "OpenAI Image Edit", "ERPK/OpenAI", True, False),
+    ("image_nodes", "OpenAIImageResponses", "OpenAIImageResponses",
+     "OpenAI Image Generation (Responses)", "ERPK/OpenAI", True, False),
 ]
 
 
@@ -275,7 +277,7 @@ class TestOpenAIProviderExport:
     def test_nodes_list_has_all_classes(self):
         import importlib
         mod = importlib.import_module("openai")
-        assert len(mod.NODES) == 7, f"Expected 7 OpenAI nodes, got {len(mod.NODES)}"
+        assert len(mod.NODES) == 8, f"Expected 8 OpenAI nodes, got {len(mod.NODES)}"
 
     def test_nodes_list_all_comfy_nodes(self):
         import importlib

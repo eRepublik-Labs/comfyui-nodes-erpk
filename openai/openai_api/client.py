@@ -588,6 +588,118 @@ class OpenAIClient:
                 f"You requested {size} = {pixels:,} pixels."
             )
 
+    def generate_image_via_responses(
+        self,
+        prompt: str,
+        mainline_model: str = "gpt-5.4",
+        image_model: str = "gpt-image-2",
+        reasoning_effort: str = "none",
+        size: str = "auto",
+        quality: str = "auto",
+        background: str = "auto",
+        output_format: str = "png",
+        moderation: str = "auto",
+        enable_web_search: bool = False,
+        action: str = "auto",
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        Generate an image via the Responses API with the image_generation tool.
+
+        Adds reasoning effort and optional web search on top of the standard
+        image params. The mainline (text/reasoning) model revises the prompt
+        before the image model renders. Returns dict with 'images' (list of
+        base64 strings), 'revised_prompt', and 'reasoning_summary'.
+
+        Source: https://developers.openai.com/api/docs/guides/responses
+        """
+        from openai import APIError
+
+        # Preflight: gpt-image-2 size constraints apply regardless of endpoint
+        if image_model in self.GPT_IMAGE_2_MODELS:
+            self._validate_size_for_gpt_image_2(size)
+
+        # Build the image_generation tool config
+        image_tool = {
+            "type": "image_generation",
+            "model": image_model,
+            "action": action,
+        }
+        if size and size != "auto":
+            image_tool["size"] = size
+        if quality != "auto":
+            image_tool["quality"] = quality
+        if output_format and output_format != "png":
+            image_tool["output_format"] = output_format
+        if moderation != "auto":
+            image_tool["moderation"] = moderation
+        if background != "auto":
+            # gpt-image-2 rejects transparent; coerce consistent with the direct path
+            if image_model in self.GPT_IMAGE_2_MODELS and background == "transparent":
+                print(
+                    "[OpenAI Responses] gpt-image-2 does not support background='transparent'; "
+                    "coercing to 'opaque'."
+                )
+                image_tool["background"] = "opaque"
+            else:
+                image_tool["background"] = background
+
+        tools = [image_tool]
+        if enable_web_search:
+            tools.append({"type": "web_search"})
+
+        request_params = {
+            "model": mainline_model,
+            "input": prompt,
+            "tools": tools,
+        }
+        if reasoning_effort and reasoning_effort != "none":
+            request_params["reasoning"] = {
+                "effort": reasoning_effort,
+                "summary": "auto",
+            }
+
+        try:
+            response = self.client.responses.create(**request_params)
+
+            images = []
+            revised_prompts = []
+            reasoning_summaries = []
+            outputs = getattr(response, "output", None) or []
+            for output in outputs:
+                out_type = getattr(output, "type", None)
+                if out_type == "image_generation_call":
+                    result = getattr(output, "result", None)
+                    if result:
+                        images.append(result)
+                    revised = getattr(output, "revised_prompt", None)
+                    if revised:
+                        revised_prompts.append(revised)
+                elif out_type == "reasoning":
+                    for part in getattr(output, "summary", []) or []:
+                        text = getattr(part, "text", None)
+                        if text is None and isinstance(part, dict):
+                            text = part.get("text")
+                        if text:
+                            reasoning_summaries.append(text)
+
+            return {
+                "images": images,
+                "revised_prompt": "\n\n".join(revised_prompts),
+                "reasoning_summary": "\n\n".join(reasoning_summaries),
+            }
+
+        except APIError as e:
+            if hasattr(e, "code") and e.code == "content_policy_violation":
+                return {
+                    "images": [],
+                    "blocked": True,
+                    "error": str(e),
+                    "revised_prompt": "",
+                    "reasoning_summary": "",
+                }
+            raise
+
     def edit_image(
         self,
         image_data,
