@@ -90,6 +90,17 @@ class OpenAIClient:
         "o3", "o3-mini", "o3-pro", "o4-mini",
     }
 
+    # Models that accept the `verbosity` parameter (gpt-5.x family).
+    # When the user selects "default", we omit the param so the model picks its
+    # own default. Sending verbosity to a model that doesn't support it returns
+    # 400, so we silently drop it for older families.
+    VERBOSITY_MODELS = {
+        "gpt-5.5", "gpt-5.5-pro",
+        "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
+        "gpt-5.2", "gpt-5.2-pro", "gpt-5.1",
+        "gpt-5", "gpt-5-mini", "gpt-5-nano",
+    }
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -201,6 +212,7 @@ class OpenAIClient:
         response_format: Optional[Dict] = None,
         seed: Optional[int] = None,
         reasoning_effort: Optional[str] = None,
+        verbosity: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -275,6 +287,9 @@ class OpenAIClient:
         if reasoning_effort and is_reasoning:
             params["reasoning_effort"] = reasoning_effort
 
+        if verbosity and verbosity != "default" and model_to_use in self.VERBOSITY_MODELS:
+            params["verbosity"] = verbosity
+
         if response_format:
             params["response_format"] = response_format
 
@@ -346,6 +361,7 @@ class OpenAIClient:
         response_format: Optional[Dict] = None,
         seed: Optional[int] = None,
         reasoning_effort: Optional[str] = None,
+        verbosity: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -402,6 +418,9 @@ class OpenAIClient:
 
         if reasoning_effort and is_reasoning:
             params["reasoning_effort"] = reasoning_effort
+
+        if verbosity and verbosity != "default" and model_to_use in self.VERBOSITY_MODELS:
+            params["verbosity"] = verbosity
 
         if response_format:
             params["response_format"] = response_format
@@ -595,7 +614,7 @@ class OpenAIClient:
     def generate_image_via_responses(
         self,
         prompt: str,
-        mainline_model: str = "gpt-5.4",
+        mainline_model: str = "gpt-5.5",
         image_model: str = "gpt-image-2",
         reasoning_effort: str = "none",
         size: str = "auto",
@@ -605,6 +624,7 @@ class OpenAIClient:
         moderation: str = "auto",
         enable_web_search: bool = False,
         action: str = "auto",
+        verbosity: str = "default",
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -662,6 +682,9 @@ class OpenAIClient:
                 "effort": reasoning_effort,
                 "summary": "auto",
             }
+
+        if verbosity and verbosity != "default" and mainline_model in self.VERBOSITY_MODELS:
+            request_params["verbosity"] = verbosity
 
         try:
             response = self.client.responses.create(**request_params)

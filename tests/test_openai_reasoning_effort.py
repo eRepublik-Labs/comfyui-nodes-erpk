@@ -20,6 +20,7 @@ from openai.openai_api.client import OpenAIClient
 
 
 REASONING_EFFORT_OPTIONS = ["none", "minimal", "low", "medium", "high", "xhigh"]
+VERBOSITY_OPTIONS = ["default", "low", "medium", "high"]
 
 
 def _import_node(module_name, class_name):
@@ -167,6 +168,52 @@ class TestReasoningEffortSchema:
         assert "reasoning_effort" in ids
 
 
+class TestVerbositySchema:
+    """verbosity appears as an input on text/chat/vision/image-responses nodes."""
+
+    @pytest.mark.parametrize("module,class_name", [
+        ("nodes", "OpenAITextGeneration"),
+        ("nodes", "OpenAIChat"),
+        ("nodes", "OpenAIVision"),
+        ("image_nodes", "OpenAIImageResponses"),
+    ])
+    def test_verbosity_in_schema(self, module, class_name):
+        cls = _import_node(module, class_name)
+        schema = cls.define_schema()
+        matches = [i for i in schema.inputs if i.id == "verbosity"]
+        assert len(matches) == 1, (
+            f"{class_name} must expose exactly one verbosity input"
+        )
+        inp = matches[0]
+        assert inp.optional is True
+        assert set(inp.options) == set(VERBOSITY_OPTIONS)
+        assert inp.default == "default"
+
+
+class TestVerbosityModelsSet:
+    """VERBOSITY_MODELS controls which models receive the verbosity param."""
+
+    @pytest.mark.parametrize("model_id", [
+        "gpt-5.5", "gpt-5.5-pro",
+        "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
+        "gpt-5.2", "gpt-5.2-pro", "gpt-5.1",
+        "gpt-5", "gpt-5-mini", "gpt-5-nano",
+    ])
+    def test_gpt_5_x_in_verbosity_models(self, model_id):
+        assert model_id in OpenAIClient.VERBOSITY_MODELS, (
+            f"{model_id} should accept the verbosity parameter"
+        )
+
+    @pytest.mark.parametrize("model_id", [
+        "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
+        "o3", "o3-mini", "o3-pro", "o4-mini",
+    ])
+    def test_non_gpt_5_x_excluded_from_verbosity(self, model_id):
+        assert model_id not in OpenAIClient.VERBOSITY_MODELS, (
+            f"{model_id} should NOT be in VERBOSITY_MODELS — verbosity is a gpt-5.x parameter"
+        )
+
+
 def _make_client_with_mock_sdk():
     """Build an OpenAIClient instance with the SDK mocked out (no __init__)."""
     client = OpenAIClient.__new__(OpenAIClient)
@@ -261,6 +308,106 @@ class TestReasoningEffortPassThrough:
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert "reasoning_effort" not in kwargs
+
+
+class TestVerbosityPassThrough:
+    """verbosity is forwarded only when (a) value != 'default' and (b) model in VERBOSITY_MODELS."""
+
+    def test_verbosity_passed_for_gpt_5_5(self):
+        client, mock_sdk = _make_client_with_mock_sdk()
+
+        client.generate_content(
+            prompt="hello",
+            model="gpt-5.5",
+            verbosity="low",
+        )
+
+        kwargs = mock_sdk.chat.completions.create.call_args.kwargs
+        assert kwargs.get("verbosity") == "low"
+
+    def test_verbosity_passed_for_gpt_5_5_pro(self):
+        client, mock_sdk = _make_client_with_mock_sdk()
+
+        client.generate_content(
+            prompt="hello",
+            model="gpt-5.5-pro",
+            verbosity="high",
+        )
+
+        kwargs = mock_sdk.chat.completions.create.call_args.kwargs
+        assert kwargs.get("verbosity") == "high"
+
+    def test_verbosity_dropped_when_default(self):
+        """'default' is the no-op marker — never sent over the wire."""
+        client, mock_sdk = _make_client_with_mock_sdk()
+
+        client.generate_content(
+            prompt="hello",
+            model="gpt-5.5",
+            verbosity="default",
+        )
+
+        kwargs = mock_sdk.chat.completions.create.call_args.kwargs
+        assert "verbosity" not in kwargs
+
+    def test_verbosity_dropped_when_omitted(self):
+        client, mock_sdk = _make_client_with_mock_sdk()
+
+        client.generate_content(prompt="hello", model="gpt-5.5")
+
+        kwargs = mock_sdk.chat.completions.create.call_args.kwargs
+        assert "verbosity" not in kwargs
+
+    def test_verbosity_dropped_for_unsupported_model(self):
+        """gpt-4o doesn't accept verbosity — silently drop."""
+        client, mock_sdk = _make_client_with_mock_sdk()
+
+        client.generate_content(
+            prompt="hello",
+            model="gpt-4o",
+            verbosity="medium",
+        )
+
+        kwargs = mock_sdk.chat.completions.create.call_args.kwargs
+        assert "verbosity" not in kwargs
+
+    def test_verbosity_dropped_for_o3(self):
+        """o-series reasoning models also don't take verbosity."""
+        client, mock_sdk = _make_client_with_mock_sdk()
+
+        client.generate_content(
+            prompt="hello",
+            model="o3",
+            verbosity="high",
+        )
+
+        kwargs = mock_sdk.chat.completions.create.call_args.kwargs
+        assert "verbosity" not in kwargs
+
+    def test_verbosity_passed_via_chat(self):
+        """chat() should also forward verbosity for supported models."""
+        client, mock_sdk = _make_client_with_mock_sdk()
+
+        client.chat(
+            messages=[{"role": "user", "content": "hi"}],
+            model="gpt-5.5",
+            verbosity="medium",
+        )
+
+        kwargs = mock_sdk.chat.completions.create.call_args.kwargs
+        assert kwargs.get("verbosity") == "medium"
+
+    def test_verbosity_dropped_via_chat_for_unsupported_model(self):
+        client, mock_sdk = _make_client_with_mock_sdk()
+
+        client.chat(
+            messages=[{"role": "user", "content": "hi"}],
+            model="gpt-4o",
+            verbosity="low",
+        )
+
+        kwargs = mock_sdk.chat.completions.create.call_args.kwargs
+        assert "verbosity" not in kwargs
 
 
 class TestDallE3DeprecationTooltip:

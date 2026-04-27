@@ -298,6 +298,17 @@ class OpenAIImageResponses(IO.ComfyNode):
                     ),
                 ),
                 IO.Combo.Input(
+                    "verbosity",
+                    options=["default", "low", "medium", "high"],
+                    default="default",
+                    optional=True,
+                    tooltip=(
+                        "Mainline-model output verbosity (gpt-5.x family). Shapes how chatty "
+                        "the response is independent of max_tokens. 'default' lets the model "
+                        "pick. Silently dropped for older mainlines."
+                    ),
+                ),
+                IO.Combo.Input(
                     "size",
                     options=GEN_SIZES,
                     default="1024x1024",
@@ -380,6 +391,7 @@ class OpenAIImageResponses(IO.ComfyNode):
         mainline_model = kwargs.get("mainline_model", "gpt-5.5")
         image_model = kwargs.get("image_model", "gpt-image-2")
         reasoning_effort = kwargs.get("reasoning_effort", "none")
+        verbosity = kwargs.get("verbosity", "default")
         size = kwargs.get("size", "1024x1024")
         quality = kwargs.get("quality", "auto")
         background = kwargs.get("background", "auto")
@@ -408,6 +420,7 @@ class OpenAIImageResponses(IO.ComfyNode):
                 mainline_model=mainline_model,
                 image_model=image_model,
                 reasoning_effort=reasoning_effort,
+                verbosity=verbosity,
                 size=size,
                 quality=quality,
                 background=background,

@@ -98,6 +98,7 @@ General-purpose text generation and completion.
 - `stop_sequences`: Newline-separated sequences where generation stops
 - `response_format`: Output format - "default" or "json_object"
 - `reasoning_effort`: Reasoning depth for reasoning-capable models (gpt-5.5, gpt-5.5-pro, gpt-5.4 family, o3, o4-mini) — none, minimal, low, medium, high, xhigh
+- `verbosity`: Output verbosity for gpt-5.x models (gpt-5.5, gpt-5.5-pro, gpt-5.4 family, gpt-5.x family) — default, low, medium, high. Shapes how chatty the response is independently of `max_tokens`. 'default' lets the model pick. Silently dropped for older models.
 
 **Outputs:**
 - `response`: Generated text

@@ -13,6 +13,14 @@ REASONING_EFFORT_TOOLTIP = (
     "Ignored by non-reasoning models."
 )
 
+VERBOSITY_OPTIONS = ["default", "low", "medium", "high"]
+VERBOSITY_TOOLTIP = (
+    "Output verbosity for gpt-5.x models. 'low' produces terse responses, "
+    "'high' produces more detailed ones. Distinct from max_tokens — shapes "
+    "style, not the hard length cap. 'default' lets the model choose. "
+    "Silently ignored by older models that do not accept verbosity."
+)
+
 
 class OpenAIAPIConfig(IO.ComfyNode):
     """Initializes and provides an OpenAI API client for use by other nodes."""
@@ -137,6 +145,13 @@ class OpenAITextGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip=REASONING_EFFORT_TOOLTIP,
                 ),
+                IO.Combo.Input(
+                    "verbosity",
+                    options=VERBOSITY_OPTIONS,
+                    default="default",
+                    optional=True,
+                    tooltip=VERBOSITY_TOOLTIP,
+                ),
                 IO.Int.Input(
                     "seed",
                     default=-1,
@@ -166,6 +181,7 @@ class OpenAITextGeneration(IO.ComfyNode):
         stop_sequences = kwargs.get("stop_sequences", "")
         response_format = kwargs.get("response_format", "default")
         reasoning_effort = kwargs.get("reasoning_effort", "none")
+        verbosity = kwargs.get("verbosity", "default")
         seed = kwargs.get("seed", -1)
 
         if not prompt or not prompt.strip():
@@ -200,6 +216,7 @@ class OpenAITextGeneration(IO.ComfyNode):
                 response_format=resp_format,
                 seed=seed if seed != -1 else None,
                 reasoning_effort=effort,
+                verbosity=verbosity if verbosity and verbosity != "default" else None,
             )
 
             if response.get("blocked", False):
@@ -306,6 +323,13 @@ class OpenAIChat(IO.ComfyNode):
                     optional=True,
                     tooltip=REASONING_EFFORT_TOOLTIP,
                 ),
+                IO.Combo.Input(
+                    "verbosity",
+                    options=VERBOSITY_OPTIONS,
+                    default="default",
+                    optional=True,
+                    tooltip=VERBOSITY_TOOLTIP,
+                ),
                 IO.Int.Input(
                     "seed",
                     default=-1,
@@ -338,6 +362,7 @@ class OpenAIChat(IO.ComfyNode):
         stop_sequences = kwargs.get("stop_sequences", "")
         response_format = kwargs.get("response_format", "default")
         reasoning_effort = kwargs.get("reasoning_effort", "none")
+        verbosity = kwargs.get("verbosity", "default")
         seed = kwargs.get("seed", -1)
 
         if not prompt or not prompt.strip():
@@ -384,6 +409,7 @@ class OpenAIChat(IO.ComfyNode):
                 response_format=resp_format,
                 seed=seed if seed != -1 else None,
                 reasoning_effort=effort,
+                verbosity=verbosity if verbosity and verbosity != "default" else None,
             )
 
             text = response.get("text", "")
@@ -466,6 +492,13 @@ class OpenAIVision(IO.ComfyNode):
                     optional=True,
                     tooltip=REASONING_EFFORT_TOOLTIP,
                 ),
+                IO.Combo.Input(
+                    "verbosity",
+                    options=VERBOSITY_OPTIONS,
+                    default="default",
+                    optional=True,
+                    tooltip=VERBOSITY_TOOLTIP,
+                ),
                 IO.Int.Input(
                     "seed",
                     default=-1,
@@ -495,6 +528,7 @@ class OpenAIVision(IO.ComfyNode):
         max_tokens = kwargs.get("max_tokens", 4096)
         temperature = kwargs.get("temperature", 0.4)
         reasoning_effort = kwargs.get("reasoning_effort", "none")
+        verbosity = kwargs.get("verbosity", "default")
         seed = kwargs.get("seed", -1)
 
         if not prompt or not prompt.strip():
@@ -519,6 +553,7 @@ class OpenAIVision(IO.ComfyNode):
                 model=model,
                 seed=seed if seed != -1 else None,
                 reasoning_effort=effort,
+                verbosity=verbosity if verbosity and verbosity != "default" else None,
             )
 
             if response.get("blocked", False):
