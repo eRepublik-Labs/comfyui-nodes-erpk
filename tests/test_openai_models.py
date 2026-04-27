@@ -64,7 +64,7 @@ class TestOpenAIModels:
         for model in expected:
             assert model in OpenAIClient.MODELS, f"Missing model: {model}"
 
-    def test_default_model_unchanged(self):
-        """Default model should remain gpt-4o."""
+    def test_default_model_is_current_flagship(self):
+        """Default model is the premium flagship — gpt-5.5."""
         from openai.openai_api.client import OpenAIClient
-        assert OpenAIClient.DEFAULT_MODEL == "gpt-4o"
+        assert OpenAIClient.DEFAULT_MODEL == "gpt-5.5"

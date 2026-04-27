@@ -11,6 +11,7 @@ EDIT_MODELS = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"
 # image_generation tool is attached. Full list per OpenAI's tools page.
 RESPONSES_MAINLINE_MODELS = [
     "gpt-5.5",
+    "gpt-5.5-pro",
     "gpt-5.4",
     "gpt-5.4-mini",
     "gpt-5.4-nano",
@@ -265,13 +266,14 @@ class OpenAIImageResponses(IO.ComfyNode):
                 IO.Combo.Input(
                     "mainline_model",
                     options=RESPONSES_MAINLINE_MODELS,
-                    default="gpt-5.4",
+                    default="gpt-5.5",
                     optional=True,
                     tooltip=(
                         "Text/reasoning model that drives the Responses API call. "
                         "Not the image model — this picks prompt interpretation, "
-                        "reasoning, and (optionally) web search. gpt-5.4 is the "
-                        "current flagship with configurable reasoning."
+                        "reasoning, and (optionally) web search. gpt-5.5 is the "
+                        "current premium flagship with the highest reasoning tier; "
+                        "gpt-5.4 is a cheaper alternative for cost-sensitive workflows."
                     ),
                 ),
                 IO.Combo.Input(
@@ -375,7 +377,7 @@ class OpenAIImageResponses(IO.ComfyNode):
         from .openai_api.utils import ImageConverter
 
         client = kwargs.get("client")
-        mainline_model = kwargs.get("mainline_model", "gpt-5.4")
+        mainline_model = kwargs.get("mainline_model", "gpt-5.5")
         image_model = kwargs.get("image_model", "gpt-image-2")
         reasoning_effort = kwargs.get("reasoning_effort", "none")
         size = kwargs.get("size", "1024x1024")

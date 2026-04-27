@@ -21,6 +21,7 @@ class OpenAIClient:
     # Available text/vision models
     MODELS = {
         "gpt-5.5": "GPT-5.5 (Premium flagship, 1.05M context, highest reasoning tier)",
+        "gpt-5.5-pro": "GPT-5.5 Pro (Extended compute, no streaming, $30/$180 per MTok)",
         "gpt-5.4": "GPT-5.4 (Recommended default, 1M context)",
         "gpt-5.4-pro": "GPT-5.4 Pro (Extended compute, Responses API)",
         "gpt-5.4-mini": "GPT-5.4 Mini (Fast, cost-efficient, 400K context)",
@@ -68,7 +69,7 @@ class OpenAIClient:
     GPT_IMAGE_2_MAX_EDGE = 3840
 
     # Default configuration
-    DEFAULT_MODEL = "gpt-4o"
+    DEFAULT_MODEL = "gpt-5.5"
     DEFAULT_MAX_TOKENS = 4096
     DEFAULT_TEMPERATURE = 0.7
     MAX_RETRIES = 3
@@ -76,7 +77,7 @@ class OpenAIClient:
 
     # Models that use max_completion_tokens instead of max_tokens
     NEW_TOKEN_PARAM_MODELS = {
-        "gpt-5.5",
+        "gpt-5.5", "gpt-5.5-pro",
         "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
         "gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano",
         "o3", "o3-mini", "o3-pro", "o4-mini",
@@ -84,7 +85,7 @@ class OpenAIClient:
 
     # Reasoning models that support reasoning_effort parameter
     REASONING_MODELS = {
-        "gpt-5.5",
+        "gpt-5.5", "gpt-5.5-pro",
         "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
         "o3", "o3-mini", "o3-pro", "o4-mini",
     }

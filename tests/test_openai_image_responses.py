@@ -258,8 +258,10 @@ class TestNodeSchema:
     def test_has_mainline_model_input(self, schema):
         inp = next((i for i in schema.inputs if i.id == "mainline_model"), None)
         assert inp is not None
+        assert "gpt-5.5" in inp.options
+        assert "gpt-5.5-pro" in inp.options
         assert "gpt-5.4" in inp.options
-        assert inp.default == "gpt-5.4"
+        assert inp.default == "gpt-5.5"
 
     def test_has_image_model_input(self, schema):
         inp = next((i for i in schema.inputs if i.id == "image_model"), None)

@@ -56,38 +56,51 @@ class TestGPT54FamilyInModels:
         )
 
 
-class TestGPT55InModels:
-    """gpt-5.5 is the premium flagship and must be wired into all relevant sets.
+class TestGPT55FamilyInModels:
+    """gpt-5.5 family (gpt-5.5 + gpt-5.5-pro) is wired into all relevant sets.
 
-    Released 2026-04-23. Has no mini/nano/pro variants — single model ID.
+    Released 2026-04-23. The base gpt-5.5 is the premium flagship; gpt-5.5-pro
+    is an extended-compute Responses API variant at $30/$180 per MTok with no
+    streaming support. Both use max_completion_tokens and support reasoning_effort.
     """
 
-    def test_gpt_5_5_in_models(self):
-        assert "gpt-5.5" in OpenAIClient.MODELS, (
-            "gpt-5.5 must be present in OpenAIClient.MODELS"
+    @pytest.mark.parametrize("model_id", ["gpt-5.5", "gpt-5.5-pro"])
+    def test_gpt_5_5_family_in_models(self, model_id):
+        assert model_id in OpenAIClient.MODELS, (
+            f"{model_id} must be present in OpenAIClient.MODELS"
         )
 
-    def test_gpt_5_5_uses_max_completion_tokens(self):
-        assert "gpt-5.5" in OpenAIClient.NEW_TOKEN_PARAM_MODELS, (
-            "gpt-5.5 should use max_completion_tokens like the rest of the gpt-5 family"
+    @pytest.mark.parametrize("model_id", ["gpt-5.5", "gpt-5.5-pro"])
+    def test_gpt_5_5_family_uses_max_completion_tokens(self, model_id):
+        assert model_id in OpenAIClient.NEW_TOKEN_PARAM_MODELS, (
+            f"{model_id} should use max_completion_tokens like the rest of the gpt-5 family"
         )
 
-    def test_gpt_5_5_supports_reasoning(self):
-        assert "gpt-5.5" in OpenAIClient.REASONING_MODELS, (
-            "gpt-5.5 must support reasoning_effort (it's a reasoning-first flagship)"
+    @pytest.mark.parametrize("model_id", ["gpt-5.5", "gpt-5.5-pro"])
+    def test_gpt_5_5_family_supports_reasoning(self, model_id):
+        assert model_id in OpenAIClient.REASONING_MODELS, (
+            f"{model_id} must support reasoning_effort"
         )
 
-    def test_gpt_5_5_in_responses_mainline_models(self):
+    @pytest.mark.parametrize("model_id", ["gpt-5.5", "gpt-5.5-pro"])
+    def test_gpt_5_5_family_in_responses_mainline_models(self, model_id):
         from openai.image_nodes import RESPONSES_MAINLINE_MODELS
-        assert "gpt-5.5" in RESPONSES_MAINLINE_MODELS, (
-            "gpt-5.5 must be selectable as a mainline model on the Image Responses node"
+        assert model_id in RESPONSES_MAINLINE_MODELS, (
+            f"{model_id} must be selectable as a mainline model on the Image Responses node"
         )
 
     def test_gpt_5_5_appears_first_in_dropdown(self):
-        """5.5 is the premium flagship — should be first in the model dropdown."""
+        """5.5 (base) is the premium flagship — should be first in the model dropdown."""
         from openai.nodes import TEXT_MODELS
         assert TEXT_MODELS[0] == "gpt-5.5", (
             f"gpt-5.5 should be the first option in TEXT_MODELS, got {TEXT_MODELS[0]}"
+        )
+
+    def test_gpt_5_5_pro_appears_second_in_dropdown(self):
+        """5.5-pro is the premium-of-premium tier — should sit right after 5.5."""
+        from openai.nodes import TEXT_MODELS
+        assert TEXT_MODELS[1] == "gpt-5.5-pro", (
+            f"gpt-5.5-pro should be the second option in TEXT_MODELS, got {TEXT_MODELS[1]}"
         )
 
 

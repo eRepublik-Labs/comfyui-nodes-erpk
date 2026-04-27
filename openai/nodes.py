@@ -430,7 +430,7 @@ class OpenAIVision(IO.ComfyNode):
                 IO.Combo.Input(
                     "model",
                     options=VISION_MODELS,
-                    default="gpt-4o",
+                    default="gpt-5.5",
                     optional=True,
                     tooltip="OpenAI model to use for vision analysis",
                 ),
