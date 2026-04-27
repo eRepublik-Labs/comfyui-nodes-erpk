@@ -10,6 +10,7 @@ EDIT_MODELS = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"
 # Mainline (text/reasoning) models accepted by Responses API when the
 # image_generation tool is attached. Full list per OpenAI's tools page.
 RESPONSES_MAINLINE_MODELS = [
+    "gpt-5.5",
     "gpt-5.4",
     "gpt-5.4-mini",
     "gpt-5.4-nano",

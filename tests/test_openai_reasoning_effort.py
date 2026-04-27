@@ -56,6 +56,41 @@ class TestGPT54FamilyInModels:
         )
 
 
+class TestGPT55InModels:
+    """gpt-5.5 is the premium flagship and must be wired into all relevant sets.
+
+    Released 2026-04-23. Has no mini/nano/pro variants — single model ID.
+    """
+
+    def test_gpt_5_5_in_models(self):
+        assert "gpt-5.5" in OpenAIClient.MODELS, (
+            "gpt-5.5 must be present in OpenAIClient.MODELS"
+        )
+
+    def test_gpt_5_5_uses_max_completion_tokens(self):
+        assert "gpt-5.5" in OpenAIClient.NEW_TOKEN_PARAM_MODELS, (
+            "gpt-5.5 should use max_completion_tokens like the rest of the gpt-5 family"
+        )
+
+    def test_gpt_5_5_supports_reasoning(self):
+        assert "gpt-5.5" in OpenAIClient.REASONING_MODELS, (
+            "gpt-5.5 must support reasoning_effort (it's a reasoning-first flagship)"
+        )
+
+    def test_gpt_5_5_in_responses_mainline_models(self):
+        from openai.image_nodes import RESPONSES_MAINLINE_MODELS
+        assert "gpt-5.5" in RESPONSES_MAINLINE_MODELS, (
+            "gpt-5.5 must be selectable as a mainline model on the Image Responses node"
+        )
+
+    def test_gpt_5_5_appears_first_in_dropdown(self):
+        """5.5 is the premium flagship — should be first in the model dropdown."""
+        from openai.nodes import TEXT_MODELS
+        assert TEXT_MODELS[0] == "gpt-5.5", (
+            f"gpt-5.5 should be the first option in TEXT_MODELS, got {TEXT_MODELS[0]}"
+        )
+
+
 class TestVisionModelsDerivedFromModels:
     """VISION_MODELS is derived from MODELS and excludes o-series."""
 
