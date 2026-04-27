@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2026.4.20 (CalVer)
+**Current Version:** 2026.4.22 (CalVer)
 
 ## Repository Structure
 
@@ -179,16 +179,18 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 #### Nodes
 
 - **OpenAI API Config** - Initialize OpenAI API connection (API key configuration). Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- OpenAI nodes can run standalone.
-- **OpenAI Text Generation** - General-purpose text generation with model selection (GPT-5.4 family, GPT-5.2, GPT-4o, GPT-4.1, o3, o3-mini, o3-pro) and optional `reasoning_effort` control for reasoning-capable models
-- **OpenAI Chat** - Multi-turn conversations with automatic context preservation
-- **OpenAI Vision** - Analyze images with GPT-4 vision capabilities
+- **OpenAI Text Generation** - General-purpose text generation with model selection (GPT-5.5, GPT-5.5 Pro, GPT-5.4 family, GPT-5.2, GPT-4o, GPT-4.1, o3, o3-mini, o3-pro, o4-mini) and optional `reasoning_effort` and `verbosity` controls
+- **OpenAI Chat** - Multi-turn conversations with automatic context preservation, plus reasoning_effort and verbosity control on gpt-5.x models
+- **OpenAI Vision** - Analyze images with GPT-5.5 / GPT-5.4 / GPT-4o vision capabilities
 - **OpenAI System Instruction** - Set persistent system-level instructions to guide model behavior
-- **OpenAI Image Generation** - Generate images with GPT-Image-1.5 and DALL-E models
+- **OpenAI Image Generation** - Generate images with GPT-Image-2 (default), GPT-Image-1.5, GPT-Image-1, GPT-Image-1-Mini (DALL-E 3 deprecated 2026-05-12)
+- **OpenAI Image Generation (Responses)** - Generate images via the Responses API with a mainline reasoning model (gpt-5.5 default) driving the `image_generation` hosted tool. Adds optional web search grounding and prompt revision.
 - **OpenAI Image Edit** - Edit and inpaint images with natural language prompts
 
 **Key Benefits:**
-- Support for latest GPT-5.4 family (flagship, pro, mini, nano), GPT-5.2, GPT-4.1, GPT-4o, and o-series reasoning models
-- `reasoning_effort` parameter (minimal/low/medium/high/xhigh) for reasoning-capable models; ignored silently by non-reasoning models
+- Support for latest GPT-5.5 (premium flagship, 1.05M context, $5/$30 per MTok), GPT-5.5 Pro (extended-compute, $30/$180 per MTok, no streaming), GPT-5.4 family (flagship, pro, mini, nano), GPT-5.2, GPT-4.1, GPT-4o, and o-series reasoning models
+- `reasoning_effort` parameter (none/minimal/low/medium/high/xhigh) for reasoning-capable models; ignored silently by non-reasoning models
+- `verbosity` parameter (default/low/medium/high) for gpt-5.x models — shapes how chatty the response is independently of `max_tokens`; silently dropped for older models
 - Image generation with GPT-Image-2 (latest flagship: 4K output, multilingual text, rebuilt architecture), GPT-Image-1.5 (still available, supports transparent background), GPT-Image-1, and GPT-Image-1-Mini (cost tier)
 - DALL-E 3 shuts down 2026-05-12 — migrate to GPT-Image models
 - Image editing with optional mask support for inpainting

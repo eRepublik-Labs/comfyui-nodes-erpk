@@ -22,9 +22,10 @@ Use **OpenAI Image Generation (Responses)** when you want:
 |---|---|---|---|
 | `prompt` | String (multiline) | — | Image description. The mainline model may auto-revise before handing to the image model. |
 | `client` | OPENAI_API_CLIENT (optional) | — | Provided by an OpenAI API Config node. Optional if API key is in ComfyUI Settings / env / config.ini. |
-| `mainline_model` | Combo | `gpt-5.4` | Text/reasoning model that drives the call. Options: gpt-5.4, gpt-5.4-mini/nano, gpt-5.2, gpt-5, gpt-5-mini/nano, gpt-4.1, gpt-4.1-mini, gpt-4o, gpt-4o-mini, o3, o4-mini. |
+| `mainline_model` | Combo | `gpt-5.5` | Text/reasoning model that drives the call. Options: gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-mini/nano, gpt-5.2, gpt-5, gpt-5-mini/nano, gpt-4.1, gpt-4.1-mini, gpt-4o, gpt-4o-mini, o3, o4-mini. |
 | `image_model` | Combo | `gpt-image-2` | GPT Image model used for pixel generation inside the tool. Options: gpt-image-2, gpt-image-1.5, gpt-image-1, gpt-image-1-mini. |
 | `reasoning_effort` | Combo | `none` | Mainline-model reasoning depth: none / minimal / low / medium / high / xhigh. Only supported on reasoning-capable mainline models. |
+| `verbosity` | Combo | `default` | Mainline-model output verbosity for gpt-5.x: default / low / medium / high. Shapes how chatty the model is independent of token caps. Silently dropped for older mainlines. |
 | `size` | Combo | `1024x1024` | Image size. gpt-image-2 requires at least 655,360 pixels — small sizes like 512x512 are rejected at preflight. |
 | `quality` | Combo | `auto` | Image quality tier (auto / low / medium / high). |
 | `background` | Combo | `auto` | Background: auto / transparent / opaque. gpt-image-2 rejects transparent and auto-coerces to opaque with a warning. |
