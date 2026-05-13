@@ -216,6 +216,38 @@ def image_to_base64s(tensor) -> Optional[List[str]]:
     return [base64.b64encode(encode_image(image)).decode("utf-8") for image in images]
 
 
+def image_to_data_uri(image) -> Optional[str]:
+    """
+    Convert a tensor or PIL image to a base64 data URI for WaveSpeed API inputs.
+
+    WaveSpeed accepts `data:` URIs anywhere a URL is expected (per API docs §5
+    Files: "image, images, mask_image, video, and audio accept file URLs or
+    Base64 data URIs"). Useful for nodes that take an IMAGE input directly
+    instead of requiring a pre-uploaded URL.
+    """
+    b64 = image_to_base64(image)
+    if b64 is None:
+        return None
+    return f"data:image/jpeg;base64,{b64}"
+
+
+def images_to_data_uris(tensor, max_count: Optional[int] = None) -> Optional[List[str]]:
+    """
+    Convert a batched image tensor to a list of base64 data URIs.
+
+    Each batch slice becomes one data URI. Optionally caps the list at
+    `max_count` (e.g. 4 for Seedance reference_images).
+    """
+    if tensor is None:
+        return None
+    b64_list = image_to_base64s(tensor)
+    if not b64_list:
+        return None
+    if max_count is not None:
+        b64_list = b64_list[:max_count]
+    return [f"data:image/jpeg;base64,{b}" for b in b64_list]
+
+
 class BaseRequest(BaseModel):
     """
     Base class for all WaveSpeed API request objects.

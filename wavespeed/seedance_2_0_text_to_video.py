@@ -58,11 +58,13 @@ class Seedance20TextToVideoNode(IO.ComfyNode):
                 IO.String.Input("prompt", multiline=True, default="",
                                 tooltip="Text description of the video to generate"),
                 IO.String.Input("reference_images", optional=True, default="",
-                                tooltip="Reference image URL(s) for style/character/composition guidance. Single URL or list from WaveSpeed Upload Image. Up to 4 images."),
+                                tooltip="Reference image URL(s) for style/character/composition guidance. Single URL or list from WaveSpeed Upload Image. Up to 4 images. Ignored when `reference_images_tensor` is connected."),
                 IO.String.Input("reference_videos", optional=True, default="",
                                 tooltip="Reference video URL(s) for motion/style guidance. Single URL or list. Up to 4 videos; total duration should not exceed 15s."),
                 IO.String.Input("reference_audios", optional=True, default="",
                                 tooltip="Reference audio URL(s) for audio style guidance. Single URL or list. Up to 4 audios; total duration should not exceed 15s."),
+                IO.Image.Input("reference_images_tensor", optional=True,
+                               tooltip="Reference images as a ComfyUI IMAGE batch (B,H,W,C). Each batch slice becomes one reference, capped at 4. Takes precedence over `reference_images` URLs when connected. Sent as base64 data URIs."),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
                 IO.Int.Input("duration", optional=True, default=5, min=4, max=15,
@@ -96,10 +98,12 @@ class Seedance20TextToVideoNode(IO.ComfyNode):
     @classmethod
     def execute(cls, model="Seedance 2.0", prompt="",
                 reference_images="", reference_videos="", reference_audios="",
+                reference_images_tensor=None,
                 client=None, duration=5, aspect_ratio="16:9", resolution="720p", seed=-1,
                 enable_web_search=False, generate_audio=True,
                 **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
+        from .wavespeed_api.utils import images_to_data_uris
 
         if client is None:
             from .nodes import WaveSpeedAIAPIClient
@@ -108,6 +112,11 @@ class Seedance20TextToVideoNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
+        if reference_images_tensor is not None:
+            reference_images_value = images_to_data_uris(reference_images_tensor, max_count=4)
+        else:
+            reference_images_value = cls._normalize_url_list(reference_images)
+
         request_cls = cls._request_class_for(model)
 
         request = request_cls(
@@ -115,7 +124,7 @@ class Seedance20TextToVideoNode(IO.ComfyNode):
             duration=duration,
             aspect_ratio=aspect_ratio,
             resolution=resolution,
-            reference_images=cls._normalize_url_list(reference_images),
+            reference_images=reference_images_value,
             reference_videos=cls._normalize_url_list(reference_videos),
             reference_audios=cls._normalize_url_list(reference_audios),
             enable_web_search=enable_web_search,

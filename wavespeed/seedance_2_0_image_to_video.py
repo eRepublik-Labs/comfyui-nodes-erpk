@@ -45,10 +45,14 @@ class Seedance20ImageToVideoNode(IO.ComfyNode):
                                tooltip="Model variant: standard, Turbo (faster, 720p/1080p only), Fast (cheaper), or Fast Turbo (Fast family + turbo, 720p/1080p only)"),
                 IO.String.Input("prompt", multiline=True, default="",
                                 tooltip="Text description of the desired motion"),
-                IO.String.Input("start_frame",
-                                tooltip="Start frame image URL to guide the video generation"),
+                IO.String.Input("start_frame", optional=True, default="",
+                                tooltip="Start frame image URL. Leave blank if connecting `start_frame_image` instead."),
                 IO.String.Input("end_frame", optional=True, default="",
-                                tooltip="End frame image URL for video continuation (optional)"),
+                                tooltip="End frame image URL for video continuation. Leave blank if connecting `end_frame_image` instead."),
+                IO.Image.Input("start_frame_image", optional=True,
+                               tooltip="Start frame as a ComfyUI IMAGE tensor. Takes precedence over `start_frame` URL when connected. Sent to WaveSpeed as a base64 data URI."),
+                IO.Image.Input("end_frame_image", optional=True,
+                               tooltip="End frame as a ComfyUI IMAGE tensor. Takes precedence over `end_frame` URL when connected. Sent to WaveSpeed as a base64 data URI."),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
                 IO.Int.Input("duration", optional=True, default=5, min=4, max=15,
@@ -81,10 +85,12 @@ class Seedance20ImageToVideoNode(IO.ComfyNode):
 
     @classmethod
     def execute(cls, model="Seedance 2.0", prompt="", start_frame="",
-                end_frame="", client=None, duration=5, aspect_ratio="16:9", resolution="720p", seed=-1,
+                end_frame="", start_frame_image=None, end_frame_image=None,
+                client=None, duration=5, aspect_ratio="16:9", resolution="720p", seed=-1,
                 enable_web_search=False, generate_audio=True,
                 **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
+        from .wavespeed_api.utils import image_to_data_uri
 
         if client is None:
             from .nodes import WaveSpeedAIAPIClient
@@ -93,15 +99,18 @@ class Seedance20ImageToVideoNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        if start_frame is None or start_frame == "":
-            raise ValueError("Start frame image must be provided")
+        start_value = image_to_data_uri(start_frame_image) if start_frame_image is not None else (start_frame or None)
+        if not start_value:
+            raise ValueError("Start frame must be provided as either an IMAGE tensor or a URL")
+
+        end_value = image_to_data_uri(end_frame_image) if end_frame_image is not None else (end_frame or None)
 
         request_cls = cls._request_class_for(model)
 
         request = request_cls(
             prompt=prompt,
-            image=start_frame,
-            last_image=end_frame or None,
+            image=start_value,
+            last_image=end_value,
             duration=duration,
             aspect_ratio=aspect_ratio,
             resolution=resolution,
