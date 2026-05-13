@@ -1,6 +1,6 @@
 # WaveSpeed AI - ComfyUI Custom Nodes
 
-**Version:** 2026.4.21 (CalVer)
+**Version:** 2026.5.4 (CalVer)
 **Category:** ERPK/WaveSpeedAI
 **Namespace:** ERPK Organization Custom Nodes
 
@@ -14,7 +14,7 @@ Part of the [ERPK Custom Nodes Collection](../../README.md) for ComfyUI.
 ## Qwen Image Nodes
 ![Qwen Nodes Preview](assets/qwen-preview.png)
 
-ComfyUI custom nodes for WaveSpeed AI integration. Covers image generation (ByteDance Seedream V4/V4.5/V5.0 Lite, Qwen Image family, Qwen Image 2.0, Dreamina, JibMix) and video generation (Bytedance Seedance 2.0, Alibaba WAN 2.7, Kling 3.0/O3, Lightricks LTX 2 Pro, WaveSpeed LTX 2.3, WaveSpeed Veo 3.1).
+ComfyUI custom nodes for WaveSpeed AI integration. Covers image generation (ByteDance Seedream V4/V4.5/V5.0 Lite, Qwen Image family, Qwen Image 2.0, Dreamina, JibMix) and video generation (Bytedance Seedance 2.0, Alibaba WAN 2.7, Kling 2.5 Turbo / 2.6 / 3.0 / O3 with Kling Elements, Lightricks LTX 2 Pro, WaveSpeed LTX 2.3, WaveSpeed Veo 3.1).
 
 ## Features
 
@@ -85,9 +85,15 @@ Video nodes return a STRING URL (pipe to `WaveSpeed Preview Video` or the Previe
 | **Alibaba WAN 2.7 Text-to-Video** | WAN 2.7 | Long-form video from text | 2-15s | 16:9/9:16/1:1 · 720p/1080p | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-text-to-video) |
 | **Alibaba WAN 2.7 Image-to-Video** | WAN 2.7 | Animate a source image | 2-15s | Same as T2V | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-image-to-video) |
 | **Alibaba WAN 2.7 Video Extend** | WAN 2.7 | Continue an existing clip | Configurable | Same as T2V | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-video-extend) |
-| **Kling 3.0 Image-to-Video** | Kling v3.0 Std, Pro | Kling v3.0 i2v at std/pro tiers | Fixed | N/A | [Link](https://wavespeed.ai/docs/docs-api/kwaivgi/kling-v3.0-std-image-to-video) |
-| **Kling O3 Text-to-Video** | Kling O3 Std, Pro | Kling flagship O3 text-to-video | 3-10s | 16:9/9:16/1:1 | [Link](https://wavespeed.ai/docs/docs-api/kwaivgi/kling-video-o3-std-text-to-video) |
-| **Kling O3 Image-to-Video** | Kling O3 Std, Pro | Kling flagship O3 image-to-video | 3-10s | Inferred from image | [Link](https://wavespeed.ai/docs/docs-api/kwaivgi/kling-video-o3-std-image-to-video) |
+| **Kling Elements** | Kling Elements | Create a reusable element ID (character/style/scene anchor) for Pro-variant `element_list` inputs | N/A | N/A | [Link](https://wavespeed.ai/docs/docs-api/kwaivgi/kling-elements) |
+| **Kling 2.5 Turbo Text-to-Video** | Kling 2.5 Turbo Pro | T2V; Std tier is not exposed for this modality | 5s/10s | 16:9/9:16/1:1 | [Link](https://wavespeed.ai/docs/docs-api/kwaivgi/kling-v2.5-turbo-pro-text-to-video) |
+| **Kling 2.5 Turbo Image-to-Video** | Kling 2.5 Turbo Std, Pro | I2V; Pro adds `last_image` for keyframe interpolation | 5s/10s | Inferred from image | [Link](https://wavespeed.ai/docs/docs-api/kwaivgi/kling-v2.5-turbo-std-image-to-video) |
+| **Kling 2.6 Text-to-Video** | Kling 2.6 Std, Pro | T2V; Pro adds `cfg_scale` and `sound` (joint audio-video) | 5s/10s | 16:9/9:16/1:1 | [Link](https://wavespeed.ai/docs/docs-api/kwaivgi/kling-v2.6-std-text-to-video) |
+| **Kling 2.6 Image-to-Video** | Kling 2.6 Std, Pro | I2V; Pro adds `cfg_scale`, `end_image`, and `sound` (end_image and sound are mutually exclusive) | 5s/10s | Inferred from image | [Link](https://wavespeed.ai/docs/docs-api/kwaivgi/kling-v2.6-std-image-to-video) |
+| **Kling 3.0 Text-to-Video** | Kling 3.0 Std, Pro, 4K | T2V with negative_prompt, cfg_scale, sound, shot_type, multi_prompt, element_list | 3-15s | 16:9/9:16/1:1 | [Link](https://wavespeed.ai/docs/docs-api/kwaivgi/kling-v3.0-std-text-to-video) |
+| **Kling 3.0 Image-to-Video** | Kling 3.0 Std, Pro, 4K | I2V with negative_prompt, end_image, cfg_scale, sound, shot_type, multi_prompt, element_list | 3-15s | Inferred from image | [Link](https://wavespeed.ai/docs/docs-api/kwaivgi/kling-v3.0-std-image-to-video) |
+| **Kling O3 Text-to-Video** | Kling O3 Std, Pro | T2V; Pro adds `element_list` for visual consistency | 3-15s (Std) / 5s/10s (Pro) | 16:9/9:16/1:1 | [Link](https://wavespeed.ai/docs/docs-api/kwaivgi/kling-video-o3-std-text-to-video) |
+| **Kling O3 Image-to-Video** | Kling O3 Std, Pro | I2V with end_image, sound, shot_type, multi_prompt; Pro adds `element_list` | 3-15s (Std) / 5s/10s (Pro) | Inferred from image | [Link](https://wavespeed.ai/docs/docs-api/kwaivgi/kling-video-o3-std-image-to-video) |
 | **Lightricks LTX 2 Pro Text-to-Video** | LTX 2 Pro | Short-form video with optional audio | 6/8/10s | Default | [Link](https://wavespeed.ai/docs/docs-api/lightricks/lightricks-ltx-2-pro-text-to-video) |
 | **Lightricks LTX 2 Pro Image-to-Video** | LTX 2 Pro | Animate image with optional audio | 6/8/10s | Inferred from image | [Link](https://wavespeed.ai/docs/docs-api/lightricks/lightricks-ltx-2-pro-image-to-video) |
 | **WaveSpeed LTX 2.3 Text-to-Video** | LTX 2.3 | Longer silent clips with seed control | 5-20s | 16:9/9:16 · 480p/720p/1080p | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/ltx-2.3-text-to-video) |
@@ -97,7 +103,11 @@ Video nodes return a STRING URL (pipe to `WaveSpeed Preview Video` or the Previe
 
 **LTX note:** LTX 2.3 and LTX 2 Pro are separate nodes (not a unified dropdown) — LTX 2 Pro has `generate_audio`, LTX 2.3 has `resolution`/`aspect_ratio`/`seed`. The APIs take different parameter sets.
 
-**Kling namespace note:** Kling 3.0 lives under `kling-v3.0-*` API paths; Kling O3 lives under `kling-video-o3-*`. Despite the shared "Kling" brand they're separate model families with separate API namespaces.
+**Kling namespace note:** Kling 2.5 Turbo lives under `kling-v2.5-turbo-{std,pro}-*`, Kling 2.6 under `kling-v2.6-{std,pro}-*`, Kling 3.0 under `kling-v3.0-{std,pro,4k}-*`, and Kling O3 under `kling-video-o3-{std,pro}-*`. Despite the shared "Kling" brand they're separate model families with separate API namespaces.
+
+**Kling Elements:** the `Kling Elements` node returns an element ID — pass it through the `element_list` JSON array of Pro-variant Kling i2v/t2v nodes (V3 Std/Pro/4K, O3 Pro) to lock characters/styles across generations.
+
+**Kling i2v IMAGE inputs:** all Kling i2v nodes (V2.5 Turbo, V2.6, V3, O3) and the Kling Elements node accept a ComfyUI IMAGE tensor (encoded as a base64 data URI) on the `image` / `end_image` / `last_image` / `element_refer_images` inputs *or* a URL string on the matching `*_url` field. When both are provided, the IMAGE input takes precedence.
 
 **Common Features (All Seedream Nodes):**
 - Size preset dropdown with recommended resolutions
@@ -515,7 +525,7 @@ pip install -r requirements.txt
 ```
 [ERPK] Loaded <N> V3 nodes
 ```
-The WaveSpeed module alone contributes 45 nodes as of 2026.4.21.
+The WaveSpeed module alone contributes 51 nodes as of 2026.5.4.
 
 ### Common Issues
 
@@ -532,7 +542,7 @@ All WaveSpeed nodes are located under the **ERPK/WaveSpeedAI** category:
 3. Navigate to: **ERPK → WaveSpeedAI**
 4. Select your desired node
 
-**Available nodes (45 total):**
+**Available nodes (51 total):**
 
 Client & I/O:
 - WaveSpeed Client
@@ -570,6 +580,12 @@ Video:
 - Alibaba WAN 2.7 Text-to-Video
 - Alibaba WAN 2.7 Image-to-Video
 - Alibaba WAN 2.7 Video Extend
+- Kling Elements
+- Kling 2.5 Turbo Text-to-Video
+- Kling 2.5 Turbo Image-to-Video
+- Kling 2.6 Text-to-Video
+- Kling 2.6 Image-to-Video
+- Kling 3.0 Text-to-Video
 - Kling 3.0 Image-to-Video
 - Kling O3 Text-to-Video
 - Kling O3 Image-to-Video
@@ -584,7 +600,7 @@ Video:
 
 This package follows **Calendar Versioning (CalVer)**: `YYYY.MM.PATCH`
 
-**Current Version:** 2026.4.21
+**Current Version:** 2026.5.4
 
 - Major changes are released monthly
 - Patch releases for bug fixes within the month
@@ -592,10 +608,10 @@ This package follows **Calendar Versioning (CalVer)**: `YYYY.MM.PATCH`
 
 ### Version History
 
-See the [project changelog on GitHub Releases](https://github.com/eRepublik-Labs/comfyui-nodes-erpk/releases) for the authoritative history. Notable WaveSpeed additions in the 2026.4.x series:
-- **Video generation** — Seedance 2.0, Alibaba WAN 2.7 (T2V/I2V/Extend), Kling 3.0 / Kling O3, WaveSpeed LTX 2.3, Lightricks LTX 2 Pro, WaveSpeed Veo 3.1
+See the [project changelog on GitHub Releases](https://github.com/eRepublik-Labs/comfyui-nodes-erpk/releases) for the authoritative history. Notable WaveSpeed additions in the 2026.4.x and 2026.5.x series:
+- **Video generation** — Seedance 2.0, Alibaba WAN 2.7 (T2V/I2V/Extend), Kling 2.5 Turbo (I2V/T2V), Kling 2.6 (I2V/T2V Std/Pro), Kling 3.0 (T2V/I2V Std/Pro/4K) with full parameter surface, Kling O3 (T2V/I2V Std/Pro with element_list on Pro), Kling Elements, WaveSpeed LTX 2.3, Lightricks LTX 2 Pro, WaveSpeed Veo 3.1
 - **Image generation** — Qwen Image 2.0 family (replaces 12 Qwen 1.x nodes long-term), Seedream V5.0 Lite family, ByteDance Dreamina V3.0/V3.1
-- **Infrastructure** — multi-user settings resolution, API-key masked preview, Preview Anything integration for all video node outputs
+- **Infrastructure** — multi-user settings resolution, API-key masked preview, Preview Anything integration for all video node outputs, dual-input pattern (IMAGE tensor + URL fallback) on all Kling i2v nodes
 
 ## License
 

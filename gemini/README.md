@@ -2,8 +2,9 @@
 
 Complete Google Gemini API integration providing text generation, vision analysis, multi-turn conversations, image generation, image editing, **video generation (Veo)**, and safety controls for ComfyUI workflows.
 
-**Version:** 2026.4.21
+**Version:** 2026.5.4
 **Category in ComfyUI:** `ERPK/Gemini` and `ERPK/Gemini/Veo`
+**SDK requirement:** `google-genai>=2.2.0` (per `gemini/requirements.txt`)
 
 ## Features
 
@@ -400,6 +401,15 @@ Generate videos from an input image and optional text prompt.
 **Pricing:** Veo 3+ is priced at $0.75 per second of video output.
 
 **Note:** Video generation is asynchronous and may take several minutes. Videos are saved as .mp4 files.
+
+### Veo client-side validators
+
+Both Veo nodes run client-side validators before submitting the long-running job, to avoid eating a 4-5 minute generation just to see an opaque 400 from the API:
+
+- **Duration normalization** — Veo 2 accepts `{5, 6, 8}`; Veo 3.x accepts `{4, 6, 8}`. Out-of-range values are snapped to the nearest valid duration with a warning.
+- **Resolution gating** — Models without a resolution parameter drop the field; models that don't accept `4k` are clamped to `1080p`. On Veo 3.x, an 8s duration with `720p` and no reference images is auto-bumped to `1080p`.
+- **person_generation** — Veo 3.x image-to-video rejects `allow_all` server-side; the validator raises a `ValueError` early. Veo 2 and all text-to-video paths accept the full enum.
+- **i2v feature combos (Veo 3.1)** — `image + last_frame` interpolation requires `duration_seconds=8`; `reference_images` requires `duration_seconds=8` and `aspect_ratio=16:9`; `reference_images` cannot be combined with `image`/`last_frame`. These gates are not documented in Google's parameter table but are confirmed by Google staff in forum threads — see `gemini/veo_nodes.py` for the linked discussions.
 
 ## Example Workflows
 
