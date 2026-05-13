@@ -27,6 +27,59 @@ def _is_gemini_3x(model: str) -> bool:
     return model.startswith("gemini-3")
 
 
+_FINISH_REASON_HINTS = {
+    "IMAGE_OTHER": (
+        "Gemini soft-refused image generation without a specific reason. "
+        "Try lower image_size (2K instead of 4K), simpler prompts, "
+        "disabling enable_google_search for image edits, or splitting "
+        "multi-constraint edits into single-change steps."
+    ),
+    "IMAGE_SAFETY": (
+        "Output was blocked by Gemini's image safety filters. "
+        "Rephrase the prompt to avoid sensitive content."
+    ),
+    "IMAGE_PROHIBITED_CONTENT": (
+        "Output was blocked under prohibited-content rules. "
+        "Rephrase or remove the disallowed element."
+    ),
+    "IMAGE_RECITATION": (
+        "Output was blocked because it resembled training data too closely. "
+        "Rephrase the prompt to be more original."
+    ),
+    "SAFETY": "Response was blocked by content safety filters. Rephrase the prompt.",
+    "RECITATION": "Response was blocked due to recitation policies. Rephrase to be more original.",
+    "PROHIBITED_CONTENT": "Response was blocked under prohibited-content rules.",
+    "BLOCKLIST": "Response contains terms from Gemini's blocklist. Rephrase the prompt.",
+    "SPII": "Response contained sensitive personally identifiable information.",
+    "MAX_TOKENS": "Response hit the token limit before completing. Increase max_tokens or shorten the prompt.",
+    "MALFORMED_FUNCTION_CALL": "Model produced a malformed function/tool call. Usually retryable.",
+}
+
+
+def _finish_reason_hint(finish_reason):
+    """Map a Gemini finish_reason enum value to a short remediation hint."""
+    if finish_reason is None:
+        return None
+    name = str(finish_reason).split(".")[-1].upper()
+    return _FINISH_REASON_HINTS.get(name)
+
+
+def _dump_response_payload(response, label="response"):
+    """Print the full Gemini response object to console for post-mortem debugging.
+
+    Tries Pydantic's model_dump_json first; falls back to repr if the response
+    isn't a Pydantic model (older SDK versions).
+    """
+    print(f"[Gemini] Full {label} payload on failure:")
+    try:
+        print(response.model_dump_json(indent=2))
+    except Exception:
+        try:
+            print(response.model_dump(mode="json"))
+        except Exception:
+            print(repr(response))
+
+
 def _build_thinking_config(thinking_level, model):
     """Build a ThinkingConfig tailored to the model's generation.
 
@@ -1032,11 +1085,12 @@ class GeminiImageGeneration(IO.ComfyNode):
 
             if image_tensor is None:
                 error_parts = ["No image was generated."]
+                finish_reason = None
 
                 if response.candidates and response.candidates[0].content.parts:
                     for part in response.candidates[0].content.parts:
                         if hasattr(part, 'text') and part.text:
-                            error_parts.append(f"Model returned text: {part.text[:100]}")
+                            error_parts.append(f"Model returned text: {part.text}")
 
                 if response.candidates:
                     finish_reason = response.candidates[0].finish_reason
@@ -1044,6 +1098,12 @@ class GeminiImageGeneration(IO.ComfyNode):
 
                 if hasattr(response, 'prompt_feedback') and hasattr(response.prompt_feedback, 'block_reason'):
                     error_parts.append(f"Blocked: {response.prompt_feedback.block_reason}")
+
+                hint = _finish_reason_hint(finish_reason)
+                if hint:
+                    error_parts.append(f"Hint: {hint}")
+
+                _dump_response_payload(response)
 
                 raise ValueError(" ".join(error_parts))
 
@@ -1284,11 +1344,12 @@ class GeminiImageEdit(IO.ComfyNode):
 
             if image_tensor is None:
                 error_parts = ["No image was generated."]
+                finish_reason = None
 
                 if response.candidates and response.candidates[0].content.parts:
                     for part in response.candidates[0].content.parts:
                         if hasattr(part, 'text') and part.text:
-                            error_parts.append(f"Model returned text: {part.text[:100]}")
+                            error_parts.append(f"Model returned text: {part.text}")
 
                 if response.candidates:
                     finish_reason = response.candidates[0].finish_reason
@@ -1296,6 +1357,12 @@ class GeminiImageEdit(IO.ComfyNode):
 
                 if hasattr(response, 'prompt_feedback') and hasattr(response.prompt_feedback, 'block_reason'):
                     error_parts.append(f"Blocked: {response.prompt_feedback.block_reason}")
+
+                hint = _finish_reason_hint(finish_reason)
+                if hint:
+                    error_parts.append(f"Hint: {hint}")
+
+                _dump_response_payload(response)
 
                 raise ValueError(" ".join(error_parts))
 
