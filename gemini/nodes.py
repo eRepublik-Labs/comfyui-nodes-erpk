@@ -978,6 +978,8 @@ class GeminiImageGeneration(IO.ComfyNode):
             if enable_google_search and model != "gemini-2.5-flash-image":
                 config.tools = [{"google_search": {}}]
                 print(f"[Gemini] Google Search grounding enabled")
+            else:
+                config.automatic_function_calling = types.AutomaticFunctionCallingConfig(disable=True)
 
             image_config_params = {}
             if aspect_ratio != "default":
@@ -991,7 +993,9 @@ class GeminiImageGeneration(IO.ComfyNode):
             if image_config_params:
                 config.image_config = types.ImageConfig(**image_config_params)
 
-            response = image_client.client.models.generate_content(
+            from .gemini_api.cooperative_call import call_with_retry
+            response = call_with_retry(
+                image_client.client.models.generate_content,
                 model=image_client.model_name,
                 contents=[prompt.strip()],
                 config=config,
@@ -1224,6 +1228,8 @@ class GeminiImageEdit(IO.ComfyNode):
             if enable_google_search and model != "gemini-2.5-flash-image":
                 config.tools = [{"google_search": {}}]
                 print(f"[Gemini] Google Search grounding enabled")
+            else:
+                config.automatic_function_calling = types.AutomaticFunctionCallingConfig(disable=True)
 
             image_config_params = {}
             if aspect_ratio != "default":
@@ -1239,7 +1245,9 @@ class GeminiImageEdit(IO.ComfyNode):
 
             contents = pil_images + [prompt.strip()]
 
-            response = image_client.client.models.generate_content(
+            from .gemini_api.cooperative_call import call_with_retry
+            response = call_with_retry(
+                image_client.client.models.generate_content,
                 model=image_client.model_name,
                 contents=contents,
                 config=config,
