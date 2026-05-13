@@ -922,21 +922,43 @@ function renderInto(content, payload, onMediaReady, preview) {
     }
 
     if (kind === "video") {
+        // Wrapper uses position:absolute to fill content reliably across
+        // ComfyUI redraws (right-click context menus trigger layout passes
+        // that can confuse percentage heights through flex containers).
+        // Centering + max-width/height keeps the video proportional and
+        // as large as possible within whatever shape content takes.
+        content.style.position = "relative";
+        const wrapper = document.createElement("div");
+        wrapper.style.position = "absolute";
+        wrapper.style.inset = "0";
+        wrapper.style.display = "flex";
+        wrapper.style.alignItems = "center";
+        wrapper.style.justifyContent = "center";
+
         const video = document.createElement("video");
         video.src = payload.url;
         video.controls = true;
         video.preload = "metadata";
-        video.style.width = "100%";
-        video.style.height = "auto";
+        video.style.maxWidth = "100%";
+        video.style.maxHeight = "100%";
         video.style.display = "block";
         video.style.borderRadius = "3px";
         video.addEventListener("loadedmetadata", () => {
             if (video.videoWidth && video.videoHeight) {
+                // Aspect ratio is set so resizeNodeToContent can compute the right
+                // initial node height (it runs in 2 rAFs after notifyReady), then
+                // we release the constraint so the user can freely resize.
                 content.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+                notifyReady();
+                requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+                    content.style.aspectRatio = "";
+                })));
+            } else {
+                notifyReady();
             }
-            notifyReady();
         }, { once: true });
-        content.appendChild(video);
+        wrapper.appendChild(video);
+        content.appendChild(wrapper);
         return;
     }
 

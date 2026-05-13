@@ -128,6 +128,15 @@ def _forced_payload(value, display_type: str, filename: str) -> dict:
 
 
 def _payload_from_string(value: str, filename: str, strip_metadata: bool = False) -> dict:
+    # If the value is an absolute filesystem path to a file under one of
+    # ComfyUI's served directories (output / temp / input), rewrite it to
+    # the /view URL form so the browser can actually fetch the bytes.
+    # Otherwise the absolute path passes _url_kind (scheme="" + startswith("/"))
+    # but the browser then 404s on /Users/.../output/<file>.mp4.
+    served = _local_path_to_view_url(value)
+    if served is not None:
+        value = served
+
     url_kind = _url_kind(value)
     if url_kind is not None:
         url = value
@@ -416,6 +425,42 @@ def _view_url(filename: str, subfolder: str, folder_type: str) -> str:
         parts.append(f"subfolder={quote(subfolder)}")
     parts.append(f"type={folder_type}")
     return "/view?" + "&".join(parts)
+
+
+def _local_path_to_view_url(value: str):
+    """Convert an absolute filesystem path under ComfyUI's served directories
+    into the /view URL form the frontend can fetch. Returns None if the value
+    isn't an absolute path, doesn't exist, or sits outside output/temp/input.
+    """
+    if not value or not os.path.isabs(value):
+        return None
+    try:
+        if not os.path.isfile(value):
+            return None
+        import folder_paths
+    except Exception:
+        return None
+
+    real = os.path.realpath(value)
+    dir_map = (
+        ("output", folder_paths.get_output_directory()),
+        ("temp", folder_paths.get_temp_directory()),
+        ("input", folder_paths.get_input_directory()),
+    )
+    for folder_type, base in dir_map:
+        if not base:
+            continue
+        try:
+            base_real = os.path.realpath(base)
+        except Exception:
+            continue
+        rel = os.path.relpath(real, base_real)
+        if rel.startswith("..") or os.path.isabs(rel):
+            continue
+        # rel is something like "veo_i2v_1234.mp4" or "subdir/clip.mp4"
+        subfolder, fname = os.path.split(rel)
+        return _view_url(fname, subfolder, folder_type)
+    return None
 
 
 def _safe(name: str) -> str:
