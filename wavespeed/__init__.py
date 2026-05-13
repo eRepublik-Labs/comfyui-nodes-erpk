@@ -37,8 +37,14 @@ from .wan_2_7_video_extend import Wan27VideoExtendNode
 from .wavespeed_veo_3_1_text_to_video import WaveSpeedVeo31TextToVideoNode
 from .wavespeed_veo_3_1_image_to_video import WaveSpeedVeo31ImageToVideoNode
 from .kling_v3_image_to_video import KlingV3ImageToVideoNode
+from .kling_v3_text_to_video import KlingV3TextToVideoNode
 from .kling_o3_text_to_video import KlingO3TextToVideoNode
 from .kling_o3_image_to_video import KlingO3ImageToVideoNode
+from .kling_v2_6_image_to_video import KlingV2_6ImageToVideoNode
+from .kling_v2_6_text_to_video import KlingV2_6TextToVideoNode
+from .kling_v2_5_turbo_image_to_video import KlingV2_5TurboImageToVideoNode
+from .kling_v2_5_turbo_text_to_video import KlingV2_5TurboTextToVideoNode
+from .kling_elements import KlingElementsNode
 from .ltx_2_pro_text_to_video import Ltx2ProTextToVideoNode
 from .ltx_2_pro_image_to_video import Ltx2ProImageToVideoNode
 from .ltx_2_3_text_to_video import Ltx23TextToVideoNode
@@ -84,8 +90,14 @@ NODES = [
     WaveSpeedVeo31TextToVideoNode,
     WaveSpeedVeo31ImageToVideoNode,
     KlingV3ImageToVideoNode,
+    KlingV3TextToVideoNode,
     KlingO3TextToVideoNode,
     KlingO3ImageToVideoNode,
+    KlingV2_6ImageToVideoNode,
+    KlingV2_6TextToVideoNode,
+    KlingV2_5TurboImageToVideoNode,
+    KlingV2_5TurboTextToVideoNode,
+    KlingElementsNode,
     Ltx2ProTextToVideoNode,
     Ltx2ProImageToVideoNode,
     Ltx23TextToVideoNode,

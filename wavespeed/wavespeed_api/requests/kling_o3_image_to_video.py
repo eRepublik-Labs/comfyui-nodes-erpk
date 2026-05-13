@@ -1,7 +1,7 @@
 # ABOUTME: Kling O3 image-to-video request for WaveSpeed AI.
 # ABOUTME: Routes to the kling-video-o3-std image-to-video endpoint under /kwaivgi/.
 
-from typing import Optional
+from typing import List, Optional
 from pydantic import Field
 from ..utils import BaseRequest
 
@@ -11,25 +11,33 @@ class KlingO3ImageToVideo(BaseRequest):
     Kling O3 image-to-video model.
 
     Generates a short video from a starting image and a text prompt.
+    Supports end-frame guidance, optional audio, shot composition mode,
+    and multi-prompt scene segmentation.
     """
 
-    prompt: str = Field(..., description="The positive prompt describing the desired motion.")
+    prompt: str = Field(..., description="The positive prompt describing the desired motion, camera, and action.")
     image: str = Field(..., description="URL of the starting image.")
+    end_image: Optional[str] = Field(
+        default=None,
+        description="URL of an optional end-frame guidance image.",
+    )
     duration: Optional[int] = Field(
         default=5,
-        description="Video duration in seconds (3-10).",
+        description="Video duration in seconds (3-15).",
         ge=3,
-        le=10,
+        le=15,
     )
-    aspect_ratio: Optional[str] = Field(
-        default="16:9",
-        description="Aspect ratio of the output video (e.g. '16:9', '9:16', '1:1').",
+    sound: Optional[bool] = Field(
+        default=None,
+        description="Enable synchronized audio generation (adds roughly 33% to base cost).",
     )
-    seed: Optional[int] = Field(
-        default=-1,
-        description="Random seed; -1 generates random seed.",
-        ge=-1,
-        le=2147483647,
+    shot_type: Optional[str] = Field(
+        default=None,
+        description="Shot composition mode: 'intelligent' (auto) or 'customize' (manual).",
+    )
+    multi_prompt: Optional[List[dict]] = Field(
+        default=None,
+        description="Scene-segmented prompt list for multi-shot compositions.",
     )
 
     def build_payload(self) -> dict:
@@ -37,9 +45,11 @@ class KlingO3ImageToVideo(BaseRequest):
         payload = {
             "prompt": self.prompt,
             "image": self.image,
+            "end_image": self.end_image,
             "duration": self.duration,
-            "aspect_ratio": self.aspect_ratio,
-            "seed": self.seed,
+            "sound": self.sound,
+            "shot_type": self.shot_type,
+            "multi_prompt": self.multi_prompt,
         }
         return self._remove_empty_fields(payload)
 
@@ -53,7 +63,9 @@ class KlingO3ImageToVideo(BaseRequest):
         return [
             "prompt",
             "image",
+            "end_image",
             "duration",
-            "aspect_ratio",
-            "seed",
+            "sound",
+            "shot_type",
+            "multi_prompt",
         ]

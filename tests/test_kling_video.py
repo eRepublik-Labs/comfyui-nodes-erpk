@@ -212,7 +212,6 @@ class TestKlingV3ImageToVideoNode:
         assert "image" in ids
         assert "seed" in ids
         assert "duration" in ids
-        assert "aspect_ratio" in ids
 
     def test_client_optional(self):
         schema = self._node().define_schema()
@@ -226,7 +225,7 @@ class TestKlingV3ImageToVideoNode:
         duration = next(i for i in schema.inputs if i.id == "duration")
         assert duration.default == 5
         assert duration.min == 3
-        assert duration.max == 10
+        assert duration.max == 15
 
     def test_output_is_string_video_url(self):
         schema = self._node().define_schema()
@@ -338,7 +337,6 @@ class TestKlingO3ImageToVideoNode:
         assert "image" in ids
         assert "seed" in ids
         assert "duration" in ids
-        assert "aspect_ratio" in ids
 
     def test_client_optional(self):
         schema = self._node().define_schema()

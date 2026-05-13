@@ -301,7 +301,7 @@ class TestWaveSpeedProviderExport:
     def test_nodes_list_has_all_classes(self):
         import importlib
         mod = importlib.import_module("wavespeed")
-        assert len(mod.NODES) == 45, f"Expected 45 WaveSpeed nodes, got {len(mod.NODES)}"
+        assert len(mod.NODES) == 51, f"Expected 51 WaveSpeed nodes, got {len(mod.NODES)}"
 
     def test_nodes_list_all_comfy_nodes(self):
         import importlib

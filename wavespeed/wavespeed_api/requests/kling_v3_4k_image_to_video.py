@@ -1,23 +1,26 @@
-# ABOUTME: Kling 3.0 image-to-video request for WaveSpeed AI.
-# ABOUTME: Routes to the kling-v3.0-std image-to-video endpoint under /kwaivgi/.
+# ABOUTME: Kling 3.0 4K image-to-video request for WaveSpeed AI.
+# ABOUTME: Routes to the kling-v3.0-4k image-to-video endpoint with the documented 4K parameter set.
 
 from typing import List, Optional
 from pydantic import Field
 from ..utils import BaseRequest
 
 
-class KlingV3ImageToVideo(BaseRequest):
+class KlingV34KImageToVideo(BaseRequest):
     """
-    Kling 3.0 image-to-video model.
+    Kling 3.0 4K image-to-video model.
 
-    Generates a short video from a starting image and a text prompt.
-    Supports negative prompts, end-frame guidance, cfg_scale, optional audio,
-    shot composition mode, multi-prompt scene segmentation, and element lists
-    for visual consistency.
+    Generates a high-resolution short video from a starting image.
+    The 4K endpoint derives aspect ratio from the input image and exposes
+    additional controls (negative prompt, end frame, cfg_scale, sound, shot type,
+    multi-prompt scene segmentation, and element list) compared to Std/Pro.
     """
 
-    prompt: str = Field(..., description="The positive prompt describing the desired motion.")
-    image: str = Field(..., description="URL of the starting image.")
+    prompt: Optional[str] = Field(
+        default=None,
+        description="Positive prompt describing the desired motion. Mutually exclusive with multi_prompt; one must be provided.",
+    )
+    image: str = Field(..., description="URL of the starting image (JPG/PNG, <=10MB, min 300px per side, aspect 1:2.5 to 2.5:1).")
     negative_prompt: Optional[str] = Field(
         default=None,
         description="Elements to exclude from the generation.",
@@ -33,22 +36,22 @@ class KlingV3ImageToVideo(BaseRequest):
         le=15,
     )
     cfg_scale: Optional[float] = Field(
-        default=None,
-        description="Prompt adherence strength (0-1). Higher means stricter adherence. API default is 0.5.",
+        default=0.5,
+        description="Prompt adherence strength (0-1). Higher means stricter adherence.",
         ge=0.0,
         le=1.0,
     )
     sound: Optional[bool] = Field(
-        default=None,
-        description="Enable synchronized audio generation. Applies a 1.5x cost multiplier when enabled.",
+        default=False,
+        description="Enable synchronized audio generation.",
     )
     shot_type: Optional[str] = Field(
-        default=None,
-        description="Shot composition mode: 'customize' or 'intelligent'. API default is 'intelligent'.",
+        default="customize",
+        description="Shot composition mode: 'customize' or 'intelligent'.",
     )
     multi_prompt: Optional[List[dict]] = Field(
         default=None,
-        description="Scene-segmented prompt list for multi-shot compositions.",
+        description="Scene-segmented prompt list; mutually exclusive with prompt.",
     )
     element_list: Optional[List[dict]] = Field(
         default=None,
@@ -72,10 +75,10 @@ class KlingV3ImageToVideo(BaseRequest):
         return self._remove_empty_fields(payload)
 
     def get_api_path(self):
-        return "/api/v3/kwaivgi/kling-v3.0-std/image-to-video"
+        return "/api/v3/kwaivgi/kling-v3.0-4k/image-to-video"
 
     def field_required(self):
-        return ["prompt", "image"]
+        return ["image"]
 
     def field_order(self):
         return [

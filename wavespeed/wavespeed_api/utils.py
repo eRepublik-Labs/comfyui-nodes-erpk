@@ -231,6 +231,25 @@ def image_to_data_uri(image) -> Optional[str]:
     return f"data:image/jpeg;base64,{b64}"
 
 
+def resolve_image_input(tensor_or_url, fallback_url: str = "") -> Optional[str]:
+    """Resolve an i2v image input to a URL or base64 data URI, or None.
+
+    Used by nodes that expose paired inputs: an IMAGE-typed slot (preferred,
+    becomes a base64 data URI) and a URL string widget (fallback). Accepts:
+
+    - a torch tensor / PIL image → converts to a data URI via image_to_data_uri
+    - a non-empty string in the tensor slot → treated as a URL string (back-compat
+      for callers that pass URLs to the image= kwarg, and for any test/programmatic
+      use that predates the IMAGE-input migration)
+    - None or empty string → falls back to the URL widget value, or None if empty
+    """
+    if isinstance(tensor_or_url, str):
+        return tensor_or_url if tensor_or_url else (fallback_url or None)
+    if tensor_or_url is not None:
+        return image_to_data_uri(tensor_or_url)
+    return fallback_url or None
+
+
 def images_to_data_uris(tensor, max_count: Optional[int] = None) -> Optional[List[str]]:
     """
     Convert a batched image tensor to a list of base64 data URIs.
