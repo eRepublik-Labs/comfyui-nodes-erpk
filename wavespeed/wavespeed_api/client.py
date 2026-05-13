@@ -292,8 +292,9 @@ class WaveSpeedClient:
             else:
                 payload["seed"] = payload["seed"] % 9999999999
 
-        # Submit request with appropriate timeout
-        initial_timeout = 60  # 60s for initial request submission
+        # i2v endpoints can post several MB of base64 data URIs (start + end frame);
+        # 60s was too tight on degraded uplinks and tripped write timeouts.
+        initial_timeout = 180
         response = self.post(request.get_api_path(), payload, timeout=initial_timeout)
 
         # Extract request ID
