@@ -34,3 +34,11 @@ Generates videos from an input image and optional text prompt using Google's Veo
 - Veo 3+ models generate synchronized audio along with video
 - Video generation is asynchronous and may take 2-10 minutes
 - Pricing: $0.75 per second of video output for Veo 3+ models
+
+## Gotchas / undocumented constraints
+
+These rules aren't in Google's published Veo parameter table but are confirmed by Google staff and senior developers in the discussion thread at https://discuss.ai.google.dev/t/veo-3-1-reference-images-docs-say-available-api-says-not-supported/111853. The node pre-validates them and raises a clear error before the API call, so you don't wait several minutes for the opaque `400 "Your use case is currently not supported"` response.
+
+- **Using `last_frame_image` (image + last-frame interpolation) requires `duration_seconds = 8`.** 4-second and 6-second durations fail with the opaque 400 after several minutes of wasted generation time.
+- **Using `reference_images` requires `duration_seconds = 8` AND `aspect_ratio = "16:9"`.** Portrait `9:16` is not supported with reference images.
+- **`reference_images` and `last_frame_image` are mutually exclusive.** Use one or the other, never both — the API rejects requests that mix them.
