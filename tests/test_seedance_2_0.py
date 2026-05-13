@@ -78,7 +78,7 @@ class TestSeedance20TextToVideoFastRequest:
     def test_api_path(self):
         cls = _import_request("seedance_2_0_text_to_video_fast", "Seedance20TextToVideoFast")
         request = cls(prompt="test")
-        assert request.get_api_path() == "/api/v3/bytedance/seedance-2.0/text-to-video-fast"
+        assert request.get_api_path() == "/api/v3/bytedance/seedance-2.0-fast/text-to-video"
 
     def test_inherits_from_base(self):
         base = _import_request("seedance_2_0_text_to_video", "Seedance20TextToVideo")
@@ -151,7 +151,7 @@ class TestSeedance20ImageToVideoFastRequest:
     def test_api_path(self):
         cls = _import_request("seedance_2_0_image_to_video_fast", "Seedance20ImageToVideoFast")
         request = cls(prompt="x", image="http://example.com/a.jpg")
-        assert request.get_api_path() == "/api/v3/bytedance/seedance-2.0/image-to-video-fast"
+        assert request.get_api_path() == "/api/v3/bytedance/seedance-2.0-fast/image-to-video"
 
     def test_inherits_from_base(self):
         base = _import_request("seedance_2_0_image_to_video", "Seedance20ImageToVideo")
@@ -318,10 +318,10 @@ class TestSeedance20ImageToVideoNodeSchema:
         assert "Seedance 2.0 Fast" in model_input.options
         assert "Seedance 2.0 Turbo" in model_input.options
 
-    def test_image_input_present(self):
+    def test_start_frame_input_present(self):
         cls = _import_node("seedance_2_0_image_to_video", "Seedance20ImageToVideoNode")
-        image = next(i for i in cls.define_schema().inputs if i.id == "image")
-        assert image.io_type == "STRING"
+        start_frame = next(i for i in cls.define_schema().inputs if i.id == "start_frame")
+        assert start_frame.io_type == "STRING"
 
     def test_client_input_optional(self):
         cls = _import_node("seedance_2_0_image_to_video", "Seedance20ImageToVideoNode")

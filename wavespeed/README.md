@@ -80,8 +80,8 @@ Video nodes return a STRING URL (pipe to `WaveSpeed Preview Video` or the Previe
 
 | Node | Models / Tiers | Description | Duration | Aspect / Resolution | API Docs |
 |------|----------------|-------------|----------|---------------------|----------|
-| **Bytedance Seedance 2.0 Text-to-Video** | Seedance 2.0, Fast, Turbo | Native audio-visual generation | 3-12s | 16:9/9:16/1:1 · 480p/720p/1080p | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedance-2.0-text-to-video) |
-| **Bytedance Seedance 2.0 Image-to-Video** | Seedance 2.0, Fast, Turbo | Animate source image with audio | 3-12s | Same as T2V | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedance-2.0-image-to-video) |
+| **Bytedance Seedance 2.0 Text-to-Video** | Seedance 2.0, Turbo, Fast, Fast Turbo | Native audio-visual generation; up to 4 reference images / videos / audios | 4-15s | 16:9/9:16/4:3/3:4/1:1/21:9 · 480p/720p/1080p (Turbo variants: 720p/1080p only) | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedance-2.0-text-to-video) |
+| **Bytedance Seedance 2.0 Image-to-Video** | Seedance 2.0, Turbo, Fast, Fast Turbo | Animate source image with audio; optional end frame | 4-15s | Same as T2V | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedance-2.0-image-to-video) |
 | **Alibaba WAN 2.7 Text-to-Video** | WAN 2.7 | Long-form video from text | 2-15s | 16:9/9:16/1:1 · 720p/1080p | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-text-to-video) |
 | **Alibaba WAN 2.7 Image-to-Video** | WAN 2.7 | Animate a source image | 2-15s | Same as T2V | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-image-to-video) |
 | **Alibaba WAN 2.7 Video Extend** | WAN 2.7 | Continue an existing clip | Configurable | Same as T2V | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-video-extend) |

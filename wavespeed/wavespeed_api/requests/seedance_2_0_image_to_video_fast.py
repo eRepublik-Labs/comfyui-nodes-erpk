@@ -8,4 +8,4 @@ class Seedance20ImageToVideoFast(Seedance20ImageToVideo):
     """Seedance 2.0 Fast Image-to-Video — same parameters, faster endpoint."""
 
     def get_api_path(self):
-        return "/api/v3/bytedance/seedance-2.0/image-to-video-fast"
+        return "/api/v3/bytedance/seedance-2.0-fast/image-to-video"

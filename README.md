@@ -86,7 +86,7 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 
 Video nodes return a STRING URL that works directly with the **Preview Anything** node for preview/download. Longer polling (10s interval, 15-minute timeout) handles multi-minute generation runs.
 
-- **Bytedance Seedance 2.0 Text-to-Video** / **Image-to-Video** - Native audio-visual generation with Regular/Fast/Turbo speed tiers
+- **Bytedance Seedance 2.0 Text-to-Video** / **Image-to-Video** - Native audio-visual generation across four model variants (Seedance 2.0, Turbo, Fast, Fast Turbo). T2V supports reference images/videos/audios; I2V supports optional end frame. Turbo variants are 720p/1080p only.
 - **Alibaba WAN 2.7 Text-to-Video** / **Image-to-Video** / **Video Extend** - WAN 2.7 with extension support for continuing existing clips
 - **WaveSpeed Veo 3.1 Text-to-Video** / **Image-to-Video** - Google Veo 3.1 via WaveSpeed billing (distinct from the Gemini-direct Veo nodes under `ERPK/Gemini/Veo`)
 - **Kling 3.0 Image-to-Video** - Kling v3.0 i2v with Standard and Pro quality tiers

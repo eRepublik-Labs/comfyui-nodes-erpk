@@ -9,12 +9,13 @@ class Seedance20ImageToVideoNode(IO.ComfyNode):
     Seedance 2.0 Image-to-Video Generator Node
 
     Animates a source image into a short video clip guided by a text prompt.
-    Supports three tiers — standard, Fast, Turbo — routed to distinct WaveSpeed endpoints.
+    Supports four endpoint variants (standard, Turbo, Fast, Fast Turbo) routed to
+    distinct WaveSpeed paths. Accepts an optional end-frame image for video continuation.
     Returns a URL string suitable for the Preview Anything utility.
     """
 
-    MODELS = ["Seedance 2.0", "Seedance 2.0 Fast", "Seedance 2.0 Turbo"]
-    ASPECT_RATIOS = ["16:9", "9:16", "1:1"]
+    MODELS = ["Seedance 2.0", "Seedance 2.0 Turbo", "Seedance 2.0 Fast", "Seedance 2.0 Fast Turbo"]
+    ASPECT_RATIOS = ["16:9", "9:16", "4:3", "3:4", "1:1", "21:9"]
     RESOLUTIONS = ["480p", "720p", "1080p"]
 
     @classmethod
@@ -22,7 +23,10 @@ class Seedance20ImageToVideoNode(IO.ComfyNode):
         from .wavespeed_api.requests.seedance_2_0_image_to_video import Seedance20ImageToVideo
         from .wavespeed_api.requests.seedance_2_0_image_to_video_fast import Seedance20ImageToVideoFast
         from .wavespeed_api.requests.seedance_2_0_image_to_video_turbo import Seedance20ImageToVideoTurbo
+        from .wavespeed_api.requests.seedance_2_0_image_to_video_fast_turbo import Seedance20ImageToVideoFastTurbo
 
+        if model == "Seedance 2.0 Fast Turbo":
+            return Seedance20ImageToVideoFastTurbo
         if model == "Seedance 2.0 Fast":
             return Seedance20ImageToVideoFast
         if model == "Seedance 2.0 Turbo":
@@ -38,15 +42,17 @@ class Seedance20ImageToVideoNode(IO.ComfyNode):
             inputs=[
                 IO.Combo.Input("model", options=cls.MODELS,
                                default="Seedance 2.0",
-                               tooltip="Model tier: Seedance 2.0 (standard quality), Seedance 2.0 Fast, or Seedance 2.0 Turbo"),
+                               tooltip="Model variant: standard, Turbo (faster, 720p/1080p only), Fast (cheaper), or Fast Turbo (Fast family + turbo, 720p/1080p only)"),
                 IO.String.Input("prompt", multiline=True, default="",
                                 tooltip="Text description of the desired motion"),
-                IO.String.Input("image",
-                                tooltip="URL of the source image to animate"),
+                IO.String.Input("start_frame",
+                                tooltip="Start frame image URL to guide the video generation"),
+                IO.String.Input("end_frame", optional=True, default="",
+                                tooltip="End frame image URL for video continuation (optional)"),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
-                IO.Int.Input("duration", optional=True, default=5, min=3, max=12,
-                             tooltip="Video duration in seconds (3-12)"),
+                IO.Int.Input("duration", optional=True, default=5, min=4, max=15,
+                             tooltip="Video duration in seconds (4-15)"),
                 IO.Combo.Input("aspect_ratio", optional=True,
                                options=cls.ASPECT_RATIOS,
                                default="16:9",
@@ -57,6 +63,10 @@ class Seedance20ImageToVideoNode(IO.ComfyNode):
                                tooltip="Video resolution"),
                 IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647, control_after_generate="randomize",
                              tooltip="Random seed for reproducibility (-1 for random)"),
+                IO.Boolean.Input("enable_web_search", optional=True, default=False,
+                                 tooltip="Enable web search for real-time information during generation"),
+                IO.Boolean.Input("generate_audio", optional=True, default=True,
+                                 tooltip="Generate native audio synchronized with the output video"),
             ],
             outputs=[
                 IO.String.Output("video_url"),
@@ -70,8 +80,9 @@ class Seedance20ImageToVideoNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, model="Seedance 2.0", prompt="", image="", client=None,
-                duration=5, aspect_ratio="16:9", resolution="720p", seed=-1,
+    def execute(cls, model="Seedance 2.0", prompt="", start_frame="",
+                end_frame="", client=None, duration=5, aspect_ratio="16:9", resolution="720p", seed=-1,
+                enable_web_search=False, generate_audio=True,
                 **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
 
@@ -82,17 +93,20 @@ class Seedance20ImageToVideoNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        if image is None or image == "":
-            raise ValueError("Image must be provided")
+        if start_frame is None or start_frame == "":
+            raise ValueError("Start frame image must be provided")
 
         request_cls = cls._request_class_for(model)
 
         request = request_cls(
             prompt=prompt,
-            image=image,
+            image=start_frame,
+            last_image=end_frame or None,
             duration=duration,
             aspect_ratio=aspect_ratio,
             resolution=resolution,
+            enable_web_search=enable_web_search,
+            generate_audio=generate_audio,
             seed=seed,
         )
 
