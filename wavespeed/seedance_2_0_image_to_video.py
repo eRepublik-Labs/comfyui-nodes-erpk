@@ -40,19 +40,19 @@ class Seedance20ImageToVideoNode(IO.ComfyNode):
             display_name="Bytedance Seedance 2.0 Image-to-Video",
             category="ERPK/WaveSpeedAI",
             inputs=[
+                IO.Image.Input("start_frame", optional=True,
+                               tooltip="Start frame as a ComfyUI IMAGE tensor. Preferred input — takes precedence over `start_frame_url` when connected. Sent to WaveSpeed as a base64 data URI."),
+                IO.String.Input("start_frame_url", optional=True, default="",
+                                tooltip="Start frame image URL. Fallback when `start_frame` IMAGE input is not connected."),
+                IO.Image.Input("end_frame", optional=True,
+                               tooltip="End frame as a ComfyUI IMAGE tensor for video continuation. Preferred input — takes precedence over `end_frame_url` when connected."),
+                IO.String.Input("end_frame_url", optional=True, default="",
+                                tooltip="End frame image URL for video continuation. Fallback when `end_frame` IMAGE input is not connected."),
                 IO.Combo.Input("model", options=cls.MODELS,
                                default="Seedance 2.0",
                                tooltip="Model variant: standard, Turbo (faster, 720p/1080p only), Fast (cheaper), or Fast Turbo (Fast family + turbo, 720p/1080p only)"),
                 IO.String.Input("prompt", multiline=True, default="",
                                 tooltip="Text description of the desired motion"),
-                IO.String.Input("start_frame", optional=True, default="",
-                                tooltip="Start frame image URL. Leave blank if connecting `start_frame_image` instead."),
-                IO.String.Input("end_frame", optional=True, default="",
-                                tooltip="End frame image URL for video continuation. Leave blank if connecting `end_frame_image` instead."),
-                IO.Image.Input("start_frame_image", optional=True,
-                               tooltip="Start frame as a ComfyUI IMAGE tensor. Takes precedence over `start_frame` URL when connected. Sent to WaveSpeed as a base64 data URI."),
-                IO.Image.Input("end_frame_image", optional=True,
-                               tooltip="End frame as a ComfyUI IMAGE tensor. Takes precedence over `end_frame` URL when connected. Sent to WaveSpeed as a base64 data URI."),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
                 IO.Int.Input("duration", optional=True, default=5, min=4, max=15,
@@ -84,8 +84,9 @@ class Seedance20ImageToVideoNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, model="Seedance 2.0", prompt="", start_frame="",
-                end_frame="", start_frame_image=None, end_frame_image=None,
+    def execute(cls, model="Seedance 2.0", prompt="",
+                start_frame=None, start_frame_url="",
+                end_frame=None, end_frame_url="",
                 client=None, duration=5, aspect_ratio="16:9", resolution="720p", seed=-1,
                 enable_web_search=False, generate_audio=True,
                 **kwargs):
@@ -99,11 +100,11 @@ class Seedance20ImageToVideoNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        start_value = image_to_data_uri(start_frame_image) if start_frame_image is not None else (start_frame or None)
+        start_value = image_to_data_uri(start_frame) if start_frame is not None else (start_frame_url or None)
         if not start_value:
             raise ValueError("Start frame must be provided as either an IMAGE tensor or a URL")
 
-        end_value = image_to_data_uri(end_frame_image) if end_frame_image is not None else (end_frame or None)
+        end_value = image_to_data_uri(end_frame) if end_frame is not None else (end_frame_url or None)
 
         request_cls = cls._request_class_for(model)
 

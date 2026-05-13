@@ -318,10 +318,15 @@ class TestSeedance20ImageToVideoNodeSchema:
         assert "Seedance 2.0 Fast" in model_input.options
         assert "Seedance 2.0 Turbo" in model_input.options
 
-    def test_start_frame_input_present(self):
+    def test_start_frame_image_input_present(self):
         cls = _import_node("seedance_2_0_image_to_video", "Seedance20ImageToVideoNode")
         start_frame = next(i for i in cls.define_schema().inputs if i.id == "start_frame")
-        assert start_frame.io_type == "STRING"
+        assert start_frame.io_type == "IMAGE"
+
+    def test_start_frame_url_input_present(self):
+        cls = _import_node("seedance_2_0_image_to_video", "Seedance20ImageToVideoNode")
+        start_frame_url = next(i for i in cls.define_schema().inputs if i.id == "start_frame_url")
+        assert start_frame_url.io_type == "STRING"
 
     def test_client_input_optional(self):
         cls = _import_node("seedance_2_0_image_to_video", "Seedance20ImageToVideoNode")
