@@ -11,13 +11,12 @@ Edits existing images based on text prompts using OpenAI's image editing API. Su
 |-----------|------|---------|-------------|
 | image | Image | — | Input image to edit |
 | prompt | String | (empty) | Description of how to modify the image |
-| client | OPENAI_API_CLIENT | — | OpenAI API client (optional if using api_key or Settings) |
+| client | OPENAI_API_CLIENT | — | OpenAI API client (optional if API key is configured in Settings) |
 | mask | Mask | — | Areas to edit: white=edit, black=keep (optional). Enables inpainting |
 | model | Combo | gpt-image-1 | Editing model: gpt-image-1.5, gpt-image-1, gpt-image-1-mini (optional) |
 | size | Combo | 1024x1024 | Output image size (optional). Options: 1024x1024, 1024x1536, 1536x1024, 512x512, 256x256 |
 | quality | Combo | auto | Image quality: auto, low, medium, high (optional). gpt-image models only |
 | n | Int | 1 | Number of images to generate (optional). Range: 1–4 |
-| api_key | String | (empty) | OpenAI API key (optional). Only needed if not using client input |
 
 ## Output
 

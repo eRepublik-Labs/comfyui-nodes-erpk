@@ -80,20 +80,19 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     tooltip=(
                         "Image generation model. "
                         "gpt-image-2: latest flagship, 4K output, multilingual text. "
-                        "gpt-image-1.5: previous flagship, supports transparent background. "
-                        "dall-e-3 is deprecated and will shut down on 2026-05-12."
+                        "gpt-image-1.5: previous flagship, supports transparent background."
                     ),
                 ),
-                IO.Combo.Input(
+                IO.String.Input(
                     "size",
-                    options=GEN_SIZES,
                     default="1024x1024",
                     optional=True,
                     tooltip=(
-                        "Image size. Options auto-filter based on the selected model "
-                        "(256x256 / 512x512 only valid on dall-e-2 and gpt-image-1/-mini; "
-                        "4K options only on gpt-image-2). gpt-image-2 also requires at "
-                        "least 655,360 total pixels, so 1024x1024 is the safe minimum."
+                        "Image size as WIDTHxHEIGHT (e.g. \"1024x1024\", \"1536x864\"). "
+                        "Standard GPT Image sizes: 1024x1024, 1536x1024, 1024x1536. "
+                        "gpt-image-2 accepts arbitrary sizes: both edges divisible by 16, "
+                        "aspect ratio between 1:3 and 3:1, total pixels 655,360 to 8,294,400, "
+                        "max edge 3840px. Use \"auto\" to let the model choose."
                     ),
                 ),
                 IO.Combo.Input(
@@ -101,7 +100,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     options=["auto", "low", "medium", "high", "hd", "standard"],
                     default="auto",
                     optional=True,
-                    tooltip="Image quality (gpt-image-1: low/medium/high/auto, dall-e-3: hd/standard)",
+                    tooltip="Image quality. auto/low/medium/high for GPT Image family; hd/standard are legacy DALL-E values, kept for compatibility.",
                 ),
                 IO.Combo.Input(
                     "background",
@@ -109,9 +108,9 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     default="auto",
                     optional=True,
                     tooltip=(
-                        "Background type (GPT Image models only). "
-                        "gpt-image-2 rejects 'transparent' — it's auto-coerced to 'opaque'. "
-                        "Use gpt-image-1.5 or earlier for true transparent output."
+                        "Background type for the generated output (GPT Image models only). "
+                        "'transparent' requires an output format that supports transparency "
+                        "(png or webp)."
                     ),
                 ),
                 IO.Combo.Input(
@@ -122,7 +121,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     tooltip=(
                         "Content moderation level (GPT Image models only). "
                         "'auto' uses OpenAI's default safety filters; 'low' relaxes "
-                        "them for permissive content. Ignored by dall-e-2 / dall-e-3."
+                        "them for permissive content."
                     ),
                 ),
                 IO.Int.Input(
@@ -132,16 +131,8 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     max=10,
                     optional=True,
                     tooltip=(
-                        "Number of images to generate per call (OpenAI supports 1-10). "
-                        "dall-e-3 is hard-capped at n=1 by the API; picking n>1 with "
-                        "dall-e-3 will raise a clear error before the request is sent."
+                        "Number of images to generate per call (OpenAI supports 1-10)."
                     ),
-                ),
-                IO.String.Input(
-                    "api_key",
-                    default="",
-                    optional=True,
-                    tooltip="OpenAI API key (only needed if not using client input)",
                 ),
                 IO.Int.Input(
                     "seed",
@@ -174,7 +165,6 @@ class OpenAIImageGeneration(IO.ComfyNode):
         background = kwargs.get("background", "auto")
         moderation = kwargs.get("moderation", "auto")
         n = kwargs.get("n", 1)
-        api_key = kwargs.get("api_key", "")
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -185,7 +175,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
                 image_client = client
             else:
                 image_client = OpenAIClient(
-                    api_key=api_key if api_key.strip() else None,
+                    api_key=None,
                     model=model
                 )
 
@@ -229,7 +219,9 @@ class OpenAIImageGeneration(IO.ComfyNode):
             if revised_prompt:
                 print(f"[OpenAI] Revised prompt: {revised_prompt[:100]}...")
 
-            return IO.NodeOutput(image_tensor, revised_prompt)
+            from ..utils.inline_preview import inline_preview_image
+            ui = inline_preview_image(cls, image_tensor, slot=0)
+            return IO.NodeOutput(image_tensor, revised_prompt, ui=ui)
 
         except Exception as e:
             error_msg = f"Failed to generate image: {str(e)}"
@@ -356,12 +348,6 @@ class OpenAIImageResponses(IO.ComfyNode):
                         "Adds $10/1000 calls when the model actually invokes it."
                     ),
                 ),
-                IO.String.Input(
-                    "api_key",
-                    default="",
-                    optional=True,
-                    tooltip="OpenAI API key (only needed if not using client input)",
-                ),
                 IO.Int.Input(
                     "seed",
                     default=-1,
@@ -398,7 +384,6 @@ class OpenAIImageResponses(IO.ComfyNode):
         output_format = kwargs.get("output_format", "png")
         moderation = kwargs.get("moderation", "auto")
         enable_web_search = kwargs.get("enable_web_search", False)
-        api_key = kwargs.get("api_key", "")
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -408,7 +393,7 @@ class OpenAIImageResponses(IO.ComfyNode):
                 image_client = client
             else:
                 image_client = OpenAIClient(
-                    api_key=api_key if api_key.strip() else None,
+                    api_key=None,
                     model=mainline_model,
                 )
 
@@ -454,7 +439,9 @@ class OpenAIImageResponses(IO.ComfyNode):
             if reasoning_summary:
                 print(f"[OpenAI Responses] Reasoning summary ({len(reasoning_summary)} chars)")
 
-            return IO.NodeOutput(image_tensor, revised_prompt, reasoning_summary)
+            from ..utils.inline_preview import inline_preview_image
+            ui = inline_preview_image(cls, image_tensor, slot=0)
+            return IO.NodeOutput(image_tensor, revised_prompt, reasoning_summary, ui=ui)
 
         except Exception as e:
             error_msg = f"Failed to generate image via Responses API: {str(e)}"
@@ -549,11 +536,26 @@ class OpenAIImageEdit(IO.ComfyNode):
                         "(OpenAI supports 1-10 for all GPT Image models)."
                     ),
                 ),
-                IO.String.Input(
-                    "api_key",
-                    default="",
+                IO.Combo.Input(
+                    "background",
+                    options=["auto", "transparent", "opaque"],
+                    default="auto",
                     optional=True,
-                    tooltip="OpenAI API key (only needed if not using client input)",
+                    tooltip=(
+                        "Background type for the edited output (GPT Image models only). "
+                        "'transparent' requires an output format that supports transparency."
+                    ),
+                ),
+                IO.Combo.Input(
+                    "input_fidelity",
+                    options=["auto", "high", "low"],
+                    default="auto",
+                    optional=True,
+                    tooltip=(
+                        "Fidelity to the original input image(s). 'high' preserves details "
+                        "more aggressively; 'low' gives the model more creative freedom. "
+                        "Ignored by gpt-image-2 (always processes at high fidelity)."
+                    ),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -585,7 +587,8 @@ class OpenAIImageEdit(IO.ComfyNode):
         quality = kwargs.get("quality", "auto")
         moderation = kwargs.get("moderation", "auto")
         n = kwargs.get("n", 1)
-        api_key = kwargs.get("api_key", "")
+        background = kwargs.get("background", "auto")
+        input_fidelity = kwargs.get("input_fidelity", "auto")
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -596,7 +599,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                 image_client = client
             else:
                 image_client = OpenAIClient(
-                    api_key=api_key if api_key.strip() else None,
+                    api_key=None,
                     model=model
                 )
 
@@ -671,6 +674,8 @@ class OpenAIImageEdit(IO.ComfyNode):
                 quality=quality,
                 moderation=moderation,
                 n=n,
+                background=background,
+                input_fidelity=input_fidelity,
             )
 
             if response.get("blocked", False):
@@ -691,7 +696,9 @@ class OpenAIImageEdit(IO.ComfyNode):
                 image_tensor = torch.cat(tensors, dim=0)
             print(f"[OpenAI] Edited {len(tensors)} image(s), batch shape: {image_tensor.shape}")
 
-            return IO.NodeOutput(image_tensor)
+            from ..utils.inline_preview import inline_preview_image
+            ui = inline_preview_image(cls, image_tensor, slot=0)
+            return IO.NodeOutput(image_tensor, ui=ui)
 
         except Exception as e:
             error_msg = f"Failed to edit image: {str(e)}"

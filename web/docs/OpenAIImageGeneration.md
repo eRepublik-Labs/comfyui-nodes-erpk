@@ -10,13 +10,12 @@ Generates images using OpenAI's image generation models including GPT-Image 1.5,
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | prompt | String | (empty) | Description of the image to generate |
-| client | OPENAI_API_CLIENT | — | OpenAI API client (optional if using api_key or Settings) |
+| client | OPENAI_API_CLIENT | — | OpenAI API client (optional if API key is configured in Settings) |
 | model | Combo | gpt-image-1.5 | Image model: gpt-image-1.5, gpt-image-1, gpt-image-1-mini, dall-e-3 (optional) |
 | size | Combo | 1024x1024 | Image size (optional). Options: 1024x1024, 1024x1536, 1536x1024, 512x512, 256x256, 1792x1024, 1024x1792 |
 | quality | Combo | auto | Image quality (optional). gpt-image: low/medium/high/auto. dall-e-3: hd/standard |
 | background | Combo | auto | Background type: auto, transparent, opaque (optional). gpt-image models only |
 | n | Int | 1 | Number of images to generate (optional). Range: 1–4. DALL-E 3 only supports 1 |
-| api_key | String | (empty) | OpenAI API key (optional). Only needed if not using client input |
 
 ## Output
 

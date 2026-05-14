@@ -32,7 +32,6 @@ Use **OpenAI Image Generation (Responses)** when you want:
 | `output_format` | Combo | `png` | Output image format: png, jpeg, webp. |
 | `moderation` | Combo | `auto` | Content moderation: auto (default safety) or low (relaxed). |
 | `enable_web_search` | Boolean | `false` | Add the web_search tool alongside image_generation. Mainline model decides whether to invoke it. Adds $10/1000 calls when used. |
-| `api_key` | String (optional) | — | OpenAI API key (use if not configured in ComfyUI Settings). |
 | `seed` | Int | -1 | Cache-bust seed. -1 randomizes every run. |
 
 ## Outputs

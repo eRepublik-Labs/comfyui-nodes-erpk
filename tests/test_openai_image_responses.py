@@ -169,17 +169,17 @@ class TestGptImage2SizeValidation:
         assert sdk.responses.create.called
 
 
-class TestBackgroundCoercion:
-    """gpt-image-2 rejects transparent — should coerce to opaque consistent with direct path."""
+class TestBackgroundPassThrough:
+    """Background param passes through unchanged (no client-side coercion)."""
 
-    def test_transparent_coerced_to_opaque_on_gpt_image_2(self):
+    def test_transparent_passes_through_on_gpt_image_2(self):
         client, sdk = _make_client_with_mock_response([_image_call()])
         client.generate_image_via_responses(
             prompt="x", image_model="gpt-image-2",
             size="1024x1024", background="transparent",
         )
         tool = sdk.responses.create.call_args.kwargs["tools"][0]
-        assert tool["background"] == "opaque"
+        assert tool["background"] == "transparent"
 
     def test_transparent_preserved_for_gpt_image_1_5(self):
         client, sdk = _make_client_with_mock_response([_image_call()])

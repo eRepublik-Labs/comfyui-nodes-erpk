@@ -192,11 +192,11 @@ Generate images from text descriptions using OpenAI's image generation models.
 **Inputs:**
 - `prompt`: Text description of the image to generate
 - `client`: Optional OpenAI API client (from OpenAI API Config node)
-- `model`: gpt-image-2 (default, latest flagship), gpt-image-1.5, gpt-image-1, gpt-image-1-mini, dall-e-3 (shuts down 2026-05-12)
+- `model`: gpt-image-2 (default, latest flagship), gpt-image-1.5, gpt-image-1, gpt-image-1-mini
 - `size`: Image dimensions - 1024x1024 (default), 1024x1536, 1536x1024, 512x512, 256x256, 1792x1024, 1024x1792
-- `quality`: Image quality - auto (default), low, medium, high (GPT Image family) or hd, standard (dall-e-3)
+- `quality`: Image quality - auto (default), low, medium, high (GPT Image family)
 - `background`: Background type - auto, transparent, opaque (GPT Image family; gpt-image-2 auto-coerces `transparent` to `opaque`)
-- `n`: Number of images (1-4, dall-e-3 hard-capped at 1)
+- `n`: Number of images (1-10)
 - `api_key`: Optional API key (only needed if not using client input)
 
 **Outputs:**
@@ -320,7 +320,6 @@ Edit and modify existing images using text prompts with optional masking.
 | **gpt-image-1.5** | Previous flagship | 2K output, transparent background support |
 | **gpt-image-1** | High quality | Editing, transparent backgrounds |
 | **gpt-image-1-mini** | Cost-efficient | Budget image generation |
-| **dall-e-3** | Legacy generation | **Shuts down 2026-05-12** — migrate to GPT Image family |
 
 ## Example Workflows
 

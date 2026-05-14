@@ -410,17 +410,16 @@ class TestVerbosityPassThrough:
         assert "verbosity" not in kwargs
 
 
-class TestDallE3DeprecationTooltip:
-    """Image generation node's model tooltip warns about dall-e-3 deprecation."""
+class TestImageGenerationModelTooltip:
+    """Image generation node's model tooltip describes the GPT Image variants."""
 
-    def test_tooltip_mentions_dall_e_3_deprecation(self):
+    def test_tooltip_describes_gpt_image_models(self):
         cls = _import_node("image_nodes", "OpenAIImageGeneration")
         schema = cls.define_schema()
         model_inputs = [i for i in schema.inputs if i.id == "model"]
         assert len(model_inputs) == 1
         tooltip = model_inputs[0].tooltip or ""
-        assert "dall-e-3" in tooltip.lower()
-        assert "deprecated" in tooltip.lower()
+        assert "gpt-image" in tooltip.lower()
 
     def test_gpt_image_1_mini_in_options(self):
         cls = _import_node("image_nodes", "OpenAIImageGeneration")

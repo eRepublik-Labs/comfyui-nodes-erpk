@@ -57,17 +57,17 @@ class TestGenerateImageParams:
         )
 
 
-class TestGptImage2BackgroundCoercion:
-    """gpt-image-2 rejects background='transparent'; client must coerce to 'opaque'."""
+class TestGptImage2Background:
+    """Background param passes through unchanged to gpt-image-2 (no client-side coercion)."""
 
-    def test_transparent_coerced_to_opaque_for_gpt_image_2(self):
+    def test_transparent_passes_through_for_gpt_image_2(self):
         client, mock = _make_client_with_mock()
         client.generate_image(
             prompt="a cat", model="gpt-image-2", background="transparent"
         )
         params = mock.images.generate.call_args[1]
-        assert params.get("background") == "opaque", (
-            "gpt-image-2 should coerce background='transparent' to 'opaque'"
+        assert params.get("background") == "transparent", (
+            "background must be forwarded unchanged; OpenAI now controls model-specific support"
         )
 
     def test_transparent_preserved_for_gpt_image_1_5(self):
