@@ -200,8 +200,57 @@ class TestMultiUserSettings:
             assert get_comfy_setting("ERPK.GOOGLE_API_KEY", user_id="alice_abc123") == "alice-key"
             assert get_comfy_setting("ERPK.GOOGLE_API_KEY", user_id="bob_def456") == "bob-key"
 
-    def test_user_id_not_found_falls_back_to_iteration(self, tmp_path):
-        """If user_id directory doesn't exist, falls back to iterating dirs."""
+    def test_identified_user_missing_key_does_not_borrow_from_peer(self, tmp_path):
+        """An identified user whose settings file exists but lacks the key
+        must NOT receive another user's value for that key.
+
+        Mirrors how production callers invoke this: no default, so the
+        per-user lookup returns None and the previous code fell through
+        to the peer scan."""
+        user_dir = tmp_path / "user"
+        user_dir.mkdir()
+
+        alice_dir = user_dir / "alice_abc123"
+        alice_dir.mkdir()
+        write_settings(alice_dir, {"ERPK.GOOGLE_API_KEY": "alice-key"})
+
+        bob_dir = user_dir / "bob_def456"
+        bob_dir.mkdir()
+        write_settings(bob_dir, {"ERPK.UNRELATED": "bob-other"})
+
+        mock_folder_paths = MagicMock()
+        mock_folder_paths.get_user_directory.return_value = str(user_dir)
+
+        with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
+            result = get_comfy_setting("ERPK.GOOGLE_API_KEY", user_id="bob_def456")
+            assert result is None
+
+    def test_identified_user_empty_value_does_not_borrow_from_peer(self, tmp_path):
+        """An identified user whose value is empty/whitespace must NOT
+        receive another user's value for that key."""
+        user_dir = tmp_path / "user"
+        user_dir.mkdir()
+
+        alice_dir = user_dir / "alice_abc123"
+        alice_dir.mkdir()
+        write_settings(alice_dir, {"ERPK.GOOGLE_API_KEY": "alice-key"})
+
+        bob_dir = user_dir / "bob_def456"
+        bob_dir.mkdir()
+        write_settings(bob_dir, {"ERPK.GOOGLE_API_KEY": ""})
+
+        mock_folder_paths = MagicMock()
+        mock_folder_paths.get_user_directory.return_value = str(user_dir)
+
+        with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
+            result = get_comfy_setting(
+                "ERPK.GOOGLE_API_KEY", default="missing", user_id="bob_def456"
+            )
+            assert result == "missing"
+
+    def test_unknown_user_id_does_not_borrow_from_peers(self, tmp_path):
+        """An identified user_id whose directory doesn't exist must NOT
+        cause a peer scan. Strict isolation: user_id is a closed lookup."""
         user_dir = tmp_path / "user"
         user_dir.mkdir()
         default_dir = user_dir / "default"
@@ -212,8 +261,10 @@ class TestMultiUserSettings:
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
 
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
-            result = get_comfy_setting("ERPK.GOOGLE_API_KEY", user_id="nonexistent_user")
-            assert result == "default-key"
+            result = get_comfy_setting(
+                "ERPK.GOOGLE_API_KEY", default="missing", user_id="nonexistent_user"
+            )
+            assert result == "missing"
 
     def test_no_user_id_uses_iteration(self, tmp_path):
         """Without user_id, falls back to iterating (default first)."""

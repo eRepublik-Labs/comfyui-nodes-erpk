@@ -46,10 +46,14 @@ def _read_settings_file(settings_path, setting_id, default):
 def get_comfy_setting(setting_id, default=None, user_id=None):
     """Read a setting from ComfyUI's per-user settings file.
 
-    In multi-user mode, uses user_id to read the correct user's settings.
-    If user_id is not provided, tries get_current_user_id() to auto-detect
-    from the executing prompt's context, then falls back to iterating
-    directories with "default" first.
+    In multi-user mode, resolves the setting against the identified user
+    only. If user_id is omitted, get_current_user_id() is consulted; if
+    that also yields nothing (background tasks, no WebSocket context),
+    user directories are scanned with "default" first.
+
+    User isolation is strict: when a user_id is known, this function will
+    NEVER return a setting belonging to another user. A miss returns the
+    caller's default, not a peer's value.
 
     Args:
         setting_id: The setting key (e.g. "ERPK.ANTHROPIC_API_KEY")
@@ -65,18 +69,16 @@ def get_comfy_setting(setting_id, default=None, user_id=None):
     except (ImportError, AttributeError, TypeError):
         return default
 
-    # Auto-detect user_id from execution context if not provided
     if user_id is None:
         user_id = get_current_user_id()
 
-    # If we have a specific user_id, try that directory first
     if user_id:
         settings_path = os.path.join(user_dir, user_id, "comfy.settings.json")
         result = _read_settings_file(settings_path, setting_id, default)
         if result is not None:
             return result
+        return default
 
-    # Fallback: iterate directories with "default" first
     try:
         user_dirs = [
             d for d in os.listdir(user_dir)
@@ -93,9 +95,6 @@ def get_comfy_setting(setting_id, default=None, user_id=None):
         user_dirs.insert(0, "default")
 
     for subdir in user_dirs:
-        # Skip the user_id we already tried
-        if subdir == user_id:
-            continue
         settings_path = os.path.join(user_dir, subdir, "comfy.settings.json")
         result = _read_settings_file(settings_path, setting_id, default)
         if result is not None:
