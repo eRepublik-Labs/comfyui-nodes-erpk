@@ -3,7 +3,7 @@
 
 # Apple ML Models - ComfyUI Custom Nodes
 
-**Version:** 2026.4.21 (CalVer)
+**Version:** 2026.5.6 (CalVer)
 **Category:** ERPK/Apple/SHARP
 **Namespace:** ERPK Organization Custom Nodes
 
