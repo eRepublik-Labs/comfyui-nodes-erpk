@@ -558,14 +558,20 @@ function buildImageGallery(urls, filenameBase, preview) {
     wrapper.appendChild(header);
 
     const cols = computeGalleryCols(urls.length);
+    const rows = Math.ceil(urls.length / cols);
     const gridView = document.createElement("div");
     gridView.className = "erpk-gallery-grid";
     gridView.style.display = "grid";
     gridView.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    // Explicit row tracks let cells divide the grid's allocated height
+    // instead of inheriting a width-derived size from `aspect-ratio:1/1`,
+    // which would otherwise force the grid to overflow when the content
+    // area is shorter than its width × rows.
+    gridView.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
     gridView.style.gap = "6px";
     gridView.style.width = "100%";
     gridView.style.flex = "1 1 auto";
-    gridView.style.alignContent = "start";
+    gridView.style.minHeight = "0";
 
     const singleView = document.createElement("div");
     singleView.className = "erpk-gallery-single";
@@ -587,7 +593,11 @@ function buildImageGallery(urls, filenameBase, preview) {
         const cell = document.createElement("div");
         cell.className = "erpk-gallery-cell";
         cell.style.position = "relative";
-        cell.style.aspectRatio = "1 / 1";
+        // Cells fill their grid track (sized by gridTemplateRows × gridTemplateColumns
+        // at `1fr` each). `min-*: 0` lets the cell shrink below its intrinsic image
+        // size so the grid never overflows the content area.
+        cell.style.minWidth = "0";
+        cell.style.minHeight = "0";
         cell.style.overflow = "hidden";
         cell.style.borderRadius = "4px";
         cell.style.cursor = "pointer";
@@ -814,46 +824,8 @@ function buildImageGallery(urls, filenameBase, preview) {
     return wrapper;
 }
 
-// Grow the node height so the widget's content fits fully inside its
-// current rendered rect. Rather than guessing the full node-chrome
-// (header + other widgets + padding), we compute the delta between the
-// content's natural height and its current rendered height, and add
-// that delta to the node's size. Width is left to the user.
-function resizeNodeToContent(node) {
-    if (!node || typeof node.setSize !== "function") return;
-
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            const preview = node._erpkPreview;
-            if (!preview?.root) return;
-
-            const contentEl = preview.content;
-            const toolbarEl = preview.root.querySelector("button")?.parentElement;
-
-            // Natural height needed: content's intrinsic height + toolbar height +
-            // flex gap (6px) + root padding (6*2 = 12px).
-            const contentNaturalH = contentEl.scrollHeight;
-            const toolbarH = toolbarEl ? toolbarEl.getBoundingClientRect().height : 0;
-            const gap = 6;
-            const rootPadding = 12;
-            const naturalRootH = contentNaturalH + toolbarH + gap + rootPadding;
-
-            const currentRootH = preview.root.getBoundingClientRect().height;
-            const delta = naturalRootH - currentRootH;
-
-            if (delta > 2) {
-                const newH = (node.size?.[1] || 260) + delta;
-                node.setSize([node.size?.[0] || 320, newH]);
-                node.setDirtyCanvas?.(true, true);
-            }
-        });
-    });
-}
-
-function renderInto(content, payload, onMediaReady, preview) {
+function renderInto(content, payload, preview) {
     clearChildren(content);
-    content.style.aspectRatio = "";
-    content.style.height = "";
 
     if (!payload) {
         content.textContent = "No content.";
@@ -861,17 +833,26 @@ function renderInto(content, payload, onMediaReady, preview) {
     }
 
     const kind = payload.kind || "text";
-    const notifyReady = () => { if (typeof onMediaReady === "function") onMediaReady(); };
 
     if (kind === "image" || kind === "gif") {
+        // Flex-centered wrapper so the image sits in the middle of whatever
+        // shape the node currently has. The image hugs its own rendered
+        // size via max-* + auto, so the dims overlay anchors to the image
+        // (not the wrapper) — no floating-in-letterbox-space surprise.
         const wrapper = document.createElement("div");
         wrapper.style.position = "relative";
         wrapper.style.width = "100%";
+        wrapper.style.height = "100%";
+        wrapper.style.display = "flex";
+        wrapper.style.alignItems = "center";
+        wrapper.style.justifyContent = "center";
 
         const img = document.createElement("img");
         img.src = payload.url;
         img.alt = payload.filename || "image";
-        img.style.width = "100%";
+        img.style.maxWidth = "100%";
+        img.style.maxHeight = "100%";
+        img.style.width = "auto";
         img.style.height = "auto";
         img.style.display = "block";
         img.style.borderRadius = "3px";
@@ -897,11 +878,9 @@ function renderInto(content, payload, onMediaReady, preview) {
 
         img.addEventListener("load", () => {
             if (img.naturalWidth && img.naturalHeight) {
-                content.style.aspectRatio = `${img.naturalWidth} / ${img.naturalHeight}`;
                 dims.textContent = `${img.naturalWidth} × ${img.naturalHeight}`;
                 dims.style.opacity = "1";
             }
-            notifyReady();
         }, { once: true });
 
         wrapper.appendChild(img);
@@ -913,24 +892,18 @@ function renderInto(content, payload, onMediaReady, preview) {
     if (kind === "image_gallery") {
         const urls = Array.isArray(payload.urls) ? payload.urls : [];
         // Pass preview so the gallery can drive the download button's label
-        // and track grid/single view state. DON'T trigger notifyReady —
-        // galleries don't auto-resize the node (would balloon it with empty
-        // space on compact grids; user controls node size manually).
+        // and track grid/single view state.
         const gallery = buildImageGallery(urls, payload.filename, preview);
         content.appendChild(gallery);
         return;
     }
 
     if (kind === "video") {
-        // Wrapper uses position:absolute to fill content reliably across
-        // ComfyUI redraws (right-click context menus trigger layout passes
-        // that can confuse percentage heights through flex containers).
         // Centering + max-width/height keeps the video proportional and
         // as large as possible within whatever shape content takes.
-        content.style.position = "relative";
         const wrapper = document.createElement("div");
-        wrapper.style.position = "absolute";
-        wrapper.style.inset = "0";
+        wrapper.style.width = "100%";
+        wrapper.style.height = "100%";
         wrapper.style.display = "flex";
         wrapper.style.alignItems = "center";
         wrapper.style.justifyContent = "center";
@@ -943,20 +916,6 @@ function renderInto(content, payload, onMediaReady, preview) {
         video.style.maxHeight = "100%";
         video.style.display = "block";
         video.style.borderRadius = "3px";
-        video.addEventListener("loadedmetadata", () => {
-            if (video.videoWidth && video.videoHeight) {
-                // Aspect ratio is set so resizeNodeToContent can compute the right
-                // initial node height (it runs in 2 rAFs after notifyReady), then
-                // we release the constraint so the user can freely resize.
-                content.style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
-                notifyReady();
-                requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => {
-                    content.style.aspectRatio = "";
-                })));
-            } else {
-                notifyReady();
-            }
-        }, { once: true });
         wrapper.appendChild(video);
         content.appendChild(wrapper);
         return;
@@ -969,7 +928,6 @@ function renderInto(content, payload, onMediaReady, preview) {
         audio.preload = "metadata";
         audio.style.width = "100%";
         audio.style.display = "block";
-        audio.addEventListener("loadedmetadata", notifyReady, { once: true });
         content.appendChild(audio);
         return;
     }
@@ -980,8 +938,6 @@ function renderInto(content, payload, onMediaReady, preview) {
         md.style.lineHeight = "1.5";
         renderMarkdownInto(md, payload.text || "");
         content.appendChild(md);
-        // Text/markdown does NOT resize the node — the content area already
-        // scrolls, and long text would otherwise make the node swallow the canvas.
         return;
     }
 
@@ -999,6 +955,17 @@ app.registerExtension({
 
     async beforeRegisterNodeDef(nodeType, nodeData) {
         if (nodeData.name !== NODE_ID) return;
+
+        // Enforce a hard minimum size at the LiteGraph layer. The canvas
+        // renderer reads `computeSize` when drag-resizing and clamps the
+        // dragged dimensions to at least that. Without this override, the
+        // node would let the user drag below the height needed for the
+        // toolbar and content area, pushing them outside the node body.
+        const origComputeSize = nodeType.prototype.computeSize;
+        nodeType.prototype.computeSize = function () {
+            const size = origComputeSize?.apply(this, arguments) ?? [320, 260];
+            return [Math.max(size[0], 320), Math.max(size[1], 260)];
+        };
 
         const onNodeCreated = nodeType.prototype.onNodeCreated;
         nodeType.prototype.onNodeCreated = function () {
@@ -1100,6 +1067,8 @@ app.registerExtension({
                 hideOnZoom: false,
             });
 
+            // 260 high is the floor. User can drag the node taller when they
+            // need more room for a gallery or large media.
             if (this.size[1] < 260) this.size[1] = 260;
             if (this.size[0] < 320) this.size[0] = 320;
 
@@ -1119,7 +1088,7 @@ app.registerExtension({
             this._erpkPreview.downloadBtn.disabled = false;
             this._erpkPreview.syncDisabledStyle();
             updateToolbarForKind(this._erpkPreview, payload);
-            renderInto(this._erpkPreview.content, payload, () => resizeNodeToContent(this), this._erpkPreview);
+            renderInto(this._erpkPreview.content, payload, this._erpkPreview);
 
             this.properties = this.properties || {};
             this.properties._erpkLastPayload = payload;
@@ -1128,6 +1097,11 @@ app.registerExtension({
         const onConfigure = nodeType.prototype.onConfigure;
         nodeType.prototype.onConfigure = function (info) {
             const r = onConfigure?.apply(this, arguments);
+            // Re-enforce the minimum size: the parent's configure restored
+            // info.size from the workflow JSON, which would otherwise lock
+            // the node to a stale smaller size from before the floor was raised.
+            if (this.size[1] < 260) this.size[1] = 260;
+            if (this.size[0] < 320) this.size[0] = 320;
             const saved = info?.properties?._erpkLastPayload
                 ?? this.properties?._erpkLastPayload;
             if (saved) {
@@ -1137,7 +1111,7 @@ app.registerExtension({
                     this._erpkPreview.downloadBtn.disabled = false;
                     this._erpkPreview.syncDisabledStyle();
                     updateToolbarForKind(this._erpkPreview, saved);
-                    renderInto(this._erpkPreview.content, saved, () => resizeNodeToContent(this), this._erpkPreview);
+                    renderInto(this._erpkPreview.content, saved, this._erpkPreview);
                 }, 50);
             }
             return r;
