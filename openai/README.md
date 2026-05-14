@@ -193,28 +193,26 @@ Generate images from text descriptions using OpenAI's image generation models.
 - `prompt`: Text description of the image to generate
 - `client`: Optional OpenAI API client (from OpenAI API Config node)
 - `model`: gpt-image-2 (default, latest flagship), gpt-image-1.5, gpt-image-1, gpt-image-1-mini
-- `size`: Image dimensions - 1024x1024 (default), 1024x1536, 1536x1024, 512x512, 256x256, 1792x1024, 1024x1792
+- `size`: Free-form WIDTHxHEIGHT string (default 1024x1024). Each model has its own supported sizes; the API rejects unsupported values.
 - `quality`: Image quality - auto (default), low, medium, high (GPT Image family)
-- `background`: Background type - auto, transparent, opaque (GPT Image family; gpt-image-2 auto-coerces `transparent` to `opaque`)
+- `background`: Background type - auto, transparent, opaque (GPT Image family)
 - `n`: Number of images (1-10)
-- `api_key`: Optional API key (only needed if not using client input)
 
 **Outputs:**
 - `image`: Generated image batch (ComfyUI IMAGE tensor; when n>1, all images are stacked into a batch)
-- `revised_prompt`: Model's revised prompt (DALL-E 3 and GPT Image 2 may modify your prompt)
+- `revised_prompt`: Model's revised prompt (GPT Image models may modify your prompt)
 
 **Features:**
-- Works with OpenAI API Config node or standalone with API key
+- Credentials resolved from ComfyUI Settings, OPENAI_API_KEY env, or config.ini
 - Direct image output compatible with all ComfyUI image nodes
-- Transparent background support with gpt-image-1.5 / gpt-image-1 / gpt-image-1-mini (not gpt-image-2)
+- Transparent background support with gpt-image-1.5 / gpt-image-1 / gpt-image-1-mini
 - n>1 returns a batched IMAGE tensor — no images are dropped
-- Multiple size options
+- Free-form size input (validated against the model's supported sizes by the API)
 
 **gpt-image-2 constraints** (enforced client-side as defense-in-depth):
 - Max edge ≤ 3840px, both edges multiples of 16
 - Total pixels between 655,360 and 8,294,400
 - Aspect ratio (long:short) ≤ 3:1
-- `transparent` background rejected by API — node auto-coerces to `opaque` with a warning log
 
 **Example Prompts:**
 - "A futuristic cityscape at sunset with flying cars"
@@ -234,11 +232,10 @@ Generate images via the OpenAI Responses API with a mainline reasoning model dri
 - `reasoning_effort`: none (default), minimal, low, medium, high, xhigh (only reasoning-capable mainlines use this)
 - `size`: 1024x1024 (default) and common variants
 - `quality`: auto / low / medium / high
-- `background`: auto / transparent / opaque (same gpt-image-2 coercion as the direct node)
+- `background`: auto / transparent / opaque
 - `output_format`: png (default), jpeg, webp
 - `moderation`: auto (default) or low
 - `enable_web_search`: Attach the `web_search` tool so the mainline model can ground the prompt in fresh reference material (adds ~$10/1000 calls when invoked)
-- `api_key`: Optional (only if not using client input)
 - `seed`: Cache-bust seed (randomizes by default)
 
 **Outputs:**
@@ -263,15 +260,16 @@ Edit and modify existing images using text prompts with optional masking.
 - `model`: gpt-image-2 (default, latest flagship), gpt-image-1.5, gpt-image-1, gpt-image-1-mini
 - `size`: Output image size - 1024x1024 (default), 1024x1536, 1536x1024, 512x512, 256x256
 - `quality`: Image quality - auto (default), low, medium, high
+- `background`: auto / transparent / opaque (GPT Image family)
+- `input_fidelity`: auto / high / low (gpt-image-1.5 / gpt-image-1 / mini; gpt-image-2 always processes at high fidelity and the param is dropped silently)
 - `n`: Number of variations (1-4)
-- `api_key`: Optional API key (only needed if not using client input)
 
 **Outputs:**
 - `image`: Edited image (ComfyUI IMAGE tensor)
 
 **Features:**
 - Inpainting with optional mask support
-- Works with OpenAI API Config node or standalone with API key
+- Credentials resolved from ComfyUI Settings, OPENAI_API_KEY env, or config.ini
 - Compatible with all ComfyUI image nodes
 
 **Example Use Cases:**
@@ -398,8 +396,8 @@ https://openai.com/pricing
 ### Image generation fails
 - Check your API quota and billing status
 - Some sizes are only available for certain models
-- Transparent backgrounds work with gpt-image-1.5, gpt-image-1, gpt-image-1-mini. gpt-image-2 auto-coerces to `opaque` (API rejects transparent).
-- gpt-image-2 enforces min 655,360 total pixels and max-edge 3840 — pick a supported size in the dropdown
+- Transparent backgrounds are supported by the GPT Image family. Pass-through values: any of `auto`, `transparent`, `opaque` go to the API as-is.
+- gpt-image-2 enforces min 655,360 total pixels and max-edge 3840 — the size input is free-form, so type a size your chosen model supports
 
 ### Rate limiting
 - The nodes include automatic retry with exponential backoff

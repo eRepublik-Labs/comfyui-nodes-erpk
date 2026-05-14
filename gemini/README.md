@@ -188,14 +188,13 @@ Generate images from text descriptions using Gemini's image generation models.
 - `image_size`: Resolution - "default", "512px", "1K", "2K", "4K" (512px-4K for 3.1 Flash, 1K-4K for 3 Pro; 2.5 Flash fixed at 1024px)
 - `response_modalities`: "IMAGE" (image only) or "TEXT+IMAGE" (image + text description)
 - `enable_google_search`: Enable Google Search grounding (Gemini 3 models only)
-- `api_key`: Optional API key (only needed if not using client input)
 
 **Outputs:**
 - `image`: Generated image (ComfyUI IMAGE tensor)
 - `description`: Text description (only when response_modalities is TEXT+IMAGE)
 
 **Features:**
-- Works with Gemini API Config node or standalone with API key
+- Credentials resolved from ComfyUI Settings, GOOGLE_API_KEY env, or config.ini
 - Direct image output compatible with all ComfyUI image nodes
 - Three image models: 3.1 Flash (best balance), 3 Pro (professional quality), 2.5 Flash (speed)
 - Configurable creativity with temperature
@@ -226,14 +225,13 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 - `response_modalities`: "IMAGE" (image only) or "TEXT+IMAGE" (image + text description)
 - `enable_google_search`: Enable Google Search grounding (Gemini 3 models only)
 - `additional_images`: Optional additional reference images (combined with primary image input, up to 14 total)
-- `api_key`: Optional API key (only needed if not using client input)
 
 **Outputs:**
 - `image`: Edited image (ComfyUI IMAGE tensor)
 - `description`: Text description (only when response_modalities is TEXT+IMAGE)
 
 **Features:**
-- Works with Gemini API Config node or standalone with API key
+- Credentials resolved from ComfyUI Settings, GOOGLE_API_KEY env, or config.ini
 - Gemini 3 models support up to 14 reference images (up to 6 objects, up to 5 humans)
 - Image-to-image editing with natural language instructions
 - Compatible with all ComfyUI image nodes
