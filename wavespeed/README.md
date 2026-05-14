@@ -1,6 +1,6 @@
 # WaveSpeed AI - ComfyUI Custom Nodes
 
-**Version:** 2026.5.4 (CalVer)
+**Version:** 2026.5.5 (CalVer)
 **Category:** ERPK/WaveSpeedAI
 **Namespace:** ERPK Organization Custom Nodes
 
@@ -525,7 +525,7 @@ pip install -r requirements.txt
 ```
 [ERPK] Loaded <N> V3 nodes
 ```
-The WaveSpeed module alone contributes 51 nodes as of 2026.5.4.
+The WaveSpeed module alone contributes 51 nodes as of 2026.5.5.
 
 ### Common Issues
 
@@ -600,7 +600,7 @@ Video:
 
 This package follows **Calendar Versioning (CalVer)**: `YYYY.MM.PATCH`
 
-**Current Version:** 2026.5.4
+**Current Version:** 2026.5.5
 
 - Major changes are released monthly
 - Patch releases for bug fixes within the month
