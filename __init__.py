@@ -94,13 +94,19 @@ try:
 
     @PromptServer.instance.routes.post("/erpk/register_user")
     async def erpk_register_user(request):
-        """Map a WebSocket client_id to a ComfyUI user_id for settings resolution."""
+        """Map a WebSocket client_id to a ComfyUI user_id for settings resolution.
+
+        Refuses to overwrite an existing binding to a different user_id —
+        prevents map poisoning where Bob could hijack Alice's client_id and
+        cause Alice's prompts to resolve settings as Bob.
+        """
         try:
             data = await request.json()
             client_id = data.get("client_id")
             if client_id:
                 user_id = PromptServer.instance.user_manager.get_request_user_id(request)
-                erpk_settings._client_user_map[client_id] = user_id
+                if not erpk_settings.register_client_user(client_id, user_id):
+                    return web.Response(status=409)
         except (KeyError, Exception):
             pass
         return web.Response(status=200)
@@ -162,13 +168,18 @@ try:
             try:
                 user_id = PromptServer.instance.user_manager.get_request_user_id(request)
                 users = PromptServer.instance.user_manager.users
-                user = users.get(user_id, user_id)
+                display_name = users.get(user_id, user_id)
             except Exception:
-                user = None
-            shared_workflows.save_workflow(name, workflow, user=user)
+                user_id = None
+                display_name = None
+            shared_workflows.save_workflow(
+                name, workflow, user_id=user_id, display_name=display_name
+            )
             return web.json_response({"ok": True, "name": name})
         except ValueError as e:
             return web.json_response({"error": str(e)}, status=400)
+        except PermissionError as e:
+            return web.json_response({"error": str(e)}, status=403)
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
 
@@ -176,12 +187,18 @@ try:
     async def erpk_delete_shared_workflow(request):
         name = request.match_info["name"]
         try:
-            deleted = shared_workflows.delete_workflow(name)
+            try:
+                user_id = PromptServer.instance.user_manager.get_request_user_id(request)
+            except Exception:
+                user_id = None
+            deleted = shared_workflows.delete_workflow(name, user_id=user_id)
             if not deleted:
                 return web.json_response({"error": "Not found"}, status=404)
             return web.json_response({"ok": True})
         except ValueError as e:
             return web.json_response({"error": str(e)}, status=400)
+        except PermissionError as e:
+            return web.json_response({"error": str(e)}, status=403)
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
 

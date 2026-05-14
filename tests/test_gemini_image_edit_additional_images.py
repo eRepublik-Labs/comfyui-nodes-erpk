@@ -1,31 +1,35 @@
 # ABOUTME: Tests for GeminiImageEdit additional_images support.
-# ABOUTME: Verifies the node accepts and merges additional image inputs.
+# ABOUTME: Verifies the V3 schema declares additional_images and merging works.
 
 import pytest
 import torch
 from unittest.mock import patch, MagicMock
 
 
-def test_input_types_has_additional_images():
-    """additional_images must be declared as an optional input."""
+def test_schema_has_additional_images():
+    """additional_images must be declared as an optional IMAGE input in the V3 schema."""
     from gemini.nodes import GeminiImageEdit
 
-    input_types = GeminiImageEdit.INPUT_TYPES()
-    assert "additional_images" in input_types["optional"], (
-        "additional_images should be an optional input"
-    )
-    assert input_types["optional"]["additional_images"][0] == "IMAGE"
+    schema = GeminiImageEdit.define_schema()
+    addl = [i for i in schema.inputs if i.id == "additional_images"]
+    assert len(addl) == 1, "additional_images should appear once in the schema inputs"
+    assert addl[0].optional is True
+    assert addl[0].io_type == "IMAGE"
 
 
-def test_edit_image_accepts_additional_images_kwarg():
-    """edit_image() must accept additional_images without TypeError."""
+def test_execute_is_classmethod_accepting_kwargs():
+    """V3 nodes expose execute() (not edit_image()) and pass through kwargs.
+    The schema is the contract for which kwargs are accepted; this test just
+    pins the V3 callable shape so V2-style refactors don't silently regress."""
     import inspect
     from gemini.nodes import GeminiImageEdit
 
-    sig = inspect.signature(GeminiImageEdit.edit_image)
-    assert "additional_images" in sig.parameters, (
-        "edit_image() must accept additional_images parameter"
+    assert hasattr(GeminiImageEdit, "execute"), "V3 nodes must expose execute()"
+    sig = inspect.signature(GeminiImageEdit.execute)
+    has_var_kw = any(
+        p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
     )
+    assert has_var_kw, "execute() must accept **kwargs so the schema can drive inputs"
 
 
 @patch("gemini.nodes.GeminiClient")
@@ -33,19 +37,11 @@ def test_additional_images_merged_into_contents(mock_client_cls):
     """When additional_images is provided, all images appear in the API call."""
     from gemini.nodes import GeminiImageEdit
 
-    node = GeminiImageEdit()
-
     # Create fake image tensors (B, H, W, C) — 1 primary + 2 additional
     primary = torch.rand(1, 64, 64, 3)
     additional = torch.rand(2, 64, 64, 3)
 
     # Mock the Gemini client and its response
-    mock_client = MagicMock()
-    mock_client.api_key = "test-key"
-    mock_client.safety_settings = None
-    mock_client.system_instruction = None
-
-    # Build a fake response with an image part
     fake_image_bytes = _make_tiny_png()
     mock_part = MagicMock()
     mock_part.text = None
@@ -59,17 +55,20 @@ def test_additional_images_merged_into_contents(mock_client_cls):
     mock_instance = MagicMock()
     mock_instance.api_key = "test-key"
     mock_instance.model_name = "gemini-3-pro-image-preview"
+    mock_instance.safety_settings = None
+    mock_instance.system_instruction = None
     mock_instance.client.models.generate_content.return_value = mock_response
     mock_client_cls.return_value = mock_instance
 
-    result = node.edit_image(
+    # V3 uses execute() (classmethod) instead of V1's edit_image()
+    GeminiImageEdit.execute(
         image=primary,
         prompt="test prompt",
-        client=mock_client,
+        client=mock_instance,
         additional_images=additional,
     )
 
-    # Verify generate_content was called
+    # Verify generate_content was called with all images merged into contents
     call_args = mock_instance.client.models.generate_content.call_args
     contents = call_args.kwargs.get("contents") or call_args[1].get("contents")
 

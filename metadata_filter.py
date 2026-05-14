@@ -36,12 +36,17 @@ def make_patched_input_types(original_fn):
 
 
 def install():
-    """Apply the SaveImage/PreviewImage monkey-patches. Call once at import time."""
+    """Apply the SaveImage/PreviewImage monkey-patches. Idempotent: subsequent
+    calls (e.g., after module reload) detect the sentinel and bail out."""
     try:
         import nodes
+        if getattr(nodes.SaveImage, "_erpk_metadata_patched", False):
+            return
         nodes.SaveImage.save_images = make_filtered_save_images(nodes.SaveImage.save_images)
         nodes.SaveImage.INPUT_TYPES = make_patched_input_types(nodes.SaveImage.INPUT_TYPES)
         nodes.PreviewImage.INPUT_TYPES = make_patched_input_types(nodes.PreviewImage.INPUT_TYPES)
+        nodes.SaveImage._erpk_metadata_patched = True
+        nodes.PreviewImage._erpk_metadata_patched = True
         print("[ERPK] Installed SaveImage/PreviewImage metadata toggle")
     except ImportError:
         pass

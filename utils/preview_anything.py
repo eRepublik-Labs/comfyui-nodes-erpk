@@ -177,13 +177,15 @@ def _reencode_image_url_without_metadata(url: str, filename: str):
         return None
 
     try:
-        original = Image.open(io.BytesIO(raw_bytes))
-        original.load()  # force decode before creating clean copy
-        # Create a fresh image containing ONLY pixel data. Paste drops
-        # EXIF / ICC profile / XMP / all format-specific metadata.
-        clean = Image.new(original.mode, original.size)
-        clean.paste(original)
-        fmt = original.format or "PNG"
+        from .safe_fetch import safe_image_decode
+        with safe_image_decode():
+            original = Image.open(io.BytesIO(raw_bytes))
+            original.load()  # force decode before creating clean copy
+            # Create a fresh image containing ONLY pixel data. Paste drops
+            # EXIF / ICC profile / XMP / all format-specific metadata.
+            clean = Image.new(original.mode, original.size)
+            clean.paste(original)
+            fmt = original.format or "PNG"
     except Exception as e:
         print(f"[PreviewAnything] strip_metadata: PIL decode failed ({e}); passing original URL")
         return None
@@ -218,6 +220,10 @@ _EXT_BY_PIL_FORMAT = {
 }
 
 
+_IMAGE_MAX_BYTES = 100 * 1024 * 1024
+_LOOPBACK_MAX_BYTES = 500 * 1024 * 1024
+
+
 def _fetch_url_bytes(url: str, timeout_seconds: int = 30):
     """Fetch URL content as bytes. Handles http(s), data:, and local /view?
     paths (served by the same ComfyUI instance via loopback).
@@ -227,10 +233,13 @@ def _fetch_url_bytes(url: str, timeout_seconds: int = 30):
     try:
         parsed = urlparse(url)
         if parsed.scheme in ("http", "https"):
-            import urllib.request
-            req = urllib.request.Request(url, headers={"User-Agent": "ERPK-PreviewAnything/1.0"})
-            with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
-                return resp.read()
+            from .safe_fetch import fetch_remote_bytes
+            return fetch_remote_bytes(
+                url,
+                max_bytes=_IMAGE_MAX_BYTES,
+                timeout=timeout_seconds,
+                user_agent="ERPK-PreviewAnything/1.0",
+            )
         if parsed.scheme == "data":
             # data:<mediatype>;base64,<payload>
             header, _, payload = url.partition(",")
@@ -240,11 +249,17 @@ def _fetch_url_bytes(url: str, timeout_seconds: int = 30):
             from urllib.parse import unquote_to_bytes
             return unquote_to_bytes(payload)
         if parsed.scheme == "" and url.startswith("/"):
-            # ComfyUI serves /view?filename=X&type=Y; try loopback
+            # ComfyUI serves /view?filename=X&type=Y on its own loopback port;
+            # this branch deliberately targets 127.0.0.1 and bypasses the IP
+            # blocklist. Bounded by _LOOPBACK_MAX_BYTES to prevent OOM if
+            # someone crafts a /view URL pointing at a huge served file.
             import urllib.request
             try:
                 with urllib.request.urlopen(f"http://127.0.0.1:8188{url}", timeout=timeout_seconds) as resp:
-                    return resp.read()
+                    data = resp.read(_LOOPBACK_MAX_BYTES + 1)
+                    if len(data) > _LOOPBACK_MAX_BYTES:
+                        return None
+                    return data
             except Exception:
                 return None
         return None

@@ -146,7 +146,7 @@ class PreviewVideo(IO.ComfyNode):
 
     @classmethod
     def execute(cls, video_url, save_file_prefix, **kwargs):
-        import requests
+        from utils.safe_fetch import fetch_remote_bytes
         try:
             import folder_paths
         except ImportError:
@@ -159,18 +159,23 @@ class PreviewVideo(IO.ComfyNode):
             raise ValueError("No video URL provided")
 
         try:
-            response = requests.get(video_url, timeout=60)
-            response.raise_for_status()
-            video_data = response.content
-        except requests.RequestException as e:
+            video_data = fetch_remote_bytes(
+                video_url,
+                max_bytes=500 * 1024 * 1024,
+                timeout=60,
+                user_agent="ERPK-WaveSpeed-PreviewVideo/1.0",
+            )
+        except (ValueError, IOError) as e:
             raise RuntimeError(f"Error downloading video: {e}")
 
         file_extension = os.path.splitext(video_url)[-1].lower()
         if not file_extension or file_extension == '.' or len(file_extension) > 5:
             file_extension = '.mp4'
 
+        from utils.safe_path import safe_filename_prefix
         output_dir = folder_paths.get_output_directory()
-        filename = f"{save_file_prefix}_{int(time.time())}{file_extension}"
+        safe_prefix = safe_filename_prefix(save_file_prefix, default="wavespeed_video")
+        filename = f"{safe_prefix}_{int(time.time())}{file_extension}"
         file_path = os.path.join(output_dir, filename)
 
         with open(file_path, "wb") as f:
@@ -208,7 +213,7 @@ class SaveAudio(IO.ComfyNode):
 
     @classmethod
     def execute(cls, audio_url, save_file_prefix, **kwargs):
-        import requests
+        from utils.safe_fetch import fetch_remote_bytes
         try:
             import folder_paths
         except ImportError:
@@ -226,10 +231,13 @@ class SaveAudio(IO.ComfyNode):
             raise ValueError("No audio URL provided")
 
         try:
-            response = requests.get(audio_url, timeout=60)
-            response.raise_for_status()
-            audio_data = response.content
-        except requests.RequestException as e:
+            audio_data = fetch_remote_bytes(
+                audio_url,
+                max_bytes=100 * 1024 * 1024,
+                timeout=60,
+                user_agent="ERPK-WaveSpeed-SaveAudio/1.0",
+            )
+        except (ValueError, IOError) as e:
             raise RuntimeError(f"Error downloading audio: {e}")
 
         file_extension = os.path.splitext(audio_url)[-1].lower()

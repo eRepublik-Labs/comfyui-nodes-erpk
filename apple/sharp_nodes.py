@@ -275,9 +275,11 @@ class SHARPPredict(IO.ComfyNode):
         os.makedirs(output_dir, exist_ok=True)
 
         # Generate unique filename
+        from utils.safe_path import safe_filename_prefix
+        safe_prefix = safe_filename_prefix(filename_prefix, default="sharp")
         counter = 1
         while True:
-            ply_filename = f"{filename_prefix}_{counter:05d}.ply"
+            ply_filename = f"{safe_prefix}_{counter:05d}.ply"
             ply_path = os.path.join(output_dir, ply_filename)
             if not os.path.exists(ply_path):
                 break
@@ -542,9 +544,11 @@ class SHARPRenderVideo(IO.ComfyNode):
         os.makedirs(output_dir, exist_ok=True)
 
         # Generate unique filename
+        from utils.safe_path import safe_filename_prefix
+        safe_prefix = safe_filename_prefix(filename_prefix, default="sharp_video")
         counter = 1
         while True:
-            video_filename = f"{filename_prefix}_{counter:05d}.mp4"
+            video_filename = f"{safe_prefix}_{counter:05d}.mp4"
             video_path = os.path.join(output_dir, video_filename)
             if not os.path.exists(video_path):
                 break

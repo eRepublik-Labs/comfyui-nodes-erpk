@@ -1,20 +1,23 @@
 # ABOUTME: Consolidated requirements for all ERPK ComfyUI nodes
-# ABOUTME: Install with: pip install -r requirements.txt
+# ABOUTME: Mirror of pyproject.toml dependencies. Install with: pip install -r requirements.txt
+# ABOUTME: Source of truth: pyproject.toml. Keep these versions in sync.
 
 # Core dependencies (all packages)
-requests>=2.31.0
-Pillow>=10.0.0
+requests>=2.33.0
+Pillow>=12.2.0
 pydantic>=2.0.0
-urllib3>=1.26.0
+urllib3>=2.7.0
+cryptography>=46.0.7
 
 # Claude API integration
-anthropic>=0.40.0
+anthropic>=0.96.0
 
 # Google Gemini API integration
 google-genai>=2.2.0
 
 # OpenAI API integration
-openai>=1.0.0
+openai>=2.32.0
 
 # Apple SHARP - Single-image to 3D Gaussian view synthesis
+# TODO: pin to a specific commit hash once apple/ml-sharp publishes a stable tag
 sharp @ git+https://github.com/apple/ml-sharp.git

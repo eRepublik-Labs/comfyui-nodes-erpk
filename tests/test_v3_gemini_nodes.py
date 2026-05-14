@@ -111,6 +111,11 @@ class TestGeminiV3Compliance:
 
     def test_schema_has_inputs(self, node_spec):
         cls, *_ = node_spec
+        # Config-only nodes (e.g., GeminiAPIConfig) intentionally take no
+        # inputs — they exist to emit a client to other nodes.
+        _ZERO_INPUT_NODES = {"GeminiAPIConfig"}
+        if cls.__name__ in _ZERO_INPUT_NODES:
+            pytest.skip(f"{cls.__name__} is a config-only node with no inputs")
         schema = cls.define_schema()
         assert len(schema.inputs) > 0, f"{cls.__name__} schema must have inputs"
 
@@ -208,12 +213,15 @@ class TestGeminiCustomTypes:
         assert addl[0].optional is True
         assert addl[0].io_type == "IMAGE"
 
-    def test_veo_text_to_video_accepts_required_client(self):
+    def test_veo_text_to_video_accepts_optional_client(self):
+        # The client input is optional across all V3 provider nodes — the
+        # key can be resolved from ComfyUI Settings, env var, or config.ini
+        # when no client is connected.
         cls = _import_node("veo_nodes", "VeoTextToVideo")
         schema = cls.define_schema()
         client_inputs = [i for i in schema.inputs if i.id == "client"]
         assert len(client_inputs) == 1
-        assert client_inputs[0].optional is False
+        assert client_inputs[0].optional is True
 
     def test_veo_image_to_video_accepts_image(self):
         cls = _import_node("veo_nodes", "VeoImageToVideo")

@@ -27,13 +27,17 @@ def imageurl2tensor(image_urls: List[str]):
     if not image_urls:
         return torch.zeros((1, 1, 1, 3))
 
+    from utils.safe_fetch import fetch_remote_bytes, safe_image_decode
     for url in image_urls:
         try:
-            response = requests.get(url, stream=True, timeout=30)
-            response.raise_for_status()
-            image_data = response.content
+            image_data = fetch_remote_bytes(
+                url,
+                max_bytes=100 * 1024 * 1024,
+                timeout=30,
+                user_agent="ERPK-WaveSpeed-Image/1.0",
+            )
 
-            with io.BytesIO(image_data) as bytes_io:
+            with safe_image_decode(), io.BytesIO(image_data) as bytes_io:
                 img = PIL.Image.open(bytes_io)
                 img = img.convert('RGB')
                 images.append(img)
@@ -67,13 +71,17 @@ def imageurl2tensor_rgba(image_urls: List[str]):
     if not image_urls:
         return torch.zeros((1, 1, 1, 3)), torch.zeros((1, 1, 1))
 
+    from utils.safe_fetch import fetch_remote_bytes, safe_image_decode
     for url in image_urls:
         try:
-            response = requests.get(url, stream=True, timeout=30)
-            response.raise_for_status()
-            image_data = response.content
+            image_data = fetch_remote_bytes(
+                url,
+                max_bytes=100 * 1024 * 1024,
+                timeout=30,
+                user_agent="ERPK-WaveSpeed-ImageRGBA/1.0",
+            )
 
-            with io.BytesIO(image_data) as bytes_io:
+            with safe_image_decode(), io.BytesIO(image_data) as bytes_io:
                 img = PIL.Image.open(bytes_io)
                 img = img.convert('RGBA')
                 r, g, b, a = img.split()

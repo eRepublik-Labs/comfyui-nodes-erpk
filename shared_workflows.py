@@ -102,34 +102,55 @@ def get_workflow(name):
     return workflow
 
 
-def save_workflow(name, workflow, user=None):
-    """Atomically save a workflow to the shared storage.
+def save_workflow(name, workflow, user_id=None, display_name=None):
+    """Atomically save a workflow to shared storage with owner-only auth.
 
-    Wraps the workflow in an envelope with authorship metadata.
-    On overwrite, preserves the original creator.
-    Creates the storage directory if it doesn't exist.
-    Uses tempfile + os.replace() for atomic writes.
-    Raises ValueError for invalid names.
+    Requires user_id. On overwrite, only the original creator can write;
+    a mismatch raises PermissionError. Legacy files lacking
+    created_by_user_id are claimable by the first authenticated save.
+
+    Args:
+        name: workflow name (validated against whitelist)
+        workflow: workflow JSON to save
+        user_id: immutable identifier of the saver (required)
+        display_name: human-readable name for UI (defaults to user_id)
+
+    Raises:
+        ValueError: invalid name
+        PermissionError: missing user_id or overwrite by non-creator
     """
     name = validate_name(name)
-    os.makedirs(STORAGE_DIR, exist_ok=True)
 
+    if not user_id:
+        raise PermissionError("user_id required to save shared workflow")
+
+    if display_name is None:
+        display_name = user_id
+
+    os.makedirs(STORAGE_DIR, exist_ok=True)
     filepath = os.path.join(STORAGE_DIR, name + ".json")
 
-    # Preserve original creator on overwrite
-    created_by = user
+    created_by_user_id = user_id
+    created_by_display = display_name
     if os.path.isfile(filepath):
         try:
             existing_meta, _ = _read_envelope(filepath)
-            if existing_meta.get("created_by") is not None:
-                created_by = existing_meta["created_by"]
         except (OSError, json.JSONDecodeError):
-            pass
+            existing_meta = {}
+        existing_user_id = existing_meta.get("created_by_user_id")
+        if existing_user_id is not None:
+            if existing_user_id != user_id:
+                raise PermissionError(
+                    f"Workflow {name!r} is owned by another user"
+                )
+            created_by_display = existing_meta.get("created_by", display_name)
 
     envelope = {
         "meta": {
-            "created_by": created_by,
-            "modified_by": user,
+            "created_by": created_by_display,
+            "created_by_user_id": created_by_user_id,
+            "modified_by": display_name,
+            "modified_by_user_id": user_id,
         },
         "workflow": workflow,
     }
@@ -140,7 +161,6 @@ def save_workflow(name, workflow, user=None):
             json.dump(envelope, f, indent=2)
         os.replace(tmp_path, filepath)
     except BaseException:
-        # Clean up temp file on any failure
         try:
             os.unlink(tmp_path)
         except OSError:
@@ -148,14 +168,36 @@ def save_workflow(name, workflow, user=None):
         raise
 
 
-def delete_workflow(name):
-    """Delete a shared workflow by name.
+def delete_workflow(name, user_id=None):
+    """Delete a shared workflow by name, with owner-only auth.
+
+    Requires user_id. Only the original creator can delete an owned
+    workflow. Legacy files lacking created_by_user_id are deletable by
+    any authenticated caller.
 
     Returns True if the file was deleted, False if it didn't exist.
-    Raises ValueError for invalid names.
+    Raises ValueError for invalid names, PermissionError for
+    unauthenticated or non-creator deletes.
     """
     name = validate_name(name)
+
+    if not user_id:
+        raise PermissionError("user_id required to delete shared workflow")
+
     filepath = os.path.join(STORAGE_DIR, name + ".json")
+    if not os.path.isfile(filepath):
+        return False
+
+    try:
+        existing_meta, _ = _read_envelope(filepath)
+    except (OSError, json.JSONDecodeError):
+        existing_meta = {}
+    existing_user_id = existing_meta.get("created_by_user_id")
+    if existing_user_id is not None and existing_user_id != user_id:
+        raise PermissionError(
+            f"Workflow {name!r} is owned by another user"
+        )
+
     try:
         os.unlink(filepath)
         return True

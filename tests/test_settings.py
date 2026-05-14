@@ -266,6 +266,29 @@ class TestMultiUserSettings:
             )
             assert result == "missing"
 
+    def test_unresolved_user_in_multi_user_mode_does_not_borrow_from_peers(self, tmp_path):
+        """When no user_id can be resolved (PromptServer unavailable or
+        client_id not yet mapped) and the deployment has per-user dirs
+        without a shared 'default', the function MUST NOT return a peer
+        user's value. Otherwise a missing WebSocket->user mapping
+        silently bills one user's API quota to another."""
+        user_dir = tmp_path / "user"
+        user_dir.mkdir()
+
+        alice_dir = user_dir / "alice_abc123"
+        alice_dir.mkdir()
+        write_settings(alice_dir, {"ERPK.GOOGLE_API_KEY": "alice-key"})
+
+        mock_folder_paths = MagicMock()
+        mock_folder_paths.get_user_directory.return_value = str(user_dir)
+
+        with patch.dict(
+            sys.modules,
+            {"folder_paths": mock_folder_paths, "server": None},
+        ):
+            result = get_comfy_setting("ERPK.GOOGLE_API_KEY", default="missing")
+            assert result == "missing"
+
     def test_no_user_id_uses_iteration(self, tmp_path):
         """Without user_id, falls back to iterating (default first)."""
         user_dir = tmp_path / "user"
@@ -324,3 +347,68 @@ class TestMultiUserSettings:
         with patch.dict(sys.modules, {"server": None}):
             result = get_current_user_id()
             assert result is None
+
+
+class TestRegisterClientUser:
+    """register_client_user binds client_id->user_id with anti-poisoning protection."""
+
+    def setup_method(self):
+        from settings import _client_user_map
+        _client_user_map.clear()
+
+    def test_valid_binding_accepted(self):
+        from settings import register_client_user, _client_user_map
+        assert register_client_user("abc123def456", "alice_xxx") is True
+        assert _client_user_map["abc123def456"] == "alice_xxx"
+
+    def test_same_user_rebind_is_idempotent(self):
+        from settings import register_client_user
+        assert register_client_user("abc123def456", "alice_xxx") is True
+        # Same client_id, same user_id — page reload scenario, must succeed
+        assert register_client_user("abc123def456", "alice_xxx") is True
+
+    def test_different_user_rebind_rejected(self):
+        from settings import register_client_user, _client_user_map
+        assert register_client_user("abc123def456", "alice_xxx") is True
+        # Bob trying to hijack Alice's client_id binding
+        assert register_client_user("abc123def456", "bob_yyy") is False
+        # Alice's binding must be preserved
+        assert _client_user_map["abc123def456"] == "alice_xxx"
+
+    def test_empty_client_id_rejected(self):
+        from settings import register_client_user
+        assert register_client_user("", "alice_xxx") is False
+        assert register_client_user(None, "alice_xxx") is False
+
+    def test_empty_user_id_rejected(self):
+        from settings import register_client_user
+        assert register_client_user("abc123def456", "") is False
+        assert register_client_user("abc123def456", None) is False
+
+    def test_invalid_client_id_format_rejected(self):
+        from settings import register_client_user
+        # Too short
+        assert register_client_user("abc", "alice_xxx") is False
+        # Path traversal
+        assert register_client_user("../etc/passwd", "alice_xxx") is False
+        # Contains special chars
+        assert register_client_user("client; DROP TABLE", "alice_xxx") is False
+
+    def test_fifo_eviction_at_cap(self):
+        import settings
+        from settings import register_client_user, _client_user_map
+        # Temporarily shrink the cap for testing
+        original_cap = settings._MAX_CLIENT_USER_MAP_SIZE
+        settings._MAX_CLIENT_USER_MAP_SIZE = 3
+        try:
+            register_client_user("client01abc", "user_a")
+            register_client_user("client02abc", "user_b")
+            register_client_user("client03abc", "user_c")
+            assert len(_client_user_map) == 3
+            # Fourth registration evicts oldest (client01abc)
+            register_client_user("client04abc", "user_d")
+            assert len(_client_user_map) == 3
+            assert "client01abc" not in _client_user_map
+            assert "client04abc" in _client_user_map
+        finally:
+            settings._MAX_CLIENT_USER_MAP_SIZE = original_cap

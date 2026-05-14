@@ -47,16 +47,21 @@ def make_wrapped_task_done(original_fn):
 
 
 def install():
-    """Patch PromptQueue.task_done. Call once at import time."""
+    """Patch PromptQueue.task_done. Idempotent: a sentinel on the queue
+    instance prevents double-wrapping if install() is called twice
+    (e.g., after module reload)."""
     global PromptServer
     try:
         from server import PromptServer as _PS
         PromptServer = _PS
 
         queue = PromptServer.instance.prompt_queue
+        if getattr(queue, "_erpk_history_cleaner_installed", False):
+            return
         queue.task_done = types.MethodType(
             make_wrapped_task_done(queue.task_done), queue
         )
+        queue._erpk_history_cleaner_installed = True
         print("[ERPK] Installed job history auto-clear patch")
     except ImportError:
         pass
