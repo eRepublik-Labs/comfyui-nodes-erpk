@@ -117,14 +117,7 @@ class GeminiAPIConfig(IO.ComfyNode):
             display_name="Gemini API Config",
             category="ERPK/Gemini",
             description="Initialize a Gemini API client. Each node selects its own model.",
-            inputs=[
-                IO.String.Input(
-                    "api_key",
-                    default="",
-                    optional=True,
-                    tooltip="Google API key. If empty, will use GOOGLE_API_KEY env var or config.ini.",
-                ),
-            ],
+            inputs=[],
             outputs=[
                 IO.Custom("GEMINI_API_CLIENT").Output("client"),
             ],
@@ -137,12 +130,8 @@ class GeminiAPIConfig(IO.ComfyNode):
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
-        api_key = kwargs.get("api_key", "")
-
         try:
-            client = GeminiClient(
-                api_key=api_key if api_key.strip() else None
-            )
+            client = GeminiClient(api_key=None)
             print(f"[Gemini] Client initialized")
             return IO.NodeOutput(client)
 
@@ -949,12 +938,6 @@ class GeminiImageGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip="Enable Google Search grounding (Gemini 3 models only, not 2.5 Flash)",
                 ),
-                IO.String.Input(
-                    "api_key",
-                    default="",
-                    optional=True,
-                    tooltip="Google API key (only needed if not using client input)",
-                ),
                 IO.Int.Input(
                     "seed",
                     default=-1,
@@ -987,7 +970,6 @@ class GeminiImageGeneration(IO.ComfyNode):
         image_size = kwargs.get("image_size", "default")
         response_modalities = kwargs.get("response_modalities", "IMAGE")
         enable_google_search = kwargs.get("enable_google_search", False)
-        api_key = kwargs.get("api_key", "")
         seed = kwargs.get("seed", -1)
 
         if not prompt or not prompt.strip():
@@ -1005,7 +987,7 @@ class GeminiImageGeneration(IO.ComfyNode):
                     image_client.system_instruction = client.system_instruction
             else:
                 image_client = GeminiClient(
-                    api_key=api_key if api_key.strip() else None,
+                    api_key=None,
                     model=model,
                 )
 
@@ -1110,7 +1092,9 @@ class GeminiImageGeneration(IO.ComfyNode):
             if description_text:
                 print(f"[Gemini] Also got description: {description_text[:100]}...")
 
-            return IO.NodeOutput(image_tensor, description_text)
+            from ..utils.inline_preview import inline_preview_image
+            ui = inline_preview_image(cls, image_tensor, slot=0)
+            return IO.NodeOutput(image_tensor, description_text, ui=ui)
 
         except Exception as e:
             error_msg = f"Failed to generate image: {str(e)}"
@@ -1195,12 +1179,6 @@ class GeminiImageEdit(IO.ComfyNode):
                     optional=True,
                     tooltip="Optional additional reference images (combined with primary image input, up to 14 total)",
                 ),
-                IO.String.Input(
-                    "api_key",
-                    default="",
-                    optional=True,
-                    tooltip="Google API key (only needed if not using client input)",
-                ),
                 IO.Int.Input(
                     "seed",
                     default=-1,
@@ -1235,7 +1213,6 @@ class GeminiImageEdit(IO.ComfyNode):
         response_modalities = kwargs.get("response_modalities", "IMAGE")
         enable_google_search = kwargs.get("enable_google_search", False)
         additional_images = kwargs.get("additional_images")
-        api_key = kwargs.get("api_key", "")
         seed = kwargs.get("seed", -1)
 
         if not prompt or not prompt.strip():
@@ -1253,7 +1230,7 @@ class GeminiImageEdit(IO.ComfyNode):
                     image_client.system_instruction = client.system_instruction
             else:
                 image_client = GeminiClient(
-                    api_key=api_key if api_key.strip() else None,
+                    api_key=None,
                     model=model,
                 )
 
@@ -1369,7 +1346,9 @@ class GeminiImageEdit(IO.ComfyNode):
             if description_text:
                 print(f"[Gemini] Also got description: {description_text[:100]}...")
 
-            return IO.NodeOutput(image_tensor, description_text)
+            from ..utils.inline_preview import inline_preview_image
+            ui = inline_preview_image(cls, image_tensor, slot=0)
+            return IO.NodeOutput(image_tensor, description_text, ui=ui)
 
         except Exception as e:
             error_msg = f"Failed to edit image: {str(e)}"

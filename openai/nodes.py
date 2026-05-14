@@ -31,14 +31,7 @@ class OpenAIAPIConfig(IO.ComfyNode):
             node_id="OpenAIAPIConfig",
             display_name="OpenAI API Config",
             category="ERPK/OpenAI",
-            inputs=[
-                IO.String.Input(
-                    "api_key",
-                    default="",
-                    optional=True,
-                    tooltip="OpenAI API key. If empty, will use OPENAI_API_KEY env var or config.ini.",
-                ),
-            ],
+            inputs=[],
             outputs=[
                 IO.Custom("OPENAI_API_CLIENT").Output("client"),
             ],
@@ -51,11 +44,9 @@ class OpenAIAPIConfig(IO.ComfyNode):
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
-        api_key = kwargs.get("api_key", "")
-
         try:
             client = OpenAIClient(
-                api_key=api_key if api_key.strip() else None
+                api_key=None
             )
 
             print(f"[OpenAI] Client initialized")

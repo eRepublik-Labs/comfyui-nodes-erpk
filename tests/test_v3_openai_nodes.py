@@ -108,7 +108,9 @@ class TestOpenAIV3Compliance:
     def test_schema_has_inputs(self, node_spec):
         cls, *_ = node_spec
         schema = cls.define_schema()
-        assert len(schema.inputs) > 0, f"{cls.__name__} schema must have inputs"
+        # Config nodes (factories that only produce a client) legitimately have zero inputs;
+        # we only require that `inputs` is a list.
+        assert isinstance(schema.inputs, list)
 
     def test_schema_has_outputs(self, node_spec):
         cls, *_ = node_spec
@@ -193,19 +195,17 @@ class TestOpenAICustomTypes:
         output_types = [o.io_type for o in schema.outputs]
         assert "IMAGE" in output_types
 
-    def test_image_gen_accepts_optional_api_key(self):
+    def test_image_gen_has_no_api_key_input(self):
         cls = _import_node("image_nodes", "OpenAIImageGeneration")
         schema = cls.define_schema()
         key_inputs = [i for i in schema.inputs if i.id == "api_key"]
-        assert len(key_inputs) == 1
-        assert key_inputs[0].optional is True
+        assert key_inputs == []
 
-    def test_image_edit_accepts_optional_api_key(self):
+    def test_image_edit_has_no_api_key_input(self):
         cls = _import_node("image_nodes", "OpenAIImageEdit")
         schema = cls.define_schema()
         key_inputs = [i for i in schema.inputs if i.id == "api_key"]
-        assert len(key_inputs) == 1
-        assert key_inputs[0].optional is True
+        assert key_inputs == []
 
 
 class TestOpenAIModelOptions:

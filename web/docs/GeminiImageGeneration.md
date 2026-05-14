@@ -17,7 +17,6 @@ Generates images from text descriptions using Gemini's image generation models. 
 | image_size | Combo | default | Resolution: default, 512px, 1K, 2K, 4K. 512px-4K for 3.1 Flash, 1K-4K for 3 Pro, 2.5 Flash fixed at 1024px (optional) |
 | response_modalities | Combo | IMAGE | IMAGE (image only) or TEXT+IMAGE (image + text description) (optional) |
 | enable_google_search | Boolean | false | Enable Google Search grounding, Gemini 3 models only (optional) |
-| api_key | String | "" | Google API key, only needed if not using client input (optional) |
 
 ## Output
 
@@ -31,4 +30,4 @@ Generates images from text descriptions using Gemini's image generation models. 
 - 3.1 Flash supports all 14 aspect ratios and resolutions from 512px to 4K
 - 3 Pro supports 10 aspect ratios and resolutions from 1K to 4K
 - 2.5 Flash is fixed at 1024px resolution and does not support Google Search grounding
-- Can work standalone with just an api_key, or with a client from Gemini API Config
+- API key resolved from ComfyUI Settings, GOOGLE_API_KEY env var, or config.ini — connect a `client` from Gemini API Config only when you need shared safety/system-instruction state across nodes
