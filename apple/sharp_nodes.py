@@ -417,7 +417,9 @@ class SHARPRenderViews(IO.ComfyNode):
         # Stack into batch tensor (B, H, W, C) for ComfyUI IMAGE format
         images_tensor = torch.stack(rendered_images, dim=0)
 
-        return IO.NodeOutput(images_tensor)
+        from ..utils.inline_preview import inline_preview_image
+        ui = inline_preview_image(cls, images_tensor, slot=0)
+        return IO.NodeOutput(images_tensor, ui=ui)
 
 
 class SHARPRenderVideo(IO.ComfyNode):

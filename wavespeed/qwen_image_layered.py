@@ -83,4 +83,6 @@ class QwenImageLayeredNode(IO.ComfyNode):
             raise ValueError("No image URLs in the generated result")
 
         rgb_tensor, alpha_tensor = imageurl2tensor_rgba(image_urls)
-        return IO.NodeOutput(rgb_tensor, alpha_tensor)
+        from ..utils.inline_preview import inline_preview_image
+        ui = inline_preview_image(cls, rgb_tensor, slot=0)
+        return IO.NodeOutput(rgb_tensor, alpha_tensor, ui=ui)

@@ -133,4 +133,6 @@ class QwenImageEditPlusLoraNode(IO.ComfyNode):
             raise ValueError("No image URLs in the generated result")
 
         result_images = imageurl2tensor(image_urls)
-        return IO.NodeOutput(result_images)
+        from ..utils.inline_preview import inline_preview_image
+        ui = inline_preview_image(cls, result_images, slot=0)
+        return IO.NodeOutput(result_images, ui=ui)
