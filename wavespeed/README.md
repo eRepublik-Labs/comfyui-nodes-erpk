@@ -14,7 +14,7 @@ Part of the [ERPK Custom Nodes Collection](../../README.md) for ComfyUI.
 ## Qwen Image Nodes
 ![Qwen Nodes Preview](assets/qwen-preview.png)
 
-ComfyUI custom nodes for WaveSpeed AI integration. Covers image generation (ByteDance Seedream V4/V4.5/V5.0 Lite, Qwen Image family, Qwen Image 2.0, Dreamina, JibMix) and video generation (Bytedance Seedance 2.0, Alibaba WAN 2.7, Kling 2.5 Turbo / 2.6 / 3.0 / O3 with Kling Elements, Lightricks LTX 2 Pro, WaveSpeed LTX 2.3, WaveSpeed Veo 3.1).
+ComfyUI custom nodes for WaveSpeed AI integration. Covers image generation (ByteDance Seedream V4/V4.5/V5.0 Lite, Qwen Image family, Qwen Image 2.0, Dreamina, JibMix) and video generation (Bytedance Seedance 2.0, Alibaba WAN 2.7, Kling 2.5 Turbo / 2.6 / 3.0 / O3 with Kling Elements, Lightricks LTX 2 Pro, WaveSpeed LTX 2.3).
 
 ## Features
 
@@ -98,8 +98,6 @@ Video nodes return a STRING URL (pipe to `WaveSpeed Preview Video` or the Previe
 | **Lightricks LTX 2 Pro Image-to-Video** | LTX 2 Pro | Animate image with optional audio | 6/8/10s | Inferred from image | [Link](https://wavespeed.ai/docs/docs-api/lightricks/lightricks-ltx-2-pro-image-to-video) |
 | **WaveSpeed LTX 2.3 Text-to-Video** | LTX 2.3 | Longer silent clips with seed control | 5-20s | 16:9/9:16 · 480p/720p/1080p | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/ltx-2.3-text-to-video) |
 | **WaveSpeed LTX 2.3 Image-to-Video** | LTX 2.3 | Animate source image | 5-20s | 480p/720p/1080p · aspect inferred | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/ltx-2.3-image-to-video) |
-| **WaveSpeed Veo 3.1 Text-to-Video** | Veo 3.1 | Google Veo 3.1 via WaveSpeed billing | Varies | Per Veo specs | [Link](https://wavespeed.ai/docs/docs-api/google/google-veo-3.1-text-to-video) |
-| **WaveSpeed Veo 3.1 Image-to-Video** | Veo 3.1 | Veo 3.1 i2v via WaveSpeed billing | Varies | Per Veo specs | [Link](https://wavespeed.ai/docs/docs-api/google/google-veo-3.1-image-to-video) |
 
 **LTX note:** LTX 2.3 and LTX 2 Pro are separate nodes (not a unified dropdown) — LTX 2 Pro has `generate_audio`, LTX 2.3 has `resolution`/`aspect_ratio`/`seed`. The APIs take different parameter sets.
 
@@ -525,7 +523,7 @@ pip install -r requirements.txt
 ```
 [ERPK] Loaded <N> V3 nodes
 ```
-The WaveSpeed module alone contributes 51 nodes as of 2026.5.5.
+The WaveSpeed module alone contributes 49 nodes as of 2026.5.5.
 
 ### Common Issues
 
@@ -593,8 +591,6 @@ Video:
 - Lightricks LTX 2 Pro Image-to-Video
 - WaveSpeed LTX 2.3 Text-to-Video
 - WaveSpeed LTX 2.3 Image-to-Video
-- WaveSpeed Veo 3.1 Text-to-Video
-- WaveSpeed Veo 3.1 Image-to-Video
 
 ## Versioning
 
@@ -609,7 +605,7 @@ This package follows **Calendar Versioning (CalVer)**: `YYYY.MM.PATCH`
 ### Version History
 
 See the [project changelog on GitHub Releases](https://github.com/eRepublik-Labs/comfyui-nodes-erpk/releases) for the authoritative history. Notable WaveSpeed additions in the 2026.4.x and 2026.5.x series:
-- **Video generation** — Seedance 2.0, Alibaba WAN 2.7 (T2V/I2V/Extend), Kling 2.5 Turbo (I2V/T2V), Kling 2.6 (I2V/T2V Std/Pro), Kling 3.0 (T2V/I2V Std/Pro/4K) with full parameter surface, Kling O3 (T2V/I2V Std/Pro with element_list on Pro), Kling Elements, WaveSpeed LTX 2.3, Lightricks LTX 2 Pro, WaveSpeed Veo 3.1
+- **Video generation** — Seedance 2.0, Alibaba WAN 2.7 (T2V/I2V/Extend), Kling 2.5 Turbo (I2V/T2V), Kling 2.6 (I2V/T2V Std/Pro), Kling 3.0 (T2V/I2V Std/Pro/4K) with full parameter surface, Kling O3 (T2V/I2V Std/Pro with element_list on Pro), Kling Elements, WaveSpeed LTX 2.3, Lightricks LTX 2 Pro
 - **Image generation** — Qwen Image 2.0 family (replaces 12 Qwen 1.x nodes long-term), Seedream V5.0 Lite family, ByteDance Dreamina V3.0/V3.1
 - **Infrastructure** — multi-user settings resolution, API-key masked preview, Preview Anything integration for all video node outputs, dual-input pattern (IMAGE tensor + URL fallback) on all Kling i2v nodes
 

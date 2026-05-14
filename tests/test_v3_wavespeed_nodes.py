@@ -110,10 +110,6 @@ WAVESPEED_NODES = [
      "Alibaba WAN 2.7 Image-to-Video", "ERPK/WaveSpeedAI", True, False),
     ("wan_2_7_video_extend", "Wan27VideoExtendNode", "Wan27VideoExtendNode",
      "Alibaba WAN 2.7 Video Extend", "ERPK/WaveSpeedAI", True, False),
-    ("wavespeed_veo_3_1_text_to_video", "WaveSpeedVeo31TextToVideoNode", "WaveSpeedVeo31TextToVideoNode",
-     "WaveSpeed Veo 3.1 Text-to-Video", "ERPK/WaveSpeedAI", True, False),
-    ("wavespeed_veo_3_1_image_to_video", "WaveSpeedVeo31ImageToVideoNode", "WaveSpeedVeo31ImageToVideoNode",
-     "WaveSpeed Veo 3.1 Image-to-Video", "ERPK/WaveSpeedAI", True, False),
     ("kling_v3_image_to_video", "KlingV3ImageToVideoNode", "KlingV3ImageToVideoNode",
      "Kling 3.0 Image-to-Video", "ERPK/WaveSpeedAI", True, False),
     ("kling_o3_text_to_video", "KlingO3TextToVideoNode", "KlingO3TextToVideoNode",
@@ -301,7 +297,7 @@ class TestWaveSpeedProviderExport:
     def test_nodes_list_has_all_classes(self):
         import importlib
         mod = importlib.import_module("wavespeed")
-        assert len(mod.NODES) == 51, f"Expected 51 WaveSpeed nodes, got {len(mod.NODES)}"
+        assert len(mod.NODES) == 49, f"Expected 49 WaveSpeed nodes, got {len(mod.NODES)}"
 
     def test_nodes_list_all_comfy_nodes(self):
         import importlib

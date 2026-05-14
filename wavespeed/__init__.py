@@ -34,8 +34,6 @@ from .seedance_2_0_image_to_video import Seedance20ImageToVideoNode
 from .wan_2_7_text_to_video import Wan27TextToVideoNode
 from .wan_2_7_image_to_video import Wan27ImageToVideoNode
 from .wan_2_7_video_extend import Wan27VideoExtendNode
-from .wavespeed_veo_3_1_text_to_video import WaveSpeedVeo31TextToVideoNode
-from .wavespeed_veo_3_1_image_to_video import WaveSpeedVeo31ImageToVideoNode
 from .kling_v3_image_to_video import KlingV3ImageToVideoNode
 from .kling_v3_text_to_video import KlingV3TextToVideoNode
 from .kling_o3_text_to_video import KlingO3TextToVideoNode
@@ -87,8 +85,6 @@ NODES = [
     Wan27TextToVideoNode,
     Wan27ImageToVideoNode,
     Wan27VideoExtendNode,
-    WaveSpeedVeo31TextToVideoNode,
-    WaveSpeedVeo31ImageToVideoNode,
     KlingV3ImageToVideoNode,
     KlingV3TextToVideoNode,
     KlingO3TextToVideoNode,
