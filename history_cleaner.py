@@ -5,7 +5,7 @@ import threading
 import time
 import types
 
-from settings import get_comfy_setting
+from .settings import get_comfy_setting
 
 # Lazy-imported in install() to avoid import errors outside ComfyUI
 PromptServer = None

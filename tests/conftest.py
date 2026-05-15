@@ -30,3 +30,12 @@ if "comfy_api" not in sys.modules:
 
     sys.modules["comfy_api"] = comfy_api_pkg
     sys.modules["comfy_api.latest"] = comfy_api_latest
+
+# Register a synthetic `erpk` package rooted at the project directory so tests
+# can load modules that use relative imports (e.g. `from .settings import ...`).
+# ComfyUI loads the real package via spec_from_file_location at runtime; this
+# mirror lets tests exercise the same import path without installing the package.
+if "erpk" not in sys.modules:
+    erpk_pkg = types.ModuleType("erpk")
+    erpk_pkg.__path__ = [project_root]
+    sys.modules["erpk"] = erpk_pkg
