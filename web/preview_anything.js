@@ -385,6 +385,23 @@ function renderMarkdownInto(container, text) {
     }
 }
 
+// Pin the DOM widget's root element to the current node width in px.
+// ComfyUI positions DOM widgets in an absolutely-placed wrapper whose
+// width is set via JavaScript on each canvas draw, not via CSS. On
+// workflow load and on initial creation, that wrapper sometimes resolves
+// to a stale value before our size floor is applied, leaving root's
+// `width: 100%` sized against the wrong containing block. Writing an
+// explicit px width here is the belt-and-suspenders fix — applied from
+// onNodeCreated, onConfigure, and onResize so every "size has changed"
+// path reaches it.
+function clampRootToNodeWidth(node) {
+    const root = node?._erpkPreview?.root;
+    if (!root) return;
+    const w = Math.max(node.size?.[0] ?? 320, 100);
+    root.style.width = w + "px";
+    root.style.maxWidth = w + "px";
+}
+
 function buildContainer() {
     const root = document.createElement("div");
     root.className = "erpk-preview-anything";
@@ -1072,6 +1089,15 @@ app.registerExtension({
             if (this.size[1] < 260) this.size[1] = 260;
             if (this.size[0] < 320) this.size[0] = 320;
 
+            clampRootToNodeWidth(this);
+
+            return r;
+        };
+
+        const origOnResize = nodeType.prototype.onResize;
+        nodeType.prototype.onResize = function (size) {
+            const r = origOnResize?.apply(this, arguments);
+            clampRootToNodeWidth(this);
             return r;
         };
 
@@ -1102,6 +1128,7 @@ app.registerExtension({
             // the node to a stale smaller size from before the floor was raised.
             if (this.size[1] < 260) this.size[1] = 260;
             if (this.size[0] < 320) this.size[0] = 320;
+            clampRootToNodeWidth(this);
             const saved = info?.properties?._erpkLastPayload
                 ?? this.properties?._erpkLastPayload;
             if (saved) {
@@ -1112,6 +1139,7 @@ app.registerExtension({
                     this._erpkPreview.syncDisabledStyle();
                     updateToolbarForKind(this._erpkPreview, saved);
                     renderInto(this._erpkPreview.content, saved, this._erpkPreview);
+                    clampRootToNodeWidth(this);
                 }, 50);
             }
             return r;
