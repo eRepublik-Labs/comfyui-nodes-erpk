@@ -394,10 +394,20 @@ function renderMarkdownInto(container, text) {
 // explicit px width here is the belt-and-suspenders fix — applied from
 // onNodeCreated, onConfigure, and onResize so every "size has changed"
 // path reaches it.
+//
+// CHROME_HORIZONTAL_INSET accounts for the per-side inset that ComfyUI
+// applies between the outer node frame and the inner widget area (the
+// same inset that makes canvas-drawn widgets like `display_type` sit
+// flush with the rounded card edges in both the legacy and Vue
+// renderers). Without subtracting it from node.size[0], the DOM widget
+// renders past the inner edge on the right side.
+const CHROME_HORIZONTAL_INSET = 16;
+
 function clampRootToNodeWidth(node) {
     const root = node?._erpkPreview?.root;
     if (!root) return;
-    const w = Math.max(node.size?.[0] ?? 320, 100);
+    const outer = Math.max(node.size?.[0] ?? 320, 100);
+    const w = Math.max(outer - CHROME_HORIZONTAL_INSET, 100);
     root.style.width = w + "px";
     root.style.maxWidth = w + "px";
 }
