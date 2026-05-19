@@ -418,6 +418,47 @@ class TestStripMetadata:
         sys.modules.pop("folder_paths", None)
 
 
+class TestSaveAudioFallback:
+    """torchaudio 2.x delegates `save` to torchcodec. If torchcodec is missing
+    (common in many ComfyUI environments), save raises ImportError mid-call.
+    The audio path must fall back to a stdlib WAV writer instead of propagating."""
+
+    def test_writes_wav_when_torchaudio_save_raises_importerror(self, tmp_path, monkeypatch):
+        torch = pytest.importorskip("torch")
+
+        import sys
+        import types
+        folder_paths = types.ModuleType("folder_paths")
+        folder_paths.get_temp_directory = lambda: str(tmp_path)
+        sys.modules["folder_paths"] = folder_paths
+
+        torchaudio_stub = types.ModuleType("torchaudio")
+        def raise_missing_codec(*args, **kwargs):
+            raise ImportError(
+                "TorchCodec is required for save_with_torchcodec. "
+                "Please install torchcodec to use this function."
+            )
+        torchaudio_stub.save = raise_missing_codec
+        monkeypatch.setitem(sys.modules, "torchaudio", torchaudio_stub)
+
+        import utils.preview_anything as mod
+        sample_rate = 16000
+        waveform = torch.zeros(1, 1, sample_rate)  # 1s of silence, 1 channel, [B, C, T] like ComfyUI emits
+        url = mod._save_audio_dict({"waveform": waveform, "sample_rate": sample_rate}, "test")
+
+        assert url is not None
+        assert url.startswith("/view?")
+        wav_files = list(tmp_path.glob("*.wav"))
+        assert len(wav_files) == 1
+        # Smoke-check the WAV header
+        with open(wav_files[0], "rb") as fh:
+            header = fh.read(12)
+        assert header[:4] == b"RIFF"
+        assert header[8:12] == b"WAVE"
+
+        sys.modules.pop("folder_paths", None)
+
+
 def _find_input(schema, input_id: str):
     for inp in schema.inputs:
         if inp.id == input_id:

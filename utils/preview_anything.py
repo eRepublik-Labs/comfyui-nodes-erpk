@@ -415,7 +415,6 @@ def _save_image_tensor_batch(tensor, filename: str):
 
 def _save_audio_dict(audio, filename: str):
     try:
-        import torchaudio
         import folder_paths
     except ImportError:
         return None
@@ -424,13 +423,39 @@ def _save_audio_dict(audio, filename: str):
     sample_rate = int(audio["sample_rate"])
     if waveform.ndim == 3:
         waveform = waveform[0]
+    waveform = waveform.detach().cpu()
 
     temp_dir = folder_paths.get_temp_directory()
     os.makedirs(temp_dir, exist_ok=True)
     name = f"{_safe(filename)}_{int(time.time() * 1000)}.wav"
     path = os.path.join(temp_dir, name)
-    torchaudio.save(path, waveform.detach().cpu(), sample_rate)
+
+    try:
+        import torchaudio
+        torchaudio.save(path, waveform, sample_rate)
+    except ImportError:
+        # torchaudio.save in 2.x delegates to torchcodec; if torchcodec is not
+        # installed, fall back to a stdlib WAV writer. 16-bit PCM is the WAV
+        # default and matches torchaudio's default for float inputs.
+        _write_wav_pcm16(path, waveform, sample_rate)
     return _view_url(name, "", "temp")
+
+
+def _write_wav_pcm16(path: str, waveform, sample_rate: int) -> None:
+    import wave
+    import numpy as np
+    array = waveform.numpy()
+    if array.ndim == 1:
+        array = array[None, :]
+    channels, samples = array.shape
+    interleaved = array.T.reshape(-1)
+    interleaved = np.clip(interleaved, -1.0, 1.0)
+    pcm16 = (interleaved * 32767.0).astype(np.int16)
+    with wave.open(path, "wb") as wf:
+        wf.setnchannels(channels)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(pcm16.tobytes())
 
 
 def _view_url(filename: str, subfolder: str, folder_type: str) -> str:
