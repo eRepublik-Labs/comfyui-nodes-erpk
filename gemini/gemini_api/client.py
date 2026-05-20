@@ -54,6 +54,7 @@ class GeminiClient:
     MODELS = {
         "gemini-3.1-pro-preview": "Gemini 3.1 Pro Preview (Most advanced reasoning)",
         "gemini-3-pro-preview": "Gemini 3 Pro Preview (Most intelligent, best reasoning)",
+        "gemini-3.5-flash": "Gemini 3.5 Flash (Frontier intelligence, fast and cost-efficient)",
         "gemini-3-flash-preview": "Gemini 3 Flash Preview (Balanced speed and intelligence)",
         "gemini-3.1-flash-lite-preview": "Gemini 3.1 Flash-Lite Preview (Fastest, most cost-efficient)",
         "gemini-2.5-pro": "Gemini 2.5 Pro (Complex reasoning, 1M context)",
@@ -69,7 +70,7 @@ class GeminiClient:
     ]
 
     # Default configuration
-    DEFAULT_MODEL = "gemini-3-flash-preview"
+    DEFAULT_MODEL = "gemini-3.5-flash"
     DEFAULT_MAX_TOKENS = 8192
     DEFAULT_TEMPERATURE = 0.7
 

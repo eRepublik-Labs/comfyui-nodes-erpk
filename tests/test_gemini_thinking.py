@@ -71,6 +71,7 @@ class TestIsGemini3xClassifier:
         assert _is_gemini_3x("gemini-3-flash-preview") is True
         assert _is_gemini_3x("gemini-2.5-pro") is False
         assert _is_gemini_3x("gemini-3.1-pro-preview") is True
+        assert _is_gemini_3x("gemini-3.5-flash") is True
 
 
 class TestBuildThinkingConfigGeneration:
@@ -81,6 +82,12 @@ class TestBuildThinkingConfigGeneration:
         result = _build_thinking_config("minimal", "gemini-3-flash-preview")
         assert result is not None
         assert result.thinking_level == "MINIMAL"
+
+    def test_high_on_gemini_35_flash_uses_level(self):
+        from gemini.nodes import _build_thinking_config
+        result = _build_thinking_config("high", "gemini-3.5-flash")
+        assert result is not None
+        assert result.thinking_level == "HIGH"
 
     def test_minimal_on_gemini_2_5_flash_uses_budget_zero(self):
         from gemini.nodes import _build_thinking_config

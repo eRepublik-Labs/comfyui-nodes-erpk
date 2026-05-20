@@ -16,8 +16,15 @@ class TestModelsDict:
         desc = GeminiClient.MODELS["gemini-3.1-pro-preview"]
         assert "reasoning" in desc.lower() or "advanced" in desc.lower()
 
-    def test_default_model_unchanged(self):
-        assert GeminiClient.DEFAULT_MODEL == "gemini-3-flash-preview"
+    def test_default_model_is_gemini_35_flash(self):
+        assert GeminiClient.DEFAULT_MODEL == "gemini-3.5-flash"
+
+    def test_gemini_35_flash_in_models(self):
+        assert "gemini-3.5-flash" in GeminiClient.MODELS
+
+    def test_gemini_35_flash_description_mentions_speed_or_intelligence(self):
+        desc = GeminiClient.MODELS["gemini-3.5-flash"]
+        assert "intelligence" in desc.lower() or "fast" in desc.lower() or "speed" in desc.lower()
 
     def test_gemini_31_flash_lite_preview_in_models(self):
         assert "gemini-3.1-flash-lite-preview" in GeminiClient.MODELS

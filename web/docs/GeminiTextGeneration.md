@@ -11,7 +11,7 @@ Generates text using Gemini models. Supports structured JSON output, thinking/re
 |-----------|------|---------|-------------|
 | prompt | String | "" | Text prompt for Gemini |
 | client | GEMINI_API_CLIENT | - | Gemini API client (optional if API key is configured in Settings) |
-| model | Combo | gemini-3-flash-preview | Model to use: gemini-3.1-pro-preview, gemini-3-pro-preview, gemini-3-flash-preview, gemini-3.1-flash-lite-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite (optional) |
+| model | Combo | gemini-3.5-flash | Model to use: gemini-3.1-pro-preview, gemini-3-pro-preview, gemini-3.5-flash, gemini-3-flash-preview, gemini-3.1-flash-lite-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite (optional) |
 | temperature | Float | 0.7 | Creativity level, 0.0=focused to 2.0=very creative (optional) |
 | max_tokens | Int | 8192 | Maximum response length, 256-65536 (optional) |
 | top_p | Float | 0.95 | Nucleus sampling threshold, 0.0=disabled (optional) |
