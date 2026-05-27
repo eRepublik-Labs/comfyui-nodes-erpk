@@ -1,6 +1,7 @@
 # ABOUTME: Google Gemini API client using the new google-genai SDK
 # ABOUTME: Handles authentication, requests, and error handling
 
+import asyncio
 import os
 import configparser
 from typing import Dict, Any, List, Optional
@@ -178,7 +179,7 @@ class GeminiClient:
         if safety_settings:
             self.safety_settings = safety_settings
 
-    def generate_content(
+    def _generate_content_sync(
         self,
         prompt: str,
         images: Optional[List[Any]] = None,
@@ -194,25 +195,6 @@ class GeminiClient:
         seed: Optional[int] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """
-        Generate content using Gemini API.
-
-        Args:
-            prompt: Text prompt
-            images: Optional list of PIL Images for vision tasks
-            max_tokens: Maximum tokens to generate
-            temperature: Sampling temperature (0.0-2.0)
-            model: Optional model override (uses client default if not specified)
-            top_p: Nucleus sampling threshold (None to disable)
-            top_k: Top-k sampling limit (None to disable)
-            stop_sequences: List of sequences where generation stops
-            response_mime_type: Output format (e.g., "application/json")
-            response_schema: JSON schema dict for structured output
-            **kwargs: Additional parameters
-
-        Returns:
-            Response dict with 'text' and metadata
-        """
         max_tokens = max_tokens or self.DEFAULT_MAX_TOKENS
         temperature = temperature if temperature is not None else self.DEFAULT_TEMPERATURE
         model_to_use = model or self.model_name
@@ -286,6 +268,62 @@ class GeminiClient:
                 "finish_reason": response.candidates[0].finish_reason if response.candidates else "ERROR",
                 "error": str(e)
             }
+
+    async def generate_content(
+        self,
+        prompt: str,
+        images: Optional[List[Any]] = None,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        model: Optional[str] = None,
+        top_p: Optional[float] = None,
+        top_k: Optional[int] = None,
+        stop_sequences: Optional[List[str]] = None,
+        response_mime_type: Optional[str] = None,
+        response_schema: Optional[Dict] = None,
+        thinking_config: Optional[Any] = None,
+        seed: Optional[int] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Generate content using Gemini API.
+
+        Runs in a worker thread via asyncio.to_thread so the event loop is free
+        for other parallel API nodes while the SDK call (and its retry/interrupt
+        polling loop) is in progress.
+
+        Args:
+            prompt: Text prompt
+            images: Optional list of PIL Images for vision tasks
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature (0.0-2.0)
+            model: Optional model override (uses client default if not specified)
+            top_p: Nucleus sampling threshold (None to disable)
+            top_k: Top-k sampling limit (None to disable)
+            stop_sequences: List of sequences where generation stops
+            response_mime_type: Output format (e.g., "application/json")
+            response_schema: JSON schema dict for structured output
+            **kwargs: Additional parameters
+
+        Returns:
+            Response dict with 'text' and metadata
+        """
+        return await asyncio.to_thread(
+            self._generate_content_sync,
+            prompt,
+            images=images,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            model=model,
+            top_p=top_p,
+            top_k=top_k,
+            stop_sequences=stop_sequences,
+            response_mime_type=response_mime_type,
+            response_schema=response_schema,
+            thinking_config=thinking_config,
+            seed=seed,
+            **kwargs,
+        )
 
     def start_chat(self, model: Optional[str] = None, history: Optional[List[Dict[str, str]]] = None, thinking_config: Optional[Any] = None):
         """

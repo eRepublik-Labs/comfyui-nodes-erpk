@@ -1,6 +1,7 @@
 # ABOUTME: ComfyUI V3 nodes for Google Veo video generation API.
 # ABOUTME: Provides text-to-video and image-to-video generation nodes.
 
+import asyncio
 import os
 import time
 import tempfile
@@ -211,8 +212,13 @@ def _save_video(video, client, output_directory, prefix):
     return output_path
 
 
-def _poll_until_done(operation, client, max_minutes=40):
-    """Block until a Veo operation completes; returns the completed operation."""
+async def _poll_until_done(operation, client, max_minutes=40):
+    """Poll until a Veo operation completes; returns the completed operation.
+
+    Uses await asyncio.sleep so the event loop is free for other parallel Veo
+    or Gemini nodes between status checks. operations.get runs in a thread so
+    the sync SDK call doesn't block the loop during the HTTP round-trip.
+    """
     poll_count = 0
     max_polls = max_minutes * 3  # 20s intervals → 3 polls/min
     while not operation.done:
@@ -220,8 +226,8 @@ def _poll_until_done(operation, client, max_minutes=40):
         if poll_count > max_polls:
             raise TimeoutError(f"Video generation timed out after {max_minutes} minutes")
         print(f"[Veo] Waiting for video generation... ({poll_count * 20}s elapsed)")
-        time.sleep(20)
-        operation = client.client.operations.get(operation)
+        await asyncio.sleep(20)
+        operation = await asyncio.to_thread(client.client.operations.get, operation)
     return operation
 
 
@@ -352,7 +358,7 @@ class VeoTextToVideo(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
         client = kwargs.get("client")
         if client is None:
             from .gemini_api.client import GeminiClient
@@ -421,9 +427,11 @@ class VeoTextToVideo(IO.ComfyNode):
             }
 
             print("[Veo] Starting video generation (this may take several minutes)...")
-            operation = client.client.models.generate_videos(**request_params)
+            operation = await asyncio.to_thread(
+                client.client.models.generate_videos, **request_params
+            )
 
-            operation = _poll_until_done(operation, client)
+            operation = await _poll_until_done(operation, client)
 
             if operation.error:
                 raise ValueError(f"Video generation failed: {operation.error}")
@@ -586,7 +594,7 @@ class VeoImageToVideo(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
         from .gemini_api.utils import ImageConverter
 
         client = kwargs.get("client")
@@ -678,9 +686,11 @@ class VeoImageToVideo(IO.ComfyNode):
                 request_params["prompt"] = prompt.strip()
 
             print("[Veo] Starting video generation (this may take several minutes)...")
-            operation = client.client.models.generate_videos(**request_params)
+            operation = await asyncio.to_thread(
+                client.client.models.generate_videos, **request_params
+            )
 
-            operation = _poll_until_done(operation, client)
+            operation = await _poll_until_done(operation, client)
 
             if operation.error:
                 raise ValueError(f"Video generation failed: {operation.error}")

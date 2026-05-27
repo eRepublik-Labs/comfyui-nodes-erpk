@@ -1,6 +1,8 @@
 # ABOUTME: ComfyUI V3 nodes for Google Gemini API integration.
 # ABOUTME: Provides text generation, vision, chat, image gen/edit, and configuration nodes.
 
+import asyncio
+
 from comfy_api.latest import IO
 
 from .gemini_api.client import GeminiClient
@@ -129,7 +131,7 @@ class GeminiAPIConfig(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
         try:
             client = GeminiClient(api_key=None)
             print(f"[Gemini] Client initialized")
@@ -256,7 +258,7 @@ class GeminiTextGeneration(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
         prompt = kwargs.get("prompt", "")
         client = kwargs.get("client")
         model = kwargs.get("model")
@@ -292,7 +294,7 @@ class GeminiTextGeneration(IO.ComfyNode):
         thinking_cfg = _build_thinking_config(thinking_level, model)
 
         try:
-            response = client.generate_content(
+            response = await client.generate_content(
                 prompt=prompt.strip(),
                 max_tokens=max_tokens,
                 temperature=temperature,
@@ -449,7 +451,7 @@ class GeminiChat(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
         prompt = kwargs.get("prompt", "")
         client = kwargs.get("client")
         model = kwargs.get("model")
@@ -515,7 +517,8 @@ class GeminiChat(IO.ComfyNode):
             config = types.GenerateContentConfig(**config_params)
             if thinking_cfg is not None:
                 config.thinking_config = thinking_cfg
-            response = chat_session.send_message(
+            response = await asyncio.to_thread(
+                chat_session.send_message,
                 prompt.strip(),
                 config=config,
             )
@@ -649,7 +652,7 @@ class GeminiVision(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
         from .gemini_api.utils import ImageConverter
 
         image = kwargs.get("image")
@@ -690,7 +693,7 @@ class GeminiVision(IO.ComfyNode):
 
             thinking_cfg = _build_thinking_config(thinking_level, model)
 
-            response = client.generate_content(
+            response = await client.generate_content(
                 prompt=prompt.strip(),
                 images=pil_images,
                 max_tokens=max_tokens,
@@ -754,7 +757,7 @@ class GeminiSystemInstruction(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
         client = kwargs.get("client")
         system_instruction = kwargs.get("system_instruction", "")
 
@@ -838,7 +841,7 @@ class GeminiSafetySettings(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
         from .gemini_api.utils import SafetySettings
 
         client = kwargs.get("client")
@@ -959,7 +962,7 @@ class GeminiImageGeneration(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
         from .gemini_api.utils import ImageConverter
 
         prompt = kwargs.get("prompt", "")
@@ -1029,7 +1032,8 @@ class GeminiImageGeneration(IO.ComfyNode):
                 config.image_config = types.ImageConfig(**image_config_params)
 
             from .gemini_api.cooperative_call import call_with_retry
-            response = call_with_retry(
+            response = await asyncio.to_thread(
+                call_with_retry,
                 image_client.client.models.generate_content,
                 model=image_client.model_name,
                 contents=[prompt.strip()],
@@ -1200,7 +1204,7 @@ class GeminiImageEdit(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
         from .gemini_api.utils import ImageConverter
 
         image = kwargs.get("image")
@@ -1283,7 +1287,8 @@ class GeminiImageEdit(IO.ComfyNode):
             contents = pil_images + [prompt.strip()]
 
             from .gemini_api.cooperative_call import call_with_retry
-            response = call_with_retry(
+            response = await asyncio.to_thread(
+                call_with_retry,
                 image_client.client.models.generate_content,
                 model=image_client.model_name,
                 contents=contents,
