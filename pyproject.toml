@@ -29,4 +29,9 @@ Documentation = "https://github.com/eRepublik-Labs/comfyui-nodes-erpk/wiki"
 PublisherId = "erpk"
 DisplayName = "ERPK Custom Nodes"
 Icon = "https://raw.githubusercontent.com/eRepublik-Labs/comfyui-nodes-erpk/main/icon.png"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
 # requires-comfyui = ">=1.0.0"
