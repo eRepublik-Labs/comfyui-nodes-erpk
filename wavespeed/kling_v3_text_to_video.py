@@ -102,6 +102,15 @@ class KlingV3TextToVideoNode(IO.ComfyNode):
         if (prompt is None or prompt == "") and not multi_prompt_value:
             raise ValueError("Either prompt or multi_prompt is required")
 
+        # The Wavespeed Kling 3.0 std API rejects shot_type="intelligent" when
+        # multi_prompt is empty (intelligent mode auto-determines scope across
+        # scene segments, which requires segments to exist). Saved workflows
+        # from before the default flipped to "customize" still carry the old
+        # widget value, so defensively drop the field here when it would fail.
+        if shot_type == "intelligent" and not multi_prompt_value:
+            print("[WaveSpeed] Kling shot_type='intelligent' requires multi_prompt; omitting field so API uses its default ('customize').")
+            shot_type = None
+
         if model == "Kling 3.0 4K":
             request_cls = KlingV34KTextToVideo
         elif model == "Kling 3.0 Pro":
