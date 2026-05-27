@@ -18,7 +18,7 @@ class KlingV3TextToVideoNode(IO.ComfyNode):
 
     MODELS = ["Kling 3.0", "Kling 3.0 Pro", "Kling 3.0 4K"]
     ASPECT_RATIOS = ["16:9", "9:16", "1:1"]
-    SHOT_TYPES = ["intelligent", "customize"]
+    SHOT_TYPES = ["customize", "intelligent"]
 
     @classmethod
     def define_schema(cls):
@@ -51,8 +51,8 @@ class KlingV3TextToVideoNode(IO.ComfyNode):
                                  tooltip="Enable synchronized audio generation"),
                 IO.Combo.Input("shot_type", optional=True,
                                options=cls.SHOT_TYPES,
-                               default="intelligent",
-                               tooltip="Shot composition mode"),
+                               default="customize",
+                               tooltip="Shot composition mode. 'customize' is the API default; 'intelligent' auto-determines scope but requires multi_prompt to be set."),
                 IO.String.Input("multi_prompt", optional=True, multiline=True, default="",
                                 tooltip="JSON array of scene-segmented prompts (mutually exclusive with prompt)"),
                 IO.String.Input("element_list", optional=True, multiline=True, default="",
@@ -85,7 +85,7 @@ class KlingV3TextToVideoNode(IO.ComfyNode):
     async def execute(cls, model="Kling 3.0", prompt="", client=None,
                 duration=5, aspect_ratio="16:9", seed=-1,
                 negative_prompt="", cfg_scale=0.5, sound=False,
-                shot_type="intelligent", multi_prompt="", element_list="",
+                shot_type="customize", multi_prompt="", element_list="",
                 **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.requests.kling_v3_text_to_video import KlingV3TextToVideo

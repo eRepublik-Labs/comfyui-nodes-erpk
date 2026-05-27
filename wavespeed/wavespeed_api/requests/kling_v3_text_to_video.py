@@ -44,8 +44,8 @@ class KlingV3TextToVideo(BaseRequest):
         description="Enable synchronized audio generation.",
     )
     shot_type: Optional[str] = Field(
-        default="intelligent",
-        description="Shot composition mode: 'intelligent' or 'customize'.",
+        default="customize",
+        description="Shot composition mode: 'customize' (API default) or 'intelligent' (requires multi_prompt).",
     )
     multi_prompt: Optional[List[dict]] = Field(
         default=None,
