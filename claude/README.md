@@ -2,7 +2,7 @@
 
 Complete Claude API integration providing text generation, prompt enhancement, vision analysis, and conversational AI capabilities for ComfyUI workflows.
 
-**Version:** 2026.4.21
+**Version:** 2026.5.13
 **Category in ComfyUI:** `ERPK/Claude`
 
 ## Features
@@ -413,5 +413,5 @@ MIT License
 
 For issues, questions, or contributions, please visit the repository or contact the maintainers.
 
-**Version:** 2026.4.21
-**Last Updated:** April 2026
+**Version:** 2026.5.13
+**Last Updated:** May 2026
