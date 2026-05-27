@@ -1,6 +1,7 @@
 # ABOUTME: Tests for OpenAI reasoning_effort parameter and gpt-5.4 family models
 # ABOUTME: Validates schema inputs, SDK pass-through for reasoning models, and drop for non-reasoning
 
+import asyncio
 import importlib
 from unittest.mock import MagicMock
 
@@ -239,11 +240,11 @@ class TestReasoningEffortPassThrough:
     def test_reasoning_effort_passed_to_sdk_for_reasoning_model(self):
         client, mock_sdk = _make_client_with_mock_sdk()
 
-        client.generate_content(
+        asyncio.run(client.generate_content(
             prompt="hello",
             model="gpt-5.4",
             reasoning_effort="high",
-        )
+        ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert kwargs.get("reasoning_effort") == "high"
@@ -251,11 +252,11 @@ class TestReasoningEffortPassThrough:
     def test_reasoning_effort_dropped_for_non_reasoning_model(self):
         client, mock_sdk = _make_client_with_mock_sdk()
 
-        client.generate_content(
+        asyncio.run(client.generate_content(
             prompt="hello",
             model="gpt-4o",
             reasoning_effort="high",
-        )
+        ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert "reasoning_effort" not in kwargs
@@ -263,11 +264,11 @@ class TestReasoningEffortPassThrough:
     def test_reasoning_effort_passed_for_o3(self):
         client, mock_sdk = _make_client_with_mock_sdk()
 
-        client.generate_content(
+        asyncio.run(client.generate_content(
             prompt="hello",
             model="o3",
             reasoning_effort="medium",
-        )
+        ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert kwargs.get("reasoning_effort") == "medium"
@@ -276,10 +277,10 @@ class TestReasoningEffortPassThrough:
         """When reasoning_effort is None (default), it is never passed."""
         client, mock_sdk = _make_client_with_mock_sdk()
 
-        client.generate_content(
+        asyncio.run(client.generate_content(
             prompt="hello",
             model="gpt-5.4",
-        )
+        ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert "reasoning_effort" not in kwargs
@@ -288,11 +289,11 @@ class TestReasoningEffortPassThrough:
         """chat() should forward reasoning_effort for reasoning models."""
         client, mock_sdk = _make_client_with_mock_sdk()
 
-        client.chat(
+        asyncio.run(client.chat(
             messages=[{"role": "user", "content": "hi"}],
             model="gpt-5.4-pro",
             reasoning_effort="xhigh",
-        )
+        ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert kwargs.get("reasoning_effort") == "xhigh"
@@ -300,11 +301,11 @@ class TestReasoningEffortPassThrough:
     def test_reasoning_effort_dropped_via_chat_for_non_reasoning(self):
         client, mock_sdk = _make_client_with_mock_sdk()
 
-        client.chat(
+        asyncio.run(client.chat(
             messages=[{"role": "user", "content": "hi"}],
             model="gpt-4o",
             reasoning_effort="low",
-        )
+        ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert "reasoning_effort" not in kwargs
@@ -316,11 +317,11 @@ class TestVerbosityPassThrough:
     def test_verbosity_passed_for_gpt_5_5(self):
         client, mock_sdk = _make_client_with_mock_sdk()
 
-        client.generate_content(
+        asyncio.run(client.generate_content(
             prompt="hello",
             model="gpt-5.5",
             verbosity="low",
-        )
+        ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert kwargs.get("verbosity") == "low"
@@ -328,11 +329,11 @@ class TestVerbosityPassThrough:
     def test_verbosity_passed_for_gpt_5_5_pro(self):
         client, mock_sdk = _make_client_with_mock_sdk()
 
-        client.generate_content(
+        asyncio.run(client.generate_content(
             prompt="hello",
             model="gpt-5.5-pro",
             verbosity="high",
-        )
+        ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert kwargs.get("verbosity") == "high"
@@ -341,11 +342,11 @@ class TestVerbosityPassThrough:
         """'default' is the no-op marker — never sent over the wire."""
         client, mock_sdk = _make_client_with_mock_sdk()
 
-        client.generate_content(
+        asyncio.run(client.generate_content(
             prompt="hello",
             model="gpt-5.5",
             verbosity="default",
-        )
+        ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert "verbosity" not in kwargs
@@ -353,7 +354,7 @@ class TestVerbosityPassThrough:
     def test_verbosity_dropped_when_omitted(self):
         client, mock_sdk = _make_client_with_mock_sdk()
 
-        client.generate_content(prompt="hello", model="gpt-5.5")
+        asyncio.run(client.generate_content(prompt="hello", model="gpt-5.5"))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert "verbosity" not in kwargs
@@ -362,11 +363,11 @@ class TestVerbosityPassThrough:
         """gpt-4o doesn't accept verbosity — silently drop."""
         client, mock_sdk = _make_client_with_mock_sdk()
 
-        client.generate_content(
+        asyncio.run(client.generate_content(
             prompt="hello",
             model="gpt-4o",
             verbosity="medium",
-        )
+        ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert "verbosity" not in kwargs
@@ -375,11 +376,11 @@ class TestVerbosityPassThrough:
         """o-series reasoning models also don't take verbosity."""
         client, mock_sdk = _make_client_with_mock_sdk()
 
-        client.generate_content(
+        asyncio.run(client.generate_content(
             prompt="hello",
             model="o3",
             verbosity="high",
-        )
+        ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert "verbosity" not in kwargs
@@ -388,11 +389,11 @@ class TestVerbosityPassThrough:
         """chat() should also forward verbosity for supported models."""
         client, mock_sdk = _make_client_with_mock_sdk()
 
-        client.chat(
+        asyncio.run(client.chat(
             messages=[{"role": "user", "content": "hi"}],
             model="gpt-5.5",
             verbosity="medium",
-        )
+        ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert kwargs.get("verbosity") == "medium"
@@ -400,11 +401,11 @@ class TestVerbosityPassThrough:
     def test_verbosity_dropped_via_chat_for_unsupported_model(self):
         client, mock_sdk = _make_client_with_mock_sdk()
 
-        client.chat(
+        asyncio.run(client.chat(
             messages=[{"role": "user", "content": "hi"}],
             model="gpt-4o",
             verbosity="low",
-        )
+        ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert "verbosity" not in kwargs

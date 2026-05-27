@@ -14,6 +14,7 @@ Validates that:
 - OpenAIImageResponses node schema exposes the expected inputs/outputs
 """
 
+import asyncio
 import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -62,12 +63,12 @@ class TestRequestShape:
 
     def test_minimal_request_has_model_input_tools(self):
         client, sdk = _make_client_with_mock_response([_image_call()])
-        client.generate_image_via_responses(
+        asyncio.run(client.generate_image_via_responses(
             prompt="a red apple",
             mainline_model="gpt-5.4",
             image_model="gpt-image-2",
             size="1024x1024",
-        )
+        ))
         args = sdk.responses.create.call_args.kwargs
         assert args["model"] == "gpt-5.4"
         assert args["input"] == "a red apple"
@@ -77,26 +78,26 @@ class TestRequestShape:
 
     def test_reasoning_omitted_when_none(self):
         client, sdk = _make_client_with_mock_response([_image_call()])
-        client.generate_image_via_responses(
+        asyncio.run(client.generate_image_via_responses(
             prompt="x", image_model="gpt-image-2", reasoning_effort="none",
-        )
+        ))
         args = sdk.responses.create.call_args.kwargs
         assert "reasoning" not in args
 
     def test_reasoning_added_when_effort_set(self):
         client, sdk = _make_client_with_mock_response([_image_call()])
-        client.generate_image_via_responses(
+        asyncio.run(client.generate_image_via_responses(
             prompt="x", image_model="gpt-image-2", reasoning_effort="medium",
-        )
+        ))
         args = sdk.responses.create.call_args.kwargs
         assert args["reasoning"]["effort"] == "medium"
         assert args["reasoning"]["summary"] == "auto"
 
     def test_web_search_tool_added_when_enabled(self):
         client, sdk = _make_client_with_mock_response([_image_call()])
-        client.generate_image_via_responses(
+        asyncio.run(client.generate_image_via_responses(
             prompt="x", image_model="gpt-image-2", enable_web_search=True,
-        )
+        ))
         tools = sdk.responses.create.call_args.kwargs["tools"]
         tool_types = [t["type"] for t in tools]
         assert "image_generation" in tool_types
@@ -104,16 +105,16 @@ class TestRequestShape:
 
     def test_web_search_tool_omitted_when_disabled(self):
         client, sdk = _make_client_with_mock_response([_image_call()])
-        client.generate_image_via_responses(
+        asyncio.run(client.generate_image_via_responses(
             prompt="x", image_model="gpt-image-2", enable_web_search=False,
-        )
+        ))
         tools = sdk.responses.create.call_args.kwargs["tools"]
         assert len(tools) == 1
         assert tools[0]["type"] == "image_generation"
 
     def test_non_default_params_present_in_tool_config(self):
         client, sdk = _make_client_with_mock_response([_image_call()])
-        client.generate_image_via_responses(
+        asyncio.run(client.generate_image_via_responses(
             prompt="x",
             image_model="gpt-image-2",
             size="1536x1024",
@@ -122,7 +123,7 @@ class TestRequestShape:
             output_format="jpeg",
             moderation="low",
             action="generate",
-        )
+        ))
         tool = sdk.responses.create.call_args.kwargs["tools"][0]
         assert tool["size"] == "1536x1024"
         assert tool["quality"] == "high"
@@ -134,14 +135,14 @@ class TestRequestShape:
     def test_default_params_omitted_from_tool_config(self):
         """Match the existing 'auto' = 'don't send' pattern from generate_image."""
         client, sdk = _make_client_with_mock_response([_image_call()])
-        client.generate_image_via_responses(
+        asyncio.run(client.generate_image_via_responses(
             prompt="x",
             image_model="gpt-image-2",
             quality="auto",
             background="auto",
             moderation="auto",
             output_format="png",
-        )
+        ))
         tool = sdk.responses.create.call_args.kwargs["tools"][0]
         assert "quality" not in tool
         assert "background" not in tool
@@ -156,16 +157,16 @@ class TestGptImage2SizeValidation:
     def test_below_min_pixels_raises_before_api_call(self):
         client, sdk = _make_client_with_mock_response([_image_call()])
         with pytest.raises(ValueError, match="at least 655,360"):
-            client.generate_image_via_responses(
+            asyncio.run(client.generate_image_via_responses(
                 prompt="x", image_model="gpt-image-2", size="512x512",
-            )
+            ))
         assert not sdk.responses.create.called, "API must not be called when preflight fails"
 
     def test_validation_skipped_for_gpt_image_1_5(self):
         client, sdk = _make_client_with_mock_response([_image_call()])
-        client.generate_image_via_responses(
+        asyncio.run(client.generate_image_via_responses(
             prompt="x", image_model="gpt-image-1.5", size="512x512",
-        )
+        ))
         assert sdk.responses.create.called
 
 
@@ -174,18 +175,18 @@ class TestBackgroundPassThrough:
 
     def test_transparent_passes_through_on_gpt_image_2(self):
         client, sdk = _make_client_with_mock_response([_image_call()])
-        client.generate_image_via_responses(
+        asyncio.run(client.generate_image_via_responses(
             prompt="x", image_model="gpt-image-2",
             size="1024x1024", background="transparent",
-        )
+        ))
         tool = sdk.responses.create.call_args.kwargs["tools"][0]
         assert tool["background"] == "transparent"
 
     def test_transparent_preserved_for_gpt_image_1_5(self):
         client, sdk = _make_client_with_mock_response([_image_call()])
-        client.generate_image_via_responses(
+        asyncio.run(client.generate_image_via_responses(
             prompt="x", image_model="gpt-image-1.5", background="transparent",
-        )
+        ))
         tool = sdk.responses.create.call_args.kwargs["tools"][0]
         assert tool["background"] == "transparent"
 
@@ -198,9 +199,9 @@ class TestResponseParsing:
             _image_call(result="AAAA", revised="a revised prompt"),
             _message_item(),
         ])
-        result = client.generate_image_via_responses(
+        result = asyncio.run(client.generate_image_via_responses(
             prompt="x", image_model="gpt-image-2", size="1024x1024",
-        )
+        ))
         assert result["images"] == ["AAAA"]
         assert "a revised prompt" in result["revised_prompt"]
         assert result["reasoning_summary"] == ""
@@ -211,9 +212,9 @@ class TestResponseParsing:
             _image_call(result="IMG2"),
             _message_item(),
         ])
-        result = client.generate_image_via_responses(
+        result = asyncio.run(client.generate_image_via_responses(
             prompt="x", image_model="gpt-image-2", size="1024x1024",
-        )
+        ))
         assert result["images"] == ["IMG1", "IMG2"]
 
     def test_reasoning_summary_extracted(self):
@@ -222,17 +223,17 @@ class TestResponseParsing:
             _image_call(result="IMG"),
             _message_item(),
         ])
-        result = client.generate_image_via_responses(
+        result = asyncio.run(client.generate_image_via_responses(
             prompt="x", image_model="gpt-image-2",
             size="1024x1024", reasoning_effort="medium",
-        )
+        ))
         assert "considered multiple options" in result["reasoning_summary"]
 
     def test_empty_output_returns_empty_images(self):
         client, _ = _make_client_with_mock_response([])
-        result = client.generate_image_via_responses(
+        result = asyncio.run(client.generate_image_via_responses(
             prompt="x", image_model="gpt-image-2", size="1024x1024",
-        )
+        ))
         assert result["images"] == []
         assert result["revised_prompt"] == ""
         assert result["reasoning_summary"] == ""

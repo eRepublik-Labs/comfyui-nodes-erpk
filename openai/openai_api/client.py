@@ -1,6 +1,7 @@
 # ABOUTME: OpenAI API client using the official openai SDK
 # ABOUTME: Handles authentication, chat completions, and image generation
 
+import asyncio
 import os
 import configparser
 import time
@@ -198,7 +199,7 @@ class OpenAIClient:
         if system_instruction:
             self.system_instruction = system_instruction
 
-    def generate_content(
+    def _generate_content_sync(
         self,
         prompt: str,
         images: Optional[List[Dict[str, Any]]] = None,
@@ -213,25 +214,6 @@ class OpenAIClient:
         verbosity: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """
-        Generate content using OpenAI API.
-
-        Args:
-            prompt: Text prompt
-            images: Optional list of image data dicts for vision tasks
-            max_tokens: Maximum tokens to generate
-            temperature: Sampling temperature (0.0-2.0)
-            model: Optional model override (uses client default if not specified)
-            top_p: Nucleus sampling threshold (None to disable)
-            stop_sequences: List of sequences where generation stops
-            response_format: Output format (e.g., {"type": "json_object"})
-            reasoning_effort: Reasoning depth for reasoning models
-                (minimal/low/medium/high/xhigh). Silently dropped for non-reasoning models.
-            **kwargs: Additional parameters
-
-        Returns:
-            Response dict with 'text' and metadata
-        """
         from openai import APIError, RateLimitError, APIConnectionError
 
         max_tokens = max_tokens or self.DEFAULT_MAX_TOKENS
@@ -348,7 +330,49 @@ class OpenAIClient:
         # All retries exhausted
         raise Exception(f"Request failed after {self.MAX_RETRIES} attempts: {last_exception}")
 
-    def chat(
+    async def generate_content(
+        self,
+        prompt: str,
+        images: Optional[List[Dict[str, Any]]] = None,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        model: Optional[str] = None,
+        top_p: Optional[float] = None,
+        stop_sequences: Optional[List[str]] = None,
+        response_format: Optional[Dict] = None,
+        seed: Optional[int] = None,
+        reasoning_effort: Optional[str] = None,
+        verbosity: Optional[str] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Generate content using OpenAI API.
+
+        Args:
+            prompt: Text prompt
+            images: Optional list of image data dicts for vision tasks
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature (0.0-2.0)
+            model: Optional model override (uses client default if not specified)
+            top_p: Nucleus sampling threshold (None to disable)
+            stop_sequences: List of sequences where generation stops
+            response_format: Output format (e.g., {"type": "json_object"})
+            reasoning_effort: Reasoning depth for reasoning models
+                (minimal/low/medium/high/xhigh). Silently dropped for non-reasoning models.
+            **kwargs: Additional parameters
+
+        Returns:
+            Response dict with 'text' and metadata
+        """
+        return await asyncio.to_thread(
+            self._generate_content_sync, prompt,
+            images=images, max_tokens=max_tokens, temperature=temperature,
+            model=model, top_p=top_p, stop_sequences=stop_sequences,
+            response_format=response_format, seed=seed,
+            reasoning_effort=reasoning_effort, verbosity=verbosity, **kwargs
+        )
+
+    def _chat_sync(
         self,
         messages: List[Dict[str, str]],
         max_tokens: Optional[int] = None,
@@ -461,7 +485,46 @@ class OpenAIClient:
 
         raise Exception(f"Chat request failed after {self.MAX_RETRIES} attempts: {last_exception}")
 
-    def generate_image(
+    async def chat(
+        self,
+        messages: List[Dict[str, str]],
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        model: Optional[str] = None,
+        top_p: Optional[float] = None,
+        stop_sequences: Optional[List[str]] = None,
+        response_format: Optional[Dict] = None,
+        seed: Optional[int] = None,
+        reasoning_effort: Optional[str] = None,
+        verbosity: Optional[str] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Send a chat completion request with full message history.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature (0.0-2.0)
+            model: Optional model override
+            top_p: Nucleus sampling threshold
+            stop_sequences: List of stop sequences
+            response_format: Output format specification
+            reasoning_effort: Reasoning depth for reasoning models
+                (minimal/low/medium/high/xhigh). Silently dropped for non-reasoning models.
+            **kwargs: Additional parameters
+
+        Returns:
+            Response dict with 'text' and metadata
+        """
+        return await asyncio.to_thread(
+            self._chat_sync, messages,
+            max_tokens=max_tokens, temperature=temperature, model=model,
+            top_p=top_p, stop_sequences=stop_sequences, response_format=response_format,
+            seed=seed, reasoning_effort=reasoning_effort, verbosity=verbosity, **kwargs
+        )
+
+    def _generate_image_sync(
         self,
         prompt: str,
         model: str = "gpt-image-1",
@@ -541,6 +604,38 @@ class OpenAIClient:
                 }
             raise
 
+    async def generate_image(
+        self,
+        prompt: str,
+        model: str = "gpt-image-1",
+        size: str = "1024x1024",
+        quality: str = "auto",
+        background: str = "auto",
+        moderation: str = "auto",
+        n: int = 1,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Generate an image using OpenAI's image generation API.
+
+        Args:
+            prompt: Text description of image to generate
+            model: Image model (gpt-image-1, dall-e-3, dall-e-2)
+            size: Image size (1024x1024, 1024x1536, 1536x1024, etc.)
+            quality: Image quality (auto, low, medium, high - gpt-image-1 only)
+            background: Background type (auto, transparent, opaque - GPT Image models only)
+            n: Number of images to generate
+            **kwargs: Additional parameters
+
+        Returns:
+            Dict with 'images' (list of base64 data) and metadata
+        """
+        return await asyncio.to_thread(
+            self._generate_image_sync, prompt,
+            model=model, size=size, quality=quality,
+            background=background, moderation=moderation, n=n, **kwargs
+        )
+
     def _validate_n_for_model(self, n: int, model: str):
         """OpenAI's images API accepts n=1-10 for most models. dall-e-3 is the
         sole exception (hard-capped at n=1). Called in generate_image so users
@@ -601,7 +696,7 @@ class OpenAIClient:
                 f"You requested {size} = {pixels:,} pixels."
             )
 
-    def generate_image_via_responses(
+    def _generate_image_via_responses_sync(
         self,
         prompt: str,
         mainline_model: str = "gpt-5.5",
@@ -709,7 +804,42 @@ class OpenAIClient:
                 }
             raise
 
-    def edit_image(
+    async def generate_image_via_responses(
+        self,
+        prompt: str,
+        mainline_model: str = "gpt-5.5",
+        image_model: str = "gpt-image-2",
+        reasoning_effort: str = "none",
+        size: str = "auto",
+        quality: str = "auto",
+        background: str = "auto",
+        output_format: str = "png",
+        moderation: str = "auto",
+        enable_web_search: bool = False,
+        action: str = "auto",
+        verbosity: str = "default",
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        Generate an image via the Responses API with the image_generation tool.
+
+        Adds reasoning effort and optional web search on top of the standard
+        image params. The mainline (text/reasoning) model revises the prompt
+        before the image model renders. Returns dict with 'images' (list of
+        base64 strings), 'revised_prompt', and 'reasoning_summary'.
+
+        Source: https://developers.openai.com/api/docs/guides/responses
+        """
+        return await asyncio.to_thread(
+            self._generate_image_via_responses_sync, prompt,
+            mainline_model=mainline_model, image_model=image_model,
+            reasoning_effort=reasoning_effort, size=size, quality=quality,
+            background=background, output_format=output_format,
+            moderation=moderation, enable_web_search=enable_web_search,
+            action=action, verbosity=verbosity, **kwargs
+        )
+
+    def _edit_image_sync(
         self,
         image_data,
         prompt: str,
@@ -810,3 +940,44 @@ class OpenAIClient:
                     "error": str(e)
                 }
             raise
+
+    async def edit_image(
+        self,
+        image_data,
+        prompt: str,
+        mask_data: Optional[bytes] = None,
+        model: str = "gpt-image-2",
+        size: str = "1024x1024",
+        quality: str = "auto",
+        moderation: str = "auto",
+        n: int = 1,
+        background: str = "auto",
+        input_fidelity: str = "auto",
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Edit an image using OpenAI's image editing API.
+
+        Args:
+            image_data: Original image(s) as PNG bytes. Accepts either a single
+                `bytes` value OR a list of `bytes` for multi-image editing
+                (gpt-image-2 supports up to 16 reference images for character
+                and scene continuity).
+            prompt: Text description of desired edits
+            mask_data: Optional mask as bytes (PNG with transparency). When
+                multiple images are provided, mask applies to the first image.
+            model: Image model (gpt-image-2 recommended)
+            size: Output image size
+            quality: Image quality (GPT Image models only)
+            n: Number of images to generate
+            **kwargs: Additional parameters
+
+        Returns:
+            Dict with 'images' (list of base64 data) and metadata
+        """
+        return await asyncio.to_thread(
+            self._edit_image_sync, image_data, prompt,
+            mask_data=mask_data, model=model, size=size, quality=quality,
+            moderation=moderation, n=n, background=background,
+            input_fidelity=input_fidelity, **kwargs
+        )

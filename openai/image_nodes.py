@@ -155,7 +155,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
         from .openai_api.utils import ImageConverter
 
         client = kwargs.get("client")
@@ -184,7 +184,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
             print(f"[OpenAI] Size: {size}, Quality: {quality}")
 
             # Generate image
-            response = image_client.generate_image(
+            response = await image_client.generate_image(
                 prompt=prompt.strip(),
                 model=model,
                 size=size,
@@ -370,7 +370,7 @@ class OpenAIImageResponses(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
         from .openai_api.utils import ImageConverter
 
         client = kwargs.get("client")
@@ -400,7 +400,7 @@ class OpenAIImageResponses(IO.ComfyNode):
             print(f"[OpenAI Responses] mainline={mainline_model} image={image_model} reasoning={reasoning_effort}")
             print(f"[OpenAI Responses] prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
 
-            response = image_client.generate_image_via_responses(
+            response = await image_client.generate_image_via_responses(
                 prompt=prompt.strip(),
                 mainline_model=mainline_model,
                 image_model=image_model,
@@ -577,7 +577,7 @@ class OpenAIImageEdit(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, image, prompt, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, image, prompt, **kwargs) -> IO.NodeOutput:
         from .openai_api.utils import ImageConverter
 
         client = kwargs.get("client")
@@ -665,7 +665,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                 print(f"[OpenAI] Using mask for inpainting")
 
             # Edit image
-            response = image_client.edit_image(
+            response = await image_client.edit_image(
                 image_data=image_bytes,
                 prompt=prompt.strip(),
                 mask_data=mask_bytes,

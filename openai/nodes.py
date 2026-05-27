@@ -163,7 +163,7 @@ class OpenAITextGeneration(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
         client = kwargs.get("client")
         model = kwargs.get("model")
         temperature = kwargs.get("temperature", 0.7)
@@ -197,7 +197,7 @@ class OpenAITextGeneration(IO.ComfyNode):
         effort = reasoning_effort if reasoning_effort and reasoning_effort != "none" else None
 
         try:
-            response = client.generate_content(
+            response = await client.generate_content(
                 prompt=prompt.strip(),
                 max_tokens=max_tokens,
                 temperature=temperature,
@@ -342,7 +342,7 @@ class OpenAIChat(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
         client = kwargs.get("client")
         model = kwargs.get("model")
         chat_session = kwargs.get("chat_session")
@@ -390,7 +390,7 @@ class OpenAIChat(IO.ComfyNode):
             effort = reasoning_effort if reasoning_effort and reasoning_effort != "none" else None
 
             # Send chat request
-            response = client.chat(
+            response = await client.chat(
                 messages=messages,
                 max_tokens=max_tokens,
                 temperature=temperature,
@@ -510,7 +510,7 @@ class OpenAIVision(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, image, prompt, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, image, prompt, **kwargs) -> IO.NodeOutput:
         from .openai_api.utils import ImageConverter
 
         client = kwargs.get("client")
@@ -536,7 +536,7 @@ class OpenAIVision(IO.ComfyNode):
             effort = reasoning_effort if reasoning_effort and reasoning_effort != "none" else None
 
             # Generate content with images
-            response = client.generate_content(
+            response = await client.generate_content(
                 prompt=prompt.strip(),
                 images=image_content,
                 max_tokens=max_tokens,
