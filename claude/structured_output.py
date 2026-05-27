@@ -78,7 +78,7 @@ class ClaudeStructuredOutput(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
         prompt = kwargs.get("prompt", "")
         tool = kwargs.get("tool")
         client = kwargs.get("client")
@@ -103,7 +103,7 @@ class ClaudeStructuredOutput(IO.ComfyNode):
 
         system = system_prompt.strip() if system_prompt and system_prompt.strip() else None
 
-        response = client.send_request(
+        response = await client.send_request(
             messages=[{"role": "user", "content": prompt.strip()}],
             system=system,
             temperature=temperature,

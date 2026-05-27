@@ -3,8 +3,14 @@ Claude API Client
 
 Provides a client wrapper for interacting with Anthropic's Claude API.
 Supports streaming, prompt caching, and error handling with retries.
+
+Public methods that perform HTTP I/O are async so ComfyUI's executor can
+interleave concurrent API nodes. The underlying HTTP work uses the synchronous
+Anthropic SDK via asyncio.to_thread, preserving the existing retry machinery
+while releasing the event loop during network I/O.
 """
 
+import asyncio
 import os
 import time
 from typing import Dict, Any, Generator, Optional
@@ -136,7 +142,7 @@ class ClaudeClient:
             "4. config.ini file in claude/ directory"
         )
 
-    def send_request(
+    def _send_request_sync(
         self,
         messages: list,
         system: Optional[str] = None,
@@ -145,23 +151,6 @@ class ClaudeClient:
         model: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
-        """
-        Send a synchronous request to Claude API with retry logic.
-
-        Args:
-            messages: List of message dicts with 'role' and 'content'
-            system: Optional system prompt
-            max_tokens: Maximum tokens to generate
-            temperature: Sampling temperature (0.0-1.0)
-            model: Override default model
-            **kwargs: Additional parameters for the API
-
-        Returns:
-            API response dict with 'content', 'usage', etc.
-
-        Raises:
-            APIError: If request fails after retries
-        """
         model = model or self.model
         max_tokens = max_tokens or self.DEFAULT_MAX_TOKENS
         temperature = temperature if temperature is not None else self.DEFAULT_TEMPERATURE
@@ -235,6 +224,42 @@ class ClaudeClient:
         # All retries exhausted
         raise APIError(f"Request failed after {self.MAX_RETRIES} attempts") from last_exception
 
+    async def send_request(
+        self,
+        messages: list,
+        system: Optional[str] = None,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        model: Optional[str] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Send a request to Claude API with retry logic.
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            system: Optional system prompt
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature (0.0-1.0)
+            model: Override default model
+            **kwargs: Additional parameters for the API
+
+        Returns:
+            API response dict with 'content', 'usage', etc.
+
+        Raises:
+            APIError: If request fails after retries
+        """
+        return await asyncio.to_thread(
+            self._send_request_sync,
+            messages,
+            system=system,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            model=model,
+            **kwargs,
+        )
+
     def send_request_streaming(
         self,
         messages: list,
@@ -306,17 +331,7 @@ class ClaudeClient:
         except AnthropicError as e:
             raise APIError(f"Streaming request failed: {str(e)}") from e
 
-    def count_tokens(self, messages: list, system: Optional[str] = None) -> int:
-        """
-        Count tokens in a message list using Anthropic's API.
-
-        Args:
-            messages: List of message dicts
-            system: Optional system prompt
-
-        Returns:
-            Token count
-        """
+    def _count_tokens_sync(self, messages: list, system: Optional[str] = None) -> int:
         try:
             # Use Anthropic's beta token counting API
             params = {
@@ -345,6 +360,19 @@ class ClaudeClient:
                             total_text += item.get("text", "") + " "
             # Rough estimate: ~4 characters per token
             return len(total_text) // 4
+
+    async def count_tokens(self, messages: list, system: Optional[str] = None) -> int:
+        """
+        Count tokens in a message list using Anthropic's API.
+
+        Args:
+            messages: List of message dicts
+            system: Optional system prompt
+
+        Returns:
+            Token count
+        """
+        return await asyncio.to_thread(self._count_tokens_sync, messages, system)
 
     def get_usage_stats(self) -> Dict[str, int]:
         """

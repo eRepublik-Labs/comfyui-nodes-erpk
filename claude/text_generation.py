@@ -78,7 +78,7 @@ class ClaudeTextGeneration(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
         from .claude_api.client import ClaudeClient
 
         prompt = kwargs.get("prompt", "")
@@ -101,7 +101,7 @@ class ClaudeTextGeneration(IO.ComfyNode):
             if use_streaming and client.enable_streaming:
                 response_text = cls._generate_streaming(client, messages, system, temperature, max_tokens)
             else:
-                response_text = cls._generate_standard(client, messages, system, temperature, max_tokens)
+                response_text = await cls._generate_standard(client, messages, system, temperature, max_tokens)
 
             print(f"[Claude] Text generated successfully ({len(response_text)} characters)")
             return IO.NodeOutput(response_text)
@@ -112,9 +112,9 @@ class ClaudeTextGeneration(IO.ComfyNode):
             raise ValueError(error_msg)
 
     @classmethod
-    def _generate_standard(cls, client, messages, system, temperature, max_tokens):
+    async def _generate_standard(cls, client, messages, system, temperature, max_tokens):
         """Generate using standard (non-streaming) mode."""
-        response = client.send_request(
+        response = await client.send_request(
             messages=messages,
             system=system,
             temperature=temperature,

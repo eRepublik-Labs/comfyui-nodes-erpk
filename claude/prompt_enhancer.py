@@ -292,7 +292,7 @@ Emphasize architectural beauty and structural design."""
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
         from .claude_api.client import ClaudeClient
 
         prompt = kwargs.get("prompt", "")
@@ -317,7 +317,7 @@ Emphasize architectural beauty and structural design."""
             if use_streaming and client.enable_streaming:
                 enhanced = cls._generate_streaming(client, messages, system_prompt, temperature, max_tokens)
             else:
-                enhanced = cls._generate_standard(client, messages, system_prompt, temperature, max_tokens)
+                enhanced = await cls._generate_standard(client, messages, system_prompt, temperature, max_tokens)
 
             print(f"[Claude] Prompt enhanced successfully")
             print(f"[Claude] Original: {prompt[:100]}...")
@@ -356,9 +356,9 @@ Guidelines:
 - Output ONLY the enhanced prompt, no explanation or preamble"""
 
     @classmethod
-    def _generate_standard(cls, client, messages, system, temperature, max_tokens):
+    async def _generate_standard(cls, client, messages, system, temperature, max_tokens):
         """Generate using standard (non-streaming) mode."""
-        response = client.send_request(
+        response = await client.send_request(
             messages=messages,
             system=system,
             temperature=temperature,

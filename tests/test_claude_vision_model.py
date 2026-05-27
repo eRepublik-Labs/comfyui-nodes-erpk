@@ -8,7 +8,8 @@ is used. When set to an explicit model ID, that value is passed to
 send_request and overrides the client's model for this call only.
 """
 
-from unittest.mock import MagicMock, patch
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -56,7 +57,7 @@ def _patched_client():
     client = MagicMock()
     mock_response = MagicMock()
     mock_response.content = [MagicMock(text="mock analysis")]
-    client.send_request.return_value = mock_response
+    client.send_request = AsyncMock(return_value=mock_response)
     return client
 
 
@@ -70,12 +71,12 @@ def test_vision_inherit_does_not_pass_model_to_client():
         mock_converter.validate_image_for_claude.return_value = (True, None)
         mock_converter.pil_to_base64.return_value = "fake_base64"
 
-        ClaudeVisionAnalysis.execute(
+        asyncio.run(ClaudeVisionAnalysis.execute(
             image=_mock_image_tensor(),
             question="test",
             client=client,
             model=INHERIT_SENTINEL,
-        )
+        ))
 
     call_kwargs = client.send_request.call_args.kwargs
     assert "model" not in call_kwargs, \
@@ -92,12 +93,12 @@ def test_vision_explicit_model_is_passed_to_client():
         mock_converter.validate_image_for_claude.return_value = (True, None)
         mock_converter.pil_to_base64.return_value = "fake_base64"
 
-        ClaudeVisionAnalysis.execute(
+        asyncio.run(ClaudeVisionAnalysis.execute(
             image=_mock_image_tensor(),
             question="test",
             client=client,
             model="claude-opus-4-7",
-        )
+        ))
 
     call_kwargs = client.send_request.call_args.kwargs
     assert call_kwargs.get("model") == "claude-opus-4-7"

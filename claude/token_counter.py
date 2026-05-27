@@ -75,7 +75,7 @@ class ClaudeTokenCounter(IO.ComfyNode):
             }, "2026-02-20"
 
     @classmethod
-    def execute(cls, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
         from .claude_api.utils import TokenManager
 
         text = kwargs.get("text", "")
@@ -87,7 +87,7 @@ class ClaudeTokenCounter(IO.ComfyNode):
 
         try:
             if client:
-                token_count = client.count_tokens([{"role": "user", "content": text}])
+                token_count = await client.count_tokens([{"role": "user", "content": text}])
                 counting_method = "Anthropic API (accurate)"
             else:
                 token_manager = TokenManager(model=model)

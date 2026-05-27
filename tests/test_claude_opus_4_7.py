@@ -11,6 +11,7 @@ These tests lock in that ClaudeClient strips sampling params and injects adaptiv
 thinking only for the 4.7 model, and preserves prior behavior for other models.
 """
 
+import asyncio
 from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
@@ -138,13 +139,13 @@ class TestSendRequestOpus47:
     def test_strips_temperature_top_p_top_k(self):
         with _patched_anthropic() as messages:
             client = _make_client()
-            client.send_request(
+            asyncio.run(client.send_request(
                 messages=[{"role": "user", "content": "hi"}],
                 model=OPUS_4_7,
                 temperature=0.5,
                 top_p=0.9,
                 top_k=40,
-            )
+            ))
             kwargs = messages.create.call_args.kwargs
             assert "temperature" not in kwargs
             assert "top_p" not in kwargs
@@ -153,10 +154,10 @@ class TestSendRequestOpus47:
     def test_injects_adaptive_thinking(self):
         with _patched_anthropic() as messages:
             client = _make_client()
-            client.send_request(
+            asyncio.run(client.send_request(
                 messages=[{"role": "user", "content": "hi"}],
                 model=OPUS_4_7,
-            )
+            ))
             kwargs = messages.create.call_args.kwargs
             assert kwargs.get("thinking") == {
                 "type": "adaptive",
@@ -170,21 +171,21 @@ class TestSendRequestSonnet46:
     def test_preserves_temperature(self):
         with _patched_anthropic() as messages:
             client = _make_client()
-            client.send_request(
+            asyncio.run(client.send_request(
                 messages=[{"role": "user", "content": "hi"}],
                 model=SONNET_4_6,
                 temperature=0.5,
-            )
+            ))
             kwargs = messages.create.call_args.kwargs
             assert kwargs.get("temperature") == 0.5
 
     def test_no_thinking_key(self):
         with _patched_anthropic() as messages:
             client = _make_client()
-            client.send_request(
+            asyncio.run(client.send_request(
                 messages=[{"role": "user", "content": "hi"}],
                 model=SONNET_4_6,
-            )
+            ))
             kwargs = messages.create.call_args.kwargs
             assert "thinking" not in kwargs
 

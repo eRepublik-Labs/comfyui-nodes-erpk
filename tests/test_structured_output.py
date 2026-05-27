@@ -1,9 +1,10 @@
 # ABOUTME: Tests for ClaudeStructuredOutput node — JSON extraction from forced tool use.
 # ABOUTME: Uses mocked API responses to test extraction logic without real API calls.
 
+import asyncio
 import json
 import pytest
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 
 def _make_tool_use_block(name="extract", input_data=None):
@@ -60,15 +61,15 @@ class TestStructuredOutputExtraction:
 
         client = Mock()
         tool_data = {"name": "Alice", "age": 30}
-        client.send_request.return_value = _make_response(
+        client.send_request = AsyncMock(return_value=_make_response(
             [_make_tool_use_block("extract", tool_data)]
-        )
+        ))
 
-        result = ClaudeStructuredOutput.execute(
+        result = asyncio.run(ClaudeStructuredOutput.execute(
             client=client,
             prompt="Extract the person info",
             tool=_make_tool_list("extract"),
-        )
+        ))
 
         parsed = json.loads(result[0])
         assert parsed == {"name": "Alice", "age": 30}
@@ -77,17 +78,17 @@ class TestStructuredOutputExtraction:
         from claude.structured_output import ClaudeStructuredOutput
 
         client = Mock()
-        client.send_request.return_value = _make_response([
+        client.send_request = AsyncMock(return_value=_make_response([
             _make_text_block("Let me analyze this..."),
             _make_text_block("The text mentions a person."),
             _make_tool_use_block("extract", {"name": "Bob"}),
-        ])
+        ]))
 
-        result = ClaudeStructuredOutput.execute(
+        result = asyncio.run(ClaudeStructuredOutput.execute(
             client=client,
             prompt="Extract person",
             tool=_make_tool_list("extract"),
-        )
+        ))
 
         thinking = result[1]
         assert "Let me analyze this..." in thinking
@@ -97,14 +98,14 @@ class TestStructuredOutputExtraction:
         from claude.structured_output import ClaudeStructuredOutput
 
         client = Mock()
-        client.send_request.return_value = _make_response(
+        client.send_request = AsyncMock(return_value=_make_response(
             [_make_tool_use_block("extract", {"x": 1})]
-        )
+        ))
         tools = _make_tool_list("extract")
 
-        ClaudeStructuredOutput.execute(
+        asyncio.run(ClaudeStructuredOutput.execute(
             client=client, prompt="Test prompt", tool=tools
-        )
+        ))
 
         call_kwargs = client.send_request.call_args
         assert call_kwargs.kwargs["tools"] == tools
@@ -114,18 +115,18 @@ class TestStructuredOutputExtraction:
         from claude.structured_output import ClaudeStructuredOutput
 
         client = Mock()
-        client.send_request.return_value = _make_response(
+        client.send_request = AsyncMock(return_value=_make_response(
             [_make_tool_use_block("extract", {"x": 1})]
-        )
+        ))
 
-        ClaudeStructuredOutput.execute(
+        asyncio.run(ClaudeStructuredOutput.execute(
             client=client,
             prompt="Test",
             tool=_make_tool_list("extract"),
             system_prompt="You are a parser",
             temperature=0.2,
             max_tokens=2048,
-        )
+        ))
 
         call_kwargs = client.send_request.call_args.kwargs
         assert call_kwargs["system"] == "You are a parser"
@@ -136,15 +137,15 @@ class TestStructuredOutputExtraction:
         from claude.structured_output import ClaudeStructuredOutput
 
         client = Mock()
-        client.send_request.return_value = _make_response(
+        client.send_request = AsyncMock(return_value=_make_response(
             [_make_tool_use_block("extract", {"result": True})]
-        )
+        ))
 
-        result = ClaudeStructuredOutput.execute(
+        result = asyncio.run(ClaudeStructuredOutput.execute(
             client=client,
             prompt="Test",
             tool=_make_tool_list("extract"),
-        )
+        ))
 
         assert result[1] == ""
 
@@ -159,9 +160,9 @@ class TestStructuredOutputValidation:
         two_tools = _make_tool_list("tool_a") + _make_tool_list("tool_b")
 
         with pytest.raises(ValueError, match="exactly 1 tool"):
-            ClaudeStructuredOutput.execute(
+            asyncio.run(ClaudeStructuredOutput.execute(
                 client=client, prompt="Test", tool=two_tools
-            )
+            ))
 
         client.send_request.assert_not_called()
 
@@ -171,9 +172,9 @@ class TestStructuredOutputValidation:
         client = Mock()
 
         with pytest.raises(ValueError, match="exactly 1 tool"):
-            ClaudeStructuredOutput.execute(
+            asyncio.run(ClaudeStructuredOutput.execute(
                 client=client, prompt="Test", tool=[]
-            )
+            ))
 
         client.send_request.assert_not_called()
 
@@ -183,9 +184,9 @@ class TestStructuredOutputValidation:
         client = Mock()
 
         with pytest.raises(ValueError, match="[Pp]rompt"):
-            ClaudeStructuredOutput.execute(
+            asyncio.run(ClaudeStructuredOutput.execute(
                 client=client, prompt="", tool=_make_tool_list()
-            )
+            ))
 
         client.send_request.assert_not_called()
 
@@ -195,9 +196,9 @@ class TestStructuredOutputValidation:
         client = Mock()
 
         with pytest.raises(ValueError, match="[Pp]rompt"):
-            ClaudeStructuredOutput.execute(
+            asyncio.run(ClaudeStructuredOutput.execute(
                 client=client, prompt="   \n  ", tool=_make_tool_list()
-            )
+            ))
 
 
 class TestStructuredOutputErrors:
@@ -207,14 +208,14 @@ class TestStructuredOutputErrors:
         from claude.structured_output import ClaudeStructuredOutput
 
         client = Mock()
-        client.send_request.side_effect = Exception("API connection failed")
+        client.send_request = AsyncMock(side_effect=Exception("API connection failed"))
 
         with pytest.raises(Exception, match="API connection failed"):
-            ClaudeStructuredOutput.execute(
+            asyncio.run(ClaudeStructuredOutput.execute(
                 client=client,
                 prompt="Test prompt",
                 tool=_make_tool_list(),
-            )
+            ))
 
 
 class TestStructuredOutputNodeMeta:

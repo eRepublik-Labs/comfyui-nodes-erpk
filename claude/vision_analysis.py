@@ -86,7 +86,7 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, **kwargs) -> IO.NodeOutput:
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
         from .claude_api.client import ClaudeClient
         from .claude_api.utils import ImageConverter
 
@@ -121,7 +121,7 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
             if model and model != "(inherit from client)":
                 send_kwargs["model"] = model
 
-            response = client.send_request(**send_kwargs)
+            response = await client.send_request(**send_kwargs)
 
             if hasattr(response, 'content') and len(response.content) > 0:
                 analysis_text = response.content[0].text
