@@ -63,7 +63,7 @@ class KlingV2_6ImageToVideoNode(IO.ComfyNode):
         return float("NaN")
 
     @classmethod
-    def execute(cls, model="Kling 2.6", prompt="", image=None, end_image=None,
+    async def execute(cls, model="Kling 2.6", prompt="", image=None, end_image=None,
                 image_url="", client=None, negative_prompt="", duration="5",
                 end_image_url="", cfg_scale=0.5, sound=True, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
@@ -105,7 +105,7 @@ class KlingV2_6ImageToVideoNode(IO.ComfyNode):
             )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
-        response = waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
+        response = await waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
 
         video_url = response.get("outputs", [""])[0]
         return IO.NodeOutput(video_url)

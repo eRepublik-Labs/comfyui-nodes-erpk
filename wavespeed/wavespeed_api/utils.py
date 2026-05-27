@@ -27,7 +27,7 @@ def imageurl2tensor(image_urls: List[str]):
     if not image_urls:
         return torch.zeros((1, 1, 1, 3))
 
-    from utils.safe_fetch import fetch_remote_bytes, safe_image_decode
+    from ...utils.safe_fetch import fetch_remote_bytes, safe_image_decode
     for url in image_urls:
         try:
             image_data = fetch_remote_bytes(
@@ -71,7 +71,7 @@ def imageurl2tensor_rgba(image_urls: List[str]):
     if not image_urls:
         return torch.zeros((1, 1, 1, 3)), torch.zeros((1, 1, 1))
 
-    from utils.safe_fetch import fetch_remote_bytes, safe_image_decode
+    from ...utils.safe_fetch import fetch_remote_bytes, safe_image_decode
     for url in image_urls:
         try:
             image_data = fetch_remote_bytes(

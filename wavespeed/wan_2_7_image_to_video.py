@@ -57,7 +57,7 @@ class Wan27ImageToVideoNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, prompt="", image="", client=None, last_image="", negative_prompt="",
+    async def execute(cls, prompt="", image="", client=None, last_image="", negative_prompt="",
                 audio="", duration=5, resolution="720p",
                 enable_prompt_expansion=False, seed=-1, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
@@ -86,6 +86,6 @@ class Wan27ImageToVideoNode(IO.ComfyNode):
         )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
-        response = waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
+        response = await waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
 
         return IO.NodeOutput(response.get("outputs", [""])[0])

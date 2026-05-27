@@ -57,7 +57,7 @@ class Wan27TextToVideoNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, prompt="", client=None, negative_prompt="", audio="",
+    async def execute(cls, prompt="", client=None, negative_prompt="", audio="",
                 duration=5, aspect_ratio="16:9", resolution="720p",
                 enable_prompt_expansion=False, seed=-1, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
@@ -82,6 +82,6 @@ class Wan27TextToVideoNode(IO.ComfyNode):
         )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
-        response = waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
+        response = await waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
 
         return IO.NodeOutput(response.get("outputs", [""])[0])

@@ -68,7 +68,7 @@ class KlingElementsNode(IO.ComfyNode):
         return value
 
     @classmethod
-    def execute(cls, name="", description="", image=None, image_url="",
+    async def execute(cls, name="", description="", image=None, image_url="",
                 element_refer_images=None, element_refer_url_list="",
                 client=None, voice_id="", tag_list="", **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
@@ -107,7 +107,7 @@ class KlingElementsNode(IO.ComfyNode):
         )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
-        response = waveSpeedClient.send_request(request, True, polling_interval=5, timeout=300)
+        response = await waveSpeedClient.send_request(request, True, polling_interval=5, timeout=300)
 
         element_id = response.get("id") or response.get("data", {}).get("id", "")
         if not element_id:

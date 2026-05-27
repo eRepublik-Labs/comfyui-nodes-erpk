@@ -146,7 +146,7 @@ class PreviewVideo(IO.ComfyNode):
 
     @classmethod
     def execute(cls, video_url, save_file_prefix, **kwargs):
-        from utils.safe_fetch import fetch_remote_bytes
+        from ..utils.safe_fetch import fetch_remote_bytes
         try:
             import folder_paths
         except ImportError:
@@ -172,7 +172,7 @@ class PreviewVideo(IO.ComfyNode):
         if not file_extension or file_extension == '.' or len(file_extension) > 5:
             file_extension = '.mp4'
 
-        from utils.safe_path import safe_filename_prefix
+        from ..utils.safe_path import safe_filename_prefix
         output_dir = folder_paths.get_output_directory()
         safe_prefix = safe_filename_prefix(save_file_prefix, default="wavespeed_video")
         filename = f"{safe_prefix}_{int(time.time())}{file_extension}"
@@ -213,7 +213,7 @@ class SaveAudio(IO.ComfyNode):
 
     @classmethod
     def execute(cls, audio_url, save_file_prefix, **kwargs):
-        from utils.safe_fetch import fetch_remote_bytes
+        from ..utils.safe_fetch import fetch_remote_bytes
         try:
             import folder_paths
         except ImportError:
@@ -289,7 +289,7 @@ class UploadImage(IO.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, image, client=None, **kwargs):
+    async def execute(cls, image, client=None, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.utils import tensor2images
 
@@ -301,7 +301,7 @@ class UploadImage(IO.ComfyNode):
 
         real_client = WaveSpeedClient(api_key=client["api_key"])
         for img in images:
-            image_url = real_client.upload_file(img)
+            image_url = await real_client.upload_file(img)
             image_urls.append(image_url)
             print(f"[WaveSpeed] Image uploaded: {image_url}")
 

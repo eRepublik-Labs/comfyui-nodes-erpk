@@ -59,7 +59,7 @@ class SeedreamV4EditSequentialNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, prompt, max_images, size_preset, client=None, image_url=None,
+    async def execute(cls, prompt, max_images, size_preset, client=None, image_url=None,
                 width=1408, height=1408, show_aspect_ratio=True, enable_sync_mode=False,
                 enable_base64_output=False, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
@@ -99,7 +99,7 @@ class SeedreamV4EditSequentialNode(IO.ComfyNode):
         )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
-        response = waveSpeedClient.send_request(request, True, 1)
+        response = await waveSpeedClient.send_request(request, True, 1)
 
         image_urls = response.get("outputs", [])
         if not image_urls:

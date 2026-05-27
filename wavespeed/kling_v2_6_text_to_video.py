@@ -56,7 +56,7 @@ class KlingV2_6TextToVideoNode(IO.ComfyNode):
         return float("NaN")
 
     @classmethod
-    def execute(cls, model="Kling 2.6", prompt="", client=None,
+    async def execute(cls, model="Kling 2.6", prompt="", client=None,
                 negative_prompt="", aspect_ratio="16:9", duration="5",
                 cfg_scale=0.5, sound=True, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
@@ -90,7 +90,7 @@ class KlingV2_6TextToVideoNode(IO.ComfyNode):
             )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
-        response = waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
+        response = await waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
 
         video_url = response.get("outputs", [""])[0]
         return IO.NodeOutput(video_url)

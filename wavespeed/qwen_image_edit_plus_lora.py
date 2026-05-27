@@ -70,7 +70,7 @@ class QwenImageEditPlusLoraNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, model="Qwen Edit Plus LoRA", prompt="", images="",
+    async def execute(cls, model="Qwen Edit Plus LoRA", prompt="", images="",
                 lora_1_path="", lora_1_scale=1.0,
                 lora_2_path="", lora_2_scale=1.0, lora_3_path="", lora_3_scale=1.0,
                 client=None, width=1024, height=1024, seed=-1,
@@ -126,7 +126,7 @@ class QwenImageEditPlusLoraNode(IO.ComfyNode):
         )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
-        response = waveSpeedClient.send_request(request, True, 1)
+        response = await waveSpeedClient.send_request(request, True, 1)
 
         image_urls = response.get("outputs", [])
         if not image_urls:

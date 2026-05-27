@@ -2,8 +2,16 @@
 WaveSpeed AI API Client
 
 This module provides the core client for interacting with the WaveSpeed AI API.
+
+Public methods are async so ComfyUI's executor can interleave concurrent API
+nodes. Underlying HTTP work uses the synchronous `requests` library through
+`asyncio.to_thread`, which preserves the existing retry/session machinery
+while releasing the event loop during network I/O. The polling loop uses
+`await asyncio.sleep` so multiple in-flight jobs share the event loop instead
+of blocking it for minutes between status checks.
 """
 
+import asyncio
 import time
 import io
 import requests
@@ -63,21 +71,7 @@ class WaveSpeedClient:
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
 
-    def post(self, endpoint: str, payload: Dict[str, Any], timeout: float = 60) -> Dict[str, Any]:
-        """
-        Send POST request to WaveSpeed AI API.
-
-        Args:
-            endpoint: API endpoint path
-            payload: Request payload
-            timeout: Request timeout in seconds
-
-        Returns:
-            dict: API response data
-
-        Raises:
-            Exception: If request fails or returns error status
-        """
+    def _post_sync(self, endpoint: str, payload: Dict[str, Any], timeout: float = 60) -> Dict[str, Any]:
         url = f"{self.BASE_URL}{endpoint}"
 
         # Use tuple for timeout: (connect_timeout, read_timeout)
@@ -126,13 +120,13 @@ class WaveSpeedClient:
         except requests.exceptions.RequestException as e:
             raise Exception(f"Request failed: {str(e)}")
 
-    def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None, timeout: float = 30) -> Dict[str, Any]:
+    async def post(self, endpoint: str, payload: Dict[str, Any], timeout: float = 60) -> Dict[str, Any]:
         """
-        Send GET request to WaveSpeed AI API.
+        Send POST request to WaveSpeed AI API.
 
         Args:
             endpoint: API endpoint path
-            params: Query parameters
+            payload: Request payload
             timeout: Request timeout in seconds
 
         Returns:
@@ -141,6 +135,9 @@ class WaveSpeedClient:
         Raises:
             Exception: If request fails or returns error status
         """
+        return await asyncio.to_thread(self._post_sync, endpoint, payload, timeout)
+
+    def _get_sync(self, endpoint: str, params: Optional[Dict[str, Any]] = None, timeout: float = 30) -> Dict[str, Any]:
         url = f"{self.BASE_URL}{endpoint}"
 
         # Use tuple for timeout: (connect_timeout, read_timeout)
@@ -181,7 +178,24 @@ class WaveSpeedClient:
         except requests.exceptions.RequestException as e:
             raise Exception(f"Request failed: {str(e)}")
 
-    def check_task_status(self, request_id: str) -> Dict[str, Any]:
+    async def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None, timeout: float = 30) -> Dict[str, Any]:
+        """
+        Send GET request to WaveSpeed AI API.
+
+        Args:
+            endpoint: API endpoint path
+            params: Query parameters
+            timeout: Request timeout in seconds
+
+        Returns:
+            dict: API response data
+
+        Raises:
+            Exception: If request fails or returns error status
+        """
+        return await asyncio.to_thread(self._get_sync, endpoint, params, timeout)
+
+    async def check_task_status(self, request_id: str) -> Dict[str, Any]:
         """
         Check the status of a submitted task.
 
@@ -198,9 +212,9 @@ class WaveSpeedClient:
             raise Exception("No valid task ID provided")
 
         # Use 30s timeout for status checks - these should be quick
-        return self.get(f"/api/v2/predictions/{request_id}/result", timeout=30)
+        return await self.get(f"/api/v2/predictions/{request_id}/result", timeout=30)
 
-    def wait_for_task(
+    async def wait_for_task(
         self,
         request_id: str,
         polling_interval: int = 5,
@@ -231,7 +245,7 @@ class WaveSpeedClient:
 
         while time.time() - start_time < timeout:
             try:
-                task_status = self.check_task_status(request_id)
+                task_status = await self.check_task_status(request_id)
                 status = task_status.get("status")
 
                 # Log status changes
@@ -245,7 +259,7 @@ class WaveSpeedClient:
                     error_message = task_status.get("error", "Task failed")
                     raise Exception(f"Task failed: {error_message}")
 
-                time.sleep(polling_interval)
+                await asyncio.sleep(polling_interval)
 
             except Exception as e:
                 # If it's a task failure, re-raise
@@ -253,11 +267,11 @@ class WaveSpeedClient:
                     raise
                 # Otherwise log and continue polling
                 print(f"[WaveSpeed] Error checking task status: {e}")
-                time.sleep(polling_interval)
+                await asyncio.sleep(polling_interval)
 
         raise Exception(f"Task timed out after {timeout} seconds")
 
-    def send_request(
+    async def send_request(
         self,
         request: BaseRequest,
         wait_for_completion: bool = True,
@@ -295,7 +309,7 @@ class WaveSpeedClient:
         # i2v endpoints can post several MB of base64 data URIs (start + end frame);
         # 60s was too tight on degraded uplinks and tripped write timeouts.
         initial_timeout = 180
-        response = self.post(request.get_api_path(), payload, timeout=initial_timeout)
+        response = await self.post(request.get_api_path(), payload, timeout=initial_timeout)
 
         # Extract request ID
         request_id = response.get("id")
@@ -309,7 +323,7 @@ class WaveSpeedClient:
             return {"request_id": request_id, "status": "processing"}
 
         # Wait for task completion
-        task_result = self.wait_for_task(
+        task_result = await self.wait_for_task(
             request_id,
             polling_interval=polling_interval,
             timeout=timeout
@@ -317,19 +331,7 @@ class WaveSpeedClient:
 
         return task_result
 
-    def upload_file(self, image) -> str:
-        """
-        Upload an image file to WaveSpeed AI API.
-
-        Args:
-            image: PIL Image to upload
-
-        Returns:
-            str: URL of the uploaded image
-
-        Raises:
-            Exception: If upload fails
-        """
+    def _upload_file_sync(self, image) -> str:
         url = f"{self.BASE_URL}/api/v2/media/upload/binary"
 
         # Convert image to PNG bytes
@@ -368,20 +370,22 @@ class WaveSpeedClient:
         except requests.exceptions.RequestException as e:
             raise Exception(f"Upload failed: {str(e)}")
 
-    def upload_file_with_type(self, file_path: str, file_type: str) -> str:
+    async def upload_file(self, image) -> str:
         """
-        Upload a file of specified type to WaveSpeed AI API.
+        Upload an image file to WaveSpeed AI API.
 
         Args:
-            file_path: Path to the file to upload
-            file_type: MIME type of the file (e.g., "video/mp4", "audio/mp3")
+            image: PIL Image to upload
 
         Returns:
-            str: URL of the uploaded file
+            str: URL of the uploaded image
 
         Raises:
-            Exception: If upload fails or invalid file type
+            Exception: If upload fails
         """
+        return await asyncio.to_thread(self._upload_file_sync, image)
+
+    def _upload_file_with_type_sync(self, file_path: str, file_type: str) -> str:
         url = f"{self.BASE_URL}/api/v2/media/upload/binary"
 
         # Determine filename based on type
@@ -429,3 +433,19 @@ class WaveSpeedClient:
             raise Exception(f"File not found: {file_path}")
         except requests.exceptions.RequestException as e:
             raise Exception(f"Upload failed: {str(e)}")
+
+    async def upload_file_with_type(self, file_path: str, file_type: str) -> str:
+        """
+        Upload a file of specified type to WaveSpeed AI API.
+
+        Args:
+            file_path: Path to the file to upload
+            file_type: MIME type of the file (e.g., "video/mp4", "audio/mp3")
+
+        Returns:
+            str: URL of the uploaded file
+
+        Raises:
+            Exception: If upload fails or invalid file type
+        """
+        return await asyncio.to_thread(self._upload_file_with_type_sync, file_path, file_type)

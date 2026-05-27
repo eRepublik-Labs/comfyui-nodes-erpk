@@ -56,7 +56,7 @@ class Ltx23ImageToVideoNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, image="", prompt="", client=None, resolution="720p",
+    async def execute(cls, image="", prompt="", client=None, resolution="720p",
                 duration=5, seed=-1, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.requests.ltx_2_3_image_to_video import Ltx23ImageToVideo
@@ -79,7 +79,7 @@ class Ltx23ImageToVideoNode(IO.ComfyNode):
         )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
-        response = waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
+        response = await waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
 
         video_urls = response.get("outputs", [])
         if not video_urls:

@@ -15,6 +15,7 @@ Validates:
 - Output is a single STRING video_url
 """
 
+import asyncio
 import math
 import pytest
 
@@ -370,7 +371,7 @@ class _FakeClient:
     def __init__(self):
         self.requests = []
 
-    def send_request(self, request, *args, **kwargs):
+    async def send_request(self, request, *args, **kwargs):
         self.requests.append((request, args, kwargs))
         return {"outputs": ["http://cdn.example.com/out.mp4"]}
 
@@ -389,7 +390,7 @@ class TestKlingV3ImageToVideoExecute:
         _patch_client(monkeypatch, fake)
         cls = _import_node("kling_v3_image_to_video", "KlingV3ImageToVideoNode")
 
-        output = cls.execute(
+        output = asyncio.run(cls.execute(
             model="Kling 3.0",
             prompt="a running dog",
             image="http://example.com/dog.jpg",
@@ -397,7 +398,7 @@ class TestKlingV3ImageToVideoExecute:
             seed=123,
             duration=5,
             aspect_ratio="16:9",
-        )
+        ))
 
         sent_request = fake.requests[0][0]
         assert sent_request.get_api_path() == "/api/v3/kwaivgi/kling-v3.0-std/image-to-video"
@@ -408,7 +409,7 @@ class TestKlingV3ImageToVideoExecute:
         _patch_client(monkeypatch, fake)
         cls = _import_node("kling_v3_image_to_video", "KlingV3ImageToVideoNode")
 
-        cls.execute(
+        asyncio.run(cls.execute(
             model="Kling 3.0 Pro",
             prompt="a running dog",
             image="http://example.com/dog.jpg",
@@ -416,7 +417,7 @@ class TestKlingV3ImageToVideoExecute:
             seed=123,
             duration=5,
             aspect_ratio="16:9",
-        )
+        ))
 
         sent_request = fake.requests[0][0]
         assert sent_request.get_api_path() == "/api/v3/kwaivgi/kling-v3.0-pro/image-to-video"
@@ -426,24 +427,24 @@ class TestKlingV3ImageToVideoExecute:
         _patch_client(monkeypatch, fake)
         cls = _import_node("kling_v3_image_to_video", "KlingV3ImageToVideoNode")
         with pytest.raises(ValueError, match="[Pp]rompt"):
-            cls.execute(
+            asyncio.run(cls.execute(
                 model="Kling 3.0",
                 prompt="",
                 image="http://example.com/x.jpg",
                 client={"api_key": "fake"},
-            )
+            ))
 
     def test_requires_image(self, monkeypatch):
         fake = _FakeClient()
         _patch_client(monkeypatch, fake)
         cls = _import_node("kling_v3_image_to_video", "KlingV3ImageToVideoNode")
         with pytest.raises(ValueError, match="[Ii]mage"):
-            cls.execute(
+            asyncio.run(cls.execute(
                 model="Kling 3.0",
                 prompt="test",
                 image="",
                 client={"api_key": "fake"},
-            )
+            ))
 
 
 class TestKlingO3TextToVideoExecute:
@@ -452,14 +453,14 @@ class TestKlingO3TextToVideoExecute:
         _patch_client(monkeypatch, fake)
         cls = _import_node("kling_o3_text_to_video", "KlingO3TextToVideoNode")
 
-        output = cls.execute(
+        output = asyncio.run(cls.execute(
             model="Kling O3",
             prompt="a dancing cat",
             client={"api_key": "fake"},
             seed=1,
             duration=5,
             aspect_ratio="16:9",
-        )
+        ))
 
         sent_request = fake.requests[0][0]
         assert sent_request.get_api_path() == "/api/v3/kwaivgi/kling-video-o3-std/text-to-video"
@@ -470,14 +471,14 @@ class TestKlingO3TextToVideoExecute:
         _patch_client(monkeypatch, fake)
         cls = _import_node("kling_o3_text_to_video", "KlingO3TextToVideoNode")
 
-        cls.execute(
+        asyncio.run(cls.execute(
             model="Kling O3 Pro",
             prompt="a dancing cat",
             client={"api_key": "fake"},
             seed=1,
             duration=5,
             aspect_ratio="16:9",
-        )
+        ))
 
         sent_request = fake.requests[0][0]
         assert sent_request.get_api_path() == "/api/v3/kwaivgi/kling-video-o3-pro/text-to-video"
@@ -489,7 +490,7 @@ class TestKlingO3ImageToVideoExecute:
         _patch_client(monkeypatch, fake)
         cls = _import_node("kling_o3_image_to_video", "KlingO3ImageToVideoNode")
 
-        output = cls.execute(
+        output = asyncio.run(cls.execute(
             model="Kling O3",
             prompt="zoom in",
             image="http://example.com/x.jpg",
@@ -497,7 +498,7 @@ class TestKlingO3ImageToVideoExecute:
             seed=1,
             duration=5,
             aspect_ratio="16:9",
-        )
+        ))
 
         sent_request = fake.requests[0][0]
         assert sent_request.get_api_path() == "/api/v3/kwaivgi/kling-video-o3-std/image-to-video"
@@ -508,7 +509,7 @@ class TestKlingO3ImageToVideoExecute:
         _patch_client(monkeypatch, fake)
         cls = _import_node("kling_o3_image_to_video", "KlingO3ImageToVideoNode")
 
-        cls.execute(
+        asyncio.run(cls.execute(
             model="Kling O3 Pro",
             prompt="zoom in",
             image="http://example.com/x.jpg",
@@ -516,7 +517,7 @@ class TestKlingO3ImageToVideoExecute:
             seed=1,
             duration=5,
             aspect_ratio="16:9",
-        )
+        ))
 
         sent_request = fake.requests[0][0]
         assert sent_request.get_api_path() == "/api/v3/kwaivgi/kling-video-o3-pro/image-to-video"

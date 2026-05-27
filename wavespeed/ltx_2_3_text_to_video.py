@@ -58,7 +58,7 @@ class Ltx23TextToVideoNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, prompt="", client=None, resolution="720p", aspect_ratio="16:9",
+    async def execute(cls, prompt="", client=None, resolution="720p", aspect_ratio="16:9",
                 duration=5, seed=-1, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.requests.ltx_2_3_text_to_video import Ltx23TextToVideo
@@ -79,7 +79,7 @@ class Ltx23TextToVideoNode(IO.ComfyNode):
         )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
-        response = waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
+        response = await waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
 
         video_urls = response.get("outputs", [])
         if not video_urls:

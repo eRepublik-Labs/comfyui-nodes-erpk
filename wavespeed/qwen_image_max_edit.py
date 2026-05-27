@@ -45,7 +45,7 @@ class QwenImageMaxEditNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, prompt="", images="", client=None, width=1024, height=1024,
+    async def execute(cls, prompt="", images="", client=None, width=1024, height=1024,
                 seed=-1, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.utils import imageurl2tensor
@@ -81,7 +81,7 @@ class QwenImageMaxEditNode(IO.ComfyNode):
         )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
-        response = waveSpeedClient.send_request(request, True, 1)
+        response = await waveSpeedClient.send_request(request, True, 1)
 
         image_urls = response.get("outputs", [])
         if not image_urls:

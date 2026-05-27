@@ -275,7 +275,7 @@ class SHARPPredict(IO.ComfyNode):
         os.makedirs(output_dir, exist_ok=True)
 
         # Generate unique filename
-        from utils.safe_path import safe_filename_prefix
+        from ..utils.safe_path import safe_filename_prefix
         safe_prefix = safe_filename_prefix(filename_prefix, default="sharp")
         counter = 1
         while True:
@@ -544,7 +544,7 @@ class SHARPRenderVideo(IO.ComfyNode):
         os.makedirs(output_dir, exist_ok=True)
 
         # Generate unique filename
-        from utils.safe_path import safe_filename_prefix
+        from ..utils.safe_path import safe_filename_prefix
         safe_prefix = safe_filename_prefix(filename_prefix, default="sharp_video")
         counter = 1
         while True:

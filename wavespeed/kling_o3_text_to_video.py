@@ -77,7 +77,7 @@ class KlingO3TextToVideoNode(IO.ComfyNode):
         return parsed
 
     @classmethod
-    def execute(cls, model="Kling O3", prompt="", client=None,
+    async def execute(cls, model="Kling O3", prompt="", client=None,
                 duration=5, aspect_ratio="16:9", seed=-1,
                 sound=False, shot_type="intelligent",
                 multi_prompt="", element_list="", **kwargs):
@@ -116,7 +116,7 @@ class KlingO3TextToVideoNode(IO.ComfyNode):
             )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
-        response = waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
+        response = await waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
 
         video_url = response.get("outputs", [""])[0]
         return IO.NodeOutput(video_url)

@@ -84,7 +84,7 @@ class Seedance20ImageToVideoNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, model="Seedance 2.0", prompt="",
+    async def execute(cls, model="Seedance 2.0", prompt="",
                 start_frame=None, start_frame_url="",
                 end_frame=None, end_frame_url="",
                 client=None, duration=5, aspect_ratio="16:9", resolution="720p", seed=-1,
@@ -121,7 +121,7 @@ class Seedance20ImageToVideoNode(IO.ComfyNode):
         )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
-        response = waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
+        response = await waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)
 
         video_urls = response.get("outputs", [])
         if not video_urls:

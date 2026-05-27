@@ -50,7 +50,7 @@ class QwenImageLayeredNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, image="", prompt="", client=None, num_layers=4,
+    async def execute(cls, image="", prompt="", client=None, num_layers=4,
                 enable_sync_mode=False, enable_base64_output=False, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.utils import imageurl2tensor_rgba
@@ -76,7 +76,7 @@ class QwenImageLayeredNode(IO.ComfyNode):
         request = QwenImageLayered(**request_kwargs)
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
-        response = waveSpeedClient.send_request(request, True, num_layers)
+        response = await waveSpeedClient.send_request(request, True, num_layers)
 
         image_urls = response.get("outputs", [])
         if not image_urls:

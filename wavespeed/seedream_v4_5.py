@@ -62,7 +62,7 @@ class SeedreamV4_5Node(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def execute(cls, prompt, size_preset, client=None, width=2048, height=2048,
+    async def execute(cls, prompt, size_preset, client=None, width=2048, height=2048,
                 show_aspect_ratio=True, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.utils import imageurl2tensor
@@ -86,7 +86,7 @@ class SeedreamV4_5Node(IO.ComfyNode):
         )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
-        response = waveSpeedClient.send_request(request, True, 1)
+        response = await waveSpeedClient.send_request(request, True, 1)
 
         image_urls = response.get("outputs", [])
         if not image_urls:
