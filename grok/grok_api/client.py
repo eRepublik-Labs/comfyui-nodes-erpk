@@ -20,12 +20,21 @@ class GrokClient:
     """
 
     DEFAULT_TEXT_MODEL = "grok-4.3"
-    DEFAULT_IMAGE_MODEL = "grok-imagine-image-quality"
+    DEFAULT_IMAGE_MODEL = "grok-imagine-image"
     DEFAULT_VIDEO_MODEL = "grok-imagine-video"
 
     IMAGE_MODELS = [
-        "grok-imagine-image-quality",
+        "grok-imagine-image",
+        "grok-imagine-image-pro",
     ]
+
+    # Defensive remap for saved workflows that still reference docs-only model
+    # names (the xai-sdk Literal type uses the canonical IDs above; the public
+    # docs called the same model "grok-imagine-image-quality"). Any deprecated
+    # alias the user picks gets translated at execute time.
+    IMAGE_MODEL_ALIASES = {
+        "grok-imagine-image-quality": "grok-imagine-image",
+    }
     IMAGE_ASPECT_RATIOS = ["1:1", "16:9", "9:16", "4:3", "3:4", "2:1", "1:2", "auto"]
     IMAGE_RESOLUTIONS = ["1k", "2k"]
 
@@ -172,6 +181,10 @@ class GrokClient:
     # Image generation / editing
     # ------------------------------------------------------------------
 
+    def _resolve_image_model(self, model: str) -> str:
+        """Translate deprecated model aliases to the SDK's canonical IDs."""
+        return self.IMAGE_MODEL_ALIASES.get(model, model)
+
     def _generate_image_sync(
         self,
         prompt: str,
@@ -183,23 +196,26 @@ class GrokClient:
     ) -> List[str]:
         """Returns a list of image URLs (length n)."""
         client = self._ensure_client()
-        response = client.image.sample(
-            prompt=prompt,
-            model=model,
-            n=n,
+        model = self._resolve_image_model(model)
+        if n <= 1:
+            response = client.image.sample(
+                prompt,
+                model,
+                aspect_ratio=aspect_ratio,
+                resolution=resolution,
+                **kwargs,
+            )
+            return [response.url] if getattr(response, "url", None) else []
+        # n > 1 uses the batch endpoint; returns a sequence of ImageResponse.
+        responses = client.image.sample_batch(
+            prompt,
+            model,
+            n,
             aspect_ratio=aspect_ratio,
             resolution=resolution,
             **kwargs,
         )
-        # The xai-sdk returns either a single response or a batch object.
-        urls: List[str] = []
-        if hasattr(response, "url") and response.url:
-            urls.append(response.url)
-        if hasattr(response, "images"):
-            for item in response.images:
-                if hasattr(item, "url") and item.url:
-                    urls.append(item.url)
-        return urls
+        return [r.url for r in responses if getattr(r, "url", None)]
 
     async def generate_image(self, prompt: str, **kwargs) -> List[str]:
         return await asyncio.to_thread(self._generate_image_sync, prompt, **kwargs)
@@ -212,28 +228,23 @@ class GrokClient:
         aspect_ratio: Optional[str] = None,
         **kwargs,
     ) -> List[str]:
-        """Edit one or more source images (URL or data URI). Cap: 3 images."""
+        """Edit one or more source images. SDK takes `image_url` (singular) for
+        one source and `image_urls` (plural) for multi-image edit — mutually
+        exclusive. Cap: MAX_EDIT_IMAGES sources."""
         if not image_urls:
             raise ValueError("edit_image requires at least one source image URL or data URI")
         client = self._ensure_client()
-        image_arg = image_urls[0] if len(image_urls) == 1 else image_urls[: self.MAX_EDIT_IMAGES]
-        call_kwargs: Dict[str, Any] = {
-            "prompt": prompt,
-            "model": model,
-            "image_url": image_arg,
-        }
+        model = self._resolve_image_model(model)
+        call_kwargs: Dict[str, Any] = {}
+        if len(image_urls) == 1:
+            call_kwargs["image_url"] = image_urls[0]
+        else:
+            call_kwargs["image_urls"] = image_urls[: self.MAX_EDIT_IMAGES]
         if aspect_ratio:
             call_kwargs["aspect_ratio"] = aspect_ratio
         call_kwargs.update(kwargs)
-        response = client.image.sample(**call_kwargs)
-        urls: List[str] = []
-        if hasattr(response, "url") and response.url:
-            urls.append(response.url)
-        if hasattr(response, "images"):
-            for item in response.images:
-                if hasattr(item, "url") and item.url:
-                    urls.append(item.url)
-        return urls
+        response = client.image.sample(prompt, model, **call_kwargs)
+        return [response.url] if getattr(response, "url", None) else []
 
     async def edit_image(self, prompt: str, image_urls: List[str], **kwargs) -> List[str]:
         return await asyncio.to_thread(self._edit_image_sync, prompt, image_urls, **kwargs)
@@ -257,23 +268,21 @@ class GrokClient:
 
         Modes (mutually exclusive after prompt):
         - text-to-video: just prompt
-        - reference-to-video: prompt + reference_images
+        - reference-to-video: prompt + reference_images (SDK kwarg: reference_image_urls)
         - video-edit: prompt + video_url
         """
         client = self._ensure_client()
         call_kwargs: Dict[str, Any] = {
-            "prompt": prompt,
-            "model": model,
             "duration": duration,
             "aspect_ratio": aspect_ratio,
             "resolution": resolution,
         }
         if reference_images:
-            call_kwargs["reference_images"] = reference_images
+            call_kwargs["reference_image_urls"] = reference_images
         if video_url:
             call_kwargs["video_url"] = video_url
         call_kwargs.update(kwargs)
-        response = client.video.generate(**call_kwargs)
+        response = client.video.generate(prompt, model, **call_kwargs)
         return getattr(response, "url", "")
 
     async def generate_video(self, prompt: str, **kwargs) -> str:
@@ -305,26 +314,20 @@ class GrokClient:
     ) -> str:
         """Append `duration` seconds of new content to the input video.
 
-        Uses /v1/videos/extensions. The xai-sdk exposes this via
-        `client.video.extend(...)` — falls back to a direct extensions call
-        if the SDK method signature differs.
+        SDK signature: extend(prompt, model, video_url, *, duration, ...).
+        `prompt` is positional and non-Optional; pass empty string when the
+        node's caller didn't supply one.
         """
         if not video_url:
             raise ValueError("extend_video requires a source video URL")
         client = self._ensure_client()
-        call_kwargs: Dict[str, Any] = {
-            "video_url": video_url,
-            "duration": duration,
-            "model": model,
-        }
-        if prompt:
-            call_kwargs["prompt"] = prompt
-        call_kwargs.update(kwargs)
-        if hasattr(client.video, "extend"):
-            response = client.video.extend(**call_kwargs)
-        else:
-            # SDK doesn't expose extend yet; pass mode through generate.
-            response = client.video.generate(mode="extend-video", **call_kwargs)
+        response = client.video.extend(
+            prompt or "",
+            model,
+            video_url,
+            duration=duration,
+            **kwargs,
+        )
         return getattr(response, "url", "")
 
     async def extend_video(self, video_url: str, duration: int = 5, **kwargs) -> str:

@@ -10,13 +10,16 @@ from comfy_api.latest import IO
 
 from .grok_api.client import GrokClient
 
-# Known Grok text models. GrokClient does not expose a list constant, so we
-# maintain it here alongside the default so the Combo reflects real options.
+# Known Grok text models per xai_sdk.sync.chat.Client.create() Literal type
+# (xai-sdk 1.14.0). The "-latest" suffix variants are aliased server-side.
+# grok-2 is intentionally absent — not in the SDK's accepted model list.
 TEXT_MODELS = [
     "grok-4.3",
+    "grok-4-fast",
+    "grok-4",
     "grok-3",
     "grok-3-mini",
-    "grok-2",
+    "grok-code-fast-1",
 ]
 
 
