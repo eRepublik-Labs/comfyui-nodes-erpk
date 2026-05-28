@@ -220,4 +220,10 @@ try:
 except Exception as e:
     print(f"[ERPK] Warning: Could not install history cleaner: {e}")
 
+try:
+    from . import parallel_workers
+    parallel_workers.install()
+except Exception as e:
+    print(f"[ERPK] Warning: Could not install parallel workers: {e}")
+
 __all__ = ["comfy_entrypoint", "WEB_DIRECTORY"]

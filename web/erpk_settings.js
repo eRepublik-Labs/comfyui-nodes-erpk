@@ -269,6 +269,15 @@ const GENERAL_SETTINGS = [
         category: ["ERPK", "General", "Auto-Clear Job History"],
         tooltip: "Automatically remove completed jobs from history. Reduces UI slowdown with large workflows.",
     },
+    {
+        id: "ERPK.PARALLEL_WORKERS",
+        name: "Parallel Prompt Workers",
+        type: "slider",
+        defaultValue: 1,
+        attrs: { min: 1, max: 8, step: 1 },
+        category: ["ERPK", "General", "Parallel Prompt Workers"],
+        tooltip: "Number of concurrent prompts the queue runs. 1 = ComfyUI default (serial). Higher = multiple queued prompts execute in parallel. WARNING: local-diffusion workflows will race on GPU memory — only raise this when running API-only workflows. Requires ComfyUI restart to take effect.",
+    },
 ];
 
 function buildSettings() {
