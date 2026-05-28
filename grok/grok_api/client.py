@@ -23,15 +23,19 @@ class GrokClient:
     DEFAULT_IMAGE_MODEL = "grok-imagine-image"
     DEFAULT_VIDEO_MODEL = "grok-imagine-video"
 
+    # Canonical model IDs come first; aliases follow so the Combo dropdown
+    # still accepts saved workflows that reference the docs-only name.
+    # ComfyUI's frontend validates Combo values against this options list
+    # BEFORE execute runs, so the alias must be present in IMAGE_MODELS too —
+    # remapping only at execute time isn't enough.
     IMAGE_MODELS = [
         "grok-imagine-image",
         "grok-imagine-image-pro",
+        "grok-imagine-image-quality",  # alias of grok-imagine-image; remapped at execute
     ]
 
-    # Defensive remap for saved workflows that still reference docs-only model
-    # names (the xai-sdk Literal type uses the canonical IDs above; the public
-    # docs called the same model "grok-imagine-image-quality"). Any deprecated
-    # alias the user picks gets translated at execute time.
+    # Translated at execute time so the SDK call uses the canonical ID even
+    # when the saved widget value is the docs-only alias.
     IMAGE_MODEL_ALIASES = {
         "grok-imagine-image-quality": "grok-imagine-image",
     }

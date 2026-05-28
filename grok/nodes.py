@@ -3,12 +3,12 @@
 
 import asyncio
 import io as _io
-import urllib.request
 from typing import List
 
 from comfy_api.latest import IO
 
 from .grok_api.client import GrokClient
+from ..utils.safe_fetch import fetch_remote_bytes
 
 # Known Grok text models per xai_sdk.sync.chat.Client.create() Literal type
 # (xai-sdk 1.14.0). The "-latest" suffix variants are aliased server-side.
@@ -36,7 +36,12 @@ def _make_grok_client(client_dict) -> GrokClient:
 
 
 def _url_to_tensor(url: str):
-    """Download an image URL and return a ComfyUI tensor (1, H, W, C) float32 0-1."""
+    """Download an image URL and return a ComfyUI tensor (1, H, W, C) float32 0-1.
+
+    Uses utils.safe_fetch.fetch_remote_bytes so the request carries a proper
+    User-Agent ('ERPK/1.0') — xAI's image CDN rejects bare 'Python-urllib/3.12'
+    with HTTP 403.
+    """
     try:
         from PIL import Image as PILImage
         import numpy as np
@@ -44,8 +49,12 @@ def _url_to_tensor(url: str):
     except ImportError as e:
         raise ImportError(f"PIL, numpy, and torch are required for image output: {e}")
 
-    with urllib.request.urlopen(url, timeout=60) as resp:
-        data = resp.read()
+    data = fetch_remote_bytes(
+        url,
+        max_bytes=100 * 1024 * 1024,  # 100 MB cap, matches the convention from utils/preview_anything.py
+        timeout=60,
+        user_agent="ERPK-Grok/1.0",
+    )
     pil = PILImage.open(_io.BytesIO(data)).convert("RGB")
     arr = np.array(pil).astype("float32") / 255.0
     return torch.from_numpy(arr).unsqueeze(0)  # (1, H, W, C)
