@@ -142,11 +142,15 @@ function maskApiKey(val) {
     return `${val.slice(0, 4)}…${val.slice(-4)}`;
 }
 
+// Display names must match the `name` field of each entry in API_KEY_SETTINGS
+// exactly — the masking pass walks the DOM and matches the label text. When
+// you add a new key to API_KEY_SETTINGS above, add the same name here too.
 const API_KEY_LABELS = new Set([
     "Anthropic API Key",
     "Google API Key",
     "OpenAI API Key",
     "WaveSpeed API Key",
+    "xAI (Grok) API Key",
 ]);
 
 function enhanceApiKeyInput(input) {
