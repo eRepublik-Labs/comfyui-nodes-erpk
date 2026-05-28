@@ -260,13 +260,14 @@ function observeSettingsDialog(displayName) {
     observer.observe(document.body, { childList: true, subtree: true });
 }
 
-// Track last-notified value so onChange fires once per real change, not on
-// every slider micro-tick. `_readyToNotify` is flipped to true a short time
-// after extension setup, so the load-time onChange fire (when ComfyUI seeds
-// the setting from the saved value) doesn't show a spurious toast on every
-// page open.
+// Slider onChange fires per detent during a drag, so 1 → 5 produces 4 fires.
+// We debounce (wait for the slider to settle) AND dedupe (skip if value
+// matches the previous notification), and `_readyToNotify` suppresses the
+// load-time onChange fire so opening Settings doesn't pop a toast.
 let _lastParallelWorkersNotified = null;
 let _readyToNotify = false;
+let _parallelWorkersDebounce = null;
+const _PARALLEL_WORKERS_DEBOUNCE_MS = 750;
 
 function _showErpkNotice({ severity, summary, detail }) {
     try {
@@ -292,6 +293,27 @@ function _showErpkNotice({ severity, summary, detail }) {
     try { alert(`[ERPK] ${summary}\n\n${detail}`); } catch (e) {}
 }
 
+function _fireParallelWorkersNotice(n) {
+    if (n === _lastParallelWorkersNotified) {
+        return;
+    }
+    _lastParallelWorkersNotified = n;
+
+    if (n > 1) {
+        _showErpkNotice({
+            severity: "warn",
+            summary: "Restart ComfyUI to apply parallel workers",
+            detail: "Local-diffusion workflows will race on GPU memory under multi-worker mode. Only enable this when your queue is API-only (Wavespeed / Claude / OpenAI / Gemini).",
+        });
+    } else {
+        _showErpkNotice({
+            severity: "info",
+            summary: "Restart ComfyUI to apply parallel workers",
+            detail: "Worker thread count change takes effect at package load.",
+        });
+    }
+}
+
 function onParallelWorkersChange(newValue) {
     const n = Number(newValue);
     if (!Number.isFinite(n)) {
@@ -303,24 +325,15 @@ function onParallelWorkersChange(newValue) {
         _lastParallelWorkersNotified = n;
         return;
     }
-    if (n === _lastParallelWorkersNotified) {
-        return;
+    // Debounce: a slider drag fires onChange at every detent passed. Wait
+    // for the slider to settle before firing the notice with the final value.
+    if (_parallelWorkersDebounce !== null) {
+        clearTimeout(_parallelWorkersDebounce);
     }
-    _lastParallelWorkersNotified = n;
-
-    _showErpkNotice({
-        severity: "info",
-        summary: "Restart ComfyUI required",
-        detail: `Parallel Prompt Workers changed to ${n}. The extra worker threads are spawned at package-load time, so this change does NOT take effect until you fully restart ComfyUI.`,
-    });
-
-    if (n > 1) {
-        _showErpkNotice({
-            severity: "warn",
-            summary: "GPU contention risk under multi-worker mode",
-            detail: `With ${n} parallel workers, multiple prompts run concurrently. Any workflow that loads local diffusion models will race on GPU memory and may OOM or produce wrong outputs. Only use values > 1 when your queue is API-only (Wavespeed / Claude / OpenAI / Gemini). The standard ComfyUI single-worker assumption is load-bearing for local-diffusion safety.`,
-        });
-    }
+    _parallelWorkersDebounce = setTimeout(() => {
+        _parallelWorkersDebounce = null;
+        _fireParallelWorkersNotice(n);
+    }, _PARALLEL_WORKERS_DEBOUNCE_MS);
 }
 
 const GENERAL_SETTINGS = [
