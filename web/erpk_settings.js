@@ -260,6 +260,69 @@ function observeSettingsDialog(displayName) {
     observer.observe(document.body, { childList: true, subtree: true });
 }
 
+// Track last-notified value so onChange fires once per real change, not on
+// every slider micro-tick. `_readyToNotify` is flipped to true a short time
+// after extension setup, so the load-time onChange fire (when ComfyUI seeds
+// the setting from the saved value) doesn't show a spurious toast on every
+// page open.
+let _lastParallelWorkersNotified = null;
+let _readyToNotify = false;
+
+function _showErpkNotice({ severity, summary, detail }) {
+    try {
+        if (app?.extensionManager?.toast?.add) {
+            app.extensionManager.toast.add({
+                severity,
+                summary,
+                detail,
+                life: 10000,
+            });
+            return;
+        }
+    } catch (e) {
+        // fall through
+    }
+    // Fallback: console + alert (intentionally loud, since the user
+    // needs to know about restart/GPU risk)
+    if (severity === "warn" || severity === "error") {
+        console.warn(`[ERPK] ${summary}: ${detail}`);
+    } else {
+        console.info(`[ERPK] ${summary}: ${detail}`);
+    }
+    try { alert(`[ERPK] ${summary}\n\n${detail}`); } catch (e) {}
+}
+
+function onParallelWorkersChange(newValue) {
+    const n = Number(newValue);
+    if (!Number.isFinite(n)) {
+        return;
+    }
+    // Suppress the load-time fire: record the value so a later real change
+    // can compare against it correctly, but don't show a toast yet.
+    if (!_readyToNotify) {
+        _lastParallelWorkersNotified = n;
+        return;
+    }
+    if (n === _lastParallelWorkersNotified) {
+        return;
+    }
+    _lastParallelWorkersNotified = n;
+
+    _showErpkNotice({
+        severity: "info",
+        summary: "Restart ComfyUI required",
+        detail: `Parallel Prompt Workers changed to ${n}. The extra worker threads are spawned at package-load time, so this change does NOT take effect until you fully restart ComfyUI.`,
+    });
+
+    if (n > 1) {
+        _showErpkNotice({
+            severity: "warn",
+            summary: "GPU contention risk under multi-worker mode",
+            detail: `With ${n} parallel workers, multiple prompts run concurrently. Any workflow that loads local diffusion models will race on GPU memory and may OOM or produce wrong outputs. Only use values > 1 when your queue is API-only (Wavespeed / Claude / OpenAI / Gemini). The standard ComfyUI single-worker assumption is load-bearing for local-diffusion safety.`,
+        });
+    }
+}
+
 const GENERAL_SETTINGS = [
     {
         id: "ERPK.AUTO_CLEAR_HISTORY",
@@ -277,6 +340,7 @@ const GENERAL_SETTINGS = [
         attrs: { min: 1, max: 8, step: 1 },
         category: ["ERPK", "General", "Parallel Prompt Workers"],
         tooltip: "Number of concurrent prompts the queue runs. 1 = ComfyUI default (serial). Higher = multiple queued prompts execute in parallel. WARNING: local-diffusion workflows will race on GPU memory — only raise this when running API-only workflows. Requires ComfyUI restart to take effect.",
+        onChange: onParallelWorkersChange,
     },
 ];
 
@@ -298,6 +362,11 @@ app.registerExtension({
     settings: buildSettings(),
 
     async setup() {
+        // Open the notification window 2s after setup. Any onChange fires
+        // before this point are treated as initial-load seeding and don't
+        // pop a toast (see onParallelWorkersChange).
+        setTimeout(() => { _readyToNotify = true; }, 2000);
+
         // Register user context for multi-user settings resolution
         await registerUserContext();
 
