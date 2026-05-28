@@ -4,7 +4,15 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 
+// ComfyUI Settings UI renders these in REVERSE order of registration:
+// array[0] → bottom of the panel, array[n-1] → top. To control where a key
+// appears in the rendered list, place it accordingly in this array.
 const API_KEY_SETTINGS = [
+    {
+        id: "ERPK.XAI_API_KEY",
+        name: "xAI (Grok) API Key",
+        nodes: ["GrokAPIClient"],
+    },
     {
         id: "ERPK.ANTHROPIC_API_KEY",
         name: "Anthropic API Key",
@@ -24,11 +32,6 @@ const API_KEY_SETTINGS = [
         id: "ERPK.WAVESPEED_API_KEY",
         name: "WaveSpeed API Key",
         nodes: ["WaveSpeed Custom Client"],
-    },
-    {
-        id: "ERPK.XAI_API_KEY",
-        name: "xAI (Grok) API Key",
-        nodes: ["GrokAPIClient"],
     },
 ];
 
