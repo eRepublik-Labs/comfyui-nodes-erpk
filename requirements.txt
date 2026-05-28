@@ -18,6 +18,9 @@ google-genai>=2.2.0
 # OpenAI API integration
 openai>=2.32.0
 
+# xAI Grok API integration
+xai-sdk>=1.14.0
+
 # Apple SHARP - Single-image to 3D Gaussian view synthesis
 # TODO: pin to a specific commit hash once apple/ml-sharp publishes a stable tag
 sharp @ git+https://github.com/apple/ml-sharp.git
