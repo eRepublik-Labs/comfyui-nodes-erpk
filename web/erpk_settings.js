@@ -25,6 +25,11 @@ const API_KEY_SETTINGS = [
         name: "WaveSpeed API Key",
         nodes: ["WaveSpeed Custom Client"],
     },
+    {
+        id: "ERPK.XAI_API_KEY",
+        name: "xAI (Grok) API Key",
+        nodes: ["GrokAPIClient"],
+    },
 ];
 
 // Lookup: node comfyClass -> setting ID

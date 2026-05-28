@@ -59,6 +59,7 @@ class ERPKExtension(ComfyExtension):
             (".claude", "Claude"),
             (".gemini", "Gemini"),
             (".openai", "OpenAI"),
+            (".grok", "Grok"),
             (".wavespeed", "WaveSpeed"),
             (".apple", "Apple ML"),
         ]

@@ -34,6 +34,11 @@ ComfyUI-Custom-Nodes/
 │   ├── nodes.py                   # Core nodes (Config, Text, Vision, Chat)
 │   ├── image_nodes.py             # Image generation/editing nodes
 │   └── openai_api/                # API integration layer
+├── grok/                          # xAI Grok API integration
+│   ├── README.md                  # Package documentation
+│   ├── nodes.py                   # Config, Text, Chat, Image nodes
+│   ├── video_nodes.py             # Text-to-Video, Ref-to-Video, Edit, Extend
+│   └── grok_api/                  # API integration layer
 ├── apple/                         # Apple ML models integration
 │   ├── README.md                  # Package documentation
 │   └── sharp_nodes.py             # SHARP view synthesis nodes
@@ -199,6 +204,34 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 - JSON response format support
 
 **Installation & Documentation:** See [openai/README.md](openai/README.md)
+
+### ERPK/Grok
+
+xAI Grok integration — text, multi-turn chat, image generation/editing (up to 3 source images), and full video coverage (text-to-video, reference-to-video, edit, extend).
+
+**Category in ComfyUI:** `ERPK/Grok` and `ERPK/Grok/Video`
+**Version:** 2026.5.15
+**SDK requirement:** `xai-sdk>=1.14.0`
+
+#### Text & Chat Nodes
+
+- **Grok API Client** - Initialize the xAI client (optional for downstream nodes)
+- **Grok Text Generation** - One-shot text completion via `grok-4.3` / `grok-3` / `grok-3-mini` / `grok-2`
+- **Grok Chat** - Multi-turn conversation threaded via `GROK_CHAT_SESSION`
+
+#### Image Nodes
+
+- **Grok Image Generation** - Text-to-image, 8 aspect ratios, 1k/2k resolution, n=1..4 batched output
+- **Grok Image Edit** - Single or multi-image editing (up to 3 source images per xAI's cap)
+
+#### Video Nodes
+
+- **Grok Text to Video** - Text-to-video, 1-15s, 7 aspect ratios, 480p/720p
+- **Grok Reference to Video** - Up to 3 reference images guide generation; `<IMAGE_N>` token addressing
+- **Grok Video Edit** - Edit existing video URL with text prompt (output capped at 720p)
+- **Grok Video Extend** - Append N more seconds of new content to an existing video URL
+
+**Installation & Documentation:** See [grok/README.md](grok/README.md)
 
 ### Background Removal (Removed)
 
