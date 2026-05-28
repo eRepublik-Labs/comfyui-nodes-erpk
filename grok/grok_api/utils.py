@@ -38,11 +38,24 @@ def tensor_to_pil(image) -> Optional["PILImage.Image"]:
     return PILImage.fromarray(arr)
 
 
+# xAI's image-edit endpoint goes through gRPC, which has a 4 MB
+# (4_194_304-byte) default max message size. PNG + base64 blows past this for
+# any reasonably-detailed source image (a 3 MB PNG becomes 4 MB+ after base64,
+# plus the rest of the gRPC envelope). Encode as JPEG to stay well under, and
+# cap the longest edge so high-res inputs don't slip through.
+_JPEG_QUALITY = 90
+_MAX_EDGE = 2048
+# Leave headroom for the rest of the gRPC message (prompt, model, metadata).
+_PAYLOAD_BUDGET_BYTES = 3_500_000
+
+
 def image_to_data_uri(image) -> Optional[str]:
-    """Convert a ComfyUI IMAGE tensor or PIL Image to a `data:image/png;base64,...` URI.
+    """Convert a ComfyUI IMAGE tensor or PIL Image to a `data:image/jpeg;base64,...` URI.
 
     Used wherever xAI's image-edit / reference-to-video / video-edit APIs accept
-    an image as base64 data URI alongside HTTPS URLs.
+    an image as base64 data URI alongside HTTPS URLs. Encoded as JPEG to stay
+    under xAI's 4 MB gRPC message limit; quality is dropped progressively if the
+    first encode exceeds the per-image payload budget.
     """
     if image is None:
         return None
@@ -52,10 +65,31 @@ def image_to_data_uri(image) -> Optional[str]:
         pil = tensor_to_pil(image)
     if pil is None:
         return None
-    buf = io.BytesIO()
-    pil.save(buf, format="PNG")
-    b64 = base64.b64encode(buf.getvalue()).decode("ascii")
-    return f"data:image/png;base64,{b64}"
+
+    # Downscale if either dimension exceeds the cap. Preserves aspect ratio.
+    if max(pil.size) > _MAX_EDGE:
+        pil.thumbnail((_MAX_EDGE, _MAX_EDGE), PILImage.LANCZOS)
+
+    # JPEG doesn't support RGBA; convert any alpha to RGB on white background.
+    if pil.mode not in ("RGB", "L"):
+        if pil.mode in ("RGBA", "LA"):
+            bg = PILImage.new("RGB", pil.size, (255, 255, 255))
+            bg.paste(pil, mask=pil.split()[-1])
+            pil = bg
+        else:
+            pil = pil.convert("RGB")
+
+    # Encode at the configured quality; if the result is still over budget,
+    # step down quality before giving up. 4 MB is a hard wall; 60 quality is
+    # the floor before visible artifacts get distracting for edit references.
+    for quality in (_JPEG_QUALITY, 80, 70, 60):
+        buf = io.BytesIO()
+        pil.save(buf, format="JPEG", quality=quality, optimize=True)
+        data = buf.getvalue()
+        if len(data) <= _PAYLOAD_BUDGET_BYTES:
+            break
+    b64 = base64.b64encode(data).decode("ascii")
+    return f"data:image/jpeg;base64,{b64}"
 
 
 def images_to_data_uris(images, max_count: int = 3) -> List[str]:
