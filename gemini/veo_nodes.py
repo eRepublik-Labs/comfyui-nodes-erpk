@@ -257,7 +257,7 @@ class VeoTextToVideo(IO.ComfyNode):
                     tooltip=(
                         "Gemini API client from Gemini API Config node. "
                         "Optional: when unconnected, the key is resolved from "
-                        "ComfyUI Settings > GOOGLE_API_KEY (or env / config.ini)."
+                        "ComfyUI Settings or config.ini."
                     ),
                 ),
                 IO.String.Input(
@@ -477,7 +477,7 @@ class VeoImageToVideo(IO.ComfyNode):
                     tooltip=(
                         "Gemini API client from Gemini API Config node. "
                         "Optional: when unconnected, the key is resolved from "
-                        "ComfyUI Settings > GOOGLE_API_KEY (or env / config.ini)."
+                        "ComfyUI Settings or config.ini."
                     ),
                 ),
                 IO.Image.Input(

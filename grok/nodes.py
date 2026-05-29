@@ -83,13 +83,13 @@ class GrokAPIClient(IO.ComfyNode):
             node_id="GrokAPIClient",
             display_name="Grok API Client",
             category="ERPK/Grok",
-            description="Initialize an xAI Grok API client. Leave api_key empty to fall through to ComfyUI Settings, XAI_API_KEY env var, or config.ini.",
+            description="Initialize an xAI Grok API client. Leave api_key empty to fall through to ComfyUI Settings or config.ini.",
             inputs=[
                 IO.String.Input(
                     "api_key",
                     optional=True,
                     default="",
-                    tooltip="xAI API key. If empty, checks ComfyUI Settings, then XAI_API_KEY env var, then grok/config.ini.",
+                    tooltip="xAI API key. If empty, checks ComfyUI Settings, then grok/config.ini.",
                 ),
             ],
             outputs=[

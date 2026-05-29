@@ -3,7 +3,7 @@
 
 # Gemini API Config
 
-Initializes a Gemini API client for use by other Gemini nodes. Optional — Gemini nodes work without this node as long as your API key is configured in Settings, the `GOOGLE_API_KEY` environment variable, or config.ini.
+Initializes a Gemini API client for use by other Gemini nodes. Optional — Gemini nodes work without this node as long as your API key is configured in Settings or config.ini.
 
 ## Parameters
 
@@ -17,6 +17,6 @@ This node takes no parameters.
 
 ## Notes
 
-- API key is resolved in priority order: ComfyUI Settings > environment variable > config.ini
-- Other Gemini nodes can run without this node if an API key is configured in Settings or environment
+- API key is resolved in priority order: ComfyUI Settings > node input > config.ini
+- Other Gemini nodes can run without this node if an API key is configured in Settings or config.ini
 - Connect the client output to System Instruction or Safety Settings nodes before passing to generation nodes

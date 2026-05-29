@@ -44,17 +44,15 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 
 4. **Configure API key** (choose one method):
 
-   When multiple methods are configured, they are checked in priority order: Settings > Node widget > Environment variable > config.ini.
+   When multiple methods are configured, they are checked in priority order: Settings > Node widget > config.ini.
 
    **Method 1: ComfyUI Settings** (Recommended, highest priority)
    Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**) and enter your Anthropic API key.
    Keys configured here are stored in your user settings, not in workflows, so they won't leak when sharing.
    In multi-user installations, each user's keys are resolved separately.
 
-   **Method 2: Environment Variable**
-   ```bash
-   export ANTHROPIC_API_KEY="your-api-key-here"
-   ```
+   **Method 2: In ComfyUI Node**
+   Enter API key directly in the Claude API Client node (not recommended for shared workflows)
 
    **Method 3: config.ini File** (lowest priority)
    ```ini
@@ -62,9 +60,6 @@ Complete Claude API integration providing text generation, prompt enhancement, v
    [claude]
    # api_key = YOUR_API_KEY_HERE
    ```
-
-   **Method 4: In ComfyUI Node**
-   Enter API key directly in the Claude API Client node (not recommended for shared workflows)
 
 5. **Restart ComfyUI**
 
@@ -81,7 +76,7 @@ Initializes the Claude API client. Optional if API key is configured in ComfyUI 
 
 **Inputs:**
 - `model`: claude-sonnet-4-6 (default), claude-opus-4-7, claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929 (legacy)
-- `api_key`: Optional API key (uses env/config if empty)
+- `api_key`: Optional API key (uses Settings/config if empty)
 - `enable_streaming`: Enable streaming responses
 - `enable_caching`: Enable prompt caching for cost savings
 
@@ -341,11 +336,8 @@ Enabled by default. Caches system prompts to reduce costs by up to 90% for repea
 ## Troubleshooting
 
 ### "No API key found" Error
-**Solution:** Set API key via ComfyUI Settings (recommended), environment variable, config.ini, or node input.
-Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**) or:
-```bash
-export ANTHROPIC_API_KEY="your-key"
-```
+**Solution:** Set API key via ComfyUI Settings (recommended), config.ini, or node input.
+Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**).
 
 ### "Rate limit hit" Errors
 **Solution:** Reduce request frequency. Client auto-retries with exponential backoff.

@@ -17,5 +17,5 @@ This node takes no parameters.
 
 ## Notes
 
-- API key resolution order: ComfyUI Settings > OPENAI_API_KEY env var > config.ini
+- API key resolution order: ComfyUI Settings > node input > config.ini
 - This node is optional — text and image nodes can create their own client if an API key is available

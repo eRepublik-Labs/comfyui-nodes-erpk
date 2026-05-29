@@ -20,7 +20,6 @@ SKIP_DIRS = {"tests", "web", ".cs", ".git", "__pycache__", ".venv", "venv", "bui
 # loudly with `ImportError: cannot import name X from openai`, so the silent-
 # failure risk that motivates this guard doesn't apply.
 INTERNAL_NAMES = {
-    "apple",
     "claude",
     "gemini",
     "wavespeed",

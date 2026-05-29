@@ -30,4 +30,4 @@ Generates images from text descriptions using Gemini's image generation models. 
 - 3.1 Flash supports all 14 aspect ratios and resolutions from 512px to 4K
 - 3 Pro supports 10 aspect ratios and resolutions from 1K to 4K
 - 2.5 Flash is fixed at 1024px resolution and does not support Google Search grounding
-- API key resolved from ComfyUI Settings, GOOGLE_API_KEY env var, or config.ini — connect a `client` from Gemini API Config only when you need shared safety/system-instruction state across nodes
+- API key resolved from ComfyUI Settings or config.ini — connect a `client` from Gemini API Config only when you need shared safety/system-instruction state across nodes

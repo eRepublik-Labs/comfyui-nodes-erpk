@@ -91,8 +91,7 @@ class ClaudeClient:
         Resolve API key from multiple sources in order of priority:
         1. ComfyUI Settings (comfy.settings.json)
         2. Provided api_key parameter
-        3. ANTHROPIC_API_KEY environment variable
-        4. config.ini file
+        3. config.ini file
 
         Args:
             api_key: API key provided directly
@@ -117,11 +116,6 @@ class ClaudeClient:
         if api_key and api_key.strip():
             return api_key.strip()
 
-        # Priority 2: Environment variable
-        env_key = os.getenv("ANTHROPIC_API_KEY")
-        if env_key:
-            return env_key
-
         # Priority 3: Config file
         if config_path is None:
             # Default to config.ini in same directory as this file
@@ -138,8 +132,7 @@ class ClaudeClient:
             "No API key found. Please provide via:\n"
             "1. ComfyUI Settings (Settings > ERPK > API Keys)\n"
             "2. api_key parameter\n"
-            "3. ANTHROPIC_API_KEY environment variable\n"
-            "4. config.ini file in claude/ directory"
+            "3. config.ini file in claude/ directory"
         )
 
     def _send_request_sync(

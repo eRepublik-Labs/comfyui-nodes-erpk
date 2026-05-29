@@ -9,7 +9,7 @@ Initializes an xAI Grok API client used by other Grok nodes. The `client` output
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| api_key | String | (empty) | xAI API key (optional). If empty, resolves from ComfyUI Settings > XAI_API_KEY env var > `grok/config.ini` |
+| api_key | String | (empty) | xAI API key (optional). If empty, resolves from ComfyUI Settings > `grok/config.ini` |
 
 ## Output
 

@@ -31,7 +31,7 @@ class ClaudeAPIClient(IO.ComfyNode):
                     "api_key",
                     default="",
                     optional=True,
-                    tooltip="Anthropic API key. If empty, will use ANTHROPIC_API_KEY env var or config.ini.",
+                    tooltip="Anthropic API key. If empty, will use ComfyUI Settings or config.ini.",
                 ),
                 IO.Boolean.Input(
                     "enable_streaming",

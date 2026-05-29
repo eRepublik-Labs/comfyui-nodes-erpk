@@ -70,9 +70,23 @@ async function fetchUserInfo() {
     return { multi_user: false, user_id: "default", display_name: "default" };
 }
 
+async function fetchVersion() {
+    // Fetch the ERPK package version (read from pyproject.toml server-side).
+    try {
+        const resp = await api.fetchApi("/erpk/version");
+        if (resp.ok) {
+            const data = await resp.json();
+            return data.version || null;
+        }
+    } catch (e) {
+        // Non-fatal
+    }
+    return null;
+}
+
 const BANNER_ID = "erpk-user-banner";
 
-function createUserBanner(displayName) {
+function createUserBanner(displayName, version) {
     const banner = document.createElement("div");
     banner.id = BANNER_ID;
     banner.style.cssText =
@@ -92,10 +106,20 @@ function createUserBanner(displayName) {
 
     banner.appendChild(label);
     banner.appendChild(name);
+
+    if (version) {
+        const ver = document.createElement("span");
+        ver.textContent = `v${version}`;
+        ver.title = "ERPK Custom Nodes version";
+        ver.style.cssText =
+            "margin-left:auto;opacity:0.6;font-size:11px;" +
+            "font-family:var(--font-family-monospace,ui-monospace,Menlo,monospace);";
+        banner.appendChild(ver);
+    }
     return banner;
 }
 
-function tryInjectBanner(displayName) {
+function tryInjectBanner(displayName, version) {
     if (document.getElementById(BANNER_ID)) return;
 
     // Find ERPK settings by looking for our setting labels in the dialog
@@ -127,7 +151,7 @@ function tryInjectBanner(displayName) {
     }
     if (!container) return;
 
-    container.prepend(createUserBanner(displayName));
+    container.prepend(createUserBanner(displayName, version));
 }
 
 // Mask API-key values in the settings dialog. ComfyUI's "text" setting type
@@ -258,14 +282,14 @@ function enhanceApiKeyInputs() {
     }
 }
 
-function observeSettingsDialog(displayName) {
+function observeSettingsDialog(displayName, version) {
     // Watch for dialog open/close to inject the banner and mask API-key inputs.
     const observer = new MutationObserver(() => {
         const dialogOpen =
             document.querySelector(".p-dialog-content") ||
             document.querySelector(".comfy-modal-content");
         if (dialogOpen) {
-            tryInjectBanner(displayName);
+            tryInjectBanner(displayName, version);
             enhanceApiKeyInputs();
         }
     });
@@ -376,7 +400,7 @@ function buildSettings() {
         type: "text",
         defaultValue: "",
         category: ["ERPK", "API Keys", entry.name],
-        tooltip: `${entry.name}. Leave empty to use environment variable or config.ini.`,
+        tooltip: `${entry.name}. Leave empty to use config.ini.`,
     }));
     return [...apiKeySettings, ...GENERAL_SETTINGS];
 }
@@ -400,10 +424,14 @@ app.registerExtension({
             registerUserContext();
         });
 
-        // Inject user banner into ERPK Settings panel when dialog opens
+        // Inject user banner (with package version) into ERPK Settings panel when dialog opens
         const userInfo = await fetchUserInfo();
+        const version = await fetchVersion();
+        if (version) {
+            console.info(`[ERPK] Custom Nodes v${version}`);
+        }
         if (userInfo.display_name) {
-            observeSettingsDialog(userInfo.display_name);
+            observeSettingsDialog(userInfo.display_name, version);
         }
     },
 

@@ -31,7 +31,7 @@ class GrokTextToVideo(IO.ComfyNode):
                     tooltip=(
                         "Grok API client from Grok API Client node. "
                         "Optional: when unconnected, the key is resolved from "
-                        "ComfyUI Settings, XAI_API_KEY env var, or grok/config.ini."
+                        "ComfyUI Settings or grok/config.ini."
                     ),
                 ),
                 IO.String.Input(
@@ -144,7 +144,7 @@ class GrokRefToVideo(IO.ComfyNode):
                     tooltip=(
                         "Grok API client from Grok API Client node. "
                         "Optional: when unconnected, the key is resolved from "
-                        "ComfyUI Settings, XAI_API_KEY env var, or grok/config.ini."
+                        "ComfyUI Settings or grok/config.ini."
                     ),
                 ),
                 IO.String.Input(
@@ -277,7 +277,7 @@ class GrokVideoEdit(IO.ComfyNode):
                     tooltip=(
                         "Grok API client from Grok API Client node. "
                         "Optional: when unconnected, the key is resolved from "
-                        "ComfyUI Settings, XAI_API_KEY env var, or grok/config.ini."
+                        "ComfyUI Settings or grok/config.ini."
                     ),
                 ),
                 IO.String.Input(
@@ -369,7 +369,7 @@ class GrokVideoExtend(IO.ComfyNode):
                     tooltip=(
                         "Grok API client from Grok API Client node. "
                         "Optional: when unconnected, the key is resolved from "
-                        "ComfyUI Settings, XAI_API_KEY env var, or grok/config.ini."
+                        "ComfyUI Settings or grok/config.ini."
                     ),
                 ),
                 IO.String.Input(

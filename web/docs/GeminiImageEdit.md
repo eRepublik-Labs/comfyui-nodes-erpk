@@ -32,4 +32,4 @@ Edits and modifies existing images using text prompts. Supports up to 14 referen
 - Reference images in prompts by order ("the first image"), content ("the logo"), or role ("the style reference")
 - Gemini 3 Pro supports up to 14 reference images (up to 6 objects, up to 5 humans for character consistency)
 - Primary image input and additional_images are combined before sending to the API
-- API key resolved from ComfyUI Settings, GOOGLE_API_KEY env var, or config.ini — connect a `client` from Gemini API Config only when you need shared safety/system-instruction state across nodes
+- API key resolved from ComfyUI Settings or config.ini — connect a `client` from Gemini API Config only when you need shared safety/system-instruction state across nodes

@@ -5,10 +5,39 @@
 ERPK ComfyUI Custom Nodes
 
 A collection of custom ComfyUI nodes from ERPK, including WaveSpeed AI, Claude API,
-Gemini API integrations, and Apple ML models.
+Gemini, OpenAI, and Grok API integrations.
 """
 
+import re
+from pathlib import Path
+
 from comfy_api.latest import ComfyExtension, ComfyAPI, IO
+
+
+def _resolve_version(pyproject_path=None):
+    """Resolve the package version from pyproject.toml (the single source of truth)."""
+    path = Path(pyproject_path) if pyproject_path else Path(__file__).parent / "pyproject.toml"
+    try:
+        import tomllib
+        with open(path, "rb") as f:
+            return tomllib.load(f)["project"]["version"]
+    except Exception:
+        pass
+    # Fallback for Python < 3.11 (no tomllib) or a malformed file.
+    try:
+        match = re.search(
+            r'^version\s*=\s*"([^"]+)"',
+            path.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        )
+        if match:
+            return match.group(1)
+    except Exception:
+        pass
+    return "unknown"
+
+
+__version__ = _resolve_version()
 
 # Web directory for frontend extensions
 WEB_DIRECTORY = "./web"
@@ -32,10 +61,6 @@ _NODE_REPLACEMENTS = {
     "WaveSpeed Custom QwenImageT2I": "QwenImageTextToImageNode",
     "WaveSpeed Custom QwenImageEdit": "QwenImageEditNode",
     "WaveSpeed Custom QwenImageEditPlus": "QwenImageEditPlusNode",
-    # Apple ML
-    "ERPK SHARP Predict": "SHARPPredict",
-    "ERPK SHARP Render Views": "SHARPRenderViews",
-    "ERPK SHARP Render Video": "SHARPRenderVideo",
 }
 
 
@@ -61,7 +86,6 @@ class ERPKExtension(ComfyExtension):
             (".openai", "OpenAI"),
             (".grok", "Grok"),
             (".wavespeed", "WaveSpeed"),
-            (".apple", "Apple ML"),
         ]
 
         for module_path, label in _providers:
@@ -131,6 +155,19 @@ try:
     print("[ERPK] Registered multi-user settings routes")
 except Exception as e:
     print(f"[ERPK] Warning: Could not register settings routes: {e}")
+
+# Register version route (read by the frontend to display the package version)
+try:
+    from server import PromptServer
+    from aiohttp import web
+
+    @PromptServer.instance.routes.get("/erpk/version")
+    async def erpk_version(request):
+        return web.json_response({"version": __version__})
+
+    print("[ERPK] Registered version route")
+except Exception as e:
+    print(f"[ERPK] Warning: Could not register version route: {e}")
 
 # Register shared workflows API routes
 try:
@@ -227,4 +264,4 @@ try:
 except Exception as e:
     print(f"[ERPK] Warning: Could not install parallel workers: {e}")
 
-__all__ = ["comfy_entrypoint", "WEB_DIRECTORY"]
+__all__ = ["comfy_entrypoint", "WEB_DIRECTORY", "__version__"]

@@ -1,10 +1,16 @@
 .claude
+.claude-crawl/
 .serena
 _docs
 ref
 CLAUDE.md
 claude/config.ini
 gemini/config.ini
+
+# Dev-only analysis/audit reports (kept local, not published)
+codebase_analysis_report.md
+CODEBASE_AUDIT_REPORT.md
+registry-api-bug-report.md
 
 # Shared workflow storage (user-generated content)
 shared_workflows/

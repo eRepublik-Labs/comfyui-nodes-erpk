@@ -1,5 +1,5 @@
 # ABOUTME: Tests for V1→V3 NodeReplace mappings registered in ERPKExtension.on_load().
-# ABOUTME: Verifies that all 18 renamed nodes have correct replacement mappings.
+# ABOUTME: Verifies that all 15 renamed nodes have correct replacement mappings.
 
 import asyncio
 import pytest
@@ -25,10 +25,6 @@ EXPECTED_REPLACEMENTS = {
     "WaveSpeed Custom QwenImageT2I": "QwenImageTextToImageNode",
     "WaveSpeed Custom QwenImageEdit": "QwenImageEditNode",
     "WaveSpeed Custom QwenImageEditPlus": "QwenImageEditPlusNode",
-    # Apple (3 nodes)
-    "ERPK SHARP Predict": "SHARPPredict",
-    "ERPK SHARP Render Views": "SHARPRenderViews",
-    "ERPK SHARP Render Video": "SHARPRenderVideo",
 }
 
 
@@ -57,10 +53,10 @@ class TestNodeReplacements:
         assert len(registered) > 0, "on_load() should register node replacements"
 
     def test_replacement_count(self):
-        """Exactly 18 replacements should be registered."""
+        """Exactly 15 replacements should be registered."""
         registered = _run_on_load()
-        assert len(registered) == 18, (
-            f"Expected 18 replacements, got {len(registered)}"
+        assert len(registered) == 15, (
+            f"Expected 15 replacements, got {len(registered)}"
         )
 
     def test_all_expected_old_ids_present(self):

@@ -51,20 +51,15 @@ Complete Google Gemini API integration providing text generation, vision analysi
    Keys configured here are stored in your user settings, not in workflows, so they won't leak when sharing.
    In multi-user installations, each user's keys are resolved separately.
 
-   **Method 2: Environment Variable**
-   ```bash
-   export GOOGLE_API_KEY="your-api-key-here"
-   ```
+   **Method 2: In ComfyUI Node**
+   Enter API key directly in the Gemini API Config node (not recommended for shared workflows)
 
-   **Method 3: config.ini File**
+   **Method 3: config.ini File** (lowest priority)
    ```ini
    # Edit gemini/config.ini
    [gemini]
    # api_key = YOUR_GOOGLE_API_KEY_HERE
    ```
-
-   **Method 4: In ComfyUI Node** (lowest priority)
-   Enter API key directly in the Gemini API Config node (not recommended for shared workflows)
 
 5. **Restart ComfyUI**
 
@@ -77,10 +72,10 @@ Complete Google Gemini API integration providing text generation, vision analysi
 ### Core Nodes
 
 #### Gemini API Config
-Initializes the Gemini API client. Optional if API key is configured via ComfyUI Settings, environment variable, or config.ini — Gemini nodes can run standalone.
+Initializes the Gemini API client. Optional if API key is configured via ComfyUI Settings or config.ini — Gemini nodes can run standalone.
 
 **Inputs:**
-- `api_key`: Optional API key (uses env/config if empty)
+- `api_key`: Optional API key (uses Settings/config if empty)
 
 **Outputs:**
 - `client`: Gemini API client instance
@@ -194,7 +189,7 @@ Generate images from text descriptions using Gemini's image generation models.
 - `description`: Text description (only when response_modalities is TEXT+IMAGE)
 
 **Features:**
-- Credentials resolved from ComfyUI Settings, GOOGLE_API_KEY env, or config.ini
+- Credentials resolved from ComfyUI Settings or config.ini
 - Direct image output compatible with all ComfyUI image nodes
 - Three image models: 3.1 Flash (best balance), 3 Pro (professional quality), 2.5 Flash (speed)
 - Configurable creativity with temperature
@@ -231,7 +226,7 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 - `description`: Text description (only when response_modalities is TEXT+IMAGE)
 
 **Features:**
-- Credentials resolved from ComfyUI Settings, GOOGLE_API_KEY env, or config.ini
+- Credentials resolved from ComfyUI Settings or config.ini
 - Gemini 3 models support up to 14 reference images (up to 6 objects, up to 5 humans)
 - Image-to-image editing with natural language instructions
 - Compatible with all ComfyUI image nodes
@@ -465,9 +460,8 @@ https://ai.google.dev/pricing
 
 ### "No API key found" error
 - Set your API key via ComfyUI Settings (**Settings > ERPK > API Keys**, recommended)
-- Or verify your API key is set via environment variable, config.ini, or the node input
+- Or verify your API key is set via the node input or config.ini
 - Check that the config.ini file has the correct format
-- Restart ComfyUI after setting environment variables
 
 ### "Response blocked by safety filters" error
 - Your prompt or the model's response triggered safety filters

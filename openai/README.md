@@ -49,20 +49,15 @@ Complete OpenAI API integration providing text generation, vision analysis, mult
    Keys configured here are stored in your user settings, not in workflows, so they won't leak when sharing.
    In multi-user installations, each user's keys are resolved separately.
 
-   **Method 2: Environment Variable**
-   ```bash
-   export OPENAI_API_KEY="your-api-key-here"
-   ```
+   **Method 2: In ComfyUI Node**
+   Enter API key directly in the OpenAI API Config node (not recommended for shared workflows)
 
-   **Method 3: config.ini File**
+   **Method 3: config.ini File** (lowest priority)
    ```ini
    # Edit openai/config.ini
    [openai]
    # api_key = YOUR_OPENAI_API_KEY_HERE
    ```
-
-   **Method 4: In ComfyUI Node** (lowest priority)
-   Enter API key directly in the OpenAI API Config node (not recommended for shared workflows)
 
 5. **Restart ComfyUI**
 
@@ -78,7 +73,7 @@ Complete OpenAI API integration providing text generation, vision analysis, mult
 Initializes the OpenAI API client. Optional if API key is configured in ComfyUI Settings — generation nodes can run standalone.
 
 **Inputs:**
-- `api_key`: Optional API key (uses env/config if empty)
+- `api_key`: Optional API key (uses Settings/config if empty)
 
 **Outputs:**
 - `client`: OpenAI API client instance
@@ -203,7 +198,7 @@ Generate images from text descriptions using OpenAI's image generation models.
 - `revised_prompt`: Model's revised prompt (GPT Image models may modify your prompt)
 
 **Features:**
-- Credentials resolved from ComfyUI Settings, OPENAI_API_KEY env, or config.ini
+- Credentials resolved from ComfyUI Settings, the node input, or config.ini
 - Direct image output compatible with all ComfyUI image nodes
 - Transparent background support with gpt-image-1.5 / gpt-image-1 / gpt-image-1-mini
 - n>1 returns a batched IMAGE tensor — no images are dropped
@@ -269,7 +264,7 @@ Edit and modify existing images using text prompts with optional masking.
 
 **Features:**
 - Inpainting with optional mask support
-- Credentials resolved from ComfyUI Settings, OPENAI_API_KEY env, or config.ini
+- Credentials resolved from ComfyUI Settings, the node input, or config.ini
 - Compatible with all ComfyUI image nodes
 
 **Example Use Cases:**
@@ -377,11 +372,10 @@ https://openai.com/pricing
 ## Troubleshooting
 
 ### "No API key found" error
-- The API key is resolved in this priority order: ComfyUI Settings > node widget > environment variable > config.ini
+- The API key is resolved in this priority order: ComfyUI Settings > node widget > config.ini
 - Set your API key via ComfyUI Settings (**Settings > ERPK > API Keys**, recommended) or right-click canvas > **ERPK Settings**
-- Or verify your API key is set via environment variable, config.ini, or the node input
+- Or verify your API key is set via config.ini or the node input
 - Check that the config.ini file has the correct format
-- Restart ComfyUI after setting environment variables
 
 ### "Content policy violation" error
 - Your prompt or the model's response triggered content filters

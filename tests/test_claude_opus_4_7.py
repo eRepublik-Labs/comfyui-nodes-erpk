@@ -126,7 +126,7 @@ def _patched_anthropic():
 
 def _make_client(**kwargs):
     from claude.claude_api.client import ClaudeClient
-    # Pass api_key so _resolve_api_key skips settings/env/config.
+    # Pass api_key so _resolve_api_key skips settings/config.
     return ClaudeClient(api_key="test-key", **kwargs)
 
 

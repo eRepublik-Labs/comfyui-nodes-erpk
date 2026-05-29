@@ -44,7 +44,7 @@ class WaveSpeedAIAPIClient(IO.ComfyNode):
             category="ERPK/WaveSpeedAI",
             inputs=[
                 IO.String.Input("api_key", optional=True, default="",
-                                tooltip="WaveSpeed AI API key. If empty, checks ComfyUI Settings, then WAVESPEED_API_KEY environment variable, then config.ini"),
+                                tooltip="WaveSpeed AI API key. If empty, checks ComfyUI Settings, then config.ini"),
             ],
             outputs=[
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Output("client"),
@@ -70,50 +70,22 @@ class WaveSpeedAIAPIClient(IO.ComfyNode):
             wavespeed_api_key = api_key.strip()
             print("[WaveSpeed] Using API key from node input")
 
-        # Priority 3 & 4: Environment variable, then config file
-        if not wavespeed_api_key:
-            env_key = os.getenv("WAVESPEED_API_KEY", "").strip()
-            if env_key:
-                wavespeed_api_key = env_key
-                print("[WaveSpeed] Using API key from environment variable WAVESPEED_API_KEY")
-            elif config:
-                try:
-                    config_key = config['API']['WAVESPEED_API_KEY'].strip()
-                    if config_key:
-                        wavespeed_api_key = config_key
-                        print("[WaveSpeed] Using API key from config.ini")
-                    else:
-                        raise ValueError(
-                            "No API key found. Please provide via:\n"
-                            "  1. ComfyUI Settings (Settings > ERPK > API Keys)\n"
-                            "  2. Node input parameter\n"
-                            "  3. WAVESPEED_API_KEY environment variable\n"
-                            "  4. config.ini file"
-                        )
-                except KeyError:
-                    raise ValueError(
-                        "No API key found. Please provide via:\n"
-                        "  1. ComfyUI Settings (Settings > ERPK > API Keys)\n"
-                        "  2. Node input parameter\n"
-                        "  3. WAVESPEED_API_KEY environment variable\n"
-                        "  4. config.ini file"
-                    )
-            else:
-                raise ValueError(
-                    "No API key found. Please provide via:\n"
-                    "  1. ComfyUI Settings (Settings > ERPK > API Keys)\n"
-                    "  2. Node input parameter\n"
-                    "  3. WAVESPEED_API_KEY environment variable\n"
-                    "  4. config.ini file"
-                )
+        # Priority 3: Config file
+        if not wavespeed_api_key and config:
+            try:
+                config_key = config['API']['WAVESPEED_API_KEY'].strip()
+                if config_key:
+                    wavespeed_api_key = config_key
+                    print("[WaveSpeed] Using API key from config.ini")
+            except KeyError:
+                pass
 
         if not wavespeed_api_key:
             raise ValueError(
                 "No API key found. Please provide via:\n"
                 "  1. ComfyUI Settings (Settings > ERPK > API Keys)\n"
                 "  2. Node input parameter\n"
-                "  3. WAVESPEED_API_KEY environment variable\n"
-                "  4. config.ini file"
+                "  3. config.ini file"
             )
 
         return IO.NodeOutput({"api_key": wavespeed_api_key})

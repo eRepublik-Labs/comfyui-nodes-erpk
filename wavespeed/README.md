@@ -240,10 +240,10 @@ ComfyUI/
 ### Core Nodes
 
 #### WaveSpeedAI Client Node
-Optional if API key is configured via ComfyUI Settings, environment variable, or config.ini — WaveSpeed model nodes can run standalone.
+Optional if API key is configured via ComfyUI Settings or config.ini — WaveSpeed model nodes can run standalone.
 
 1. Add the "WaveSpeedAI Client" node to your workflow
-2. Enter your WaveSpeed AI API key (or leave empty to use Settings/env/config.ini)
+2. Enter your WaveSpeed AI API key (or leave empty to use Settings/config.ini)
 3. Connect the client output to any WaveSpeed AI node
 
 #### Upload Image Node
@@ -437,7 +437,7 @@ Same usage as Seedream V4.5, with higher minimum resolution (1440px) at a lower 
 
 ## API Configuration
 
-You'll need a WaveSpeed AI API key to use these nodes. There are four ways to provide your API key, checked in this priority order (Settings highest, config.ini lowest):
+You'll need a WaveSpeed AI API key to use these nodes. There are three ways to provide your API key, checked in this priority order (Settings highest, config.ini lowest):
 
 ### 1. ComfyUI Settings (Recommended, Highest Priority)
 Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**) and enter your WaveSpeed AI API key.
@@ -447,23 +447,7 @@ In multi-user installations, each user's keys are resolved separately.
 ### 2. Direct Node Input
 Enter your API key directly in the WaveSpeedAI Client node's `api_key` field.
 
-### 3. Environment Variable
-Set the `WAVESPEED_API_KEY` environment variable:
-
-```bash
-# On Linux/macOS
-export WAVESPEED_API_KEY="your-api-key-here"
-
-# On Windows (PowerShell)
-$env:WAVESPEED_API_KEY="your-api-key-here"
-
-# On Windows (Command Prompt)
-set WAVESPEED_API_KEY=your-api-key-here
-```
-
-Then restart ComfyUI to load the environment variable.
-
-### 4. Config File (Lowest Priority)
+### 3. Config File (Lowest Priority)
 Create or edit `config.ini` in the wavespeed folder:
 
 ```ini
@@ -471,7 +455,7 @@ Create or edit `config.ini` in the wavespeed folder:
 WAVESPEED_API_KEY = your-api-key-here
 ```
 
-**Note:** The API client will try each method in order until it finds a valid key. This allows you to use environment variables for development and production deployments while still supporting direct input for testing.
+**Note:** The API client will try each method in order until it finds a valid key. This lets you keep a key in config.ini for deployments while still supporting direct input for testing.
 
 For detailed API reference and parameters:
 - [Bytedance Seedream V4 API Documentation](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4)

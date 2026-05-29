@@ -3,7 +3,7 @@
 
 [project]
 name = "comfyui-nodes-erpk"
-description = "ERPK custom nodes for ComfyUI: WaveSpeed AI, Claude API, Google Gemini API, OpenAI API, and Apple SHARP 3D view synthesis."
+description = "ERPK custom nodes for ComfyUI: WaveSpeed AI, Claude API, Google Gemini API, OpenAI API, and xAI Grok API."
 version = "2026.5.17"
 license = { file = "LICENSE" }
 dependencies = [

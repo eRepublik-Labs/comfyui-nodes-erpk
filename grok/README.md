@@ -39,12 +39,7 @@ Complete xAI Grok integration providing text generation, multi-turn chat, image 
    **Method 1: ComfyUI Settings** (Recommended)
    Settings > ERPK > API Keys > xAI (Grok) API Key. Keys here aren't saved into workflows so they don't leak when sharing.
 
-   **Method 2: Environment variable**
-   ```bash
-   export XAI_API_KEY="your-api-key-here"
-   ```
-
-   **Method 3: config.ini**
+   **Method 2: config.ini**
    ```ini
    [API]
    XAI_API_KEY = your-api-key-here
@@ -106,7 +101,7 @@ Complete xAI Grok integration providing text generation, multi-turn chat, image 
 | Symptom | Fix |
 |---|---|
 | `xai-sdk is required` | `pip install xai-sdk>=1.14.0` |
-| `No xAI API key found` | Configure via Settings, env var, or config.ini (see Installation step 2) |
+| `No xAI API key found` | Configure via Settings, the node's api_key input, or config.ini (see Installation step 2) |
 | Video node returns empty URL | Check xAI status; the SDK already retried internally |
 | Image edit raises "Could not convert input image to a data URI" | Check that the input IMAGE tensor is a valid (B, H, W, C) float tensor |
 

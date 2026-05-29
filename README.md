@@ -39,9 +39,6 @@ ComfyUI-Custom-Nodes/
 │   ├── nodes.py                   # Config, Text, Chat, Image nodes
 │   ├── video_nodes.py             # Text-to-Video, Ref-to-Video, Edit, Extend
 │   └── grok_api/                  # API integration layer
-├── apple/                         # Apple ML models integration
-│   ├── README.md                  # Package documentation
-│   └── sharp_nodes.py             # SHARP view synthesis nodes
 ├── utils/                         # String and general utilities
 │   ├── __init__.py                # Module exports
 │   └── concat_strings.py          # String concatenation node
@@ -114,7 +111,7 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 
 #### Nodes
 
-- **Claude API Client** - Initialize Claude API connection with model selection (Opus 4.7, Sonnet 4.6, Opus 4.6, Haiku 4.5) and configuration. Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- Claude nodes can run standalone.
+- **Claude API Client** - Initialize Claude API connection with model selection (Opus 4.7, Sonnet 4.6, Opus 4.6, Haiku 4.5) and configuration. Optional if API key is configured in ComfyUI Settings or config.ini -- Claude nodes can run standalone.
 - **Claude Prompt Enhancer** - Transform simple prompts into detailed descriptions with 51 artistic styles (photorealistic, cinematic, fantasy, cyberpunk, anime, oil painting, watercolor, and more)
 - **Claude Vision Analysis** - Analyze images with Claude's multimodal capabilities (up to 20 images simultaneously). Optional per-node `model` override lets you use Opus 4.7 (2576px image resolution) for vision even when your client is configured with a different model.
 - **Claude Text Generation** - General-purpose text completion and generation
@@ -145,7 +142,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 
 #### Nodes
 
-- **Gemini API Config** - Initialize Gemini API connection (API key configuration). Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- Gemini nodes can run standalone.
+- **Gemini API Config** - Initialize Gemini API connection (API key configuration). Optional if API key is configured in ComfyUI Settings or config.ini -- Gemini nodes can run standalone.
 - **Gemini Text Generation** - General-purpose text generation with model selection (Gemini 3.1 Pro, 3 Pro, 3 Flash, 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite)
 - **Gemini Chat** - Multi-turn conversations with automatic context preservation
 - **Gemini Vision** - Analyze images with multimodal capabilities
@@ -183,7 +180,7 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 
 #### Nodes
 
-- **OpenAI API Config** - Initialize OpenAI API connection (API key configuration). Optional if API key is configured in ComfyUI Settings, environment variable, or config.ini -- OpenAI nodes can run standalone.
+- **OpenAI API Config** - Initialize OpenAI API connection (API key configuration). Optional if API key is configured in ComfyUI Settings or config.ini -- OpenAI nodes can run standalone.
 - **OpenAI Text Generation** - General-purpose text generation with model selection (GPT-5.5, GPT-5.5 Pro, GPT-5.4 family, GPT-5.2, GPT-4o, GPT-4.1, o3, o3-mini, o3-pro, o4-mini) and optional `reasoning_effort` and `verbosity` controls
 - **OpenAI Chat** - Multi-turn conversations with automatic context preservation, plus reasoning_effort and verbosity control on gpt-5.x models
 - **OpenAI Vision** - Analyze images with GPT-5.5 / GPT-5.4 / GPT-4o vision capabilities
@@ -236,29 +233,6 @@ xAI Grok integration — text, multi-turn chat, image generation/editing (up to 
 ### Background Removal (Removed)
 
 Background removal nodes have been removed from this package. For background removal in ComfyUI, use [ComfyUI-RMBG](https://github.com/1038lab/ComfyUI-RMBG) instead.
-
-### ERPK/Apple
-
-Apple ML models integration, currently featuring SHARP for single-image 3D view synthesis.
-
-**Category in ComfyUI:** `ERPK/Apple/SHARP`
-**Version:** 2026.2.15
-
-#### SHARP Nodes
-
-SHARP converts a single photograph into a 3D Gaussian splat representation that can be rendered from novel viewpoints.
-
-- **SHARP Predict** - Convert image to 3D Gaussian splat (.ply file)
-- **SHARP Render Views** - Render novel views from .ply (CUDA required)
-- **SHARP Render Video** - Render orbit video from .ply (CUDA required)
-
-**Key Features:**
-- Single-image to 3D in under 1 second on GPU
-- Outputs standard .ply Gaussian splat format
-- Novel view rendering with customizable camera paths
-- Video generation with orbit trajectories
-
-**Installation & Documentation:** See [apple/README.md](apple/README.md)
 
 ### ERPK/utils
 
@@ -378,8 +352,7 @@ Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishe
    API keys are resolved in priority order:
    1. **ComfyUI Settings** (recommended) -- right-click canvas > ERPK Settings
    2. **Widget input** -- api_key field on client/config nodes
-   3. **Environment variable** -- `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_API_KEY`, `WAVESPEED_API_KEY`
-   4. **Config file** -- `provider/config.ini`
+   3. **Config file** -- `provider/config.ini`
 
    **Multi-user support:** In multi-user ComfyUI installations, each user's API keys are stored separately in their own `comfy.settings.json`. The correct user's keys are resolved automatically during workflow execution. A "Current user: [name]" banner appears in the ERPK Settings panel when multi-user mode is active.
 
@@ -387,13 +360,13 @@ Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishe
    - **Claude:** See [claude/README.md](claude/README.md#installation)
    - **Gemini:** See [gemini/README.md](gemini/README.md#installation)
    - **OpenAI:** See [openai/README.md](openai/README.md#installation)
-   - **Apple/SHARP:** No API keys required. Install with: `pip install git+https://github.com/apple/ml-sharp.git`
+   - **Grok:** See [grok/README.md](grok/README.md#installation)
 
-2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, `ERPK/Gemini`, `ERPK/OpenAI`, `ERPK/Apple/SHARP`, and `ERPK/utils`
+2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, `ERPK/Gemini`, `ERPK/OpenAI`, `ERPK/Grok`, and `ERPK/utils`
 
 ## Backward Compatibility
 
-This package uses the ComfyUI V3 node API. Saved workflows that reference older node IDs (e.g. `"WaveSpeed Custom SeedreamV4"`, `"ERPK SHARP Predict"`) are automatically migrated to the current node IDs at load time via ComfyUI's NodeReplace system. No manual workflow editing is required.
+This package uses the ComfyUI V3 node API. Saved workflows that reference older node IDs (e.g. `"WaveSpeed Custom SeedreamV4"`) are automatically migrated to the current node IDs at load time via ComfyUI's NodeReplace system. No manual workflow editing is required.
 
 ## ComfyUI API Integration
 

@@ -3,13 +3,13 @@
 
 # WaveSpeed Client
 
-Creates a client connection to the WaveSpeed AI API. Optional if your API key is configured via ComfyUI Settings, environment variable, or config.ini -- model nodes can run standalone.
+Creates a client connection to the WaveSpeed AI API. Optional if your API key is configured via ComfyUI Settings or config.ini -- model nodes can run standalone.
 
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| api_key | String | "" | WaveSpeed AI API key (optional). If empty, checks ComfyUI Settings, then WAVESPEED_API_KEY env var, then config.ini |
+| api_key | String | "" | WaveSpeed AI API key (optional). If empty, checks ComfyUI Settings, then config.ini |
 
 ## Output
 
@@ -19,6 +19,6 @@ Creates a client connection to the WaveSpeed AI API. Optional if your API key is
 
 ## Notes
 
-- **Key resolution order:** ComfyUI Settings > node input > environment variable > config.ini
+- **Key resolution order:** ComfyUI Settings > node input > config.ini
 - Connect the client output to any WaveSpeed model node's `client` input
 - If your key is set in ComfyUI Settings, you can skip this node entirely

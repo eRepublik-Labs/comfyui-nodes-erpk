@@ -16,7 +16,7 @@ class GrokClient:
     event loop during the wait.
 
     Multi-tier API key resolution: explicit arg > ComfyUI Settings >
-    XAI_API_KEY env var > config.ini.
+    config.ini.
     """
 
     DEFAULT_TEXT_MODEL = "grok-4.3"
@@ -58,7 +58,7 @@ class GrokClient:
         self._client = None
 
     def _resolve_api_key(self, api_key: Optional[str], config_path: Optional[str]) -> str:
-        """Priority: ComfyUI Settings > arg > XAI_API_KEY env > config.ini."""
+        """Priority: ComfyUI Settings > arg > config.ini."""
         try:
             from ...settings import get_comfy_setting
             settings_key = get_comfy_setting("ERPK.XAI_API_KEY")
@@ -71,11 +71,6 @@ class GrokClient:
         if api_key and api_key.strip():
             print("[Grok] Using API key from node input")
             return api_key.strip()
-
-        env_key = os.getenv("XAI_API_KEY", "").strip()
-        if env_key:
-            print("[Grok] Using API key from environment variable XAI_API_KEY")
-            return env_key
 
         if config_path is None:
             current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -95,8 +90,7 @@ class GrokClient:
             "No xAI API key found. Provide via:\n"
             "  1. ComfyUI Settings (Settings > ERPK > API Keys > xAI)\n"
             "  2. The api_key input on the Grok API Client node\n"
-            "  3. XAI_API_KEY environment variable\n"
-            "  4. grok/config.ini"
+            "  3. grok/config.ini"
         )
 
     def _ensure_client(self):

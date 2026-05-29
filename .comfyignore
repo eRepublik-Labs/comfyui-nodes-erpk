@@ -1,0 +1,9 @@
+# ABOUTME: Files kept in git but excluded from the published Comfy Registry zip.
+# ABOUTME: Layered on top of .gitignore (gitignored paths are already excluded).
+
+# Test suite — not needed by end users, and its importlib usage trips the
+# registry security scanner without adding value to the installed package.
+tests/
+
+# CI / repo tooling — irrelevant to the installed node.
+.github/
