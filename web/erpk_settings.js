@@ -391,6 +391,14 @@ const GENERAL_SETTINGS = [
         tooltip: "Number of concurrent prompts the queue runs. 1 = ComfyUI default (serial). Higher = multiple queued prompts execute in parallel. WARNING: local-diffusion workflows will race on GPU memory — only raise this when running API-only workflows. Requires ComfyUI restart to take effect.",
         onChange: onParallelWorkersChange,
     },
+    {
+        id: "ERPK.GEMINI_TIMEOUT_MS",
+        name: "Gemini Request Timeout (ms)",
+        type: "number",
+        defaultValue: 300000,
+        category: ["ERPK", "General", "Gemini Request Timeout (ms)"],
+        tooltip: "Per-request HTTP timeout for Gemini/Veo calls, in milliseconds. Raise for very long video jobs. Default 300000 (5 min).",
+    },
 ];
 
 function buildSettings() {

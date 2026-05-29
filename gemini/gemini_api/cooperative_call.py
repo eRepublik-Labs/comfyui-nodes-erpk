@@ -1,14 +1,26 @@
 # ABOUTME: Runs blocking SDK calls in a thread while polling ComfyUI's interrupt flag.
 # ABOUTME: Lets users abort an in-flight Gemini call via /interrupt instead of waiting out the HTTP timeout.
 
-import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 DEFAULT_POLL_INTERVAL_S = 0.25
-DEFAULT_TIMEOUT_S = float(os.environ.get("ERPK_GEMINI_TIMEOUT_MS", "300000")) / 1000.0
+_DEFAULT_TIMEOUT_MS = 300000
+
+
+def resolve_timeout_ms() -> int:
+    """Per-request Gemini timeout in milliseconds.
+
+    Configurable via the ERPK.GEMINI_TIMEOUT_MS ComfyUI setting; falls back to
+    5 minutes. Read at call time so the setting applies per run with no restart.
+    """
+    try:
+        from ...settings import get_comfy_setting
+        return int(get_comfy_setting("ERPK.GEMINI_TIMEOUT_MS", _DEFAULT_TIMEOUT_MS))
+    except (ImportError, ValueError, TypeError):
+        return _DEFAULT_TIMEOUT_MS
 
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="erpk-gemini-call")
 
@@ -32,7 +44,7 @@ def _resolve_interrupt_checker() -> Callable[[], bool]:
 def call_with_interrupt(
     fn: Callable[..., Any],
     *args: Any,
-    timeout_s: float = DEFAULT_TIMEOUT_S,
+    timeout_s: Optional[float] = None,
     poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
     **kwargs: Any,
 ) -> Any:
@@ -47,6 +59,8 @@ def call_with_interrupt(
     the workflow surface as cancelled instead of frozen. The HTTP timeout on
     the genai.Client still bounds the wall-clock cost.
     """
+    if timeout_s is None:
+        timeout_s = resolve_timeout_ms() / 1000.0
     is_interrupted = _resolve_interrupt_checker()
 
     future = _executor.submit(fn, *args, **kwargs)
@@ -95,7 +109,7 @@ def call_with_retry(
     max_retries: int = 2,
     initial_delay_s: float = 1.0,
     backoff_factor: float = 2.0,
-    timeout_s: float = DEFAULT_TIMEOUT_S,
+    timeout_s: Optional[float] = None,
     poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
     **kwargs: Any,
 ) -> Any:

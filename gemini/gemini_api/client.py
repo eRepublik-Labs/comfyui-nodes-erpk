@@ -8,18 +8,11 @@ from typing import Dict, Any, List, Optional
 from google import genai
 from google.genai import types
 
-from .cooperative_call import call_with_retry
+from .cooperative_call import call_with_retry, resolve_timeout_ms
 
 # Minimum recommended SDK version
 MIN_SDK_VERSION = "1.56.0"
 _sdk_version_checked = False
-
-# Per-request HTTP timeout for the google-genai SDK. Without this, a stuck call
-# can hang the ComfyUI executor indefinitely (observed: 42-minute ghost jobs on
-# image-edit calls). Override via ERPK_GEMINI_TIMEOUT_MS env var. The SDK applies
-# this timeout to every HTTP request made by the client; AFC rounds each get
-# their own timeout, so the worst-case wall time is roughly N_AFC × timeout.
-DEFAULT_HTTP_TIMEOUT_MS = int(os.environ.get("ERPK_GEMINI_TIMEOUT_MS", "300000"))
 
 
 def _check_sdk_version():
@@ -98,8 +91,11 @@ class GeminiClient:
         self.api_key = self._resolve_api_key(api_key, config_path)
 
         # Initialize the client with a bounded HTTP timeout so stuck calls
-        # surface as errors instead of hanging the ComfyUI executor.
-        http_options = types.HttpOptions(timeout=DEFAULT_HTTP_TIMEOUT_MS)
+        # surface as errors instead of hanging the ComfyUI executor. The SDK
+        # applies this to every HTTP request; AFC rounds each get their own
+        # timeout, so worst-case wall time is roughly N_AFC × timeout.
+        # Tunable via the ERPK.GEMINI_TIMEOUT_MS setting (resolve_timeout_ms).
+        http_options = types.HttpOptions(timeout=resolve_timeout_ms())
         self.client = genai.Client(api_key=self.api_key, http_options=http_options)
 
         # Store configuration for later use
