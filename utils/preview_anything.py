@@ -224,6 +224,58 @@ _IMAGE_MAX_BYTES = 100 * 1024 * 1024
 _LOOPBACK_MAX_BYTES = 500 * 1024 * 1024
 
 
+def _read_view_file_bytes(url: str):
+    """Read bytes of a ComfyUI /view?filename=&type=&subfolder= file from disk.
+
+    Resolves the file under folder_paths' output/temp/input directory and
+    confines it there — a crafted subfolder/filename cannot escape the base dir
+    (ComfyUI's own /view handler enforces the same). Bounded by
+    _LOOPBACK_MAX_BYTES. Returns None on any error or out-of-bounds path.
+    """
+    from urllib.parse import parse_qs
+    try:
+        import folder_paths
+    except Exception:
+        return None
+
+    query = parse_qs(urlparse(url).query)
+    filename = (query.get("filename") or [""])[0]
+    file_type = (query.get("type") or ["output"])[0]
+    subfolder = (query.get("subfolder") or [""])[0]
+    if not filename:
+        return None
+
+    dir_getters = {
+        "output": folder_paths.get_output_directory,
+        "temp": folder_paths.get_temp_directory,
+        "input": folder_paths.get_input_directory,
+    }
+    get_dir = dir_getters.get(file_type)
+    if get_dir is None:
+        return None
+    base = get_dir()
+    if not base:
+        return None
+
+    base_real = os.path.realpath(base)
+    # filename is a bare name; subfolder may nest but must stay within base.
+    candidate = os.path.realpath(
+        os.path.join(base_real, subfolder, os.path.basename(filename))
+    )
+    if candidate != base_real and not candidate.startswith(base_real + os.sep):
+        return None
+
+    try:
+        if not os.path.isfile(candidate):
+            return None
+        if os.path.getsize(candidate) > _LOOPBACK_MAX_BYTES:
+            return None
+        with open(candidate, "rb") as f:
+            return f.read(_LOOPBACK_MAX_BYTES + 1)
+    except Exception:
+        return None
+
+
 def _fetch_url_bytes(url: str, timeout_seconds: int = 30):
     """Fetch URL content as bytes. Handles http(s), data:, and local /view?
     paths (served by the same ComfyUI instance via loopback).
@@ -248,20 +300,12 @@ def _fetch_url_bytes(url: str, timeout_seconds: int = 30):
                 return base64.b64decode(payload)
             from urllib.parse import unquote_to_bytes
             return unquote_to_bytes(payload)
-        if parsed.scheme == "" and url.startswith("/"):
-            # ComfyUI serves /view?filename=X&type=Y on its own loopback port;
-            # this branch deliberately targets 127.0.0.1 and bypasses the IP
-            # blocklist. Bounded by _LOOPBACK_MAX_BYTES to prevent OOM if
-            # someone crafts a /view URL pointing at a huge served file.
-            import urllib.request
-            try:
-                with urllib.request.urlopen(f"http://127.0.0.1:8188{url}", timeout=timeout_seconds) as resp:
-                    data = resp.read(_LOOPBACK_MAX_BYTES + 1)
-                    if len(data) > _LOOPBACK_MAX_BYTES:
-                        return None
-                    return data
-            except Exception:
-                return None
+        if parsed.scheme == "" and url.startswith("/view"):
+            # ComfyUI references its own temp/output/input files as
+            # /view?filename=X&type=Y&subfolder=Z. Read those bytes straight
+            # from disk via folder_paths instead of fetching them back over
+            # HTTP — no network call, no hardcoded server port, same bytes.
+            return _read_view_file_bytes(url)
         return None
     except Exception as e:
         print(f"[PreviewAnything] strip_metadata: URL fetch failed for {url!r} ({e})")
