@@ -44,6 +44,8 @@ class KlingElementsNode(IO.ComfyNode):
                                 tooltip="Bind an existing voice/tone to this element"),
                 IO.String.Input("tag_list", optional=True, multiline=True, default="",
                                 tooltip="JSON array of tags for organizing the element"),
+                IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647, control_after_generate="randomize",
+                             tooltip="Cache control: randomize re-creates the element each queue; a fixed value reuses the cached element_id. This endpoint has no seed parameter, so it is not sent to the API."),
             ],
             outputs=[
                 IO.String.Output("element_id"),
@@ -53,7 +55,8 @@ class KlingElementsNode(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     def _parse_json_array(cls, raw, field_name):

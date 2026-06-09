@@ -126,11 +126,6 @@ class GeminiAPIConfig(IO.ComfyNode):
         )
 
     @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        seed = kwargs.get("seed", -1)
-        return float("NaN") if seed == -1 else seed
-
-    @classmethod
     async def execute(cls, **kwargs) -> IO.NodeOutput:
         try:
             client = GeminiClient(api_key=None)
@@ -752,11 +747,6 @@ class GeminiSystemInstruction(IO.ComfyNode):
         )
 
     @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        seed = kwargs.get("seed", -1)
-        return float("NaN") if seed == -1 else seed
-
-    @classmethod
     async def execute(cls, **kwargs) -> IO.NodeOutput:
         client = kwargs.get("client")
         system_instruction = kwargs.get("system_instruction", "")
@@ -834,11 +824,6 @@ class GeminiSafetySettings(IO.ComfyNode):
                 IO.Custom("GEMINI_API_CLIENT").Output("client"),
             ],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        seed = kwargs.get("seed", -1)
-        return float("NaN") if seed == -1 else seed
 
     @classmethod
     async def execute(cls, **kwargs) -> IO.NodeOutput:

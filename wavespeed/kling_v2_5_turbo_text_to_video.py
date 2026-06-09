@@ -42,6 +42,8 @@ class KlingV2_5TurboTextToVideoNode(IO.ComfyNode):
                 IO.Combo.Input("duration", optional=True, options=cls.DURATIONS,
                                default="5",
                                tooltip="Video duration in seconds (5 or 10)"),
+                IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647, control_after_generate="randomize",
+                             tooltip="Cache control: randomize re-runs generation each queue; a fixed value reuses the cached video. This endpoint has no seed parameter, so it is not sent to the API."),
             ],
             outputs=[
                 IO.String.Output("video_url"),
@@ -51,7 +53,8 @@ class KlingV2_5TurboTextToVideoNode(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     async def execute(cls, model="Kling 2.5 Turbo Pro", prompt="", client=None,

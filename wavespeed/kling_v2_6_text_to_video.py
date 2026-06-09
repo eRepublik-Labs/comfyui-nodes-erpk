@@ -44,6 +44,8 @@ class KlingV2_6TextToVideoNode(IO.ComfyNode):
                                tooltip="Pro only: guidance strength (0.0-1.0); higher follows the prompt more closely"),
                 IO.Boolean.Input("sound", optional=True, default=True,
                                  tooltip="Pro only: enable joint audio-video generation (doubles cost)"),
+                IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647, control_after_generate="randomize",
+                             tooltip="Cache control: randomize re-runs generation each queue; a fixed value reuses the cached video. This endpoint has no seed parameter, so it is not sent to the API."),
             ],
             outputs=[
                 IO.String.Output("video_url"),
@@ -53,7 +55,8 @@ class KlingV2_6TextToVideoNode(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     async def execute(cls, model="Kling 2.6", prompt="", client=None,

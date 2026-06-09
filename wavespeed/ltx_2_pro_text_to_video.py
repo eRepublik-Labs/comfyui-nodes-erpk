@@ -34,6 +34,11 @@ class Ltx2ProTextToVideoNode(IO.ComfyNode):
                     "generate_audio", optional=True, default=True,
                     tooltip="Generate synchronized audio with the video.",
                 ),
+                IO.Int.Input(
+                    "seed", optional=True, default=-1, min=-1, max=2147483647,
+                    control_after_generate="randomize",
+                    tooltip="Cache control: randomize re-runs generation each queue; a fixed value reuses the cached video. This endpoint has no seed parameter, so it is not sent to the API.",
+                ),
             ],
             outputs=[IO.String.Output("video_url")],
             not_idempotent=True,
@@ -41,7 +46,8 @@ class Ltx2ProTextToVideoNode(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     async def execute(cls, prompt="", client=None, duration="6", generate_audio=True, **kwargs):

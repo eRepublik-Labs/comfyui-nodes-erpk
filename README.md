@@ -98,6 +98,8 @@ Video nodes return a STRING URL that works directly with the **Preview Anything*
 
 LTX 2 Pro and LTX 2.3 are separate nodes (not a unified dropdown) because their APIs take different parameters — LTX 2 Pro has `generate_audio`, LTX 2.3 has `resolution`/`aspect_ratio`/`seed`.
 
+The Kling (2.5 Turbo, 2.6, Elements) and LTX 2 Pro nodes expose a **seed** widget for cache control. These WaveSpeed endpoints have no API seed, so the value is not sent to the API: leaving it on "randomize" forces a fresh, re-billed generation on every queue, while a fixed value lets ComfyUI serve the cached result and skip the call. LTX 2.3's seed, by contrast, is a true generation seed sent to the API.
+
 **Installation & Documentation:** See [wavespeed/README.md](wavespeed/README.md)
 
 ⚠️ **Note:** For the official WaveSpeed ComfyUI nodes and documentation, see the [official WaveSpeed ComfyUI repository](https://github.com/wavespeedai/ComfyUI-WaveSpeed).

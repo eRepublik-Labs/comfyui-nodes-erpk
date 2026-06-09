@@ -62,6 +62,16 @@ API_NODES = [
     ("wavespeed.seedream_v5_lite_edit", "SeedreamV5LiteEditNode"),
     ("wavespeed.seedream_v5_lite_sequential", "SeedreamV5LiteSequentialNode"),
     ("wavespeed.seedream_v5_lite_edit_sequential", "SeedreamV5LiteEditSequentialNode"),
+    # WaveSpeed video (Kling / LTX 2 Pro) — seed is cache-control only; these
+    # endpoints have no API seed parameter, so a fixed seed reuses the cached
+    # result rather than reproducing a deterministic generation.
+    ("wavespeed.kling_elements", "KlingElementsNode"),
+    ("wavespeed.kling_v2_5_turbo_text_to_video", "KlingV2_5TurboTextToVideoNode"),
+    ("wavespeed.kling_v2_5_turbo_image_to_video", "KlingV2_5TurboImageToVideoNode"),
+    ("wavespeed.kling_v2_6_text_to_video", "KlingV2_6TextToVideoNode"),
+    ("wavespeed.kling_v2_6_image_to_video", "KlingV2_6ImageToVideoNode"),
+    ("wavespeed.ltx_2_pro_text_to_video", "Ltx2ProTextToVideoNode"),
+    ("wavespeed.ltx_2_pro_image_to_video", "Ltx2ProImageToVideoNode"),
 ]
 
 
@@ -114,4 +124,39 @@ class TestCacheBusting:
         result = cls.fingerprint_inputs(seed=42)
         assert result == 42, (
             f"{class_name}.fingerprint_inputs(seed=42) should return 42, got {result!r}"
+        )
+
+
+# Config / passthrough nodes: no API call, no seed input. They must NOT define
+# fingerprint_inputs — a seedless node copies the NaN branch unconditionally
+# (kwargs.get("seed", -1) is always -1), marking itself dirty every queue. As a
+# root, that cascades cache invalidation into every downstream node, re-billing
+# the whole graph. These rely on ComfyUI's default input-based caching instead.
+CONFIG_NODES = [
+    ("gemini.nodes", "GeminiAPIConfig"),
+    ("gemini.nodes", "GeminiSystemInstruction"),
+    ("gemini.nodes", "GeminiSafetySettings"),
+    ("openai.nodes", "OpenAIAPIConfig"),
+    ("openai.nodes", "OpenAISystemInstruction"),
+]
+
+
+@pytest.mark.parametrize("module_path,class_name", CONFIG_NODES,
+                         ids=[f"{m}.{c}" for m, c in CONFIG_NODES])
+class TestConfigNodesAreCacheable:
+    """Non-API config/passthrough nodes must not force re-execution every queue."""
+
+    def test_no_seed_input(self, module_path, class_name):
+        cls = _load_class(module_path, class_name)
+        schema = cls.define_schema()
+        assert not [i for i in schema.inputs if i.id == "seed"], (
+            f"{class_name} is treated as a config node but declares a seed input"
+        )
+
+    def test_does_not_declare_fingerprint_inputs(self, module_path, class_name):
+        cls = _load_class(module_path, class_name)
+        assert "fingerprint_inputs" not in cls.__dict__, (
+            f"{class_name} has no seed input, so its fingerprint_inputs always "
+            f"returns NaN — marking it dirty every queue and cascading cache "
+            f"invalidation downstream. Remove the method; rely on default caching."
         )

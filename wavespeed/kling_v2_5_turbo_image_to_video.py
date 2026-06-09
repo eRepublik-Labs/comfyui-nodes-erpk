@@ -49,6 +49,8 @@ class KlingV2_5TurboImageToVideoNode(IO.ComfyNode):
                                tooltip="Video duration in seconds (5 or 10)"),
                 IO.String.Input("last_image_url", optional=True, default="",
                                 tooltip="Pro only: end-frame URL for keyframe interpolation. Fallback when the last_image IMAGE input is not connected."),
+                IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647, control_after_generate="randomize",
+                             tooltip="Cache control: randomize re-runs generation each queue; a fixed value reuses the cached video. This endpoint has no seed parameter, so it is not sent to the API."),
             ],
             outputs=[
                 IO.String.Output("video_url"),
@@ -58,7 +60,8 @@ class KlingV2_5TurboImageToVideoNode(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        return float("NaN")
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     async def execute(cls, model="Kling 2.5 Turbo", prompt="", image=None, last_image=None,

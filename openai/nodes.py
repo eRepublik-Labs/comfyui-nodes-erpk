@@ -38,11 +38,6 @@ class OpenAIAPIConfig(IO.ComfyNode):
         )
 
     @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        seed = kwargs.get("seed", -1)
-        return float("NaN") if seed == -1 else seed
-
-    @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
         try:
             client = OpenAIClient(
@@ -588,11 +583,6 @@ class OpenAISystemInstruction(IO.ComfyNode):
                 IO.Custom("OPENAI_API_CLIENT").Output("client"),
             ],
         )
-
-    @classmethod
-    def fingerprint_inputs(cls, **kwargs):
-        seed = kwargs.get("seed", -1)
-        return float("NaN") if seed == -1 else seed
 
     @classmethod
     def execute(cls, client, system_instruction, **kwargs) -> IO.NodeOutput:
