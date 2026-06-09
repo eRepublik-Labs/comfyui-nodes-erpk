@@ -196,6 +196,14 @@ class TestQwenImage20TextToImageNodeModelCombo:
         model_input = next(i for i in schema.inputs if i.id == "model")
         assert model_input.default == "Qwen Image 2.0"
 
+    def test_dimensions_allow_up_to_2048(self):
+        cls = _import_node("qwen_image_2_0_text_to_image", "QwenImage20TextToImageNode")
+        schema = cls.define_schema()
+        width_input = next(i for i in schema.inputs if i.id == "width")
+        height_input = next(i for i in schema.inputs if i.id == "height")
+        assert width_input.max == 2048
+        assert height_input.max == 2048
+
 
 class TestQwenImage20EditNodeModelCombo:
     """QwenImage20EditNode exposes a model selector."""

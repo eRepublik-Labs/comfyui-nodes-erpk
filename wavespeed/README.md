@@ -53,7 +53,7 @@ Same capabilities as V4.5 with higher minimum resolution (1440px) at a lower pri
 
 | Node | Models | Description | Dimensions | Input Images | Language | Output | Pricing | API Docs |
 |------|--------|-------------|------------|--------------|----------|--------|---------|----------|
-| **Qwen Image 2.0 Text-to-Image** | Qwen Image 2.0,<br>Qwen Image 2.0 Pro | Next-gen Qwen image generation (full replacement for Qwen 1.x) | 256-1536px (step 8)<br>Default: 1024×1024 | N/A | 🇨🇳 🇬🇧 | Single image | Standard / Pro pricing | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-2.0/text-to-image) |
+| **Qwen Image 2.0 Text-to-Image** | Qwen Image 2.0,<br>Qwen Image 2.0 Pro | Next-gen Qwen image generation (full replacement for Qwen 1.x) | 256-2048px (step 8)<br>Default: 1024×1024 | N/A | 🇨🇳 🇬🇧 | Single image | Standard / Pro pricing | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-2.0/text-to-image) |
 | **Qwen Image 2.0 Edit** | Qwen Image 2.0,<br>Qwen Image 2.0 Pro | Next-gen Qwen image editing | 256-1536px (step 8) | Up to 3 | 🇨🇳 🇬🇧 | Single image | Standard / Pro pricing | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-2.0/edit) |
 | **Qwen Image Text-to-Image** | Qwen Image (20B MMDiT),<br>Qwen Image 2512 (7B) | Bilingual text-to-image generation | 256-1536px (step 8)<br>Default: 1024×1024 | N/A | 🇨🇳 🇬🇧 | Single image<br>~5-8 sec | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-text-to-image) |
 | **Qwen Image Edit** | Qwen Edit | Low-level & high-level semantic editing | 256-1536px (step 8) | 1 required | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit) |
