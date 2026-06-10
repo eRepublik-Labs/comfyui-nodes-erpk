@@ -183,12 +183,20 @@ class RegionalPromptBuilder(IO.ComfyNode):
                     socketless=True,
                     tooltip="Managed by the canvas editor; JSON list of normalized regions.",
                 ),
+                IO.Image.Input(
+                    "image",
+                    optional=True,
+                    tooltip="Optional reference image shown under the canvas "
+                            "regions and passed through unchanged, so the "
+                            "builder can sit inline in an image-edit chain.",
+                ),
             ],
             outputs=[
                 IO.String.Output("prompt"),
                 IO.Custom("BOUNDING_BOX").Output("bboxes"),
                 IO.Int.Output("width"),
                 IO.Int.Output("height"),
+                IO.Image.Output("image"),
             ],
         )
 
@@ -197,9 +205,10 @@ class RegionalPromptBuilder(IO.ComfyNode):
         width = kwargs.get("width", 1024)
         height = kwargs.get("height", 1024)
         prompt = kwargs.get("prompt", "")
+        image = kwargs.get("image")
         regions = parse_regions(kwargs.get("regions_data", "[]"))
         if not regions and not prompt.strip():
             raise ValueError("Describe the scene or add at least one region")
         assembled = build_prompt(prompt, width, height, regions)
         bboxes = regions_to_pixel_bboxes(regions, width, height)
-        return IO.NodeOutput(assembled, bboxes, width, height)
+        return IO.NodeOutput(assembled, bboxes, width, height, image)

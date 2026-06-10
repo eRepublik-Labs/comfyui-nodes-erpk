@@ -59,6 +59,13 @@ function round4(v) {
     return Math.round(v * 10000) / 10000;
 }
 
+function hexToRgba(hex, alpha) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function findWidget(node, name) {
     return node.widgets?.find((w) => w.name === name) ?? null;
 }
@@ -191,6 +198,7 @@ function createRegionEditor(node) {
         gridShow: false,
         gridCellPx: GRID_DEFAULT_CELL_PX,
         gridColor: GRID_DEFAULT_COLOR,
+        gridAlpha: 1,
         snapOn: false,
     };
 
@@ -304,6 +312,17 @@ function createRegionEditor(node) {
     gridColorInput.style.background = "transparent";
     gridColorInput.style.cursor = "pointer";
     gridColorInput.style.display = "none";
+    const gridAlphaInput = document.createElement("input");
+    gridAlphaInput.type = "number";
+    gridAlphaInput.min = "5";
+    gridAlphaInput.max = "100";
+    gridAlphaInput.title = "Grid opacity in percent (5–100)";
+    styleInput(gridAlphaInput);
+    gridAlphaInput.style.width = "40px";
+    gridAlphaInput.style.flex = "0 0 auto";
+    gridAlphaInput.style.padding = "1px 4px";
+    gridAlphaInput.style.fontSize = "10px";
+    gridAlphaInput.style.display = "none";
     const snapBtn = makeStripButton("⌖");
     snapBtn.title = "Snap drawing, moving, and resizing to the grid";
     const clearBtn = makeStripButton("Clear all");
@@ -315,6 +334,7 @@ function createRegionEditor(node) {
     status.appendChild(gridBtn);
     status.appendChild(gridSizeInput);
     status.appendChild(gridColorInput);
+    status.appendChild(gridAlphaInput);
     status.appendChild(snapBtn);
     status.appendChild(clearBtn);
 
@@ -576,11 +596,31 @@ function createRegionEditor(node) {
         return { x: snapAxis(p.x, dims.w), y: snapAxis(p.y, dims.h) };
     }
 
+    // Draws the upstream image (LoadImage and executed preview nodes expose it
+    // client-side via node.imgs) stretched to the frame; a distorted reference
+    // is the cue that width/height do not match the source image.
+    function drawReference() {
+        const input = node.inputs?.find((i) => i.name === "image");
+        if (!input || input.link == null) return false;
+        const link = node.graph?.links?.[input.link];
+        const origin = link ? node.graph.getNodeById(link.origin_id) : null;
+        const img = origin?.imgs?.[0];
+        if (!img) return false;
+        if (!img.complete || !img.naturalWidth) {
+            img.addEventListener("load", () => render(), { once: true });
+            return false;
+        }
+        ctx.globalAlpha = 0.9;
+        ctx.drawImage(img, 0, 0, state.cssW, state.cssH);
+        ctx.globalAlpha = 1;
+        return true;
+    }
+
     function drawGrid() {
         if (!state.gridShow) return;
         const dims = frameDims(node);
         const cell = state.gridCellPx;
-        ctx.strokeStyle = state.gridColor;
+        ctx.strokeStyle = hexToRgba(state.gridColor, state.gridAlpha);
         ctx.lineWidth = 1;
         ctx.beginPath();
         for (let px = cell; px < dims.w; px += cell) {
@@ -674,9 +714,10 @@ function createRegionEditor(node) {
         const dpr = window.devicePixelRatio || 1;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, state.cssW, state.cssH);
+        const hasReference = drawReference();
         drawGrid();
         drawGuides();
-        if (!state.boxes.length && !state.drag) drawEmptyHint();
+        if (!state.boxes.length && !state.drag && !hasReference) drawEmptyHint();
         state.boxes.forEach((box, i) => drawBox(box, i));
         if (state.drag?.mode === "create") drawPending();
         renderStatus();
@@ -949,6 +990,7 @@ function createRegionEditor(node) {
             on: state.gridShow,
             cell: state.gridCellPx,
             color: state.gridColor,
+            alpha: state.gridAlpha,
             snap: state.snapOn,
         };
     }
@@ -969,6 +1011,9 @@ function createRegionEditor(node) {
             if (typeof saved.color === "string" && /^#[0-9a-fA-F]{6}$/.test(saved.color)) {
                 state.gridColor = saved.color;
             }
+            if (Number.isFinite(saved.alpha)) {
+                state.gridAlpha = clamp(saved.alpha, 0.05, 1);
+            }
             state.gridShow = saved.on !== undefined
                 ? !!saved.on
                 : (Number.isFinite(saved.divs) ? saved.divs > 0 : !!saved.grid);
@@ -986,11 +1031,15 @@ function createRegionEditor(node) {
         gridBtn.style.borderColor = state.gridShow ? onBorder : offBorder;
         gridSizeInput.style.display = state.gridShow ? "" : "none";
         gridColorInput.style.display = state.gridShow ? "" : "none";
+        gridAlphaInput.style.display = state.gridShow ? "" : "none";
         if (document.activeElement !== gridSizeInput) {
             gridSizeInput.value = String(state.gridCellPx);
         }
         if (document.activeElement !== gridColorInput) {
             gridColorInput.value = state.gridColor;
+        }
+        if (document.activeElement !== gridAlphaInput) {
+            gridAlphaInput.value = String(Math.round(state.gridAlpha * 100));
         }
         const snapActive = state.gridShow && state.snapOn;
         snapBtn.style.opacity = state.gridShow ? "1" : "0.45";
@@ -1022,6 +1071,18 @@ function createRegionEditor(node) {
         state.gridColor = gridColorInput.value;
         persistGridPrefs();
         render();
+    }
+
+    function onGridAlphaInput() {
+        const v = Math.round(Number(gridAlphaInput.value));
+        if (!Number.isFinite(v)) return;
+        state.gridAlpha = clamp(v, 5, 100) / 100;
+        persistGridPrefs();
+        render();
+    }
+
+    function onGridAlphaBlur() {
+        gridAlphaInput.value = String(Math.round(state.gridAlpha * 100));
     }
 
     function onGridSizeKeyDown(e) {
@@ -1095,6 +1156,9 @@ function createRegionEditor(node) {
     gridSizeInput.addEventListener("blur", onGridSizeBlur);
     gridSizeInput.addEventListener("keydown", onGridSizeKeyDown);
     gridColorInput.addEventListener("input", onGridColorInput);
+    gridAlphaInput.addEventListener("input", onGridAlphaInput);
+    gridAlphaInput.addEventListener("blur", onGridAlphaBlur);
+    gridAlphaInput.addEventListener("keydown", onGridSizeKeyDown);
     snapBtn.addEventListener("click", onSnapToggle);
 
     const observer = new ResizeObserver(() => layout());
@@ -1128,6 +1192,9 @@ function createRegionEditor(node) {
         gridSizeInput.removeEventListener("blur", onGridSizeBlur);
         gridSizeInput.removeEventListener("keydown", onGridSizeKeyDown);
         gridColorInput.removeEventListener("input", onGridColorInput);
+        gridAlphaInput.removeEventListener("input", onGridAlphaInput);
+        gridAlphaInput.removeEventListener("blur", onGridAlphaBlur);
+        gridAlphaInput.removeEventListener("keydown", onGridSizeKeyDown);
         snapBtn.removeEventListener("click", onSnapToggle);
         if (clearArm) clearTimeout(clearArm);
     }
@@ -1204,6 +1271,14 @@ app.registerExtension({
         nodeType.prototype.onResize = function (size) {
             const r = origOnResize?.apply(this, arguments);
             pinRootWidth(this);
+            this._erpkRegionEditor?.layout();
+            return r;
+        };
+
+        // Repaint when the reference image link is attached or removed.
+        const origOnConnectionsChange = nodeType.prototype.onConnectionsChange;
+        nodeType.prototype.onConnectionsChange = function () {
+            const r = origOnConnectionsChange?.apply(this, arguments);
             this._erpkRegionEditor?.layout();
             return r;
         };

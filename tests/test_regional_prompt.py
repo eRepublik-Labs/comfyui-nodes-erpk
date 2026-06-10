@@ -61,12 +61,14 @@ class TestSchema:
     def test_input_ids_and_order(self):
         schema = RegionalPromptBuilder.define_schema()
         assert [i.id for i in schema.inputs] == [
-            "width", "height", "prompt", "regions_data",
+            "width", "height", "prompt", "regions_data", "image",
         ]
 
-    def test_no_input_is_optional(self):
+    def test_only_the_image_input_is_optional(self):
         schema = RegionalPromptBuilder.define_schema()
-        assert all(not i.optional for i in schema.inputs)
+        optional = {i.id: bool(i.optional) for i in schema.inputs}
+        assert optional.pop("image") is True
+        assert not any(optional.values())
 
     def test_dimension_widget_ranges(self):
         schema = RegionalPromptBuilder.define_schema()
@@ -92,10 +94,10 @@ class TestSchema:
     def test_output_ids_order_and_io_types(self):
         schema = RegionalPromptBuilder.define_schema()
         assert [o.id for o in schema.outputs] == [
-            "prompt", "bboxes", "width", "height",
+            "prompt", "bboxes", "width", "height", "image",
         ]
         assert [o.io_type for o in schema.outputs] == [
-            "STRING", "BOUNDING_BOX", "INT", "INT",
+            "STRING", "BOUNDING_BOX", "INT", "INT", "IMAGE",
         ]
 
     def test_no_seed_input(self):
@@ -330,17 +332,18 @@ class TestExecute:
                    "neon signs, cinematic photo",
             regions_data=json.dumps(CANONICAL_REGIONS),
         )
-        assert out.args == (CANONICAL_PROMPT, CANONICAL_BBOXES, 1000, 1000)
+        assert out.args == (CANONICAL_PROMPT, CANONICAL_BBOXES, 1000, 1000, None)
 
     def test_scene_only_outputs_empty_bboxes(self):
         out = RegionalPromptBuilder.execute(
             width=1024, height=1024,
             prompt="A quiet forest", regions_data="[]",
         )
-        prompt, bboxes, width, height = out.args
+        prompt, bboxes, width, height, image = out.args
         assert "A quiet forest" in prompt
         assert bboxes == []
         assert (width, height) == (1024, 1024)
+        assert image is None
 
     def test_regions_only_is_valid(self):
         regions = [{"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2,
@@ -366,3 +369,19 @@ class TestExecute:
         )
         assert out.args[1] == []
         assert "Layout:" not in out.args[0]
+
+    def test_reference_image_passes_through(self):
+        sentinel = object()
+        out = RegionalPromptBuilder.execute(
+            width=1024, height=1024,
+            prompt="A quiet forest", regions_data="[]",
+            image=sentinel,
+        )
+        assert out.args[4] is sentinel
+
+    def test_missing_reference_image_passes_none(self):
+        out = RegionalPromptBuilder.execute(
+            width=1024, height=1024,
+            prompt="A quiet forest", regions_data="[]",
+        )
+        assert out.args[4] is None
