@@ -1,0 +1,394 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1780990660728,
+  "projectRoot": "/Users/alex.geana/GitHub/ComfyUI-Custom-Nodes",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "pyproject.toml",
+          "requirements.txt"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "pytest",
+        "version": null,
+        "category": "testing"
+      }
+    ],
+    "packageManager": "pip",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "cd /Users/alex.geana/GitHub/ComfyUI-Custom-Nodes\necho \"=== STEP 2a: TESTS (STRICT) ===\"\npython3 -m pytest tests/ \\\n  --ignore=tests/test_bgremoval_utils.py \\\n  --ignore=tests/test_gemini_image_edit_additional_images.py \\\n  --ignore=tests/test_ben2_node.py \\\n  --ignore=tests/test_v3_gemini_nodes.py \\\n  -k \"not test_gemini\" -q 2>&1 | tail -4\necho\necho \"=== STEP 2b: BANDIT (advisory) ===\"\npython3 -m bandit -q -r __init__.py settings.py shared_workflows.py metadata_filter.py history_cleaner.py openai claude gemini wavespeed utils apple 2>&1 | tail -15",
+    "lintCommand": "ruff check",
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "tests"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "__pycache__": {
+      "path": "__pycache__",
+      "purpose": null,
+      "fileCount": 17,
+      "lastAccessed": 1780990660314,
+      "keyFiles": [
+        "__init__.cpython-311.pyc",
+        "__init__.cpython-312.pyc",
+        "__init__.cpython-314.pyc",
+        "history_cleaner.cpython-311.pyc",
+        "history_cleaner.cpython-312.pyc"
+      ]
+    },
+    "_docs": {
+      "path": "_docs",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1780990660316,
+      "keyFiles": []
+    },
+    "apple": {
+      "path": "apple",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1780990660317,
+      "keyFiles": []
+    },
+    "claude": {
+      "path": "claude",
+      "purpose": null,
+      "fileCount": 14,
+      "lastAccessed": 1780990660319,
+      "keyFiles": [
+        "README.md",
+        "__init__.py",
+        "config.ini",
+        "conversation.py",
+        "nodes.py"
+      ]
+    },
+    "gemini": {
+      "path": "gemini",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1780990660320,
+      "keyFiles": [
+        "README.md",
+        "__init__.py",
+        "config.ini",
+        "nodes.py",
+        "requirements.txt"
+      ]
+    },
+    "grok": {
+      "path": "grok",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1780990660323,
+      "keyFiles": [
+        "README.md",
+        "__init__.py",
+        "config.ini",
+        "nodes.py",
+        "requirements.txt"
+      ]
+    },
+    "openai": {
+      "path": "openai",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1780990660325,
+      "keyFiles": [
+        "README.md",
+        "__init__.py",
+        "config.ini",
+        "image_nodes.py",
+        "nodes.py"
+      ]
+    },
+    "ref": {
+      "path": "ref",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1780990660327,
+      "keyFiles": [
+        "README.md",
+        "api-integration.md",
+        "architecture.md",
+        "comfyui-nodes.md",
+        "development-guide.md"
+      ]
+    },
+    "shared_workflows": {
+      "path": "shared_workflows",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1780990660330,
+      "keyFiles": [
+        "Background Removal [DEMO].json"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 53,
+      "lastAccessed": 1780990660333,
+      "keyFiles": [
+        "__init__.py",
+        "comfy_api_stub.py",
+        "conftest.py",
+        "test_claude_async_parallel.py",
+        "test_claude_opus_4_7.py"
+      ]
+    },
+    "utils": {
+      "path": "utils",
+      "purpose": "Utility functions",
+      "fileCount": 7,
+      "lastAccessed": 1780990660335,
+      "keyFiles": [
+        "__init__.py",
+        "concat_strings.py",
+        "inline_preview.py",
+        "preview_anything.py",
+        "safe_fetch.py"
+      ]
+    },
+    "wavespeed": {
+      "path": "wavespeed",
+      "purpose": null,
+      "fileCount": 53,
+      "lastAccessed": 1780990660335,
+      "keyFiles": [
+        "DEBUG_COMFYUI.md",
+        "README.md",
+        "__init__.py",
+        "config.ini",
+        "dreamina_edit.py"
+      ]
+    },
+    "web": {
+      "path": "web",
+      "purpose": null,
+      "fileCount": 10,
+      "lastAccessed": 1780990660336,
+      "keyFiles": [
+        "aspect_ratio.js",
+        "concat_strings.js",
+        "erpk_settings.js",
+        "inline_preview.js",
+        "openai_dynamic_sizes.js"
+      ]
+    },
+    "wavespeed/assets": {
+      "path": "wavespeed/assets",
+      "purpose": "Static assets",
+      "fileCount": 4,
+      "lastAccessed": 1780990660341,
+      "keyFiles": [
+        "README.md",
+        "bytedance-preview.png",
+        "qwen-preview.png"
+      ]
+    },
+    "web/docs": {
+      "path": "web/docs",
+      "purpose": "Documentation",
+      "fileCount": 89,
+      "lastAccessed": 1780990660343,
+      "keyFiles": [
+        "ClaudeAPIClient.md",
+        "ClaudeConversation.md",
+        "ClaudeConversationInfo.md"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": ".cs/summary.md",
+      "accessCount": 21,
+      "lastAccessed": 1781008354729,
+      "type": "file"
+    },
+    {
+      "path": ".cs/memory/MEMORY.md",
+      "accessCount": 8,
+      "lastAccessed": 1781008131725,
+      "type": "file"
+    },
+    {
+      "path": "wavespeed/README.md",
+      "accessCount": 6,
+      "lastAccessed": 1781007583168,
+      "type": "file"
+    },
+    {
+      "path": "gemini/nodes.py",
+      "accessCount": 5,
+      "lastAccessed": 1780992121819,
+      "type": "file"
+    },
+    {
+      "path": "openai/nodes.py",
+      "accessCount": 4,
+      "lastAccessed": 1780992125391,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_fingerprint_inputs.py",
+      "accessCount": 4,
+      "lastAccessed": 1780992158282,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 4,
+      "lastAccessed": 1781007582194,
+      "type": "file"
+    },
+    {
+      "path": "wavespeed/kling_v2_5_turbo_text_to_video.py",
+      "accessCount": 3,
+      "lastAccessed": 1780992256911,
+      "type": "file"
+    },
+    {
+      "path": "wavespeed/kling_v2_5_turbo_image_to_video.py",
+      "accessCount": 3,
+      "lastAccessed": 1780992257619,
+      "type": "file"
+    },
+    {
+      "path": "wavespeed/kling_v2_6_text_to_video.py",
+      "accessCount": 3,
+      "lastAccessed": 1780992258333,
+      "type": "file"
+    },
+    {
+      "path": "wavespeed/kling_v2_6_image_to_video.py",
+      "accessCount": 3,
+      "lastAccessed": 1780992260589,
+      "type": "file"
+    },
+    {
+      "path": "wavespeed/ltx_2_pro_text_to_video.py",
+      "accessCount": 3,
+      "lastAccessed": 1780992265334,
+      "type": "file"
+    },
+    {
+      "path": "wavespeed/ltx_2_pro_image_to_video.py",
+      "accessCount": 3,
+      "lastAccessed": 1780992270488,
+      "type": "file"
+    },
+    {
+      "path": "wavespeed/kling_elements.py",
+      "accessCount": 3,
+      "lastAccessed": 1780992274538,
+      "type": "file"
+    },
+    {
+      "path": ".cs/discoveries.md",
+      "accessCount": 3,
+      "lastAccessed": 1780996760482,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_qwen_model_variants.py",
+      "accessCount": 2,
+      "lastAccessed": 1781006595218,
+      "type": "file"
+    },
+    {
+      "path": "wavespeed/qwen_image_2_0_text_to_image.py",
+      "accessCount": 2,
+      "lastAccessed": 1781006620180,
+      "type": "file"
+    },
+    {
+      "path": "gemini/README.md",
+      "accessCount": 2,
+      "lastAccessed": 1781007583505,
+      "type": "file"
+    },
+    {
+      "path": "openai/README.md",
+      "accessCount": 2,
+      "lastAccessed": 1781007584279,
+      "type": "file"
+    },
+    {
+      "path": "pyproject.toml",
+      "accessCount": 2,
+      "lastAccessed": 1781007611752,
+      "type": "file"
+    },
+    {
+      "path": "wavespeed/wan_2_7_text_to_video.py",
+      "accessCount": 1,
+      "lastAccessed": 1780991467077,
+      "type": "file"
+    },
+    {
+      "path": ".cs/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1780996256157,
+      "type": "file"
+    },
+    {
+      "path": ".cs/changes.md",
+      "accessCount": 1,
+      "lastAccessed": 1780996256979,
+      "type": "file"
+    },
+    {
+      "path": "wavespeed/qwen_image_2_0_edit.py",
+      "accessCount": 1,
+      "lastAccessed": 1781005268295,
+      "type": "file"
+    },
+    {
+      "path": "wavespeed/wavespeed_api/requests/qwen_image_2_0_text_to_image.py",
+      "accessCount": 1,
+      "lastAccessed": 1781005268625,
+      "type": "file"
+    },
+    {
+      "path": "wavespeed/__init__.py",
+      "accessCount": 1,
+      "lastAccessed": 1781005398212,
+      "type": "file"
+    },
+    {
+      "path": "tests/test_qwen_new_nodes.py",
+      "accessCount": 1,
+      "lastAccessed": 1781006560030,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
