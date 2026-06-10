@@ -318,7 +318,7 @@ Draw regions on a canvas and emit a layout-aware prompt for Gemini image generat
 - Double-click a region to edit its description, kind (object or rendered text), and literal text
 - Delete/Backspace removes the selected region
 
-**Note:** Layout adherence is strongest when regions do not overlap and each has a concrete description. Gemini follows verbal placement reliably; the box_2d coordinates sharpen it further but are not a hard guarantee.
+**Note:** Layout adherence is strongest when regions do not overlap and each has a concrete description. Gemini follows verbal placement reliably; the box_2d coordinates sharpen it further but are not a hard guarantee. The prompt explicitly instructs the model to treat the placement areas as invisible guides so it does not render boxes or coordinates into the image.
 
 ---
 

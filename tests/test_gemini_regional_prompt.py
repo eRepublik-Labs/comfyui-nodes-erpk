@@ -32,14 +32,16 @@ CANONICAL_PROMPT = (
     "Compose for a 1000x1000 frame (aspect ratio 1:1).\n"
     "\n"
     'Layout: place each element exactly where specified. Each position gives a '
-    'verbal placement plus a bounding box "box_2d = [ymin, xmin, ymax, xmax]" '
+    'verbal placement plus its placement area as "box_2d = [ymin, xmin, ymax, xmax]" '
     "on a 0-1000 grid with top-left origin.\n"
     "1. a red vintage car: at the bottom-left, covering about 30% of the image "
     "width and 25% of its height. box_2d = [620, 40, 870, 340]\n"
     '2. The text "OPEN LATE", glowing neon letters: at the top-center, covering '
     "about 40% of the image width and 14% of its height. box_2d = [30, 300, 170, 700]\n"
-    "Every element must stay fully inside its bounding box and fill most of it. "
-    "Do not add other prominent subjects."
+    "Every element must stay fully inside its placement area and fill most of it. "
+    "Do not add other prominent subjects. The placement areas are invisible "
+    "composition guides: never draw boxes, frames, outlines, coordinates, or any "
+    "annotation overlays in the image."
 )
 
 CANONICAL_BBOXES = [[
@@ -283,6 +285,13 @@ class TestBuildPrompt:
                     "kind": "text", "desc": "", "text": "SALE"}]
         prompt = build_prompt("", "", "", 1000, 1000, regions)
         assert '1. The text "SALE": at the center, covering about 20%' in prompt
+
+    def test_layout_forbids_drawing_annotations(self):
+        regions = [{"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
+                    "kind": "object", "desc": "a cat", "text": ""}]
+        prompt = build_prompt("", "", "", 1000, 1000, regions)
+        assert "never draw boxes" in prompt
+        assert "bounding box" not in prompt
 
 
     def test_unicode_and_long_desc_round_trip(self):

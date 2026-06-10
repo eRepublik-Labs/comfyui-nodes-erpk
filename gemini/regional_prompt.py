@@ -9,14 +9,19 @@ from comfy_api.latest import IO
 REGION_KINDS = {"object", "text"}
 MIN_REGION_EXTENT = 0.005
 
+# "Bounding box" is detection-annotation vocabulary: models that know it from
+# vision training will happily RENDER yellow boxes around the elements. The
+# template calls them invisible placement areas and forbids drawing them.
 LAYOUT_HEADER = (
     "Layout: place each element exactly where specified. Each position gives a "
-    'verbal placement plus a bounding box "box_2d = [ymin, xmin, ymax, xmax]" '
+    'verbal placement plus its placement area as "box_2d = [ymin, xmin, ymax, xmax]" '
     "on a 0-1000 grid with top-left origin."
 )
 LAYOUT_FOOTER = (
-    "Every element must stay fully inside its bounding box and fill most of it. "
-    "Do not add other prominent subjects."
+    "Every element must stay fully inside its placement area and fill most of it. "
+    "Do not add other prominent subjects. The placement areas are invisible "
+    "composition guides: never draw boxes, frames, outlines, coordinates, or any "
+    "annotation overlays in the image."
 )
 
 
