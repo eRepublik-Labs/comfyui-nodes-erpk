@@ -15,13 +15,27 @@ const MIN_NODE_WIDTH = 340;
 const CHROME_HORIZONTAL_INSET = 16;
 const CANVAS_MIN_H = 200;
 const CANVAS_MAX_H = 480;
-// Vertical chrome around the canvas inside the editor root (padding + border).
-const EDITOR_CHROME_V = 12;
+const STATUS_STRIP_H = 22;
+// Vertical chrome around the canvas inside the editor root: padding, the
+// status strip, the flex gap, and the canvas border.
+const EDITOR_CHROME_V = 36;
 
-const KIND_COLORS = {
-    object: "#5a9dff",
-    text: "#e8b339",
-};
+// The canvas is a stage for the image-to-be: dark like every ComfyUI content
+// preview, independent of the UI theme. Chrome around it follows the theme.
+const STAGE_BG = "#101014";
+const PANEL_BG = "#16161c";
+const PANEL_INPUT_BG = "#0d0d12";
+const HAIRLINE = "rgba(255, 255, 255, 0.10)";
+const HAIRLINE_STRONG = "rgba(255, 255, 255, 0.25)";
+const INK_ON_TAPE = "#0b0b0e";
+
+// Regions cycle through gaffer-tape hues so each keeps a stable identity on
+// the stage; kind is marked by the T badge and rendered text, not by color.
+const TAPE_COLORS = ["#4cc9f0", "#f9a826", "#f15bb5", "#9ef01a", "#9b5de5", "#ff6d5a"];
+
+function regionColor(index) {
+    return TAPE_COLORS[index % TAPE_COLORS.length];
+}
 
 function clamp(v, lo, hi) {
     return Math.min(Math.max(v, lo), hi);
@@ -130,10 +144,12 @@ function enforceMinSize(box) {
     box.y = clamp(box.y, 0, 1 - box.h);
 }
 
+// The overlay floats over the dark stage, so its controls live in the stage's
+// color world rather than following the UI theme.
 function styleInput(el) {
-    el.style.background = "var(--comfy-input-bg, #1a1a1a)";
-    el.style.color = "var(--input-text, #ddd)";
-    el.style.border = "1px solid var(--border-color, #444)";
+    el.style.background = PANEL_INPUT_BG;
+    el.style.color = "rgba(255, 255, 255, 0.9)";
+    el.style.border = "1px solid rgba(255, 255, 255, 0.14)";
     el.style.borderRadius = "3px";
     el.style.padding = "4px 6px";
     el.style.fontSize = "12px";
@@ -147,7 +163,7 @@ function makeField(labelText, input) {
     field.style.flexDirection = "column";
     field.style.gap = "3px";
     field.style.fontSize = "11px";
-    field.style.color = "var(--input-text, #bbb)";
+    field.style.color = "rgba(255, 255, 255, 0.6)";
     field.appendChild(document.createTextNode(labelText));
     field.appendChild(input);
     return field;
@@ -160,9 +176,9 @@ function makeButton(label) {
     btn.style.flex = "1 1 0";
     btn.style.padding = "5px 10px";
     btn.style.borderRadius = "3px";
-    btn.style.border = "1px solid var(--border-color, #444)";
-    btn.style.background = "var(--comfy-input-bg, #1a1a1a)";
-    btn.style.color = "var(--input-text, #ddd)";
+    btn.style.border = "1px solid rgba(255, 255, 255, 0.14)";
+    btn.style.background = PANEL_INPUT_BG;
+    btn.style.color = "rgba(255, 255, 255, 0.85)";
     btn.style.fontSize = "12px";
     btn.style.cursor = "pointer";
     return btn;
@@ -204,15 +220,46 @@ function createRegionEditor(node) {
     const canvas = document.createElement("canvas");
     canvas.tabIndex = 0;
     canvas.style.outline = "none";
-    canvas.style.background = "var(--comfy-input-bg, #1a1a1a)";
-    canvas.style.border = "1px solid var(--border-color, #444)";
+    canvas.style.background = STAGE_BG;
+    canvas.style.border = "1px solid " + HAIRLINE;
     canvas.style.boxSizing = "border-box";
     canvas.style.borderRadius = "4px";
     canvas.style.touchAction = "none";
     canvas.style.cursor = "crosshair";
     stage.appendChild(canvas);
 
+    // Camera-HUD strip: region count and selection on the left, frame
+    // dimensions and reduced aspect ratio on the right.
+    const status = document.createElement("div");
+    status.className = "erpk-region-status";
+    status.style.flex = "0 0 auto";
+    status.style.height = STATUS_STRIP_H + "px";
+    status.style.display = "flex";
+    status.style.alignItems = "center";
+    status.style.justifyContent = "space-between";
+    status.style.gap = "8px";
+    status.style.padding = "0 8px";
+    status.style.boxSizing = "border-box";
+    status.style.background = PANEL_BG;
+    status.style.border = "1px solid rgba(255, 255, 255, 0.08)";
+    status.style.borderRadius = "3px";
+    status.style.font = "10px ui-monospace, Menlo, monospace";
+    status.style.color = "rgba(255, 255, 255, 0.65)";
+    status.style.whiteSpace = "nowrap";
+    status.style.overflow = "hidden";
+
+    const statusLeft = document.createElement("span");
+    statusLeft.style.minWidth = "0";
+    statusLeft.style.overflow = "hidden";
+    statusLeft.style.textOverflow = "ellipsis";
+    const statusRight = document.createElement("span");
+    statusRight.style.flex = "0 0 auto";
+    statusRight.style.fontVariantNumeric = "tabular-nums";
+    status.appendChild(statusLeft);
+    status.appendChild(statusRight);
+
     root.appendChild(stage);
+    root.appendChild(status);
 
     const ctx = canvas.getContext("2d");
 
@@ -230,8 +277,8 @@ function createRegionEditor(node) {
     overlay.style.minWidth = "220px";
     overlay.style.maxWidth = "90%";
     overlay.style.boxSizing = "border-box";
-    overlay.style.background = "var(--comfy-menu-bg, #202020)";
-    overlay.style.border = "1px solid var(--border-color, #444)";
+    overlay.style.background = PANEL_BG;
+    overlay.style.border = "1px solid rgba(255, 255, 255, 0.12)";
     overlay.style.borderRadius = "6px";
     overlay.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.55)";
     overlay.style.zIndex = "10";
@@ -380,32 +427,52 @@ function createRegionEditor(node) {
         const y = box.y * state.cssH;
         const w = box.w * state.cssW;
         const h = box.h * state.cssH;
-        const color = KIND_COLORS[box.kind] || KIND_COLORS.object;
+        const color = regionColor(index);
         const isSelected = index === state.selected;
 
-        if (isSelected) {
-            ctx.fillStyle = color + "26";
-            ctx.fillRect(x, y, w, h);
-        }
+        ctx.fillStyle = color + (isSelected ? "2e" : "17");
+        ctx.fillRect(x, y, w, h);
         ctx.strokeStyle = color;
-        ctx.lineWidth = isSelected ? 2 : 1;
+        ctx.lineWidth = isSelected ? 2 : 1.5;
         ctx.strokeRect(x, y, w, h);
 
+        // Text regions preview their literal text like a signage mock.
+        if (box.kind === "text" && box.text) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x, y, w, h);
+            ctx.clip();
+            ctx.font = "13px 'Segoe UI', sans-serif";
+            ctx.fillStyle = color;
+            ctx.textAlign = "center";
+            ctx.fillText(box.text, x + w / 2, y + h / 2 + 4, Math.max(w - 8, 10));
+            ctx.restore();
+            ctx.textAlign = "left";
+        }
+
+        // Numbered tape tag in the region's hue, description riding alongside.
         ctx.font = LABEL_FONT;
-        const raw = box.desc ? `${index + 1} · ${box.desc}` : `${index + 1}`;
-        const label = truncateLabel(raw, Math.max(w - 24, 14));
-        const labelWidth = ctx.measureText(label).width;
-        ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-        ctx.fillRect(x + 2, y + 2, labelWidth + 8, 15);
-        ctx.fillStyle = "#fff";
-        ctx.fillText(label, x + 6, y + 13);
+        const tag = String(index + 1);
+        const tagW = Math.ceil(ctx.measureText(tag).width) + 8;
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, tagW, 15);
+        ctx.fillStyle = INK_ON_TAPE;
+        ctx.fillText(tag, x + 4, y + 11.5);
+        if (box.desc) {
+            const label = truncateLabel(box.desc, Math.max(w - tagW - 28, 12));
+            const labelWidth = ctx.measureText(label).width;
+            ctx.fillStyle = "rgba(8, 8, 10, 0.72)";
+            ctx.fillRect(x + tagW, y, labelWidth + 10, 15);
+            ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+            ctx.fillText(label, x + tagW + 5, y + 11.5);
+        }
 
         if (box.kind === "text") {
             const bx = x + w - 16;
             ctx.fillStyle = color;
-            ctx.fillRect(bx, y + 2, 14, 14);
-            ctx.fillStyle = "#000";
-            ctx.fillText("T", bx + 4, y + 13);
+            ctx.fillRect(bx, y + h - 16, 14, 14);
+            ctx.fillStyle = INK_ON_TAPE;
+            ctx.fillText("T", bx + 4, y + h - 5);
         }
 
         if (isSelected) {
@@ -432,7 +499,7 @@ function createRegionEditor(node) {
     function drawPending() {
         const rect = rectFrom(state.drag.anchor, state.drag.current);
         ctx.setLineDash([4, 3]);
-        ctx.strokeStyle = "#aaa";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
         ctx.lineWidth = 1;
         ctx.strokeRect(
             rect.x * state.cssW,
@@ -443,10 +510,10 @@ function createRegionEditor(node) {
         ctx.setLineDash([]);
     }
 
-    // Rule-of-thirds guides double as a placement reference for the 3x3
+    // Rule-of-thirds hairlines double as a placement reference for the 3x3
     // verbal grid the Python side derives placements from.
     function drawGuides() {
-        ctx.strokeStyle = "rgba(128, 128, 128, 0.25)";
+        ctx.strokeStyle = HAIRLINE;
         ctx.lineWidth = 1;
         for (const f of [1 / 3, 2 / 3]) {
             ctx.beginPath();
@@ -458,13 +525,58 @@ function createRegionEditor(node) {
         }
     }
 
+    // Empty frame reads like an unrecorded viewfinder: center crosshair
+    // with the interaction hint beneath it.
     function drawEmptyHint() {
+        const cx = state.cssW / 2;
+        const cy = state.cssH / 2;
+        ctx.strokeStyle = HAIRLINE_STRONG;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx - 9, cy);
+        ctx.lineTo(cx + 9, cy);
+        ctx.moveTo(cx, cy - 9);
+        ctx.lineTo(cx, cy + 9);
+        ctx.stroke();
         ctx.font = LABEL_FONT;
-        ctx.fillStyle = "rgba(128, 128, 128, 0.7)";
         ctx.textAlign = "center";
-        ctx.fillText("Drag to draw a region", state.cssW / 2, state.cssH / 2 - 8);
-        ctx.fillText("Double-click to edit · Delete to remove", state.cssW / 2, state.cssH / 2 + 10);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
+        ctx.fillText("Drag to block out a region", cx, cy + 28);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.28)";
+        ctx.fillText("Double-click to edit · Delete to remove", cx, cy + 44);
         ctx.textAlign = "left";
+    }
+
+    function ratioString(w, h) {
+        const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+        const d = gcd(w, h) || 1;
+        return `${Math.round(w / d)}:${Math.round(h / d)}`;
+    }
+
+    function renderStatus() {
+        statusLeft.textContent = "";
+        const count = state.boxes.length;
+        const countSpan = document.createElement("span");
+        countSpan.textContent = count === 0
+            ? "No regions yet"
+            : `${count} region${count === 1 ? "" : "s"}`;
+        countSpan.style.color = count === 0
+            ? "rgba(255, 255, 255, 0.4)"
+            : "rgba(255, 255, 255, 0.65)";
+        statusLeft.appendChild(countSpan);
+        const box = state.boxes[state.selected];
+        if (box) {
+            const sel = document.createElement("span");
+            const name = box.kind === "text"
+                ? (box.text || box.desc || "text")
+                : (box.desc || "unnamed");
+            sel.textContent = ` · #${state.selected + 1} ${name}`;
+            sel.style.color = regionColor(state.selected);
+            statusLeft.appendChild(sel);
+        }
+        const w = Number(findWidget(node, "width")?.value) || 1024;
+        const h = Number(findWidget(node, "height")?.value) || 1024;
+        statusRight.textContent = `${w}×${h} · ${ratioString(w, h)}`;
     }
 
     function render() {
@@ -476,6 +588,7 @@ function createRegionEditor(node) {
         if (!state.boxes.length && !state.drag) drawEmptyHint();
         state.boxes.forEach((box, i) => drawBox(box, i));
         if (state.drag?.mode === "create") drawPending();
+        renderStatus();
     }
 
     // --- Hit testing -----------------------------------------------------
