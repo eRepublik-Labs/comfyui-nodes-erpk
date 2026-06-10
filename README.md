@@ -258,7 +258,7 @@ String manipulation and general utility nodes.
 - Clear button in the status strip empties all regions (two-step confirm, no blocking dialog)
 - Optional grid with a typed cell size in frame pixels (8-1024, default 64 - latent-friendly), a color picker plus opacity control, and snap-to-grid; drawing, moving, and resizing quantize to pixel multiples, and the preferences save with the workflow
 - Optional reference image input: the connected image displays under the regions (LoadImage shows immediately) and passes through unchanged on an `image` output, so the builder sits inline in image-edit chains
-- Dynamic descriptions: optional `desc_1`-`desc_6` STRING sockets override the matching region's description at execute time (numbered as on the canvas), so any text node can drive a region; the inspector locks a wired region's description field
+- Dynamic descriptions: optional `desc_1`-`desc_6` STRING sockets override the matching region's description at execute time (numbered as on the canvas), so any text node can drive a region. Sockets stay hidden until exposed with the inspector's plug button (or already wired); socket labels carry the region's text, and the inspector locks a wired region's description field
 - The prompt instructs the model to treat placement areas as invisible guides so boxes are not rendered into the image
 
 **Concatenate Strings features:**

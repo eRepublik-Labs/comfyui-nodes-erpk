@@ -16,6 +16,9 @@ const CHROME_HORIZONTAL_INSET = 16;
 // Absolute floor for degenerate aspect ratios; otherwise the canvas height
 // follows the frame aspect exactly so the canvas always spans the full width.
 const CANVAS_MIN_H = 60;
+// Matches DESC_INPUT_COUNT on the Python side: desc_1..desc_6 sockets.
+const REGION_DESC_INPUTS = 6;
+
 // Grid cell size is expressed in frame pixels, so the grid quantizes to the
 // generated image's own pixel space (64 aligns with latent blocks).
 const GRID_MIN_CELL_PX = 8;
@@ -423,6 +426,8 @@ function createRegionEditor(node) {
     textInput.style.flex = "1 1 0";
     textInput.style.minWidth = "0";
 
+    const plugBtn = makeStripButton("⌁");
+    plugBtn.title = "Expose this region's description as an input";
     const backBtn = makeStripButton("▼");
     backBtn.title = "Send back — one layer toward the background ( [ )";
     const frontBtn = makeStripButton("▲");
@@ -431,6 +436,7 @@ function createRegionEditor(node) {
     inspector.appendChild(descInput);
     inspector.appendChild(kindSelect);
     inspector.appendChild(textInput);
+    inspector.appendChild(plugBtn);
     inspector.appendChild(backBtn);
     inspector.appendChild(frontBtn);
     root.insertBefore(inspector, status);
@@ -757,6 +763,7 @@ function createRegionEditor(node) {
         clearBtn.style.opacity = count ? "1" : "0.45";
         clearBtn.style.cursor = count ? "pointer" : "default";
         if (!count) disarmClear();
+        syncDescSockets();
         syncInspector();
     }
 
@@ -943,6 +950,53 @@ function createRegionEditor(node) {
         return input?.link != null;
     }
 
+    function exposedDescSet() {
+        const saved = node.properties?.erpk_region_desc;
+        return new Set(Array.isArray(saved) ? saved : []);
+    }
+
+    function persistExposedDesc(set) {
+        if (!node.properties) node.properties = {};
+        node.properties.erpk_region_desc = [...set].sort((a, b) => a - b);
+    }
+
+    // Hidden sockets keep the server contract intact while the node face only
+    // shows inputs that are exposed or wired; the labels carry the region's
+    // text so a depth reorder visibly remaps the wires.
+    function syncDescSockets() {
+        if (!node.inputs) return;
+        const exposed = exposedDescSet();
+        let changed = false;
+        for (const input of node.inputs) {
+            const match = input.name?.match(/^desc_(\d+)$/);
+            if (!match) continue;
+            const n = parseInt(match[1]);
+            if (input.link != null && !exposed.has(n)) {
+                exposed.add(n);
+                changed = true;
+            }
+            input.hidden = !exposed.has(n);
+            const box = state.boxes[n - 1];
+            const text = box ? (box.desc || box.text || `region ${n}`) : "unused";
+            input.label = `desc ${n} · ${text.length > 18 ? text.slice(0, 17) + "…" : text}`;
+        }
+        if (changed) persistExposedDesc(exposed);
+    }
+
+    function onPlugToggle() {
+        const index = primaryIndex();
+        if (index < 0 || index >= REGION_DESC_INPUTS) return;
+        if (descWiredFor(state.primary)) return;
+        const n = index + 1;
+        const exposed = exposedDescSet();
+        if (exposed.has(n)) exposed.delete(n);
+        else exposed.add(n);
+        persistExposedDesc(exposed);
+        syncDescSockets();
+        node.setDirtyCanvas?.(true, true);
+        render();
+    }
+
     function syncInspector() {
         const box = state.primary;
         const showText = !!box && box.kind === "text";
@@ -953,6 +1007,22 @@ function createRegionEditor(node) {
         descInput.placeholder = wired
             ? `wired from the desc_${state.boxes.indexOf(box) + 1} input`
             : "description — e.g. a red vintage car";
+        const index = box ? state.boxes.indexOf(box) : -1;
+        const wireable = index >= 0 && index < REGION_DESC_INPUTS;
+        const plugged = wireable && (wired || exposedDescSet().has(index + 1));
+        plugBtn.disabled = !wireable || wired;
+        plugBtn.style.opacity = wireable ? "1" : "0.45";
+        plugBtn.style.color = plugged
+            ? "rgba(255, 255, 255, 0.92)" : "rgba(255, 255, 255, 0.65)";
+        plugBtn.style.borderColor = plugged
+            ? "rgba(255, 255, 255, 0.45)" : "rgba(255, 255, 255, 0.14)";
+        plugBtn.title = wired
+            ? "Description is wired — disconnect the input to unplug"
+            : plugged
+                ? "Hide this region's description input"
+                : wireable
+                    ? "Expose this region's description as an input"
+                    : "Only regions 1–6 can take a description input";
         if (box === inspected) return;
         inspected = box;
         descInput.value = box ? box.desc : "";
@@ -1728,6 +1798,7 @@ function createRegionEditor(node) {
     clearBtn.addEventListener("click", onClearClick);
     backBtn.addEventListener("click", onSendBack);
     frontBtn.addEventListener("click", onBringForward);
+    plugBtn.addEventListener("click", onPlugToggle);
     gridBtn.addEventListener("click", onGridToggle);
     gridSizeInput.addEventListener("input", onGridSizeInput);
     gridSizeInput.addEventListener("blur", onGridSizeBlur);
@@ -1746,6 +1817,7 @@ function createRegionEditor(node) {
         hookDimensionWidget("width");
         hookDimensionWidget("height");
         restoreGridPrefs();
+        syncDescSockets();
     }
 
     function destroy() {
@@ -1766,6 +1838,7 @@ function createRegionEditor(node) {
         clearBtn.removeEventListener("click", onClearClick);
         backBtn.removeEventListener("click", onSendBack);
         frontBtn.removeEventListener("click", onBringForward);
+        plugBtn.removeEventListener("click", onPlugToggle);
         gridBtn.removeEventListener("click", onGridToggle);
         gridSizeInput.removeEventListener("input", onGridSizeInput);
         gridSizeInput.removeEventListener("blur", onGridSizeBlur);
