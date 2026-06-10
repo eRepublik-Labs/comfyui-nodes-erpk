@@ -255,7 +255,7 @@ String manipulation and general utility nodes.
 - Depth control: regions layer back to front (number 1 is backmost). Reorder with `[` / `]` or the inspector's depth buttons; the prompt tells the model that later elements appear in front where regions overlap
 - Status strip shows region count, selection, frame dimensions, and aspect ratio
 - Clear button in the status strip empties all regions (two-step confirm, no blocking dialog)
-- Optional grid with a typed density (2-64 cells per axis in the size field next to the grid toggle) and snap-to-grid; drawing, moving, and resizing quantize to grid lines, and the preference saves with the workflow
+- Optional grid with a typed cell size in frame pixels (8-1024, default 64 - latent-friendly), a grid color picker, and snap-to-grid; drawing, moving, and resizing quantize to pixel multiples, and the preferences save with the workflow
 - The prompt instructs the model to treat placement areas as invisible guides so boxes are not rendered into the image
 
 **Concatenate Strings features:**

@@ -16,8 +16,16 @@ const CHROME_HORIZONTAL_INSET = 16;
 // Absolute floor for degenerate aspect ratios; otherwise the canvas height
 // follows the frame aspect exactly so the canvas always spans the full width.
 const CANVAS_MIN_H = 60;
-const GRID_MIN_DIVS = 2;
-const GRID_MAX_DIVS = 64;
+// Grid cell size is expressed in frame pixels, so the grid quantizes to the
+// generated image's own pixel space (64 aligns with latent blocks).
+const GRID_MIN_CELL_PX = 8;
+const GRID_MAX_CELL_PX = 1024;
+const GRID_DEFAULT_CELL_PX = 64;
+const GRID_DEFAULT_COLOR = "#26262e";
+// Destructive-action red for the clear-all control.
+const DANGER_RED = "#e5484d";
+const DANGER_RED_DIM = "rgba(229, 72, 77, 0.85)";
+const DANGER_RED_BORDER = "rgba(229, 72, 77, 0.40)";
 // Horizontal padding the editor root carries inside the DOM widget wrapper.
 const ROOT_PADDING_H = 12;
 const STATUS_STRIP_H = 22;
@@ -55,10 +63,15 @@ function findWidget(node, name) {
     return node.widgets?.find((w) => w.name === name) ?? null;
 }
 
-function frameAspect(node) {
+function frameDims(node) {
     const w = Number(findWidget(node, "width")?.value) || 1024;
     const h = Number(findWidget(node, "height")?.value) || 1024;
-    return w > 0 && h > 0 ? w / h : 1;
+    return { w: Math.max(w, 1), h: Math.max(h, 1) };
+}
+
+function frameAspect(node) {
+    const dims = frameDims(node);
+    return dims.w / dims.h;
 }
 
 // Height the editor needs below the regular widgets: a canvas matching the
@@ -176,7 +189,8 @@ function createRegionEditor(node) {
         cssW: 0,
         cssH: 0,
         gridShow: false,
-        gridDivs: 12,    // cells per axis while the grid is shown
+        gridCellPx: GRID_DEFAULT_CELL_PX,
+        gridColor: GRID_DEFAULT_COLOR,
         snapOn: false,
     };
 
@@ -267,23 +281,40 @@ function createRegionEditor(node) {
     gridBtn.title = "Show grid";
     const gridSizeInput = document.createElement("input");
     gridSizeInput.type = "number";
-    gridSizeInput.min = String(GRID_MIN_DIVS);
-    gridSizeInput.max = String(GRID_MAX_DIVS);
-    gridSizeInput.title = "Grid cells per axis (2–64)";
+    gridSizeInput.min = String(GRID_MIN_CELL_PX);
+    gridSizeInput.max = String(GRID_MAX_CELL_PX);
+    gridSizeInput.title = "Grid cell size in frame pixels (8–1024)";
     styleInput(gridSizeInput);
-    gridSizeInput.style.width = "40px";
+    gridSizeInput.style.width = "48px";
     gridSizeInput.style.flex = "0 0 auto";
     gridSizeInput.style.padding = "1px 4px";
     gridSizeInput.style.fontSize = "10px";
     gridSizeInput.style.display = "none";
+    const gridColorInput = document.createElement("input");
+    gridColorInput.type = "color";
+    gridColorInput.value = GRID_DEFAULT_COLOR;
+    gridColorInput.title = "Grid color";
+    gridColorInput.style.flex = "0 0 auto";
+    gridColorInput.style.width = "22px";
+    gridColorInput.style.height = "18px";
+    gridColorInput.style.alignSelf = "center";
+    gridColorInput.style.padding = "0";
+    gridColorInput.style.border = "1px solid rgba(255, 255, 255, 0.14)";
+    gridColorInput.style.borderRadius = "3px";
+    gridColorInput.style.background = "transparent";
+    gridColorInput.style.cursor = "pointer";
+    gridColorInput.style.display = "none";
     const snapBtn = makeStripButton("⌖");
     snapBtn.title = "Snap drawing, moving, and resizing to the grid";
-    const clearBtn = makeStripButton("✕");
-    clearBtn.title = "Clear all regions (click twice to confirm)";
+    const clearBtn = makeStripButton("Clear all");
+    clearBtn.title = "Remove every region (click twice to confirm)";
+    clearBtn.style.color = DANGER_RED_DIM;
+    clearBtn.style.borderColor = DANGER_RED_BORDER;
     status.appendChild(statusLeft);
     status.appendChild(statusRight);
     status.appendChild(gridBtn);
     status.appendChild(gridSizeInput);
+    status.appendChild(gridColorInput);
     status.appendChild(snapBtn);
     status.appendChild(clearBtn);
 
@@ -534,28 +565,35 @@ function createRegionEditor(node) {
         ctx.setLineDash([]);
     }
 
-    function snapCoord(v) {
+    function snapAxis(v, framePx) {
         if (!(state.gridShow && state.snapOn)) return v;
-        return clamp(Math.round(v * state.gridDivs) / state.gridDivs, 0, 1);
+        const cell = state.gridCellPx;
+        return clamp((Math.round((v * framePx) / cell) * cell) / framePx, 0, 1);
     }
 
     function snapPoint(p) {
-        return { x: snapCoord(p.x), y: snapCoord(p.y) };
+        const dims = frameDims(node);
+        return { x: snapAxis(p.x, dims.w), y: snapAxis(p.y, dims.h) };
     }
 
     function drawGrid() {
         if (!state.gridShow) return;
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+        const dims = frameDims(node);
+        const cell = state.gridCellPx;
+        ctx.strokeStyle = state.gridColor;
         ctx.lineWidth = 1;
-        for (let i = 1; i < state.gridDivs; i++) {
-            const f = i / state.gridDivs;
-            ctx.beginPath();
-            ctx.moveTo(f * state.cssW, 0);
-            ctx.lineTo(f * state.cssW, state.cssH);
-            ctx.moveTo(0, f * state.cssH);
-            ctx.lineTo(state.cssW, f * state.cssH);
-            ctx.stroke();
+        ctx.beginPath();
+        for (let px = cell; px < dims.w; px += cell) {
+            const x = (px / dims.w) * state.cssW;
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, state.cssH);
         }
+        for (let px = cell; px < dims.h; px += cell) {
+            const y = (px / dims.h) * state.cssH;
+            ctx.moveTo(0, y);
+            ctx.lineTo(state.cssW, y);
+        }
+        ctx.stroke();
     }
 
     // Rule-of-thirds hairlines double as a placement reference for the 3x3
@@ -798,8 +836,9 @@ function createRegionEditor(node) {
         } else if (d.mode === "move") {
             const box = state.boxes[state.selected];
             if (!box) return;
-            box.x = clamp(snapCoord(p.x - d.grabDX), 0, 1 - box.w);
-            box.y = clamp(snapCoord(p.y - d.grabDY), 0, 1 - box.h);
+            const dims = frameDims(node);
+            box.x = clamp(snapAxis(p.x - d.grabDX, dims.w), 0, 1 - box.w);
+            box.y = clamp(snapAxis(p.y - d.grabDY, dims.h), 0, 1 - box.h);
         } else if (d.mode === "resize") {
             const box = state.boxes[state.selected];
             if (!box) return;
@@ -908,21 +947,31 @@ function createRegionEditor(node) {
         if (!node.properties) node.properties = {};
         node.properties.erpk_region_grid = {
             on: state.gridShow,
-            divs: state.gridDivs,
+            cell: state.gridCellPx,
+            color: state.gridColor,
             snap: state.snapOn,
         };
     }
 
-    // Tolerates the two earlier stored shapes: {grid: bool} and
-    // {divs: 0|6|12|24} where 0 meant off.
+    // Tolerates the earlier stored shapes: {grid: bool} and {divs: number}
+    // (cells per axis, 0 meant off) - divisions convert via the frame width.
     function restoreGridPrefs() {
         const saved = node.properties?.erpk_region_grid;
         if (saved && typeof saved === "object") {
-            const rawDivs = Number.isFinite(saved.divs) ? saved.divs : null;
-            state.gridDivs = clamp(Math.round(rawDivs || 12), GRID_MIN_DIVS, GRID_MAX_DIVS);
+            if (Number.isFinite(saved.cell)) {
+                state.gridCellPx = clamp(
+                    Math.round(saved.cell), GRID_MIN_CELL_PX, GRID_MAX_CELL_PX);
+            } else if (Number.isFinite(saved.divs) && saved.divs > 0) {
+                state.gridCellPx = clamp(
+                    Math.round(frameDims(node).w / saved.divs),
+                    GRID_MIN_CELL_PX, GRID_MAX_CELL_PX);
+            }
+            if (typeof saved.color === "string" && /^#[0-9a-fA-F]{6}$/.test(saved.color)) {
+                state.gridColor = saved.color;
+            }
             state.gridShow = saved.on !== undefined
                 ? !!saved.on
-                : (rawDivs !== null ? rawDivs > 0 : !!saved.grid);
+                : (Number.isFinite(saved.divs) ? saved.divs > 0 : !!saved.grid);
             state.snapOn = !!saved.snap;
         }
         syncToolButtons();
@@ -936,8 +985,12 @@ function createRegionEditor(node) {
         gridBtn.style.color = state.gridShow ? on : off;
         gridBtn.style.borderColor = state.gridShow ? onBorder : offBorder;
         gridSizeInput.style.display = state.gridShow ? "" : "none";
+        gridColorInput.style.display = state.gridShow ? "" : "none";
         if (document.activeElement !== gridSizeInput) {
-            gridSizeInput.value = String(state.gridDivs);
+            gridSizeInput.value = String(state.gridCellPx);
+        }
+        if (document.activeElement !== gridColorInput) {
+            gridColorInput.value = state.gridColor;
         }
         const snapActive = state.gridShow && state.snapOn;
         snapBtn.style.opacity = state.gridShow ? "1" : "0.45";
@@ -956,13 +1009,19 @@ function createRegionEditor(node) {
     function onGridSizeInput() {
         const v = Math.round(Number(gridSizeInput.value));
         if (!Number.isFinite(v)) return;
-        state.gridDivs = clamp(v, GRID_MIN_DIVS, GRID_MAX_DIVS);
+        state.gridCellPx = clamp(v, GRID_MIN_CELL_PX, GRID_MAX_CELL_PX);
         persistGridPrefs();
         render();
     }
 
     function onGridSizeBlur() {
-        gridSizeInput.value = String(state.gridDivs);
+        gridSizeInput.value = String(state.gridCellPx);
+    }
+
+    function onGridColorInput() {
+        state.gridColor = gridColorInput.value;
+        persistGridPrefs();
+        render();
     }
 
     function onGridSizeKeyDown(e) {
@@ -988,17 +1047,17 @@ function createRegionEditor(node) {
     function disarmClear() {
         if (clearArm) clearTimeout(clearArm);
         clearArm = null;
-        clearBtn.textContent = "✕";
-        clearBtn.style.color = "rgba(255, 255, 255, 0.65)";
-        clearBtn.style.borderColor = "rgba(255, 255, 255, 0.14)";
+        clearBtn.textContent = "Clear all";
+        clearBtn.style.color = DANGER_RED_DIM;
+        clearBtn.style.borderColor = DANGER_RED_BORDER;
     }
 
     function onClearClick() {
         if (!state.boxes.length) return;
         if (clearArm === null) {
             clearBtn.textContent = "Confirm?";
-            clearBtn.style.color = "#f9a826";
-            clearBtn.style.borderColor = "#f9a826";
+            clearBtn.style.color = DANGER_RED;
+            clearBtn.style.borderColor = DANGER_RED;
             clearArm = setTimeout(disarmClear, 2500);
             return;
         }
@@ -1035,6 +1094,7 @@ function createRegionEditor(node) {
     gridSizeInput.addEventListener("input", onGridSizeInput);
     gridSizeInput.addEventListener("blur", onGridSizeBlur);
     gridSizeInput.addEventListener("keydown", onGridSizeKeyDown);
+    gridColorInput.addEventListener("input", onGridColorInput);
     snapBtn.addEventListener("click", onSnapToggle);
 
     const observer = new ResizeObserver(() => layout());
@@ -1067,6 +1127,7 @@ function createRegionEditor(node) {
         gridSizeInput.removeEventListener("input", onGridSizeInput);
         gridSizeInput.removeEventListener("blur", onGridSizeBlur);
         gridSizeInput.removeEventListener("keydown", onGridSizeKeyDown);
+        gridColorInput.removeEventListener("input", onGridColorInput);
         snapBtn.removeEventListener("click", onSnapToggle);
         if (clearArm) clearTimeout(clearArm);
     }
