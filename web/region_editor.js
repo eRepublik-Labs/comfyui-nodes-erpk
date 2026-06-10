@@ -572,24 +572,36 @@ function createRegionEditor(node) {
             ctx.textAlign = "left";
         }
 
-        // Numbered tape tag in the region's hue, description riding alongside.
-        ctx.font = LABEL_FONT;
+        // Numbered tape tag in the region's hue, a plug chip when the
+        // description is wired from a desc_N input, description alongside.
         const tag = String(index + 1);
-        const tagW = Math.ceil(ctx.measureText(tag).width) + 8;
+        ctx.font = "bold 9px 'Segoe UI', sans-serif";
+        const tagW = Math.ceil(ctx.measureText(tag).width) + 7;
         ctx.fillStyle = color;
-        ctx.fillRect(x, y, tagW, 15);
-        ctx.fillStyle = INK_ON_TAPE;
-        ctx.fillText(tag, x + 4, y + 11.5);
+        ctx.fillRect(x, y, tagW, 13);
+        ctx.fillStyle = "#fff";
+        ctx.fillText(tag, x + 3.5, y + 9.5);
+        let labelX = x + tagW;
+        if (descWiredFor(box)) {
+            const plugW = Math.ceil(ctx.measureText("⌁").width) + 7;
+            ctx.fillStyle = color;
+            ctx.fillRect(labelX + 1, y, plugW, 13);
+            ctx.fillStyle = "#fff";
+            ctx.fillText("⌁", labelX + 4.5, y + 9.5);
+            labelX += plugW + 1;
+        }
         if (box.desc) {
-            const label = truncateLabel(box.desc, Math.max(w - tagW - 28, 12));
+            ctx.font = LABEL_FONT;
+            const label = truncateLabel(box.desc, Math.max(w - (labelX - x) - 28, 12));
             const labelWidth = ctx.measureText(label).width;
             ctx.fillStyle = "rgba(8, 8, 10, 0.72)";
-            ctx.fillRect(x + tagW, y, labelWidth + 10, 15);
+            ctx.fillRect(labelX, y, labelWidth + 10, 13);
             ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
-            ctx.fillText(label, x + tagW + 5, y + 11.5);
+            ctx.fillText(label, labelX + 5, y + 10);
         }
 
         if (box.kind === "text") {
+            ctx.font = LABEL_FONT;
             const bx = x + w - 16;
             ctx.fillStyle = color;
             ctx.fillRect(bx, y + h - 16, 14, 14);
@@ -1682,6 +1694,13 @@ function createRegionEditor(node) {
         num.style.fontVariantNumeric = "tabular-nums";
         num.textContent = String(index + 1).padStart(2, "0");
 
+        const plug = document.createElement("span");
+        plug.style.flex = "0 0 auto";
+        plug.style.color = regionColor(index);
+        plug.title = "Description wired from a desc input";
+        plug.textContent = "⌁";
+        plug.style.display = descWiredFor(box) ? "" : "none";
+
         const label = document.createElement("span");
         label.style.flex = "1 1 auto";
         label.style.minWidth = "0";
@@ -1711,6 +1730,7 @@ function createRegionEditor(node) {
 
         row.appendChild(swatch);
         row.appendChild(num);
+        row.appendChild(plug);
         row.appendChild(label);
         row.appendChild(dupBtn);
         row.appendChild(delBtn);
