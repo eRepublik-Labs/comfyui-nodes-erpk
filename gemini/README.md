@@ -16,6 +16,7 @@ Complete Google Gemini API integration providing text generation, vision analysi
 - **Multi-turn Conversations** - Maintain chat history across requests
 - **System Instructions** - Set persistent instructions to guide model behavior
 - **Safety Settings** - Configure content safety filters with presets or custom thresholds
+- **Regional Prompt Builder** - Draw regions on a canvas to build layout-aware image prompts (verbal placement plus box_2d coordinates)
 - **Full ComfyUI Integration** - Native node types, workflow compatibility
 
 ## Installation
@@ -294,6 +295,30 @@ Configure content safety filters.
 - **strict**: Block low and above for all categories (safest)
 - **balanced**: Block medium and above (recommended)
 - **permissive**: Block only high severity content
+
+---
+
+#### Gemini Regional Prompt Builder
+Draw regions on a canvas and emit a layout-aware prompt for Gemini image generation. Each region carries a description (or literal text to render) and is expressed in the prompt twice: as a verbal placement ("at the top-center, covering about 40% of the image width") and as Gemini's native `box_2d = [ymin, xmin, ymax, xmax]` coordinates on a 0-1000 grid. This node builds the prompt only; wire its output into Gemini Image Generation.
+
+**Inputs:**
+- `width` / `height`: Target frame dimensions (define the canvas aspect ratio and pixel bbox scaling)
+- `scene_description`: Overall scene description
+- `background`: Background description
+- `style`: Style, medium, and lighting
+- `regions_data`: Managed by the canvas editor (hidden JSON widget)
+
+**Outputs:**
+- `prompt`: The assembled hybrid prompt
+- `bboxes`: Pixel-space `BOUNDING_BOX` regions, compatible with core SAM3 Detect, Draw BBoxes, and Crop By BBoxes nodes
+- `width` / `height`: Passed through for downstream wiring
+
+**Canvas editor:**
+- Drag on empty space to draw a region; click to select; drag to move; corner handles to resize
+- Double-click a region to edit its description, kind (object or rendered text), and literal text
+- Delete/Backspace removes the selected region
+
+**Note:** Layout adherence is strongest when regions do not overlap and each has a concrete description. Gemini follows verbal placement reliably; the box_2d coordinates sharpen it further but are not a hard guarantee.
 
 ---
 

@@ -152,6 +152,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Gemini Image Edit** - Edit and modify images with natural language prompts (up to 14 reference images, same model and resolution options)
 - **Gemini System Instruction** - Set persistent system-level instructions to guide model behavior
 - **Gemini Safety Settings** - Configure content safety filters (strict/balanced/permissive presets or custom)
+- **Gemini Regional Prompt Builder** - Draw regions on a canvas and emit a layout-aware prompt (verbal placement plus box_2d coordinates) for Gemini image generation, with a BOUNDING_BOX output for SAM3/crop/draw nodes
 
 #### Veo Video Generation Nodes
 

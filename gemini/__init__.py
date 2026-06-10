@@ -11,6 +11,7 @@ from .nodes import (
     GeminiImageGeneration,
     GeminiImageEdit,
 )
+from .regional_prompt import GeminiRegionalPromptBuilder
 from .veo_nodes import VeoTextToVideo, VeoImageToVideo
 
 NODES = [
@@ -24,6 +25,7 @@ NODES = [
     GeminiImageEdit,
     VeoTextToVideo,
     VeoImageToVideo,
+    GeminiRegionalPromptBuilder,
 ]
 
 __all__ = ["NODES"]
