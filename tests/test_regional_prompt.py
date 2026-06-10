@@ -9,7 +9,6 @@ import pytest
 from utils.regional_prompt import (
     RegionalPromptBuilder,
     aspect_ratio_string,
-    box_2d,
     build_prompt,
     parse_regions,
     placement_phrase,
@@ -30,15 +29,15 @@ CANONICAL_PROMPT = (
     "\n"
     "Compose for a 1000x1000 frame (aspect ratio 1:1).\n"
     "\n"
-    'Layout: place each element exactly where specified. Each position gives a '
-    'verbal placement plus its placement area as "box_2d = [ymin, xmin, ymax, xmax]" '
-    "on a 0-1000 grid with top-left origin. Elements are listed from back to "
-    "front: where placement areas overlap, a later element appears in front of "
-    "an earlier one.\n"
-    "1. a red vintage car: at the bottom-left, covering about 30% of the image "
-    "width and 25% of its height. box_2d = [620, 40, 870, 340]\n"
-    '2. The text "OPEN LATE", glowing neon letters: at the top-center, covering '
-    "about 40% of the image width and 14% of its height. box_2d = [30, 300, 170, 700]\n"
+    "Layout: place each element exactly where specified. Each position gives "
+    "a verbal placement plus the exact span it occupies as percentages of "
+    "the frame width and height, measured from the top-left corner. Elements "
+    "are listed from back to front: where placement areas overlap, a later "
+    "element appears in front of an earlier one.\n"
+    "1. a red vintage car: at the bottom-left, spanning 4% to 34% of the "
+    "frame width and 62% to 87% of its height\n"
+    '2. The text "OPEN LATE", glowing neon letters: at the top-center, '
+    "spanning 30% to 70% of the frame width and 3% to 17% of its height\n"
     "Every element must stay fully inside its placement area and fill most of it. "
     "Do not add other prominent subjects. The placement areas are invisible "
     "composition guides: never draw boxes, frames, outlines, coordinates, or any "
@@ -204,17 +203,6 @@ class TestParseRegions:
         assert parse_regions(data) == []
 
 
-class TestBox2d:
-    def test_canonical_first_region(self):
-        assert box_2d(0.04, 0.62, 0.30, 0.25) == [620, 40, 870, 340]
-
-    def test_canonical_second_region(self):
-        assert box_2d(0.30, 0.03, 0.40, 0.14) == [30, 300, 170, 700]
-
-    def test_values_clamped_to_grid(self):
-        assert box_2d(-0.5, -0.5, 2.0, 2.0) == [0, 0, 1000, 1000]
-
-
 class TestPlacementPhrase:
     @pytest.mark.parametrize("x,y,expected", [
         (0.116, 0.116, "at the top-left"),
@@ -278,14 +266,21 @@ class TestBuildPrompt:
         regions = [{"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2,
                     "kind": "object", "desc": "", "text": ""}]
         prompt = build_prompt("", 1000, 1000, regions)
-        assert ("1. An element: at the center, covering about 20% of the image "
-                "width and 20% of its height. box_2d = [400, 400, 600, 600]") in prompt
+        assert ("1. An element: at the center, spanning 40% to 60% of the "
+                "frame width and 40% to 60% of its height") in prompt
 
     def test_text_region_without_desc_omits_desc_clause(self):
         regions = [{"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2,
                     "kind": "text", "desc": "", "text": "SALE"}]
         prompt = build_prompt("", 1000, 1000, regions)
-        assert '1. The text "SALE": at the center, covering about 20%' in prompt
+        assert '1. The text "SALE": at the center, spanning 40% to 60%' in prompt
+
+    def test_spans_keep_tenth_percent_precision(self):
+        regions = [{"x": 0.042, "y": 0.617, "w": 0.296, "h": 0.254,
+                    "kind": "object", "desc": "a red vintage car", "text": ""}]
+        prompt = build_prompt("", 1000, 1000, regions)
+        assert ("spanning 4.2% to 33.8% of the frame width and "
+                "61.7% to 87.1% of its height") in prompt
 
     def test_layout_forbids_drawing_annotations(self):
         regions = [{"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
@@ -293,6 +288,7 @@ class TestBuildPrompt:
         prompt = build_prompt("", 1000, 1000, regions)
         assert "never draw boxes" in prompt
         assert "bounding box" not in prompt
+        assert "box_2d" not in prompt
 
     def test_layout_declares_back_to_front_depth_order(self):
         regions = [{"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
