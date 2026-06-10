@@ -62,13 +62,21 @@ class TestSchema:
         schema = RegionalPromptBuilder.define_schema()
         assert [i.id for i in schema.inputs] == [
             "width", "height", "prompt", "regions_data", "image",
+            "desc_1", "desc_2", "desc_3", "desc_4", "desc_5", "desc_6",
         ]
 
-    def test_only_the_image_input_is_optional(self):
+    def test_only_sockets_are_optional(self):
         schema = RegionalPromptBuilder.define_schema()
         optional = {i.id: bool(i.optional) for i in schema.inputs}
-        assert optional.pop("image") is True
-        assert not any(optional.values())
+        required = ("width", "height", "prompt", "regions_data")
+        for input_id, is_optional in optional.items():
+            assert is_optional == (input_id not in required), input_id
+
+    def test_desc_inputs_are_socket_only(self):
+        schema = RegionalPromptBuilder.define_schema()
+        for i in schema.inputs:
+            if i.id.startswith("desc_"):
+                assert i.force_input is True, i.id
 
     def test_dimension_widget_ranges(self):
         schema = RegionalPromptBuilder.define_schema()
@@ -385,3 +393,36 @@ class TestExecute:
             prompt="A quiet forest", regions_data="[]",
         )
         assert out.args[4] is None
+
+    def test_desc_input_overrides_region_description(self):
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+            desc_1="a battered taxi cab",
+        )
+        assert "a battered taxi cab: at the bottom-left" in out.args[0]
+        assert "a red vintage car" not in out.args[0]
+
+    def test_desc_override_applies_to_text_region_clause(self):
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+            desc_2="flickering tube letters",
+        )
+        assert 'The text "OPEN LATE", flickering tube letters:' in out.args[0]
+
+    def test_blank_desc_override_is_ignored(self):
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+            desc_1="   \n",
+        )
+        assert "a red vintage car: at the bottom-left" in out.args[0]
+
+    def test_desc_override_beyond_region_count_is_ignored(self):
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+            desc_5="nothing to attach to",
+        )
+        assert "nothing to attach to" not in out.args[0]

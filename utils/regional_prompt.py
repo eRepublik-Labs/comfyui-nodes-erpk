@@ -8,6 +8,9 @@ from comfy_api.latest import IO
 
 REGION_KINDS = {"object", "text"}
 MIN_REGION_EXTENT = 0.005
+# Socket-only description overrides; desc_N feeds the region numbered N on
+# the canvas (numbers are depth order, so reordering remaps the wires).
+DESC_INPUT_COUNT = 6
 
 # "Bounding box" is detection-annotation vocabulary: models that know it from
 # vision training will happily RENDER yellow boxes around the elements. The
@@ -190,6 +193,16 @@ class RegionalPromptBuilder(IO.ComfyNode):
                             "regions and passed through unchanged, so the "
                             "builder can sit inline in an image-edit chain.",
                 ),
+                *[
+                    IO.String.Input(
+                        f"desc_{n}",
+                        optional=True,
+                        force_input=True,
+                        tooltip=f"Overrides region {n}'s description when "
+                                "connected (regions numbered as on the canvas).",
+                    )
+                    for n in range(1, DESC_INPUT_COUNT + 1)
+                ],
             ],
             outputs=[
                 IO.String.Output("prompt"),
@@ -207,6 +220,10 @@ class RegionalPromptBuilder(IO.ComfyNode):
         prompt = kwargs.get("prompt", "")
         image = kwargs.get("image")
         regions = parse_regions(kwargs.get("regions_data", "[]"))
+        for index, region in enumerate(regions[:DESC_INPUT_COUNT]):
+            override = kwargs.get(f"desc_{index + 1}")
+            if isinstance(override, str) and override.strip():
+                region["desc"] = override.strip()
         if not regions and not prompt.strip():
             raise ValueError("Describe the scene or add at least one region")
         assembled = build_prompt(prompt, width, height, regions)

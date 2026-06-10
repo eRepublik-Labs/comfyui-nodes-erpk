@@ -934,22 +934,34 @@ function createRegionEditor(node) {
     // loop never clobbers live typing or resets the cursor.
     let inspected = null;
 
+    // A connected desc_N socket owns that region's description; the field
+    // locks so typed text never silently loses to the wire at execute time.
+    function descWiredFor(box) {
+        const index = state.boxes.indexOf(box);
+        if (index < 0) return false;
+        const input = node.inputs?.find((i) => i.name === `desc_${index + 1}`);
+        return input?.link != null;
+    }
+
     function syncInspector() {
         const box = state.primary;
         const showText = !!box && box.kind === "text";
         textInput.style.display = showText ? "" : "none";
         textInput.disabled = !showText;
+        const wired = !!box && descWiredFor(box);
+        descInput.disabled = !box || wired;
+        descInput.placeholder = wired
+            ? `wired from the desc_${state.boxes.indexOf(box) + 1} input`
+            : "description — e.g. a red vintage car";
         if (box === inspected) return;
         inspected = box;
         descInput.value = box ? box.desc : "";
         kindSelect.value = box ? box.kind : "object";
         textInput.value = box ? box.text : "";
-        const off = !box;
-        descInput.disabled = off;
-        kindSelect.disabled = off;
-        backBtn.disabled = off;
-        frontBtn.disabled = off;
-        const dim = off ? "0.45" : "1";
+        kindSelect.disabled = !box;
+        backBtn.disabled = !box;
+        frontBtn.disabled = !box;
+        const dim = box ? "1" : "0.45";
         backBtn.style.opacity = dim;
         frontBtn.style.opacity = dim;
     }
