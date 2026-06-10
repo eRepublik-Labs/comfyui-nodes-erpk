@@ -1435,9 +1435,10 @@ function createRegionEditor(node) {
         renderPanelRows();
     }
 
-    // The drag listens on window for its lifetime: pointer capture on the row
-    // itself is unreliable because insertBefore reparents the captured element
-    // mid-drag, which browsers may treat as capture loss.
+    // The drag listens on window for its lifetime (capture on a reparented
+    // element is unreliable) and moves rows with transforms only: the grabbed
+    // row follows the pointer, siblings glide aside with a short ease, and the
+    // single DOM reorder happens on drop.
     function onRowPointerDown(e, row) {
         if (e.button !== 0) return;
         e.stopPropagation();
@@ -1445,34 +1446,65 @@ function createRegionEditor(node) {
         const startY = e.clientY;
         let dragging = false;
         panelRowDragging = true;
+        const rows = [...panelList.children];
+        const startIndex = rows.indexOf(row);
+        const rowH = row.offsetHeight;
+        // Pointer deltas arrive in screen pixels; transforms apply in layout
+        // pixels, and the graph zoom scales between the two.
+        const zoom = row.getBoundingClientRect().height / rowH || 1;
+        let targetIndex = startIndex;
 
         function onRowMove(ev) {
             if (!dragging && Math.abs(ev.clientY - startY) > 4) {
                 dragging = true;
-                row.style.opacity = "0.55";
-            }
-            if (!dragging || !panelList) return;
-            // Float the row to the slot whose midpoint the pointer crossed.
-            let before = null;
-            for (const el of panelList.children) {
-                if (el === row) continue;
-                const r = el.getBoundingClientRect();
-                if (ev.clientY < r.top + r.height / 2) {
-                    before = el;
-                    break;
+                row.style.opacity = "0.85";
+                row.style.position = "relative";
+                row.style.zIndex = "1";
+                for (const el of rows) {
+                    if (el !== row) el.style.transition = "transform 120ms ease";
                 }
             }
-            if (before) panelList.insertBefore(row, before);
-            else panelList.appendChild(row);
+            if (!dragging || !panelList) return;
+            const dy = clamp(
+                (ev.clientY - startY) / zoom,
+                -startIndex * rowH,
+                (rows.length - 1 - startIndex) * rowH,
+            );
+            row.style.transform = `translateY(${dy}px)`;
+            targetIndex = clamp(startIndex + Math.round(dy / rowH), 0, rows.length - 1);
+            rows.forEach((el, i) => {
+                if (el === row) return;
+                let shift = 0;
+                if (startIndex < targetIndex && i > startIndex && i <= targetIndex) {
+                    shift = -rowH;
+                } else if (startIndex > targetIndex && i >= targetIndex && i < startIndex) {
+                    shift = rowH;
+                }
+                el.style.transform = shift ? `translateY(${shift}px)` : "";
+            });
         }
 
         function onRowUp() {
             window.removeEventListener("pointermove", onRowMove, true);
             window.removeEventListener("pointerup", onRowUp, true);
             window.removeEventListener("pointercancel", onRowUp, true);
-            row.style.opacity = "";
             panelRowDragging = false;
+            for (const el of rows) {
+                el.style.transition = "";
+                el.style.transform = "";
+            }
+            row.style.opacity = "";
+            row.style.position = "";
+            row.style.zIndex = "";
             if (dragging) {
+                if (panelList && targetIndex !== startIndex) {
+                    const ref = rows[targetIndex];
+                    if (targetIndex > startIndex) {
+                        panelList.insertBefore(row, ref.nextSibling);
+                    } else {
+                        panelList.insertBefore(row, ref);
+                    }
+                }
                 commitPanelOrder();
             } else if (state.boxes.includes(row._erpkBox)) {
                 select(row._erpkBox);
@@ -1494,19 +1526,19 @@ function createRegionEditor(node) {
         row._erpkBox = box;
         row.style.display = "flex";
         row.style.alignItems = "center";
-        row.style.gap = "6px";
-        row.style.padding = "3px 6px";
-        row.style.borderRadius = "4px";
+        row.style.gap = "5px";
+        row.style.padding = "2px 5px";
+        row.style.borderRadius = "3px";
         row.style.cursor = "grab";
         row.style.border = "1px solid "
             + (state.selection.has(box) ? HAIRLINE_STRONG : "transparent");
-        row.style.font = "10px ui-monospace, Menlo, monospace";
+        row.style.font = "9px ui-monospace, Menlo, monospace";
         row.style.color = "rgba(255, 255, 255, 0.8)";
 
         const swatch = document.createElement("span");
         swatch.style.flex = "0 0 auto";
-        swatch.style.width = "10px";
-        swatch.style.height = "10px";
+        swatch.style.width = "9px";
+        swatch.style.height = "9px";
         swatch.style.borderRadius = "2px";
         swatch.style.background = regionColor(index);
 
@@ -1532,8 +1564,12 @@ function createRegionEditor(node) {
 
         const dupBtn = makeStripButton("⧉");
         dupBtn.title = "Duplicate region";
+        dupBtn.style.fontSize = "10px";
+        dupBtn.style.padding = "0 4px";
         const delBtn = makeStripButton("✕");
         delBtn.title = "Delete region";
+        delBtn.style.fontSize = "10px";
+        delBtn.style.padding = "0 4px";
         delBtn.style.color = DANGER_RED_DIM;
         delBtn.style.borderColor = DANGER_RED_BORDER;
 
@@ -1574,7 +1610,7 @@ function createRegionEditor(node) {
         panel.className = "erpk-region-list";
         panel.style.position = "absolute";
         panel.style.zIndex = "20";
-        panel.style.minWidth = "190px";
+        panel.style.minWidth = "170px";
         panel.style.maxWidth = "280px";
         panel.style.maxHeight = Math.round(root.clientHeight * 0.6) + "px";
         panel.style.overflowY = "auto";
@@ -1592,7 +1628,7 @@ function createRegionEditor(node) {
         header.textContent = "Regions · top = front";
         header.title = "Click a row to select · drag rows to reorder depth · "
             + "⧉ duplicates · ✕ deletes";
-        header.style.font = "10px ui-monospace, Menlo, monospace";
+        header.style.font = "9px ui-monospace, Menlo, monospace";
         header.style.color = "rgba(255, 255, 255, 0.45)";
         header.style.padding = "2px 6px 4px";
         header.style.whiteSpace = "nowrap";
