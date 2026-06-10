@@ -25,10 +25,9 @@ CANONICAL_REGIONS = [
 ]
 
 CANONICAL_PROMPT = (
-    "A rainy neon city street at night\n"
+    "A rainy neon city street at night, wet asphalt reflecting neon signs, "
+    "cinematic photo\n"
     "\n"
-    "Background: wet asphalt reflecting neon signs\n"
-    "Style: cinematic photo\n"
     "Compose for a 1000x1000 frame (aspect ratio 1:1).\n"
     "\n"
     'Layout: place each element exactly where specified. Each position gives a '
@@ -60,8 +59,7 @@ class TestSchema:
     def test_input_ids_and_order(self):
         schema = RegionalPromptBuilder.define_schema()
         assert [i.id for i in schema.inputs] == [
-            "width", "height", "scene_description", "background", "style",
-            "regions_data",
+            "width", "height", "prompt", "regions_data",
         ]
 
     def test_no_input_is_optional(self):
@@ -78,15 +76,10 @@ class TestSchema:
             assert widget.max == 8192
             assert widget.step == 8
 
-    def test_text_widget_shapes(self):
+    def test_prompt_widget_is_multiline(self):
         schema = RegionalPromptBuilder.define_schema()
-        multiline = {i.id: i.multiline for i in schema.inputs
-                     if i.id in ("scene_description", "background", "style")}
-        assert multiline == {
-            "scene_description": True,
-            "background": False,
-            "style": False,
-        }
+        prompt_input = next(i for i in schema.inputs if i.id == "prompt")
+        assert prompt_input.multiline is True
 
     def test_regions_data_default_and_socketless(self):
         schema = RegionalPromptBuilder.define_schema()
@@ -250,46 +243,42 @@ class TestAspectRatioString:
 class TestBuildPrompt:
     def test_canonical_full_prompt(self):
         prompt = build_prompt(
-            "A rainy neon city street at night",
-            "wet asphalt reflecting neon signs",
-            "cinematic photo",
+            "A rainy neon city street at night, wet asphalt reflecting neon "
+            "signs, cinematic photo",
             1000, 1000,
             parse_regions(json.dumps(CANONICAL_REGIONS)),
         )
         assert prompt == CANONICAL_PROMPT
 
     def test_scene_only(self):
-        prompt = build_prompt("A quiet forest", "", "", 1024, 1024, [])
+        prompt = build_prompt("A quiet forest", 1024, 1024, [])
         assert prompt == (
             "A quiet forest\n"
             "\n"
             "Compose for a 1024x1024 frame (aspect ratio 1:1)."
         )
 
-    def test_style_only_has_no_leading_blank_line(self):
-        prompt = build_prompt("", "", "watercolor", 1920, 1080, [])
-        assert prompt == (
-            "Style: watercolor\n"
-            "Compose for a 1920x1080 frame (aspect ratio 16:9)."
-        )
+    def test_empty_prompt_has_no_leading_blank_line(self):
+        prompt = build_prompt("", 1920, 1080, [])
+        assert prompt == "Compose for a 1920x1080 frame (aspect ratio 16:9)."
 
     def test_object_region_without_desc_uses_an_element(self):
         regions = [{"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2,
                     "kind": "object", "desc": "", "text": ""}]
-        prompt = build_prompt("", "", "", 1000, 1000, regions)
+        prompt = build_prompt("", 1000, 1000, regions)
         assert ("1. An element: at the center, covering about 20% of the image "
                 "width and 20% of its height. box_2d = [400, 400, 600, 600]") in prompt
 
     def test_text_region_without_desc_omits_desc_clause(self):
         regions = [{"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2,
                     "kind": "text", "desc": "", "text": "SALE"}]
-        prompt = build_prompt("", "", "", 1000, 1000, regions)
+        prompt = build_prompt("", 1000, 1000, regions)
         assert '1. The text "SALE": at the center, covering about 20%' in prompt
 
     def test_layout_forbids_drawing_annotations(self):
         regions = [{"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
                     "kind": "object", "desc": "a cat", "text": ""}]
-        prompt = build_prompt("", "", "", 1000, 1000, regions)
+        prompt = build_prompt("", 1000, 1000, regions)
         assert "never draw boxes" in prompt
         assert "bounding box" not in prompt
 
@@ -302,7 +291,7 @@ class TestBuildPrompt:
             {"x": 0.5, "y": 0.5, "w": 0.3, "h": 0.3,
              "kind": "object", "desc": long_desc, "text": ""},
         ]
-        prompt = build_prompt("scene", "", "", 1024, 1024, regions)
+        prompt = build_prompt("scene", 1024, 1024, regions)
         assert 'The text "营业中 OPEN", 霓虹灯 sign with sparkles:' in prompt
         assert long_desc in prompt
 
@@ -328,9 +317,8 @@ class TestExecute:
         out = RegionalPromptBuilder.execute(
             width=1000,
             height=1000,
-            scene_description="A rainy neon city street at night",
-            background="wet asphalt reflecting neon signs",
-            style="cinematic photo",
+            prompt="A rainy neon city street at night, wet asphalt reflecting "
+                   "neon signs, cinematic photo",
             regions_data=json.dumps(CANONICAL_REGIONS),
         )
         assert out.args == (CANONICAL_PROMPT, CANONICAL_BBOXES, 1000, 1000)
@@ -338,8 +326,7 @@ class TestExecute:
     def test_scene_only_outputs_empty_bboxes(self):
         out = RegionalPromptBuilder.execute(
             width=1024, height=1024,
-            scene_description="A quiet forest",
-            background="", style="", regions_data="[]",
+            prompt="A quiet forest", regions_data="[]",
         )
         prompt, bboxes, width, height = out.args
         assert "A quiet forest" in prompt
@@ -351,8 +338,7 @@ class TestExecute:
                     "kind": "object", "desc": "a cat", "text": ""}]
         out = RegionalPromptBuilder.execute(
             width=1024, height=1024,
-            scene_description="", background="", style="",
-            regions_data=json.dumps(regions),
+            prompt="", regions_data=json.dumps(regions),
         )
         assert "a cat" in out.args[0]
 
@@ -361,15 +347,13 @@ class TestExecute:
                            match="Describe the scene or add at least one region"):
             RegionalPromptBuilder.execute(
                 width=1024, height=1024,
-                scene_description="  ", background="", style="\n",
-                regions_data="[]",
+                prompt="  \n", regions_data="[]",
             )
 
     def test_invalid_regions_json_with_scene_still_builds(self):
         out = RegionalPromptBuilder.execute(
             width=1024, height=1024,
-            scene_description="A quiet forest",
-            background="", style="", regions_data="not json",
+            prompt="A quiet forest", regions_data="not json",
         )
         assert out.args[1] == []
         assert "Layout:" not in out.args[0]

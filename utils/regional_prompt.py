@@ -108,19 +108,13 @@ def _element_line(region):
     return f'{region["desc"] or "An element"}: {geometry}'
 
 
-def build_prompt(scene_description, background, style, width, height, regions):
-    """Assemble the hybrid scene + layout prompt for Gemini image generation."""
+def build_prompt(prompt, width, height, regions):
+    """Assemble the hybrid scene + layout prompt for image generation."""
     lines = []
-    scene = scene_description.strip()
+    scene = prompt.strip()
     if scene:
         lines.append(scene)
         lines.append("")
-    background = background.strip()
-    if background:
-        lines.append(f"Background: {background}")
-    style = style.strip()
-    if style:
-        lines.append(f"Style: {style}")
     ratio = aspect_ratio_string(width, height)
     lines.append(f"Compose for a {width}x{height} frame (aspect ratio {ratio}).")
     if regions:
@@ -173,22 +167,12 @@ class RegionalPromptBuilder(IO.ComfyNode):
                     tooltip="Target frame height in pixels",
                 ),
                 IO.String.Input(
-                    "scene_description",
+                    "prompt",
                     multiline=True,
                     default="",
-                    tooltip="Overall scene description",
-                ),
-                IO.String.Input(
-                    "background",
-                    multiline=False,
-                    default="",
-                    tooltip="Background description",
-                ),
-                IO.String.Input(
-                    "style",
-                    multiline=False,
-                    default="",
-                    tooltip="Style, medium, and lighting",
+                    tooltip="Scene description: subject, setting, background, "
+                            "and style. Elements drawn on the canvas are placed "
+                            "on top of this scene.",
                 ),
                 IO.String.Input(
                     "regions_data",
@@ -210,14 +194,10 @@ class RegionalPromptBuilder(IO.ComfyNode):
     def execute(cls, **kwargs) -> IO.NodeOutput:
         width = kwargs.get("width", 1024)
         height = kwargs.get("height", 1024)
-        scene_description = kwargs.get("scene_description", "")
-        background = kwargs.get("background", "")
-        style = kwargs.get("style", "")
+        prompt = kwargs.get("prompt", "")
         regions = parse_regions(kwargs.get("regions_data", "[]"))
-        if not regions and not any(
-                value.strip() for value in (scene_description, background, style)):
+        if not regions and not prompt.strip():
             raise ValueError("Describe the scene or add at least one region")
-        prompt = build_prompt(scene_description, background, style,
-                              width, height, regions)
+        assembled = build_prompt(prompt, width, height, regions)
         bboxes = regions_to_pixel_bboxes(regions, width, height)
-        return IO.NodeOutput(prompt, bboxes, width, height)
+        return IO.NodeOutput(assembled, bboxes, width, height)
