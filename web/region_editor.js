@@ -28,15 +28,23 @@ const DANGER_RED_DIM = "rgba(229, 72, 77, 0.85)";
 const DANGER_RED_BORDER = "rgba(229, 72, 77, 0.40)";
 
 // Hover states need real CSS pseudo-classes; !important outweighs the inline
-// base styles the elements carry.
+// base styles the elements carry. The danger rule comes last so it wins over
+// the generic button rule on the red controls.
 const hoverStyles = document.createElement("style");
 hoverStyles.textContent = `
 .erpk-region-row:hover { background: rgba(255, 255, 255, 0.07); }
-.erpk-row-btn:hover {
+.erpk-strip-btn:hover:not(:disabled) {
     color: rgba(255, 255, 255, 0.95) !important;
     border-color: rgba(255, 255, 255, 0.45) !important;
 }
-.erpk-row-btn-danger:hover {
+.erpk-input:hover:not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.30) !important;
+}
+.erpk-input:focus {
+    border-color: rgba(255, 255, 255, 0.50) !important;
+    outline: none;
+}
+.erpk-btn-danger:hover:not(:disabled) {
     color: ${DANGER_RED} !important;
     border-color: ${DANGER_RED} !important;
 }
@@ -198,6 +206,7 @@ function enforceMinSize(box) {
 // Inspector controls sit in the stage's color world rather than following
 // the UI theme, matching the canvas and status strip around them.
 function styleInput(el) {
+    el.classList.add("erpk-input");
     el.style.background = PANEL_INPUT_BG;
     el.style.color = "rgba(255, 255, 255, 0.9)";
     el.style.border = "1px solid rgba(255, 255, 255, 0.14)";
@@ -293,6 +302,7 @@ function createRegionEditor(node) {
     function makeStripButton(label) {
         const btn = document.createElement("button");
         btn.type = "button";
+        btn.classList.add("erpk-strip-btn");
         btn.textContent = label;
         btn.style.flex = "0 0 auto";
         btn.style.font = "inherit";
@@ -354,7 +364,9 @@ function createRegionEditor(node) {
         + "Del removes selected · Ctrl/Cmd+C/V/D copy/paste/duplicate · "
         + "[ ] depth · H hide boxes";
     const clearBtn = makeStripButton("Clear all");
+    clearBtn.classList.add("erpk-btn-danger");
     clearBtn.title = "Remove every region (click twice to confirm)";
+    clearBtn.style.font = "bold 9px 'Segoe UI', sans-serif";
     clearBtn.style.color = DANGER_RED_DIM;
     clearBtn.style.borderColor = DANGER_RED_BORDER;
     status.appendChild(statusLeft);
@@ -741,6 +753,7 @@ function createRegionEditor(node) {
         const w = Number(findWidget(node, "width")?.value) || 1024;
         const h = Number(findWidget(node, "height")?.value) || 1024;
         statusRight.textContent = `${w}×${h} · ${ratioString(w, h)}`;
+        clearBtn.disabled = !count;
         clearBtn.style.opacity = count ? "1" : "0.45";
         clearBtn.style.cursor = count ? "pointer" : "default";
         if (!count) disarmClear();
@@ -1263,6 +1276,7 @@ function createRegionEditor(node) {
             gridAlphaInput.value = String(Math.round(state.gridAlpha * 100));
         }
         const snapActive = state.gridShow && state.snapOn;
+        snapBtn.disabled = !state.gridShow;
         snapBtn.style.opacity = state.gridShow ? "1" : "0.45";
         snapBtn.style.cursor = state.gridShow ? "pointer" : "default";
         snapBtn.style.color = snapActive ? on : off;
@@ -1582,12 +1596,11 @@ function createRegionEditor(node) {
 
         const dupBtn = makeStripButton("⧉");
         dupBtn.title = "Duplicate region";
-        dupBtn.className = "erpk-row-btn";
         dupBtn.style.fontSize = "10px";
         dupBtn.style.padding = "0 4px";
         const delBtn = makeStripButton("✕");
+        delBtn.classList.add("erpk-btn-danger");
         delBtn.title = "Delete region";
-        delBtn.className = "erpk-row-btn erpk-row-btn-danger";
         delBtn.style.fontSize = "10px";
         delBtn.style.padding = "0 4px";
         delBtn.style.color = DANGER_RED_DIM;
