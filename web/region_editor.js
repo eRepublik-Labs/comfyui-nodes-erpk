@@ -16,6 +16,8 @@ const CHROME_HORIZONTAL_INSET = 16;
 // Absolute floor for degenerate aspect ratios; otherwise the canvas height
 // follows the frame aspect exactly so the canvas always spans the full width.
 const CANVAS_MIN_H = 60;
+// Twelfths subdivide both the rule-of-thirds guides and quarters cleanly.
+const GRID_DIVS = 12;
 // Horizontal padding the editor root carries inside the DOM widget wrapper.
 const ROOT_PADDING_H = 8;
 const STATUS_STRIP_H = 22;
@@ -200,6 +202,8 @@ function createRegionEditor(node) {
         editing: -1,
         cssW: 0,
         cssH: 0,
+        gridOn: false,
+        snapOn: false,
     };
 
     // --- DOM scaffold -------------------------------------------------
@@ -264,19 +268,28 @@ function createRegionEditor(node) {
     const statusRight = document.createElement("span");
     statusRight.style.flex = "0 0 auto";
     statusRight.style.fontVariantNumeric = "tabular-nums";
-    const clearBtn = document.createElement("button");
-    clearBtn.type = "button";
-    clearBtn.textContent = "Clear";
-    clearBtn.style.flex = "0 0 auto";
-    clearBtn.style.font = "inherit";
-    clearBtn.style.color = "rgba(255, 255, 255, 0.65)";
-    clearBtn.style.background = "transparent";
-    clearBtn.style.border = "1px solid rgba(255, 255, 255, 0.14)";
-    clearBtn.style.borderRadius = "3px";
-    clearBtn.style.padding = "1px 7px";
-    clearBtn.style.cursor = "pointer";
+    function makeStripButton(label) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = label;
+        btn.style.flex = "0 0 auto";
+        btn.style.font = "inherit";
+        btn.style.color = "rgba(255, 255, 255, 0.65)";
+        btn.style.background = "transparent";
+        btn.style.border = "1px solid rgba(255, 255, 255, 0.14)";
+        btn.style.borderRadius = "3px";
+        btn.style.padding = "1px 7px";
+        btn.style.cursor = "pointer";
+        return btn;
+    }
+
+    const gridBtn = makeStripButton("Grid");
+    const snapBtn = makeStripButton("Snap");
+    const clearBtn = makeStripButton("Clear");
     status.appendChild(statusLeft);
     status.appendChild(statusRight);
+    status.appendChild(gridBtn);
+    status.appendChild(snapBtn);
     status.appendChild(clearBtn);
 
     root.appendChild(stage);
@@ -539,6 +552,30 @@ function createRegionEditor(node) {
         ctx.setLineDash([]);
     }
 
+    function snapCoord(v) {
+        if (!(state.gridOn && state.snapOn)) return v;
+        return clamp(Math.round(v * GRID_DIVS) / GRID_DIVS, 0, 1);
+    }
+
+    function snapPoint(p) {
+        return { x: snapCoord(p.x), y: snapCoord(p.y) };
+    }
+
+    function drawGrid() {
+        if (!state.gridOn) return;
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+        ctx.lineWidth = 1;
+        for (let i = 1; i < GRID_DIVS; i++) {
+            const f = i / GRID_DIVS;
+            ctx.beginPath();
+            ctx.moveTo(f * state.cssW, 0);
+            ctx.lineTo(f * state.cssW, state.cssH);
+            ctx.moveTo(0, f * state.cssH);
+            ctx.lineTo(state.cssW, f * state.cssH);
+            ctx.stroke();
+        }
+    }
+
     // Rule-of-thirds hairlines double as a placement reference for the 3x3
     // verbal grid the Python side derives placements from.
     function drawGuides() {
@@ -616,6 +653,7 @@ function createRegionEditor(node) {
         const dpr = window.devicePixelRatio || 1;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, state.cssW, state.cssH);
+        drawGrid();
         drawGuides();
         if (!state.boxes.length && !state.drag) drawEmptyHint();
         state.boxes.forEach((box, i) => drawBox(box, i));
@@ -762,7 +800,8 @@ function createRegionEditor(node) {
                 state.drag = { mode: "move", grabDX: p.x - box.x, grabDY: p.y - box.y };
             } else {
                 state.selected = -1;
-                state.drag = { mode: "create", anchor: p, current: p };
+                const anchor = snapPoint(p);
+                state.drag = { mode: "create", anchor, current: anchor };
             }
         }
         render();
@@ -776,16 +815,16 @@ function createRegionEditor(node) {
         const p = pointerNorm(e);
         const d = state.drag;
         if (d.mode === "create") {
-            d.current = p;
+            d.current = snapPoint(p);
         } else if (d.mode === "move") {
             const box = state.boxes[state.selected];
             if (!box) return;
-            box.x = clamp(p.x - d.grabDX, 0, 1 - box.w);
-            box.y = clamp(p.y - d.grabDY, 0, 1 - box.h);
+            box.x = clamp(snapCoord(p.x - d.grabDX), 0, 1 - box.w);
+            box.y = clamp(snapCoord(p.y - d.grabDY), 0, 1 - box.h);
         } else if (d.mode === "resize") {
             const box = state.boxes[state.selected];
             if (!box) return;
-            Object.assign(box, rectFrom(d.anchor, p));
+            Object.assign(box, rectFrom(d.anchor, snapPoint(p)));
         }
         render();
     }
@@ -869,6 +908,51 @@ function createRegionEditor(node) {
         textInput.disabled = kindSelect.value !== "text";
     }
 
+    // Grid/snap are editor preferences, persisted through node.properties so
+    // they travel with the workflow without touching the widget schema.
+    function persistGridPrefs() {
+        if (!node.properties) node.properties = {};
+        node.properties.erpk_region_grid = { grid: state.gridOn, snap: state.snapOn };
+    }
+
+    function restoreGridPrefs() {
+        const saved = node.properties?.erpk_region_grid;
+        if (saved && typeof saved === "object") {
+            state.gridOn = !!saved.grid;
+            state.snapOn = !!saved.snap;
+        }
+        syncToolButtons();
+    }
+
+    function syncToolButtons() {
+        const on = "rgba(255, 255, 255, 0.92)";
+        const off = "rgba(255, 255, 255, 0.65)";
+        const onBorder = "rgba(255, 255, 255, 0.45)";
+        const offBorder = "rgba(255, 255, 255, 0.14)";
+        gridBtn.style.color = state.gridOn ? on : off;
+        gridBtn.style.borderColor = state.gridOn ? onBorder : offBorder;
+        const snapActive = state.gridOn && state.snapOn;
+        snapBtn.style.opacity = state.gridOn ? "1" : "0.45";
+        snapBtn.style.cursor = state.gridOn ? "pointer" : "default";
+        snapBtn.style.color = snapActive ? on : off;
+        snapBtn.style.borderColor = snapActive ? onBorder : offBorder;
+    }
+
+    function onGridToggle() {
+        state.gridOn = !state.gridOn;
+        persistGridPrefs();
+        syncToolButtons();
+        render();
+    }
+
+    function onSnapToggle() {
+        if (!state.gridOn) return;
+        state.snapOn = !state.snapOn;
+        persistGridPrefs();
+        syncToolButtons();
+        render();
+    }
+
     // Two-step confirm keeps a stray click from nuking the layout without
     // resorting to a blocking dialog.
     let clearArm = null;
@@ -928,6 +1012,8 @@ function createRegionEditor(node) {
     clearBtn.addEventListener("click", onClearClick);
     backBtn.addEventListener("click", onSendBack);
     frontBtn.addEventListener("click", onBringForward);
+    gridBtn.addEventListener("click", onGridToggle);
+    snapBtn.addEventListener("click", onSnapToggle);
 
     const observer = new ResizeObserver(() => layout());
     observer.observe(stage);
@@ -936,6 +1022,7 @@ function createRegionEditor(node) {
         hideRegionsWidget();
         hookDimensionWidget("width");
         hookDimensionWidget("height");
+        restoreGridPrefs();
     }
 
     function destroy() {
@@ -954,6 +1041,8 @@ function createRegionEditor(node) {
         clearBtn.removeEventListener("click", onClearClick);
         backBtn.removeEventListener("click", onSendBack);
         frontBtn.removeEventListener("click", onBringForward);
+        gridBtn.removeEventListener("click", onGridToggle);
+        snapBtn.removeEventListener("click", onSnapToggle);
         if (clearArm) clearTimeout(clearArm);
     }
 
