@@ -26,6 +26,22 @@ const GRID_DEFAULT_COLOR = "#26262e";
 const DANGER_RED = "#e5484d";
 const DANGER_RED_DIM = "rgba(229, 72, 77, 0.85)";
 const DANGER_RED_BORDER = "rgba(229, 72, 77, 0.40)";
+
+// Hover states need real CSS pseudo-classes; !important outweighs the inline
+// base styles the elements carry.
+const hoverStyles = document.createElement("style");
+hoverStyles.textContent = `
+.erpk-region-row:hover { background: rgba(255, 255, 255, 0.07); }
+.erpk-row-btn:hover {
+    color: rgba(255, 255, 255, 0.95) !important;
+    border-color: rgba(255, 255, 255, 0.45) !important;
+}
+.erpk-row-btn-danger:hover {
+    color: ${DANGER_RED} !important;
+    border-color: ${DANGER_RED} !important;
+}
+`;
+document.head.appendChild(hoverStyles);
 // Horizontal padding the editor root carries inside the DOM widget wrapper.
 const ROOT_PADDING_H = 12;
 const STATUS_STRIP_H = 22;
@@ -1524,6 +1540,7 @@ function createRegionEditor(node) {
         const box = state.boxes[index];
         const row = document.createElement("div");
         row._erpkBox = box;
+        row.className = "erpk-region-row";
         row.style.display = "flex";
         row.style.alignItems = "center";
         row.style.gap = "5px";
@@ -1532,7 +1549,7 @@ function createRegionEditor(node) {
         row.style.cursor = "grab";
         row.style.border = "1px solid "
             + (state.selection.has(box) ? HAIRLINE_STRONG : "transparent");
-        row.style.font = "9px ui-monospace, Menlo, monospace";
+        row.style.font = "8px 'Segoe UI', sans-serif";
         row.style.color = "rgba(255, 255, 255, 0.8)";
 
         const swatch = document.createElement("span");
@@ -1545,6 +1562,7 @@ function createRegionEditor(node) {
         const num = document.createElement("span");
         num.style.flex = "0 0 auto";
         num.style.color = "rgba(255, 255, 255, 0.5)";
+        num.style.fontVariantNumeric = "tabular-nums";
         num.textContent = String(index + 1).padStart(2, "0");
 
         const label = document.createElement("span");
@@ -1564,10 +1582,12 @@ function createRegionEditor(node) {
 
         const dupBtn = makeStripButton("⧉");
         dupBtn.title = "Duplicate region";
+        dupBtn.className = "erpk-row-btn";
         dupBtn.style.fontSize = "10px";
         dupBtn.style.padding = "0 4px";
         const delBtn = makeStripButton("✕");
         delBtn.title = "Delete region";
+        delBtn.className = "erpk-row-btn erpk-row-btn-danger";
         delBtn.style.fontSize = "10px";
         delBtn.style.padding = "0 4px";
         delBtn.style.color = DANGER_RED_DIM;
@@ -1628,12 +1648,14 @@ function createRegionEditor(node) {
         header.textContent = "Regions · top = front";
         header.title = "Click a row to select · drag rows to reorder depth · "
             + "⧉ duplicates · ✕ deletes";
-        header.style.font = "9px ui-monospace, Menlo, monospace";
+        header.style.font = "8px 'Segoe UI', sans-serif";
         header.style.color = "rgba(255, 255, 255, 0.45)";
         header.style.padding = "2px 6px 4px";
         header.style.whiteSpace = "nowrap";
         header.style.overflow = "hidden";
         header.style.textOverflow = "ellipsis";
+        header.style.borderBottom = "1px solid " + HAIRLINE;
+        header.style.marginBottom = "3px";
         panel.appendChild(header);
 
         panelList = document.createElement("div");
