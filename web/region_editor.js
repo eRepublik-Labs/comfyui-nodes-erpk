@@ -51,6 +51,10 @@ function regionColor(index) {
     return TAPE_COLORS[index % TAPE_COLORS.length];
 }
 
+// Copy buffer of plain region data; module-level so clones carry between
+// editor instances within the page session.
+let regionClipboard = [];
+
 function clamp(v, lo, hi) {
     return Math.min(Math.max(v, lo), hi);
 }
@@ -191,10 +195,12 @@ function styleInput(el) {
 function createRegionEditor(node) {
     const state = {
         boxes: [],
-        selected: -1,
-        drag: null,      // {mode: "create"|"move"|"resize", ...}
+        selection: new Set(),  // selected region objects — identity survives reorder
+        primary: null,         // most recently selected region; inspector binds to it
+        drag: null,      // {mode: "create"|"move"|"resize"|"marquee", ...}
         cssW: 0,
         cssH: 0,
+        hideBoxes: false,      // view-only: skip drawing and hit-testing boxes
         gridShow: false,
         gridCellPx: GRID_DEFAULT_CELL_PX,
         gridColor: GRID_DEFAULT_COLOR,
@@ -325,6 +331,12 @@ function createRegionEditor(node) {
     gridAlphaInput.style.display = "none";
     const snapBtn = makeStripButton("⌖");
     snapBtn.title = "Snap drawing, moving, and resizing to the grid";
+    const helpBtn = makeStripButton("?");
+    helpBtn.title = "Drag to draw · Ctrl-drag force-draw · click select · "
+        + "shift-click toggle · shift-drag marquee · drag moves selection · "
+        + "Alt-click cycles overlap · double-click edits · right-click region list · "
+        + "Del removes selected · Ctrl/Cmd+C/V/D copy/paste/duplicate · "
+        + "[ ] depth · H hide boxes";
     const clearBtn = makeStripButton("Clear all");
     clearBtn.title = "Remove every region (click twice to confirm)";
     clearBtn.style.color = DANGER_RED_DIM;
@@ -336,6 +348,7 @@ function createRegionEditor(node) {
     status.appendChild(gridColorInput);
     status.appendChild(gridAlphaInput);
     status.appendChild(snapBtn);
+    status.appendChild(helpBtn);
     status.appendChild(clearBtn);
 
     root.appendChild(stage);
@@ -404,7 +417,7 @@ function createRegionEditor(node) {
     function loadFromWidget() {
         const widget = findWidget(node, "regions_data");
         state.boxes = parseRegions(widget?.value ?? "[]");
-        state.selected = -1;
+        clearSelection();
         render();
     }
 
@@ -503,7 +516,7 @@ function createRegionEditor(node) {
         const w = box.w * state.cssW;
         const h = box.h * state.cssH;
         const color = regionColor(index);
-        const isSelected = index === state.selected;
+        const isSelected = state.selection.has(box);
 
         ctx.fillStyle = color + (isSelected ? "2e" : "17");
         ctx.fillRect(x, y, w, h);
@@ -550,7 +563,9 @@ function createRegionEditor(node) {
             ctx.fillText("T", bx + 4, y + h - 5);
         }
 
-        if (isSelected) {
+        // Corner handles only resolve to one box, so they only show for a
+        // single-region selection.
+        if (isSelected && state.selection.size === 1) {
             for (const handle of cornerHandles(box)) {
                 ctx.fillStyle = "#fff";
                 ctx.fillRect(
@@ -669,8 +684,14 @@ function createRegionEditor(node) {
         ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
         ctx.fillText("Drag to block out a region", cx, cy + 28);
         ctx.fillStyle = "rgba(255, 255, 255, 0.28)";
-        ctx.fillText("Select to edit below · Delete removes", cx, cy + 44);
+        ctx.fillText("Right-click for the region list · ? in the bar for all shortcuts", cx, cy + 44);
         ctx.textAlign = "left";
+    }
+
+    function drawHiddenHint() {
+        ctx.font = "10px ui-monospace, Menlo, monospace";
+        ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
+        ctx.fillText("boxes hidden — H to show", 8, state.cssH - 8);
     }
 
     function ratioString(w, h) {
@@ -690,14 +711,15 @@ function createRegionEditor(node) {
             ? "rgba(255, 255, 255, 0.4)"
             : "rgba(255, 255, 255, 0.65)";
         statusLeft.appendChild(countSpan);
-        const box = state.boxes[state.selected];
+        const index = primaryIndex();
+        const box = index >= 0 ? state.boxes[index] : null;
         if (box) {
             const sel = document.createElement("span");
             const name = box.kind === "text"
                 ? (box.text || box.desc || "text")
                 : (box.desc || "unnamed");
-            sel.textContent = ` · #${state.selected + 1} ${name}`;
-            sel.style.color = regionColor(state.selected);
+            sel.textContent = ` · #${index + 1} ${name}`;
+            sel.style.color = regionColor(index);
             statusLeft.appendChild(sel);
         }
         const w = Number(findWidget(node, "width")?.value) || 1024;
@@ -718,9 +740,17 @@ function createRegionEditor(node) {
         drawGrid();
         drawGuides();
         if (!state.boxes.length && !state.drag && !hasReference) drawEmptyHint();
-        state.boxes.forEach((box, i) => drawBox(box, i));
-        if (state.drag?.mode === "create") drawPending();
+        if (state.hideBoxes) {
+            drawHiddenHint();
+        } else {
+            state.boxes.forEach((box, i) => drawBox(box, i));
+        }
+        if (state.drag?.mode === "create" || state.drag?.mode === "marquee") drawPending();
         renderStatus();
+        // Keyboard mutations (delete, paste, duplicate, depth) reach the open
+        // panel through the shared render path; a row drag in flight owns the
+        // row DOM and must not be rebuilt under the pointer.
+        if (panel && !panelRowDragging) renderPanelRows();
     }
 
     // --- Hit testing -----------------------------------------------------
@@ -746,8 +776,8 @@ function createRegionEditor(node) {
     }
 
     function hitHandle(pp) {
-        if (state.selected < 0) return null;
-        const box = state.boxes[state.selected];
+        if (state.hideBoxes || state.selection.size !== 1) return null;
+        const box = state.primary;
         if (!box) return null;
         for (const handle of cornerHandles(box)) {
             if (
@@ -760,15 +790,24 @@ function createRegionEditor(node) {
         return null;
     }
 
-    // Topmost box wins: later boxes draw above earlier ones.
-    function hitBox(p) {
+    // Every box under the pointer, topmost first: later boxes draw above
+    // earlier ones.
+    function boxesAt(p) {
+        const hits = [];
         for (let i = state.boxes.length - 1; i >= 0; i--) {
             const b = state.boxes[i];
             if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
-                return i;
+                hits.push(b);
             }
         }
-        return -1;
+        return hits;
+    }
+
+    // Topmost box wins.
+    function hitBox(p) {
+        if (state.hideBoxes) return -1;
+        const hits = boxesAt(p);
+        return hits.length ? state.boxes.indexOf(hits[0]) : -1;
     }
 
     function resizeAnchor(box, handleId) {
@@ -779,6 +818,10 @@ function createRegionEditor(node) {
     }
 
     function updateCursor(e) {
+        if (state.hideBoxes) {
+            canvas.style.cursor = "crosshair";
+            return;
+        }
         const handleId = hitHandle(pointerPx(e));
         if (handleId) {
             canvas.style.cursor =
@@ -786,7 +829,7 @@ function createRegionEditor(node) {
             return;
         }
         const hit = hitBox(pointerNorm(e));
-        if (hit >= 0 && hit === state.selected) {
+        if (hit >= 0 && state.selection.has(state.boxes[hit])) {
             canvas.style.cursor = "move";
         } else if (hit >= 0) {
             canvas.style.cursor = "pointer";
@@ -795,13 +838,75 @@ function createRegionEditor(node) {
         }
     }
 
+    // --- Selection -----------------------------------------------------
+    // Selection tracks region objects, not indices, so membership and the
+    // primary survive depth reorders the same way the inspector binding does.
+    function primaryIndex() {
+        return state.primary ? state.boxes.indexOf(state.primary) : -1;
+    }
+
+    function lastSelected() {
+        let last = null;
+        for (const box of state.selection) last = box;
+        return last;
+    }
+
+    function select(box, { toggle = false } = {}) {
+        if (toggle) {
+            if (state.selection.has(box)) {
+                state.selection.delete(box);
+                if (state.primary === box) state.primary = lastSelected();
+            } else {
+                state.selection.add(box);
+                state.primary = box;
+            }
+        } else {
+            state.selection = new Set([box]);
+            state.primary = box;
+        }
+    }
+
+    function clearSelection() {
+        state.selection.clear();
+        state.primary = null;
+    }
+
+    // Selected regions in array (depth) order, backmost first.
+    function selectionInOrder() {
+        return state.boxes.filter((b) => state.selection.has(b));
+    }
+
+    function deleteSelected() {
+        if (!state.selection.size) return;
+        state.boxes = state.boxes.filter((b) => !state.selection.has(b));
+        clearSelection();
+        syncWidget();
+        render();
+    }
+
+    // Appends clones of the given regions on top (frontmost), nudged so the
+    // copies read as distinct from their sources, and selects them.
+    function pasteRegions(source) {
+        if (!source.length) return;
+        const pasted = source.map((b) => ({
+            ...b,
+            x: clamp(b.x + 0.02, 0, 1 - b.w),
+            y: clamp(b.y + 0.02, 0, 1 - b.h),
+        }));
+        state.boxes.push(...pasted);
+        state.selection = new Set(pasted);
+        state.primary = pasted[pasted.length - 1];
+        syncWidget();
+        render();
+    }
+
     // --- Inspector flow ----------------------------------------------------
     // Repopulate only when the selected region object changes, so the render
     // loop never clobbers live typing or resets the cursor.
     let inspected = null;
 
     function syncInspector() {
-        const box = state.boxes[state.selected] ?? null;
+        const box = state.primary;
         const showText = !!box && box.kind === "text";
         textInput.style.display = showText ? "" : "none";
         textInput.disabled = !showText;
@@ -833,8 +938,9 @@ function createRegionEditor(node) {
     }
 
     function moveSelectedRegion(delta) {
-        if (state.selected < 0) return;
-        state.selected = moveRegion(state.selected, delta);
+        const index = primaryIndex();
+        if (index < 0) return;
+        moveRegion(index, delta);
         render();
     }
 
@@ -846,18 +952,71 @@ function createRegionEditor(node) {
         canvas.setPointerCapture(e.pointerId);
 
         const p = pointerNorm(e);
+
+        // Ctrl/Cmd forces a fresh box even when the drag starts over one.
+        if (e.ctrlKey || e.metaKey) {
+            clearSelection();
+            const anchor = snapPoint(p);
+            state.drag = { mode: "create", anchor, current: anchor };
+            render();
+            return;
+        }
+
+        // Shift toggles membership on a box, or starts a marquee on empty
+        // canvas.
+        if (e.shiftKey) {
+            const hit = hitBox(p);
+            if (hit >= 0) {
+                select(state.boxes[hit], { toggle: true });
+            } else {
+                state.drag = { mode: "marquee", anchor: p, current: p };
+            }
+            render();
+            return;
+        }
+
+        // Alt cycles through the stack under the pointer, topmost first;
+        // with nothing underneath it falls through to the plain behavior.
+        if (e.altKey && !state.hideBoxes) {
+            const hits = boxesAt(p);
+            if (hits.length) {
+                const idx = hits.indexOf(state.primary);
+                select(hits[(idx + 1) % hits.length]);
+                render();
+                return;
+            }
+        }
+
         const handleId = hitHandle(pointerPx(e));
         if (handleId) {
-            const box = state.boxes[state.selected];
-            state.drag = { mode: "resize", anchor: resizeAnchor(box, handleId) };
+            const box = state.primary;
+            state.drag = { mode: "resize", box, anchor: resizeAnchor(box, handleId) };
         } else {
             const hit = hitBox(p);
             if (hit >= 0) {
-                state.selected = hit;
                 const box = state.boxes[hit];
-                state.drag = { mode: "move", grabDX: p.x - box.x, grabDY: p.y - box.y };
+                const wasSelected = state.selection.has(box);
+                if (wasSelected) {
+                    state.primary = box;
+                } else {
+                    select(box);
+                }
+                state.drag = {
+                    mode: "move",
+                    grabDX: p.x - box.x,
+                    grabDY: p.y - box.y,
+                    startX: box.x,
+                    startY: box.y,
+                    starts: new Map(
+                        [...state.selection].map((b) => [b, { x: b.x, y: b.y }]),
+                    ),
+                    moved: false,
+                    // A plain click (no movement) inside a multi-selection
+                    // collapses to just that box on release.
+                    collapseTo: wasSelected && state.selection.size > 1 ? box : null,
+                };
             } else {
-                state.selected = -1;
+                clearSelection();
                 const anchor = snapPoint(p);
                 state.drag = { mode: "create", anchor, current: anchor };
             }
@@ -874,16 +1033,24 @@ function createRegionEditor(node) {
         const d = state.drag;
         if (d.mode === "create") {
             d.current = snapPoint(p);
+        } else if (d.mode === "marquee") {
+            d.current = p;
         } else if (d.mode === "move") {
-            const box = state.boxes[state.selected];
+            // Snap resolves on the grabbed (primary) box; the rest of the
+            // selection follows the same delta, each clamping individually.
+            const box = state.primary;
             if (!box) return;
             const dims = frameDims(node);
-            box.x = clamp(snapAxis(p.x - d.grabDX, dims.w), 0, 1 - box.w);
-            box.y = clamp(snapAxis(p.y - d.grabDY, dims.h), 0, 1 - box.h);
+            const dx = clamp(snapAxis(p.x - d.grabDX, dims.w), 0, 1 - box.w) - d.startX;
+            const dy = clamp(snapAxis(p.y - d.grabDY, dims.h), 0, 1 - box.h) - d.startY;
+            if (dx || dy) d.moved = true;
+            for (const [b, start] of d.starts) {
+                b.x = clamp(start.x + dx, 0, 1 - b.w);
+                b.y = clamp(start.y + dy, 0, 1 - b.h);
+            }
         } else if (d.mode === "resize") {
-            const box = state.boxes[state.selected];
-            if (!box) return;
-            Object.assign(box, rectFrom(d.anchor, snapPoint(p)));
+            if (!d.box) return;
+            Object.assign(d.box, rectFrom(d.anchor, snapPoint(p)));
         }
         render();
     }
@@ -899,14 +1066,28 @@ function createRegionEditor(node) {
         if (d.mode === "create") {
             const rect = rectFrom(d.anchor, d.current);
             if (rect.w >= MIN_REGION_SIZE && rect.h >= MIN_REGION_SIZE) {
-                state.boxes.push({ ...rect, kind: "object", desc: "", text: "" });
-                state.selected = state.boxes.length - 1;
+                const box = { ...rect, kind: "object", desc: "", text: "" };
+                state.boxes.push(box);
+                select(box);
                 syncWidget();
             }
-        } else {
-            const box = state.boxes[state.selected];
-            if (box) {
-                enforceMinSize(box);
+        } else if (d.mode === "marquee") {
+            const rect = rectFrom(d.anchor, d.current);
+            const hits = state.boxes.filter((b) =>
+                b.x <= rect.x + rect.w && b.x + b.w >= rect.x
+                && b.y <= rect.y + rect.h && b.y + b.h >= rect.y);
+            state.selection = new Set(hits);
+            state.primary = hits.length ? hits[hits.length - 1] : null;
+        } else if (d.mode === "move") {
+            if (!d.moved && d.collapseTo) {
+                select(d.collapseTo);
+            } else {
+                for (const box of d.starts.keys()) enforceMinSize(box);
+                syncWidget();
+            }
+        } else if (d.mode === "resize") {
+            if (d.box) {
+                enforceMinSize(d.box);
                 syncWidget();
             }
         }
@@ -917,29 +1098,53 @@ function createRegionEditor(node) {
         e.stopPropagation();
         const hit = hitBox(pointerNorm(e));
         if (hit < 0) return;
-        state.selected = hit;
+        select(state.boxes[hit]);
         render();
         descInput.focus();
         descInput.select();
     }
 
     function onKeyDown(e) {
+        const mod = e.ctrlKey || e.metaKey;
+        const key = e.key.toLowerCase();
         if (
             (e.key === "Delete" || e.key === "Backspace")
-            && state.selected >= 0
+            && state.selection.size
         ) {
             e.preventDefault();
             e.stopPropagation();
-            state.boxes.splice(state.selected, 1);
-            state.selected = -1;
-            syncWidget();
-            render();
+            deleteSelected();
             return;
         }
-        if ((e.key === "[" || e.key === "]") && state.selected >= 0) {
+        if ((e.key === "[" || e.key === "]") && state.primary) {
             e.preventDefault();
             e.stopPropagation();
-            state.selected = moveRegion(state.selected, e.key === "]" ? 1 : -1);
+            moveSelectedRegion(e.key === "]" ? 1 : -1);
+            return;
+        }
+        if (mod && key === "c" && state.selection.size) {
+            e.preventDefault();
+            e.stopPropagation();
+            regionClipboard = selectionInOrder().map((b) => ({ ...b }));
+            return;
+        }
+        if (mod && key === "v" && regionClipboard.length) {
+            e.preventDefault();
+            e.stopPropagation();
+            pasteRegions(regionClipboard);
+            return;
+        }
+        // Always swallowed so the browser bookmark dialog never fires.
+        if (mod && key === "d") {
+            e.preventDefault();
+            e.stopPropagation();
+            if (state.selection.size) pasteRegions(selectionInOrder());
+            return;
+        }
+        if (key === "h" && !mod && !e.altKey && !e.shiftKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            state.hideBoxes = !state.hideBoxes;
             render();
         }
     }
@@ -958,7 +1163,7 @@ function createRegionEditor(node) {
     }
 
     function onDescInput() {
-        const box = state.boxes[state.selected];
+        const box = state.primary;
         if (!box) return;
         box.desc = descInput.value;
         syncWidget();
@@ -966,7 +1171,7 @@ function createRegionEditor(node) {
     }
 
     function onKindChange() {
-        const box = state.boxes[state.selected];
+        const box = state.primary;
         if (!box) return;
         box.kind = kindSelect.value === "text" ? "text" : "object";
         syncWidget();
@@ -975,7 +1180,7 @@ function createRegionEditor(node) {
     }
 
     function onTextInput() {
-        const box = state.boxes[state.selected];
+        const box = state.primary;
         if (!box) return;
         box.text = textInput.value;
         syncWidget();
@@ -1124,7 +1329,7 @@ function createRegionEditor(node) {
         }
         disarmClear();
         state.boxes = [];
-        state.selected = -1;
+        clearSelection();
         syncWidget();
         render();
     }
@@ -1137,12 +1342,295 @@ function createRegionEditor(node) {
         moveSelectedRegion(1);
     }
 
+    // The help button is reference-only; eating the pointerdown keeps it
+    // from stealing focus or reaching the graph.
+    function onHelpPointerDown(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    // --- Region list panel ----------------------------------------------
+    // Right-click panel listing regions front-to-back with per-row select,
+    // duplicate, delete, and pointer-drag depth reordering.
+    let panel = null;
+    let panelList = null;
+    let panelRowDragging = false;
+
+    // Pointer position in the root's layout pixels; the bounding rect is
+    // scaled by the graph zoom, so divide it back out.
+    function panelPoint(e) {
+        const r = root.getBoundingClientRect();
+        if (!r.width || !r.height) return { x: 0, y: 0 };
+        return {
+            x: (e.clientX - r.left) * (root.offsetWidth / r.width),
+            y: (e.clientY - r.top) * (root.offsetHeight / r.height),
+        };
+    }
+
+    function closePanel() {
+        if (!panel) return;
+        document.removeEventListener("pointerdown", onDocPointerDown, true);
+        document.removeEventListener("keydown", onDocKeyDown, true);
+        panel.remove();
+        panel = null;
+        panelList = null;
+    }
+
+    function onDocPointerDown(e) {
+        if (!panel || panel.contains(e.target)) return;
+        // Right-button presses on the canvas resolve through the contextmenu
+        // toggle instead, so one gesture doesn't close and then reopen.
+        if (e.button === 2 && e.target === canvas) return;
+        closePanel();
+    }
+
+    function onDocKeyDown(e) {
+        if (e.key === "Escape" && panel) {
+            e.preventDefault();
+            e.stopPropagation();
+            closePanel();
+        }
+    }
+
+    function onPanelPointerDown(e) {
+        e.stopPropagation();
+    }
+
+    function onPanelContextMenu(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    function duplicateRegion(box) {
+        pasteRegions([box]);
+        renderPanelRows();
+    }
+
+    function deleteRegion(box) {
+        const index = state.boxes.indexOf(box);
+        if (index < 0) return;
+        state.boxes.splice(index, 1);
+        state.selection.delete(box);
+        if (state.primary === box) state.primary = lastSelected();
+        syncWidget();
+        render();
+        if (state.boxes.length) renderPanelRows();
+        else closePanel();
+    }
+
+    // Dropping commits the DOM order back into the array; the list displays
+    // reversed, so the reorder reads bottom row = index 0 (backmost).
+    function commitPanelOrder() {
+        if (!panelList) return;
+        const order = [...panelList.children].map((el) => el._erpkBox).reverse();
+        // A keyboard mutation mid-drag invalidates the row snapshot; refuse a
+        // reorder that would add or drop regions and just rebuild the list.
+        const valid = order.length === state.boxes.length
+            && order.every((box) => state.boxes.includes(box));
+        if (valid) {
+            state.boxes = order;
+            syncWidget();
+        }
+        render();
+        renderPanelRows();
+    }
+
+    function onRowPointerDown(e, row) {
+        if (e.button !== 0) return;
+        e.stopPropagation();
+        e.preventDefault();
+        const startY = e.clientY;
+        let dragging = false;
+        row.setPointerCapture(e.pointerId);
+        panelRowDragging = true;
+
+        function onRowMove(ev) {
+            if (!dragging && Math.abs(ev.clientY - startY) > 4) {
+                dragging = true;
+                row.style.opacity = "0.55";
+            }
+            if (!dragging || !panelList) return;
+            // Float the row to the slot whose midpoint the pointer crossed.
+            let before = null;
+            for (const el of panelList.children) {
+                if (el === row) continue;
+                const r = el.getBoundingClientRect();
+                if (ev.clientY < r.top + r.height / 2) {
+                    before = el;
+                    break;
+                }
+            }
+            if (before) panelList.insertBefore(row, before);
+            else panelList.appendChild(row);
+        }
+
+        function onRowUp(ev) {
+            row.removeEventListener("pointermove", onRowMove);
+            row.removeEventListener("pointerup", onRowUp);
+            row.removeEventListener("pointercancel", onRowUp);
+            if (row.hasPointerCapture?.(ev.pointerId)) {
+                row.releasePointerCapture(ev.pointerId);
+            }
+            row.style.opacity = "";
+            panelRowDragging = false;
+            if (dragging) {
+                commitPanelOrder();
+            } else if (state.boxes.includes(row._erpkBox)) {
+                select(row._erpkBox);
+                render();
+                renderPanelRows();
+            } else {
+                renderPanelRows();
+            }
+        }
+
+        row.addEventListener("pointermove", onRowMove);
+        row.addEventListener("pointerup", onRowUp);
+        row.addEventListener("pointercancel", onRowUp);
+    }
+
+    function buildPanelRow(index) {
+        const box = state.boxes[index];
+        const row = document.createElement("div");
+        row._erpkBox = box;
+        row.style.display = "flex";
+        row.style.alignItems = "center";
+        row.style.gap = "6px";
+        row.style.padding = "3px 6px";
+        row.style.borderRadius = "4px";
+        row.style.cursor = "grab";
+        row.style.border = "1px solid "
+            + (state.selection.has(box) ? HAIRLINE_STRONG : "transparent");
+        row.style.font = "10px ui-monospace, Menlo, monospace";
+        row.style.color = "rgba(255, 255, 255, 0.8)";
+
+        const swatch = document.createElement("span");
+        swatch.style.flex = "0 0 auto";
+        swatch.style.width = "10px";
+        swatch.style.height = "10px";
+        swatch.style.borderRadius = "2px";
+        swatch.style.background = regionColor(index);
+
+        const num = document.createElement("span");
+        num.style.flex = "0 0 auto";
+        num.style.color = "rgba(255, 255, 255, 0.5)";
+        num.textContent = String(index + 1).padStart(2, "0");
+
+        const label = document.createElement("span");
+        label.style.flex = "1 1 auto";
+        label.style.minWidth = "0";
+        label.style.overflow = "hidden";
+        label.style.textOverflow = "ellipsis";
+        label.style.whiteSpace = "nowrap";
+        const text = box.kind === "text" ? box.text : box.desc;
+        if (text) {
+            label.textContent = text;
+        } else {
+            label.textContent = "(empty)";
+            label.style.fontStyle = "italic";
+            label.style.color = "rgba(255, 255, 255, 0.4)";
+        }
+
+        const dupBtn = makeStripButton("⧉");
+        dupBtn.title = "Duplicate region";
+        const delBtn = makeStripButton("✕");
+        delBtn.title = "Delete region";
+        delBtn.style.color = DANGER_RED_DIM;
+        delBtn.style.borderColor = DANGER_RED_BORDER;
+
+        row.appendChild(swatch);
+        row.appendChild(num);
+        row.appendChild(label);
+        row.appendChild(dupBtn);
+        row.appendChild(delBtn);
+
+        // Button presses must not start a row drag; their listeners die with
+        // the row element on rebuild or panel close.
+        dupBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+        delBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+        dupBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            duplicateRegion(box);
+        });
+        delBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            deleteRegion(box);
+        });
+        row.addEventListener("pointerdown", (e) => onRowPointerDown(e, row));
+        return row;
+    }
+
+    // Top row = frontmost region (the end of the array).
+    function renderPanelRows() {
+        if (!panelList) return;
+        panelList.textContent = "";
+        for (let i = state.boxes.length - 1; i >= 0; i--) {
+            panelList.appendChild(buildPanelRow(i));
+        }
+    }
+
+    function openPanel(e) {
+        closePanel();
+        panel = document.createElement("div");
+        panel.className = "erpk-region-list";
+        panel.style.position = "absolute";
+        panel.style.zIndex = "20";
+        panel.style.minWidth = "190px";
+        panel.style.maxWidth = "260px";
+        panel.style.maxHeight = Math.round(root.clientHeight * 0.6) + "px";
+        panel.style.overflowY = "auto";
+        panel.style.boxSizing = "border-box";
+        panel.style.padding = "4px";
+        panel.style.background = PANEL_BG;
+        panel.style.border = "1px solid " + HAIRLINE;
+        panel.style.borderRadius = "6px";
+        panel.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.45)";
+
+        const header = document.createElement("div");
+        header.textContent = "Regions — top = front · click select · drag reorder";
+        header.style.font = "10px ui-monospace, Menlo, monospace";
+        header.style.color = "rgba(255, 255, 255, 0.45)";
+        header.style.padding = "2px 6px 4px";
+        header.style.whiteSpace = "nowrap";
+        panel.appendChild(header);
+
+        panelList = document.createElement("div");
+        panel.appendChild(panelList);
+        renderPanelRows();
+
+        panel.addEventListener("pointerdown", onPanelPointerDown);
+        panel.addEventListener("contextmenu", onPanelContextMenu);
+
+        // Append first so the measured size can clamp the position fully
+        // inside the root.
+        root.appendChild(panel);
+        const pt = panelPoint(e);
+        const maxX = Math.max(root.clientWidth - panel.offsetWidth - 4, 0);
+        const maxY = Math.max(root.clientHeight - panel.offsetHeight - 4, 0);
+        panel.style.left = Math.round(Math.min(Math.max(pt.x, 4), maxX)) + "px";
+        panel.style.top = Math.round(Math.min(Math.max(pt.y, 4), maxY)) + "px";
+
+        document.addEventListener("pointerdown", onDocPointerDown, true);
+        document.addEventListener("keydown", onDocKeyDown, true);
+    }
+
+    // Suppresses both the browser and ComfyUI menus; a second right-click
+    // closes the panel.
+    function onContextMenu(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (panel) closePanel();
+        else openPanel(e);
+    }
+
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerup", onPointerUp);
     canvas.addEventListener("pointercancel", onPointerUp);
     canvas.addEventListener("dblclick", onDblClick);
     canvas.addEventListener("keydown", onKeyDown);
+    canvas.addEventListener("contextmenu", onContextMenu);
+    helpBtn.addEventListener("pointerdown", onHelpPointerDown);
     inspector.addEventListener("pointerdown", onInspectorPointerDown);
     inspector.addEventListener("keydown", onInspectorKeyDown);
     descInput.addEventListener("input", onDescInput);
@@ -1179,6 +1667,8 @@ function createRegionEditor(node) {
         canvas.removeEventListener("pointercancel", onPointerUp);
         canvas.removeEventListener("dblclick", onDblClick);
         canvas.removeEventListener("keydown", onKeyDown);
+        canvas.removeEventListener("contextmenu", onContextMenu);
+        helpBtn.removeEventListener("pointerdown", onHelpPointerDown);
         inspector.removeEventListener("pointerdown", onInspectorPointerDown);
         inspector.removeEventListener("keydown", onInspectorKeyDown);
         descInput.removeEventListener("input", onDescInput);
@@ -1196,6 +1686,7 @@ function createRegionEditor(node) {
         gridAlphaInput.removeEventListener("blur", onGridAlphaBlur);
         gridAlphaInput.removeEventListener("keydown", onGridSizeKeyDown);
         snapBtn.removeEventListener("click", onSnapToggle);
+        closePanel();
         if (clearArm) clearTimeout(clearArm);
     }
 
