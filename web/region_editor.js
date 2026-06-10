@@ -21,9 +21,10 @@ const GRID_DIVS = 12;
 // Horizontal padding the editor root carries inside the DOM widget wrapper.
 const ROOT_PADDING_H = 8;
 const STATUS_STRIP_H = 22;
-// Vertical chrome around the canvas inside the editor root: padding, the
-// status strip, the flex gap, and the canvas border.
-const EDITOR_CHROME_V = 36;
+const INSPECTOR_H = 26;
+// Vertical chrome around the canvas inside the editor root: padding, canvas
+// border, the inspector row, the status strip, and the flex gaps between them.
+const EDITOR_CHROME_V = 66;
 
 // The canvas is a stage for the image-to-be: dark like every ComfyUI content
 // preview, independent of the UI theme. Chrome around it follows the theme.
@@ -154,8 +155,8 @@ function enforceMinSize(box) {
     box.y = clamp(box.y, 0, 1 - box.h);
 }
 
-// The overlay floats over the dark stage, so its controls live in the stage's
-// color world rather than following the UI theme.
+// Inspector controls sit in the stage's color world rather than following
+// the UI theme, matching the canvas and status strip around them.
 function styleInput(el) {
     el.style.background = PANEL_INPUT_BG;
     el.style.color = "rgba(255, 255, 255, 0.9)";
@@ -167,39 +168,11 @@ function styleInput(el) {
     el.style.width = "100%";
 }
 
-function makeField(labelText, input) {
-    const field = document.createElement("label");
-    field.style.display = "flex";
-    field.style.flexDirection = "column";
-    field.style.gap = "3px";
-    field.style.fontSize = "11px";
-    field.style.color = "rgba(255, 255, 255, 0.6)";
-    field.appendChild(document.createTextNode(labelText));
-    field.appendChild(input);
-    return field;
-}
-
-function makeButton(label) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.textContent = label;
-    btn.style.flex = "1 1 0";
-    btn.style.padding = "5px 10px";
-    btn.style.borderRadius = "3px";
-    btn.style.border = "1px solid rgba(255, 255, 255, 0.14)";
-    btn.style.background = PANEL_INPUT_BG;
-    btn.style.color = "rgba(255, 255, 255, 0.85)";
-    btn.style.fontSize = "12px";
-    btn.style.cursor = "pointer";
-    return btn;
-}
-
 function createRegionEditor(node) {
     const state = {
         boxes: [],
         selected: -1,
         drag: null,      // {mode: "create"|"move"|"resize", ...}
-        editing: -1,
         cssW: 0,
         cssH: 0,
         gridOn: false,
@@ -274,6 +247,8 @@ function createRegionEditor(node) {
         btn.textContent = label;
         btn.style.flex = "0 0 auto";
         btn.style.font = "inherit";
+        btn.style.fontSize = "12px";
+        btn.style.lineHeight = "1";
         btn.style.color = "rgba(255, 255, 255, 0.65)";
         btn.style.background = "transparent";
         btn.style.border = "1px solid rgba(255, 255, 255, 0.14)";
@@ -283,9 +258,12 @@ function createRegionEditor(node) {
         return btn;
     }
 
-    const gridBtn = makeStripButton("Grid");
-    const snapBtn = makeStripButton("Snap");
-    const clearBtn = makeStripButton("Clear");
+    const gridBtn = makeStripButton("⊞");
+    gridBtn.title = "Toggle the 12×12 grid";
+    const snapBtn = makeStripButton("⌖");
+    snapBtn.title = "Snap drawing, moving, and resizing to the grid";
+    const clearBtn = makeStripButton("✕");
+    clearBtn.title = "Clear all regions (click twice to confirm)";
     status.appendChild(statusLeft);
     status.appendChild(statusRight);
     status.appendChild(gridBtn);
@@ -297,32 +275,22 @@ function createRegionEditor(node) {
 
     const ctx = canvas.getContext("2d");
 
-    // --- Overlay editor (desc / kind / text) --------------------------
-    const overlay = document.createElement("div");
-    overlay.className = "erpk-region-overlay";
-    overlay.style.position = "absolute";
-    overlay.style.left = "50%";
-    overlay.style.top = "50%";
-    overlay.style.transform = "translate(-50%, -50%)";
-    overlay.style.display = "none";
-    overlay.style.flexDirection = "column";
-    overlay.style.gap = "8px";
-    overlay.style.padding = "10px";
-    overlay.style.minWidth = "220px";
-    overlay.style.maxWidth = "90%";
-    overlay.style.boxSizing = "border-box";
-    overlay.style.background = PANEL_BG;
-    overlay.style.border = "1px solid rgba(255, 255, 255, 0.12)";
-    overlay.style.borderRadius = "6px";
-    overlay.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.55)";
-    overlay.style.zIndex = "10";
-    overlay.style.maxHeight = "calc(100% - 8px)";
-    overlay.style.overflowY = "auto";
+    // --- Inspector: edits the selected region in place -----------------
+    const inspector = document.createElement("div");
+    inspector.className = "erpk-region-inspector";
+    inspector.style.flex = "0 0 auto";
+    inspector.style.height = INSPECTOR_H + "px";
+    inspector.style.display = "flex";
+    inspector.style.alignItems = "stretch";
+    inspector.style.gap = "6px";
 
     const descInput = document.createElement("input");
     descInput.type = "text";
-    descInput.placeholder = "e.g. a red vintage car";
+    descInput.placeholder = "description — e.g. a red vintage car";
+    descInput.title = "Description of the selected region";
     styleInput(descInput);
+    descInput.style.width = "";
+    descInput.style.flex = "2 1 0";
 
     const kindSelect = document.createElement("select");
     for (const kind of ["object", "text"]) {
@@ -331,35 +299,30 @@ function createRegionEditor(node) {
         option.textContent = kind;
         kindSelect.appendChild(option);
     }
+    kindSelect.title = "Region kind: an object in the scene, or literal text to render";
     styleInput(kindSelect);
+    kindSelect.style.width = "";
+    kindSelect.style.flex = "0 0 auto";
 
     const textInput = document.createElement("input");
     textInput.type = "text";
-    textInput.placeholder = "literal text to render";
+    textInput.placeholder = "text to render";
+    textInput.title = "Literal text the model should render inside this region";
     styleInput(textInput);
+    textInput.style.width = "";
+    textInput.style.flex = "1 1 0";
 
-    const depthRow = document.createElement("div");
-    depthRow.style.display = "flex";
-    depthRow.style.gap = "6px";
-    const backBtn = makeButton("Send back");
-    const frontBtn = makeButton("Bring forward");
-    depthRow.appendChild(backBtn);
-    depthRow.appendChild(frontBtn);
+    const backBtn = makeStripButton("▼");
+    backBtn.title = "Send back — one layer toward the background ( [ )";
+    const frontBtn = makeStripButton("▲");
+    frontBtn.title = "Bring forward — one layer toward the front ( ] )";
 
-    const buttonRow = document.createElement("div");
-    buttonRow.style.display = "flex";
-    buttonRow.style.gap = "6px";
-    const okBtn = makeButton("OK");
-    const cancelBtn = makeButton("Cancel");
-    buttonRow.appendChild(okBtn);
-    buttonRow.appendChild(cancelBtn);
-
-    overlay.appendChild(makeField("Description", descInput));
-    overlay.appendChild(makeField("Kind", kindSelect));
-    overlay.appendChild(makeField("Text", textInput));
-    overlay.appendChild(makeField("Depth (back to front)", depthRow));
-    overlay.appendChild(buttonRow);
-    root.appendChild(overlay);
+    inspector.appendChild(descInput);
+    inspector.appendChild(kindSelect);
+    inspector.appendChild(textInput);
+    inspector.appendChild(backBtn);
+    inspector.appendChild(frontBtn);
+    root.insertBefore(inspector, status);
 
     // --- Widget plumbing ----------------------------------------------
     function syncWidget() {
@@ -609,7 +572,7 @@ function createRegionEditor(node) {
         ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
         ctx.fillText("Drag to block out a region", cx, cy + 28);
         ctx.fillStyle = "rgba(255, 255, 255, 0.28)";
-        ctx.fillText("Double-click to edit · Delete to remove", cx, cy + 44);
+        ctx.fillText("Select to edit below · Delete removes", cx, cy + 44);
         ctx.textAlign = "left";
     }
 
@@ -646,6 +609,7 @@ function createRegionEditor(node) {
         clearBtn.style.opacity = count ? "1" : "0.45";
         clearBtn.style.cursor = count ? "pointer" : "default";
         if (!count) disarmClear();
+        syncInspector();
     }
 
     function render() {
@@ -733,31 +697,30 @@ function createRegionEditor(node) {
         }
     }
 
-    // --- Overlay editor flow ---------------------------------------------
-    function openOverlay(index) {
-        const box = state.boxes[index];
-        if (!box) return;
-        state.editing = index;
-        descInput.value = box.desc;
-        kindSelect.value = box.kind;
-        textInput.value = box.text;
-        textInput.disabled = box.kind !== "text";
-        overlay.style.display = "flex";
-        descInput.focus();
-    }
+    // --- Inspector flow ----------------------------------------------------
+    // Repopulate only when the selected region object changes, so the render
+    // loop never clobbers live typing or resets the cursor.
+    let inspected = null;
 
-    function closeOverlay(commit) {
-        if (state.editing < 0) return;
-        const box = state.boxes[state.editing];
-        if (commit && box) {
-            box.desc = descInput.value;
-            box.kind = kindSelect.value === "text" ? "text" : "object";
-            box.text = textInput.value;
-            syncWidget();
+    function syncInspector() {
+        const box = state.boxes[state.selected] ?? null;
+        if (box === inspected) {
+            textInput.disabled = !box || box.kind !== "text";
+            return;
         }
-        state.editing = -1;
-        overlay.style.display = "none";
-        render();
+        inspected = box;
+        descInput.value = box ? box.desc : "";
+        kindSelect.value = box ? box.kind : "object";
+        textInput.value = box ? box.text : "";
+        const off = !box;
+        descInput.disabled = off;
+        kindSelect.disabled = off;
+        textInput.disabled = off || box.kind !== "text";
+        backBtn.disabled = off;
+        frontBtn.disabled = off;
+        const dim = off ? "0.45" : "1";
+        backBtn.style.opacity = dim;
+        frontBtn.style.opacity = dim;
     }
 
     // Array order is depth: index 0 is backmost, the last region is frontmost.
@@ -772,10 +735,9 @@ function createRegionEditor(node) {
         return target;
     }
 
-    function moveEditingRegion(delta) {
-        if (state.editing < 0) return;
-        state.editing = moveRegion(state.editing, delta);
-        state.selected = state.editing;
+    function moveSelectedRegion(delta) {
+        if (state.selected < 0) return;
+        state.selected = moveRegion(state.selected, delta);
         render();
     }
 
@@ -783,7 +745,6 @@ function createRegionEditor(node) {
     function onPointerDown(e) {
         if (e.button !== 0) return;
         e.stopPropagation();
-        closeOverlay(false);
         canvas.focus();
         canvas.setPointerCapture(e.pointerId);
 
@@ -860,14 +821,14 @@ function createRegionEditor(node) {
         if (hit < 0) return;
         state.selected = hit;
         render();
-        openOverlay(hit);
+        descInput.focus();
+        descInput.select();
     }
 
     function onKeyDown(e) {
         if (
             (e.key === "Delete" || e.key === "Backspace")
             && state.selected >= 0
-            && state.editing < 0
         ) {
             e.preventDefault();
             e.stopPropagation();
@@ -877,11 +838,7 @@ function createRegionEditor(node) {
             render();
             return;
         }
-        if (
-            (e.key === "[" || e.key === "]")
-            && state.selected >= 0
-            && state.editing < 0
-        ) {
+        if ((e.key === "[" || e.key === "]") && state.selected >= 0) {
             e.preventDefault();
             e.stopPropagation();
             state.selected = moveRegion(state.selected, e.key === "]" ? 1 : -1);
@@ -889,23 +846,42 @@ function createRegionEditor(node) {
         }
     }
 
-    function onOverlayPointerDown(e) {
+    function onInspectorPointerDown(e) {
         e.stopPropagation();
     }
 
-    function onOverlayKeyDown(e) {
+    // Keep typing out of ComfyUI's global hotkeys and the canvas handlers.
+    function onInspectorKeyDown(e) {
         e.stopPropagation();
         if (e.key === "Enter") {
             e.preventDefault();
-            closeOverlay(true);
-        } else if (e.key === "Escape") {
-            e.preventDefault();
-            closeOverlay(false);
+            e.target.blur?.();
         }
     }
 
+    function onDescInput() {
+        const box = state.boxes[state.selected];
+        if (!box) return;
+        box.desc = descInput.value;
+        syncWidget();
+        render();
+    }
+
     function onKindChange() {
-        textInput.disabled = kindSelect.value !== "text";
+        const box = state.boxes[state.selected];
+        if (!box) return;
+        box.kind = kindSelect.value === "text" ? "text" : "object";
+        textInput.disabled = box.kind !== "text";
+        syncWidget();
+        render();
+    }
+
+    function onTextInput() {
+        const box = state.boxes[state.selected];
+        if (!box) return;
+        box.text = textInput.value;
+        syncWidget();
+        render();
     }
 
     // Grid/snap are editor preferences, persisted through node.properties so
@@ -960,7 +936,7 @@ function createRegionEditor(node) {
     function disarmClear() {
         if (clearArm) clearTimeout(clearArm);
         clearArm = null;
-        clearBtn.textContent = "Clear";
+        clearBtn.textContent = "✕";
         clearBtn.style.color = "rgba(255, 255, 255, 0.65)";
         clearBtn.style.borderColor = "rgba(255, 255, 255, 0.14)";
     }
@@ -968,34 +944,25 @@ function createRegionEditor(node) {
     function onClearClick() {
         if (!state.boxes.length) return;
         if (clearArm === null) {
-            clearBtn.textContent = "Confirm clear";
+            clearBtn.textContent = "Confirm?";
             clearBtn.style.color = "#f9a826";
             clearBtn.style.borderColor = "#f9a826";
             clearArm = setTimeout(disarmClear, 2500);
             return;
         }
         disarmClear();
-        closeOverlay(false);
         state.boxes = [];
         state.selected = -1;
         syncWidget();
         render();
     }
 
-    function onOk() {
-        closeOverlay(true);
-    }
-
-    function onCancel() {
-        closeOverlay(false);
-    }
-
     function onSendBack() {
-        moveEditingRegion(-1);
+        moveSelectedRegion(-1);
     }
 
     function onBringForward() {
-        moveEditingRegion(1);
+        moveSelectedRegion(1);
     }
 
     canvas.addEventListener("pointerdown", onPointerDown);
@@ -1004,11 +971,11 @@ function createRegionEditor(node) {
     canvas.addEventListener("pointercancel", onPointerUp);
     canvas.addEventListener("dblclick", onDblClick);
     canvas.addEventListener("keydown", onKeyDown);
-    overlay.addEventListener("pointerdown", onOverlayPointerDown);
-    overlay.addEventListener("keydown", onOverlayKeyDown);
+    inspector.addEventListener("pointerdown", onInspectorPointerDown);
+    inspector.addEventListener("keydown", onInspectorKeyDown);
+    descInput.addEventListener("input", onDescInput);
     kindSelect.addEventListener("change", onKindChange);
-    okBtn.addEventListener("click", onOk);
-    cancelBtn.addEventListener("click", onCancel);
+    textInput.addEventListener("input", onTextInput);
     clearBtn.addEventListener("click", onClearClick);
     backBtn.addEventListener("click", onSendBack);
     frontBtn.addEventListener("click", onBringForward);
@@ -1033,11 +1000,11 @@ function createRegionEditor(node) {
         canvas.removeEventListener("pointercancel", onPointerUp);
         canvas.removeEventListener("dblclick", onDblClick);
         canvas.removeEventListener("keydown", onKeyDown);
-        overlay.removeEventListener("pointerdown", onOverlayPointerDown);
-        overlay.removeEventListener("keydown", onOverlayKeyDown);
+        inspector.removeEventListener("pointerdown", onInspectorPointerDown);
+        inspector.removeEventListener("keydown", onInspectorKeyDown);
+        descInput.removeEventListener("input", onDescInput);
         kindSelect.removeEventListener("change", onKindChange);
-        okBtn.removeEventListener("click", onOk);
-        cancelBtn.removeEventListener("click", onCancel);
+        textInput.removeEventListener("input", onTextInput);
         clearBtn.removeEventListener("click", onClearClick);
         backBtn.removeEventListener("click", onSendBack);
         frontBtn.removeEventListener("click", onBringForward);

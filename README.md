@@ -250,9 +250,9 @@ String manipulation and general utility nodes.
 - **Regional Prompt Builder** - Draw regions on a canvas and emit a layout-aware prompt for any image generation model: each region becomes a verbal placement plus box_2d coordinates (works with the Gemini, OpenAI, and Grok image nodes). Also outputs pixel-space `BOUNDING_BOX` regions compatible with core SAM3 Detect, Draw BBoxes, and Crop By BBoxes nodes.
 
 **Regional Prompt Builder features:**
-- Canvas editor on the node: drag to draw, move, and resize regions; double-click to edit a region's description, kind (object or rendered text), and literal text; Delete removes
-- Regions keep stable identity colors; text regions preview their literal text in-frame
-- Depth control: regions layer back to front (number 1 is backmost). Reorder with `[` / `]` or the Send back / Bring forward buttons in the region editor; the prompt tells the model that later elements appear in front where regions overlap
+- Canvas editor on the node: drag to draw, move, and resize regions; Delete removes. An inspector row under the canvas edits the selected region's description, kind (object or rendered text), and literal text live; double-click a region to jump to its description field
+- Regions keep identity colors; text regions preview their literal text in-frame
+- Depth control: regions layer back to front (number 1 is backmost). Reorder with `[` / `]` or the inspector's depth buttons; the prompt tells the model that later elements appear in front where regions overlap
 - Status strip shows region count, selection, frame dimensions, and aspect ratio
 - Clear button in the status strip empties all regions (two-step confirm, no blocking dialog)
 - Optional 12x12 grid with snap-to-grid: Grid and Snap toggles in the status strip; drawing, moving, and resizing quantize to grid lines, and the preference saves with the workflow
