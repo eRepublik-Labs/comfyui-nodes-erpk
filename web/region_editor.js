@@ -647,11 +647,11 @@ function createRegionEditor(node) {
         }
         if (box.desc) {
             ctx.font = LABEL_FONT;
-            // Each row rides its own backing strip, so the label may run past
-            // the region's edge; rows wrap at the canvas edge and the text
-            // ellipsizes only when it runs out of rows.
-            const labelMax = Math.max(state.cssW - labelX - 6, 12);
-            const maxRows = Math.max(1, Math.min(4, Math.floor((state.cssH - y) / 13)));
+            // The label wraps inside the region: rows break at the box's
+            // right edge and ellipsize only when its height runs out of
+            // 13px bands.
+            const labelMax = Math.max(w - (labelX - x) - 6, 12);
+            const maxRows = Math.max(1, Math.floor(h / 13));
             wrapLabel(box.desc, labelMax, maxRows).forEach((line, row) => {
                 const lineWidth = ctx.measureText(line).width;
                 ctx.fillStyle = "rgba(8, 8, 10, 0.72)";
