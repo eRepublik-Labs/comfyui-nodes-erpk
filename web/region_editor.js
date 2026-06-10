@@ -1576,9 +1576,12 @@ function createRegionEditor(node) {
         panel.style.position = "absolute";
         panel.style.zIndex = "20";
         panel.style.minWidth = "190px";
-        panel.style.maxWidth = "260px";
+        panel.style.maxWidth = "280px";
         panel.style.maxHeight = Math.round(root.clientHeight * 0.6) + "px";
         panel.style.overflowY = "auto";
+        panel.style.overflowX = "hidden";
+        panel.style.scrollbarWidth = "thin";
+        panel.style.scrollbarColor = "rgba(255, 255, 255, 0.25) transparent";
         panel.style.boxSizing = "border-box";
         panel.style.padding = "4px";
         panel.style.background = PANEL_BG;
@@ -1587,11 +1590,15 @@ function createRegionEditor(node) {
         panel.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.45)";
 
         const header = document.createElement("div");
-        header.textContent = "Regions — top = front · click select · drag reorder";
+        header.textContent = "Regions · top = front";
+        header.title = "Click a row to select · drag rows to reorder depth · "
+            + "⧉ duplicates · ✕ deletes";
         header.style.font = "10px ui-monospace, Menlo, monospace";
         header.style.color = "rgba(255, 255, 255, 0.45)";
         header.style.padding = "2px 6px 4px";
         header.style.whiteSpace = "nowrap";
+        header.style.overflow = "hidden";
+        header.style.textOverflow = "ellipsis";
         panel.appendChild(header);
 
         panelList = document.createElement("div");
