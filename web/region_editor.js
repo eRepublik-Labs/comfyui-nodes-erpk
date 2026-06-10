@@ -25,6 +25,9 @@ const GRID_MIN_CELL_PX = 8;
 const GRID_MAX_CELL_PX = 1024;
 const GRID_DEFAULT_CELL_PX = 64;
 const GRID_DEFAULT_COLOR = "#26262e";
+// Active/toggled-on state for strip and inspector controls.
+const ACTIVE_GREEN = "#52c97d";
+const ACTIVE_GREEN_BORDER = "rgba(82, 201, 125, 0.55)";
 // Destructive-action red for the clear-all control.
 const DANGER_RED = "#e5484d";
 const DANGER_RED_DIM = "rgba(229, 72, 77, 0.85)";
@@ -50,6 +53,10 @@ hoverStyles.textContent = `
 .erpk-btn-danger:hover:not(:disabled) {
     color: ${DANGER_RED} !important;
     border-color: ${DANGER_RED} !important;
+}
+.erpk-btn-active:hover:not(:disabled) {
+    color: #6fe39a !important;
+    border-color: #6fe39a !important;
 }
 `;
 document.head.appendChild(hoverStyles);
@@ -1064,10 +1071,11 @@ function createRegionEditor(node) {
         const plugged = wireable && (wired || exposedDescSet().has(index + 1));
         plugBtn.disabled = !wireable || wired;
         plugBtn.style.opacity = wireable ? "1" : "0.45";
+        plugBtn.classList.toggle("erpk-btn-active", plugged);
         plugBtn.style.color = plugged
-            ? "rgba(255, 255, 255, 0.92)" : "rgba(255, 255, 255, 0.65)";
+            ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
         plugBtn.style.borderColor = plugged
-            ? "rgba(255, 255, 255, 0.45)" : "rgba(255, 255, 255, 0.14)";
+            ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
         plugBtn.title = wired
             ? "Description is wired — disconnect the input to unplug"
             : plugged
@@ -1391,10 +1399,11 @@ function createRegionEditor(node) {
     }
 
     function syncToolButtons() {
-        const on = "rgba(255, 255, 255, 0.92)";
+        const on = ACTIVE_GREEN;
         const off = "rgba(255, 255, 255, 0.65)";
-        const onBorder = "rgba(255, 255, 255, 0.45)";
+        const onBorder = ACTIVE_GREEN_BORDER;
         const offBorder = "rgba(255, 255, 255, 0.14)";
+        gridBtn.classList.toggle("erpk-btn-active", state.gridShow);
         gridBtn.style.color = state.gridShow ? on : off;
         gridBtn.style.borderColor = state.gridShow ? onBorder : offBorder;
         gridSizeInput.style.display = state.gridShow ? "" : "none";
@@ -1410,6 +1419,7 @@ function createRegionEditor(node) {
             gridAlphaInput.value = String(Math.round(state.gridAlpha * 100));
         }
         const snapActive = state.gridShow && state.snapOn;
+        snapBtn.classList.toggle("erpk-btn-active", snapActive);
         snapBtn.disabled = !state.gridShow;
         snapBtn.style.opacity = state.gridShow ? "1" : "0.45";
         snapBtn.style.cursor = state.gridShow ? "pointer" : "default";
