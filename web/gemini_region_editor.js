@@ -7,14 +7,16 @@ const NODE_ID = "GeminiRegionalPromptBuilder";
 const MIN_REGION_SIZE = 0.01;   // normalized floor; Python skips regions at or below 0.005
 const HANDLE_HIT_PX = 7;
 const HANDLE_DRAW_PX = 6;
-const STAGE_PADDING_PX = 8;
+const STAGE_PADDING_PX = 0;
 const LABEL_FONT = "11px 'Segoe UI', sans-serif";
 const MIN_NODE_WIDTH = 340;
 // Per-side inset ComfyUI applies between the outer node frame and the inner
 // widget area; the DOM widget wrapper is wider than the usable area without it.
 const CHROME_HORIZONTAL_INSET = 16;
 const CANVAS_MIN_H = 200;
-const CANVAS_MAX_H = 480;
+const CANVAS_MAX_H = 900;
+// Horizontal padding the editor root carries inside the DOM widget wrapper.
+const ROOT_PADDING_H = 8;
 const STATUS_STRIP_H = 22;
 // Vertical chrome around the canvas inside the editor root: padding, the
 // status strip, the flex gap, and the canvas border.
@@ -57,8 +59,13 @@ function frameAspect(node) {
 
 // Height the editor needs below the regular widgets: a canvas matching the
 // frame's aspect ratio at the node's current width, clamped to a usable band.
+// Wired into the DOM widget's getMinHeight/getMaxHeight so the layout pins
+// the editor at exactly this height instead of treating it as growable.
 function desiredEditorHeight(node) {
-    const innerW = Math.max((node.size?.[0] ?? MIN_NODE_WIDTH) - CHROME_HORIZONTAL_INSET, 100);
+    const innerW = Math.max(
+        (node.size?.[0] ?? MIN_NODE_WIDTH) - CHROME_HORIZONTAL_INSET - ROOT_PADDING_H,
+        100,
+    );
     const canvasH = clamp(innerW / frameAspect(node), CANVAS_MIN_H, CANVAS_MAX_H);
     return Math.round(canvasH + EDITOR_CHROME_V);
 }
@@ -860,14 +867,13 @@ app.registerExtension({
     async beforeRegisterNodeDef(nodeType, nodeData) {
         if (nodeData?.name !== NODE_ID) return;
 
-        // The node must reserve vertical room for the editor below the regular
-        // widgets, or the DOM widget's content renders past the node frame.
-        // computeSize is also what the canvas renderer clamps drag-resizes to.
+        // The editor's height reaches the layout through the DOM widget's
+        // getMinHeight/getMaxHeight (computeSize folds widget layout sizes in
+        // by itself), so the node override only floors the width.
         const origComputeSize = nodeType.prototype.computeSize;
         nodeType.prototype.computeSize = function () {
             const size = origComputeSize?.apply(this, arguments) ?? [MIN_NODE_WIDTH, 0];
-            const w = Math.max(size[0], MIN_NODE_WIDTH);
-            return [w, size[1] + desiredEditorHeight(this)];
+            return [Math.max(size[0], MIN_NODE_WIDTH), size[1]];
         };
 
         const onNodeCreated = nodeType.prototype.onNodeCreated;
@@ -880,6 +886,11 @@ app.registerExtension({
             this.addDOMWidget("region_editor", "erpk_region_editor", editor.root, {
                 serialize: false,
                 hideOnZoom: false,
+                // Pinning min == max keeps the canvas aspect-true at the node's
+                // width and leaves the multiline scene field as the only widget
+                // that grows when the node is stretched taller.
+                getMinHeight: () => desiredEditorHeight(this),
+                getMaxHeight: () => desiredEditorHeight(this),
             });
 
             const computed = this.computeSize();
