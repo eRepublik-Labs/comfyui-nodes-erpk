@@ -12,17 +12,15 @@ MIN_REGION_EXTENT = 0.005
 # the canvas (numbers are depth order, so reordering remaps the wires).
 DESC_INPUT_COUNT = 6
 
-# Detection-annotation cues make vision models RENDER boxes around the
-# elements: both the words ("bounding box") and the format - Gemini draws
-# colored rectangles at coordinates given as its native box_2d detection
-# arrays. The template calls them invisible placement areas, states geometry
-# as plain percent spans, and forbids drawing them.
+# "Bounding box" is detection-annotation vocabulary: models that know it from
+# vision training will happily RENDER yellow boxes around the elements. The
+# template calls them invisible placement areas and forbids drawing them.
 LAYOUT_HEADER = (
-    "Layout: place each element exactly where specified. Each position gives "
-    "a verbal placement plus the exact span it occupies as percentages of "
-    "the frame width and height, measured from the top-left corner. Elements "
-    "are listed from back to front: where placement areas overlap, a later "
-    "element appears in front of an earlier one."
+    "Layout: place each element exactly where specified. Each position gives a "
+    'verbal placement plus its placement area as "box_2d = [ymin, xmin, ymax, xmax]" '
+    "on a 0-1000 grid with top-left origin. Elements are listed from back to "
+    "front: where placement areas overlap, a later element appears in front of "
+    "an earlier one."
 )
 LAYOUT_FOOTER = (
     "Every element must stay fully inside its placement area and fill most of it. "
@@ -77,6 +75,13 @@ def parse_regions(regions_json):
     return regions
 
 
+def box_2d(x, y, w, h):
+    """Convert a normalized region to Gemini's [ymin, xmin, ymax, xmax] on a 0-1000 grid."""
+    def to_grid(value):
+        return _clamp(round(value * 1000), 0, 1000)
+    return [to_grid(y), to_grid(x), to_grid(y + h), to_grid(x + w)]
+
+
 def placement_phrase(x, y, w, h):
     """Describe where a region's center falls on a 3x3 grid, e.g. "at the bottom-left"."""
     cx = x + w / 2
@@ -94,22 +99,12 @@ def aspect_ratio_string(width, height):
     return f"{width // divisor}:{height // divisor}"
 
 
-# Tenth-of-a-percent resolution matches the 0-1000 grid of detection-style
-# coordinates; whole numbers drop the decimal so typical spans read clean.
-def _pct(value):
-    text = f"{value * 100:.1f}".rstrip("0").rstrip(".")
-    return text or "0"
-
-
-def _span(start, extent):
-    return f"{_pct(start)}% to {_pct(start + extent)}%"
-
-
 def _element_line(region):
     placement = placement_phrase(region["x"], region["y"], region["w"], region["h"])
+    box = box_2d(region["x"], region["y"], region["w"], region["h"])
     geometry = (
-        f"{placement}, spanning {_span(region['x'], region['w'])} of the frame "
-        f"width and {_span(region['y'], region['h'])} of its height"
+        f"{placement}, covering about {round(region['w'] * 100)}% of the image "
+        f"width and {round(region['h'] * 100)}% of its height. box_2d = {box}"
     )
     if region["kind"] == "text":
         if region["desc"]:
