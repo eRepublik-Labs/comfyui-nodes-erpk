@@ -543,6 +543,29 @@ function createRegionEditor(node) {
         return t + "…";
     }
 
+    // Greedy word wrap; once rows run out the remainder ellipsizes onto the
+    // last one. Lines a single word can't shrink to also ellipsize.
+    function wrapLabel(text, maxWidth, maxRows) {
+        const words = text.split(/\s+/).filter(Boolean);
+        const lines = [];
+        let line = "";
+        for (let i = 0; i < words.length; i++) {
+            const candidate = line ? line + " " + words[i] : words[i];
+            if (!line || ctx.measureText(candidate).width <= maxWidth) {
+                line = candidate;
+            } else if (lines.length < maxRows - 1) {
+                lines.push(truncateLabel(line, maxWidth));
+                line = words[i];
+            } else {
+                lines.push(truncateLabel(
+                    candidate + " " + words.slice(i + 1).join(" "), maxWidth));
+                return lines;
+            }
+        }
+        lines.push(truncateLabel(line, maxWidth));
+        return lines;
+    }
+
     function cornerHandles(box) {
         const x = box.x * state.cssW;
         const y = box.y * state.cssH;
@@ -624,12 +647,18 @@ function createRegionEditor(node) {
         }
         if (box.desc) {
             ctx.font = LABEL_FONT;
-            const label = truncateLabel(box.desc, Math.max(w - (labelX - x) - 28, 12));
-            const labelWidth = ctx.measureText(label).width;
-            ctx.fillStyle = "rgba(8, 8, 10, 0.72)";
-            ctx.fillRect(labelX, y, labelWidth + 10, 13);
-            ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
-            ctx.fillText(label, labelX + 5, y + 10);
+            // Each row rides its own backing strip, so the label may run past
+            // the region's edge; rows wrap at the canvas edge and the text
+            // ellipsizes only when it runs out of rows.
+            const labelMax = Math.max(state.cssW - labelX - 6, 12);
+            const maxRows = Math.max(1, Math.min(4, Math.floor((state.cssH - y) / 13)));
+            wrapLabel(box.desc, labelMax, maxRows).forEach((line, row) => {
+                const lineWidth = ctx.measureText(line).width;
+                ctx.fillStyle = "rgba(8, 8, 10, 0.72)";
+                ctx.fillRect(labelX, y + row * 13, lineWidth + 10, 13);
+                ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
+                ctx.fillText(line, labelX + 5, y + row * 13 + 10);
+            });
         }
 
         if (box.kind === "text") {
