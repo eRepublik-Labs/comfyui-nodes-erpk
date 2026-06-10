@@ -13,8 +13,9 @@ const MIN_NODE_WIDTH = 340;
 // Per-side inset ComfyUI applies between the outer node frame and the inner
 // widget area; the DOM widget wrapper is wider than the usable area without it.
 const CHROME_HORIZONTAL_INSET = 16;
-const CANVAS_MIN_H = 200;
-const CANVAS_MAX_H = 900;
+// Absolute floor for degenerate aspect ratios; otherwise the canvas height
+// follows the frame aspect exactly so the canvas always spans the full width.
+const CANVAS_MIN_H = 60;
 // Horizontal padding the editor root carries inside the DOM widget wrapper.
 const ROOT_PADDING_H = 8;
 const STATUS_STRIP_H = 22;
@@ -66,7 +67,7 @@ function desiredEditorHeight(node) {
         (node.size?.[0] ?? MIN_NODE_WIDTH) - CHROME_HORIZONTAL_INSET - ROOT_PADDING_H,
         100,
     );
-    const canvasH = clamp(innerW / frameAspect(node), CANVAS_MIN_H, CANVAS_MAX_H);
+    const canvasH = Math.max(innerW / frameAspect(node), CANVAS_MIN_H);
     return Math.round(canvasH + EDITOR_CHROME_V);
 }
 
@@ -403,13 +404,12 @@ function createRegionEditor(node) {
         const availW = stage.clientWidth - STAGE_PADDING_PX;
         const availH = stage.clientHeight - STAGE_PADDING_PX;
         if (availW <= 0 || availH <= 0) return;
+        // Width is authoritative: the canvas always spans the stage, and its
+        // height follows the frame aspect (availH only trims rounding slack,
+        // since the widget height is pinned to this same geometry).
         const aspect = frameAspect(node);
-        let cw = availW;
-        let ch = cw / aspect;
-        if (ch > availH) {
-            ch = availH;
-            cw = ch * aspect;
-        }
+        const cw = availW;
+        const ch = Math.min(cw / aspect, availH);
         const dpr = window.devicePixelRatio || 1;
         state.cssW = cw;
         state.cssH = ch;
