@@ -16,9 +16,8 @@ const CHROME_HORIZONTAL_INSET = 16;
 // Absolute floor for degenerate aspect ratios; otherwise the canvas height
 // follows the frame aspect exactly so the canvas always spans the full width.
 const CANVAS_MIN_H = 60;
-// Grid densities the grid button cycles through; 0 is off. Twelfths subdivide
-// both the rule-of-thirds guides and quarters cleanly, so 12 is the sweet spot.
-const GRID_DIV_STEPS = [0, 6, 12, 24];
+const GRID_MIN_DIVS = 2;
+const GRID_MAX_DIVS = 64;
 // Horizontal padding the editor root carries inside the DOM widget wrapper.
 const ROOT_PADDING_H = 12;
 const STATUS_STRIP_H = 22;
@@ -176,7 +175,8 @@ function createRegionEditor(node) {
         drag: null,      // {mode: "create"|"move"|"resize", ...}
         cssW: 0,
         cssH: 0,
-        gridDivs: 0,     // 0 = grid off; otherwise cells per axis
+        gridShow: false,
+        gridDivs: 12,    // cells per axis while the grid is shown
         snapOn: false,
     };
 
@@ -242,7 +242,9 @@ function createRegionEditor(node) {
     statusLeft.style.overflow = "hidden";
     statusLeft.style.textOverflow = "ellipsis";
     const statusRight = document.createElement("span");
-    statusRight.style.flex = "0 0 auto";
+    statusRight.style.flex = "0 1 auto";
+    statusRight.style.minWidth = "0";
+    statusRight.style.overflow = "hidden";
     statusRight.style.fontVariantNumeric = "tabular-nums";
     function makeStripButton(label) {
         const btn = document.createElement("button");
@@ -262,7 +264,18 @@ function createRegionEditor(node) {
     }
 
     const gridBtn = makeStripButton("⊞");
-    gridBtn.title = "Grid density — click to cycle off / 6 / 12 / 24";
+    gridBtn.title = "Show grid";
+    const gridSizeInput = document.createElement("input");
+    gridSizeInput.type = "number";
+    gridSizeInput.min = String(GRID_MIN_DIVS);
+    gridSizeInput.max = String(GRID_MAX_DIVS);
+    gridSizeInput.title = "Grid cells per axis (2–64)";
+    styleInput(gridSizeInput);
+    gridSizeInput.style.width = "40px";
+    gridSizeInput.style.flex = "0 0 auto";
+    gridSizeInput.style.padding = "1px 4px";
+    gridSizeInput.style.fontSize = "10px";
+    gridSizeInput.style.display = "none";
     const snapBtn = makeStripButton("⌖");
     snapBtn.title = "Snap drawing, moving, and resizing to the grid";
     const clearBtn = makeStripButton("✕");
@@ -270,6 +283,7 @@ function createRegionEditor(node) {
     status.appendChild(statusLeft);
     status.appendChild(statusRight);
     status.appendChild(gridBtn);
+    status.appendChild(gridSizeInput);
     status.appendChild(snapBtn);
     status.appendChild(clearBtn);
 
@@ -294,6 +308,7 @@ function createRegionEditor(node) {
     styleInput(descInput);
     descInput.style.width = "";
     descInput.style.flex = "2 1 0";
+    descInput.style.minWidth = "0";
 
     const kindSelect = document.createElement("select");
     for (const kind of ["object", "text"]) {
@@ -314,6 +329,7 @@ function createRegionEditor(node) {
     styleInput(textInput);
     textInput.style.width = "";
     textInput.style.flex = "1 1 0";
+    textInput.style.minWidth = "0";
 
     const backBtn = makeStripButton("▼");
     backBtn.title = "Send back — one layer toward the background ( [ )";
@@ -519,7 +535,7 @@ function createRegionEditor(node) {
     }
 
     function snapCoord(v) {
-        if (!(state.gridDivs && state.snapOn)) return v;
+        if (!(state.gridShow && state.snapOn)) return v;
         return clamp(Math.round(v * state.gridDivs) / state.gridDivs, 0, 1);
     }
 
@@ -528,7 +544,7 @@ function createRegionEditor(node) {
     }
 
     function drawGrid() {
-        if (!state.gridDivs) return;
+        if (!state.gridShow) return;
         ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
         ctx.lineWidth = 1;
         for (let i = 1; i < state.gridDivs; i++) {
@@ -707,10 +723,10 @@ function createRegionEditor(node) {
 
     function syncInspector() {
         const box = state.boxes[state.selected] ?? null;
-        if (box === inspected) {
-            textInput.disabled = !box || box.kind !== "text";
-            return;
-        }
+        const showText = !!box && box.kind === "text";
+        textInput.style.display = showText ? "" : "none";
+        textInput.disabled = !showText;
+        if (box === inspected) return;
         inspected = box;
         descInput.value = box ? box.desc : "";
         kindSelect.value = box ? box.kind : "object";
@@ -718,7 +734,6 @@ function createRegionEditor(node) {
         const off = !box;
         descInput.disabled = off;
         kindSelect.disabled = off;
-        textInput.disabled = off || box.kind !== "text";
         backBtn.disabled = off;
         frontBtn.disabled = off;
         const dim = off ? "0.45" : "1";
@@ -874,9 +889,9 @@ function createRegionEditor(node) {
         const box = state.boxes[state.selected];
         if (!box) return;
         box.kind = kindSelect.value === "text" ? "text" : "object";
-        textInput.disabled = box.kind !== "text";
         syncWidget();
         render();
+        if (box.kind === "text") textInput.focus();
     }
 
     function onTextInput() {
@@ -891,15 +906,23 @@ function createRegionEditor(node) {
     // they travel with the workflow without touching the widget schema.
     function persistGridPrefs() {
         if (!node.properties) node.properties = {};
-        node.properties.erpk_region_grid = { divs: state.gridDivs, snap: state.snapOn };
+        node.properties.erpk_region_grid = {
+            on: state.gridShow,
+            divs: state.gridDivs,
+            snap: state.snapOn,
+        };
     }
 
+    // Tolerates the two earlier stored shapes: {grid: bool} and
+    // {divs: 0|6|12|24} where 0 meant off.
     function restoreGridPrefs() {
         const saved = node.properties?.erpk_region_grid;
         if (saved && typeof saved === "object") {
-            state.gridDivs = Number.isFinite(saved.divs)
-                ? saved.divs
-                : (saved.grid ? 12 : 0);
+            const rawDivs = Number.isFinite(saved.divs) ? saved.divs : null;
+            state.gridDivs = clamp(Math.round(rawDivs || 12), GRID_MIN_DIVS, GRID_MAX_DIVS);
+            state.gridShow = saved.on !== undefined
+                ? !!saved.on
+                : (rawDivs !== null ? rawDivs > 0 : !!saved.grid);
             state.snapOn = !!saved.snap;
         }
         syncToolButtons();
@@ -910,27 +933,48 @@ function createRegionEditor(node) {
         const off = "rgba(255, 255, 255, 0.65)";
         const onBorder = "rgba(255, 255, 255, 0.45)";
         const offBorder = "rgba(255, 255, 255, 0.14)";
-        const gridActive = state.gridDivs > 0;
-        gridBtn.textContent = gridActive ? `⊞ ${state.gridDivs}` : "⊞";
-        gridBtn.style.color = gridActive ? on : off;
-        gridBtn.style.borderColor = gridActive ? onBorder : offBorder;
-        const snapActive = gridActive && state.snapOn;
-        snapBtn.style.opacity = gridActive ? "1" : "0.45";
-        snapBtn.style.cursor = gridActive ? "pointer" : "default";
+        gridBtn.style.color = state.gridShow ? on : off;
+        gridBtn.style.borderColor = state.gridShow ? onBorder : offBorder;
+        gridSizeInput.style.display = state.gridShow ? "" : "none";
+        if (document.activeElement !== gridSizeInput) {
+            gridSizeInput.value = String(state.gridDivs);
+        }
+        const snapActive = state.gridShow && state.snapOn;
+        snapBtn.style.opacity = state.gridShow ? "1" : "0.45";
+        snapBtn.style.cursor = state.gridShow ? "pointer" : "default";
         snapBtn.style.color = snapActive ? on : off;
         snapBtn.style.borderColor = snapActive ? onBorder : offBorder;
     }
 
-    function onGridCycle() {
-        const i = GRID_DIV_STEPS.indexOf(state.gridDivs);
-        state.gridDivs = GRID_DIV_STEPS[(i + 1) % GRID_DIV_STEPS.length];
+    function onGridToggle() {
+        state.gridShow = !state.gridShow;
         persistGridPrefs();
         syncToolButtons();
         render();
     }
 
+    function onGridSizeInput() {
+        const v = Math.round(Number(gridSizeInput.value));
+        if (!Number.isFinite(v)) return;
+        state.gridDivs = clamp(v, GRID_MIN_DIVS, GRID_MAX_DIVS);
+        persistGridPrefs();
+        render();
+    }
+
+    function onGridSizeBlur() {
+        gridSizeInput.value = String(state.gridDivs);
+    }
+
+    function onGridSizeKeyDown(e) {
+        e.stopPropagation();
+        if (e.key === "Enter") {
+            e.preventDefault();
+            gridSizeInput.blur();
+        }
+    }
+
     function onSnapToggle() {
-        if (!state.gridDivs) return;
+        if (!state.gridShow) return;
         state.snapOn = !state.snapOn;
         persistGridPrefs();
         syncToolButtons();
@@ -987,7 +1031,10 @@ function createRegionEditor(node) {
     clearBtn.addEventListener("click", onClearClick);
     backBtn.addEventListener("click", onSendBack);
     frontBtn.addEventListener("click", onBringForward);
-    gridBtn.addEventListener("click", onGridCycle);
+    gridBtn.addEventListener("click", onGridToggle);
+    gridSizeInput.addEventListener("input", onGridSizeInput);
+    gridSizeInput.addEventListener("blur", onGridSizeBlur);
+    gridSizeInput.addEventListener("keydown", onGridSizeKeyDown);
     snapBtn.addEventListener("click", onSnapToggle);
 
     const observer = new ResizeObserver(() => layout());
@@ -1016,7 +1063,10 @@ function createRegionEditor(node) {
         clearBtn.removeEventListener("click", onClearClick);
         backBtn.removeEventListener("click", onSendBack);
         frontBtn.removeEventListener("click", onBringForward);
-        gridBtn.removeEventListener("click", onGridCycle);
+        gridBtn.removeEventListener("click", onGridToggle);
+        gridSizeInput.removeEventListener("input", onGridSizeInput);
+        gridSizeInput.removeEventListener("blur", onGridSizeBlur);
+        gridSizeInput.removeEventListener("keydown", onGridSizeKeyDown);
         snapBtn.removeEventListener("click", onSnapToggle);
         if (clearArm) clearTimeout(clearArm);
     }
