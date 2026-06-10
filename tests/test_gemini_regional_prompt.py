@@ -76,6 +76,16 @@ class TestSchema:
             assert widget.max == 8192
             assert widget.step == 8
 
+    def test_text_widget_shapes(self):
+        schema = GeminiRegionalPromptBuilder.define_schema()
+        multiline = {i.id: i.multiline for i in schema.inputs
+                     if i.id in ("scene_description", "background", "style")}
+        assert multiline == {
+            "scene_description": True,
+            "background": False,
+            "style": False,
+        }
+
     def test_regions_data_default_and_socketless(self):
         schema = GeminiRegionalPromptBuilder.define_schema()
         regions_input = next(i for i in schema.inputs if i.id == "regions_data")

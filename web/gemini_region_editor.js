@@ -10,7 +10,13 @@ const HANDLE_DRAW_PX = 6;
 const STAGE_PADDING_PX = 8;
 const LABEL_FONT = "11px 'Segoe UI', sans-serif";
 const MIN_NODE_WIDTH = 340;
-const MIN_NODE_HEIGHT = 540;
+// Per-side inset ComfyUI applies between the outer node frame and the inner
+// widget area; the DOM widget wrapper is wider than the usable area without it.
+const CHROME_HORIZONTAL_INSET = 16;
+const CANVAS_MIN_H = 200;
+const CANVAS_MAX_H = 480;
+// Vertical chrome around the canvas inside the editor root (padding + border).
+const EDITOR_CHROME_V = 12;
 
 const KIND_COLORS = {
     object: "#5a9dff",
@@ -27,6 +33,31 @@ function round4(v) {
 
 function findWidget(node, name) {
     return node.widgets?.find((w) => w.name === name) ?? null;
+}
+
+function frameAspect(node) {
+    const w = Number(findWidget(node, "width")?.value) || 1024;
+    const h = Number(findWidget(node, "height")?.value) || 1024;
+    return w > 0 && h > 0 ? w / h : 1;
+}
+
+// Height the editor needs below the regular widgets: a canvas matching the
+// frame's aspect ratio at the node's current width, clamped to a usable band.
+function desiredEditorHeight(node) {
+    const innerW = Math.max((node.size?.[0] ?? MIN_NODE_WIDTH) - CHROME_HORIZONTAL_INSET, 100);
+    const canvasH = clamp(innerW / frameAspect(node), CANVAS_MIN_H, CANVAS_MAX_H);
+    return Math.round(canvasH + EDITOR_CHROME_V);
+}
+
+// The DOM widget wrapper's width resolves from a JavaScript-positioned
+// container that can lag the node size on load; pin the root to the node
+// width explicitly on every "size has changed" path.
+function pinRootWidth(node) {
+    const root = node?._erpkRegionEditor?.root;
+    if (!root) return;
+    const w = Math.max((node.size?.[0] ?? MIN_NODE_WIDTH) - CHROME_HORIZONTAL_INSET, 100);
+    root.style.width = w + "px";
+    root.style.maxWidth = w + "px";
 }
 
 // Classic LiteGraph checks widget.hidden; Nodes 2.0 (Vue) checks widget.options.hidden.
@@ -168,29 +199,20 @@ function createRegionEditor(node) {
     stage.style.display = "flex";
     stage.style.alignItems = "center";
     stage.style.justifyContent = "center";
-    stage.style.background = "var(--comfy-input-bg, #141414)";
-    stage.style.border = "1px solid var(--border-color, #333)";
-    stage.style.borderRadius = "4px";
     stage.style.overflow = "hidden";
 
     const canvas = document.createElement("canvas");
     canvas.tabIndex = 0;
     canvas.style.outline = "none";
-    canvas.style.background = "#1a1a1a";
-    canvas.style.borderRadius = "2px";
+    canvas.style.background = "var(--comfy-input-bg, #1a1a1a)";
+    canvas.style.border = "1px solid var(--border-color, #444)";
+    canvas.style.boxSizing = "border-box";
+    canvas.style.borderRadius = "4px";
     canvas.style.touchAction = "none";
     canvas.style.cursor = "crosshair";
     stage.appendChild(canvas);
 
-    const hint = document.createElement("div");
-    hint.textContent = "Drag to draw a region · double-click to edit · Delete to remove";
-    hint.style.flex = "0 0 auto";
-    hint.style.fontSize = "10px";
-    hint.style.color = "var(--descrip-text, #777)";
-    hint.style.textAlign = "center";
-
     root.appendChild(stage);
-    root.appendChild(hint);
 
     const ctx = canvas.getContext("2d");
 
@@ -213,6 +235,8 @@ function createRegionEditor(node) {
     overlay.style.borderRadius = "6px";
     overlay.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.55)";
     overlay.style.zIndex = "10";
+    overlay.style.maxHeight = "calc(100% - 8px)";
+    overlay.style.overflowY = "auto";
 
     const descInput = document.createElement("input");
     descInput.type = "text";
@@ -273,10 +297,14 @@ function createRegionEditor(node) {
         if (widget.element) widget.element.style.display = "none";
     }
 
-    function frameAspect() {
-        const w = Number(findWidget(node, "width")?.value) || 1024;
-        const h = Number(findWidget(node, "height")?.value) || 1024;
-        return w > 0 && h > 0 ? w / h : 1;
+    // A frame-aspect change can need more node height than the current size
+    // provides; grow the node first so layout() sees the final stage size.
+    function applyAspectChange() {
+        const computed = node.computeSize?.();
+        if (computed && node.size[1] < computed[1] - 1) {
+            node.setSize([node.size[0], computed[1]]);
+        }
+        layout();
     }
 
     function hookDimensionWidget(name) {
@@ -286,17 +314,17 @@ function createRegionEditor(node) {
         const original = widget.callback;
         widget.callback = function () {
             const r = original?.apply(this, arguments);
-            layout();
+            applyAspectChange();
             return r;
         };
         // Programmatic writes (widget.value = ...) bypass the callback, so the
-        // value property relays them to layout() as well.
+        // value property relays them to applyAspectChange() as well.
         let currentValue = widget.value;
         Object.defineProperty(widget, "value", {
             get() { return currentValue; },
             set(v) {
                 currentValue = v;
-                layout();
+                applyAspectChange();
             },
             configurable: true,
             enumerable: true,
@@ -308,7 +336,7 @@ function createRegionEditor(node) {
         const availW = stage.clientWidth - STAGE_PADDING_PX;
         const availH = stage.clientHeight - STAGE_PADDING_PX;
         if (availW <= 0 || availH <= 0) return;
-        const aspect = frameAspect();
+        const aspect = frameAspect(node);
         let cw = availW;
         let ch = cw / aspect;
         if (ch > availH) {
@@ -415,13 +443,37 @@ function createRegionEditor(node) {
         ctx.setLineDash([]);
     }
 
+    // Rule-of-thirds guides double as a placement reference for the 3x3
+    // verbal grid the Python side derives placements from.
+    function drawGuides() {
+        ctx.strokeStyle = "rgba(128, 128, 128, 0.25)";
+        ctx.lineWidth = 1;
+        for (const f of [1 / 3, 2 / 3]) {
+            ctx.beginPath();
+            ctx.moveTo(f * state.cssW, 0);
+            ctx.lineTo(f * state.cssW, state.cssH);
+            ctx.moveTo(0, f * state.cssH);
+            ctx.lineTo(state.cssW, f * state.cssH);
+            ctx.stroke();
+        }
+    }
+
+    function drawEmptyHint() {
+        ctx.font = LABEL_FONT;
+        ctx.fillStyle = "rgba(128, 128, 128, 0.7)";
+        ctx.textAlign = "center";
+        ctx.fillText("Drag to draw a region", state.cssW / 2, state.cssH / 2 - 8);
+        ctx.fillText("Double-click to edit · Delete to remove", state.cssW / 2, state.cssH / 2 + 10);
+        ctx.textAlign = "left";
+    }
+
     function render() {
         if (!state.cssW || !state.cssH) return;
         const dpr = window.devicePixelRatio || 1;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, state.cssW, state.cssH);
-        ctx.fillStyle = "#1a1a1a";
-        ctx.fillRect(0, 0, state.cssW, state.cssH);
+        drawGuides();
+        if (!state.boxes.length && !state.drag) drawEmptyHint();
         state.boxes.forEach((box, i) => drawBox(box, i));
         if (state.drag?.mode === "create") drawPending();
     }
@@ -695,12 +747,14 @@ app.registerExtension({
     async beforeRegisterNodeDef(nodeType, nodeData) {
         if (nodeData?.name !== NODE_ID) return;
 
-        // Floor the node size so the drawing area never collapses below a
-        // usable height; the canvas renderer clamps drag-resizes to computeSize.
+        // The node must reserve vertical room for the editor below the regular
+        // widgets, or the DOM widget's content renders past the node frame.
+        // computeSize is also what the canvas renderer clamps drag-resizes to.
         const origComputeSize = nodeType.prototype.computeSize;
         nodeType.prototype.computeSize = function () {
-            const size = origComputeSize?.apply(this, arguments) ?? [MIN_NODE_WIDTH, MIN_NODE_HEIGHT];
-            return [Math.max(size[0], MIN_NODE_WIDTH), Math.max(size[1], MIN_NODE_HEIGHT)];
+            const size = origComputeSize?.apply(this, arguments) ?? [MIN_NODE_WIDTH, 0];
+            const w = Math.max(size[0], MIN_NODE_WIDTH);
+            return [w, size[1] + desiredEditorHeight(this)];
         };
 
         const onNodeCreated = nodeType.prototype.onNodeCreated;
@@ -715,8 +769,10 @@ app.registerExtension({
                 hideOnZoom: false,
             });
 
-            if (this.size[0] < MIN_NODE_WIDTH) this.size[0] = MIN_NODE_WIDTH;
-            if (this.size[1] < MIN_NODE_HEIGHT) this.size[1] = MIN_NODE_HEIGHT;
+            const computed = this.computeSize();
+            if (this.size[0] < computed[0]) this.size[0] = computed[0];
+            if (this.size[1] < computed[1]) this.size[1] = computed[1];
+            pinRootWidth(this);
 
             // Widgets (including regions_data) can finish materializing after
             // creation; defer the lookup-dependent setup until they exist.
@@ -739,9 +795,18 @@ app.registerExtension({
                 setTimeout(() => {
                     editor.setup();
                     editor.loadFromWidget();
+                    pinRootWidth(this);
                     editor.layout();
                 }, 50);
             }
+            return r;
+        };
+
+        const origOnResize = nodeType.prototype.onResize;
+        nodeType.prototype.onResize = function (size) {
+            const r = origOnResize?.apply(this, arguments);
+            pinRootWidth(this);
+            this._erpkRegionEditor?.layout();
             return r;
         };
 

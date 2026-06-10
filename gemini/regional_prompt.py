@@ -175,13 +175,13 @@ class GeminiRegionalPromptBuilder(IO.ComfyNode):
                 ),
                 IO.String.Input(
                     "background",
-                    multiline=True,
+                    multiline=False,
                     default="",
                     tooltip="Background description",
                 ),
                 IO.String.Input(
                     "style",
-                    multiline=True,
+                    multiline=False,
                     default="",
                     tooltip="Style, medium, and lighting",
                 ),
