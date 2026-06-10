@@ -255,6 +255,7 @@ String manipulation and general utility nodes.
 - Regions keep identity colors; text regions preview their literal text in-frame
 - Depth control: regions layer back to front (number 1 is backmost). Reorder with `[` / `]` or the inspector's depth buttons; the prompt tells the model that later elements appear in front where regions overlap
 - Status strip shows region count, selection, frame dimensions, and aspect ratio
+- A `?` button in the status strip toggles a shortcuts cheat sheet over the canvas (Escape or an outside click dismisses it)
 - Clear button in the status strip empties all regions (two-step confirm, no blocking dialog)
 - Optional grid with a typed cell size in frame pixels (8-1024, default 64 - latent-friendly), a color picker plus opacity control, and snap-to-grid; drawing, moving, and resizing quantize to pixel multiples, and the preferences save with the workflow
 - Optional reference image input: the connected image displays under the regions (LoadImage shows immediately) and passes through unchanged on an `image` output, so the builder sits inline in image-edit chains
