@@ -256,14 +256,27 @@ function createRegionEditor(node) {
     status.style.overflow = "hidden";
 
     const statusLeft = document.createElement("span");
+    statusLeft.style.flex = "1 1 auto";
     statusLeft.style.minWidth = "0";
     statusLeft.style.overflow = "hidden";
     statusLeft.style.textOverflow = "ellipsis";
     const statusRight = document.createElement("span");
     statusRight.style.flex = "0 0 auto";
     statusRight.style.fontVariantNumeric = "tabular-nums";
+    const clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.textContent = "Clear";
+    clearBtn.style.flex = "0 0 auto";
+    clearBtn.style.font = "inherit";
+    clearBtn.style.color = "rgba(255, 255, 255, 0.65)";
+    clearBtn.style.background = "transparent";
+    clearBtn.style.border = "1px solid rgba(255, 255, 255, 0.14)";
+    clearBtn.style.borderRadius = "3px";
+    clearBtn.style.padding = "1px 7px";
+    clearBtn.style.cursor = "pointer";
     status.appendChild(statusLeft);
     status.appendChild(statusRight);
+    status.appendChild(clearBtn);
 
     root.appendChild(stage);
     root.appendChild(status);
@@ -584,6 +597,9 @@ function createRegionEditor(node) {
         const w = Number(findWidget(node, "width")?.value) || 1024;
         const h = Number(findWidget(node, "height")?.value) || 1024;
         statusRight.textContent = `${w}×${h} · ${ratioString(w, h)}`;
+        clearBtn.style.opacity = count ? "1" : "0.45";
+        clearBtn.style.cursor = count ? "pointer" : "default";
+        if (!count) disarmClear();
     }
 
     function render() {
@@ -814,6 +830,35 @@ function createRegionEditor(node) {
         textInput.disabled = kindSelect.value !== "text";
     }
 
+    // Two-step confirm keeps a stray click from nuking the layout without
+    // resorting to a blocking dialog.
+    let clearArm = null;
+
+    function disarmClear() {
+        if (clearArm) clearTimeout(clearArm);
+        clearArm = null;
+        clearBtn.textContent = "Clear";
+        clearBtn.style.color = "rgba(255, 255, 255, 0.65)";
+        clearBtn.style.borderColor = "rgba(255, 255, 255, 0.14)";
+    }
+
+    function onClearClick() {
+        if (!state.boxes.length) return;
+        if (clearArm === null) {
+            clearBtn.textContent = "Confirm clear";
+            clearBtn.style.color = "#f9a826";
+            clearBtn.style.borderColor = "#f9a826";
+            clearArm = setTimeout(disarmClear, 2500);
+            return;
+        }
+        disarmClear();
+        closeOverlay(false);
+        state.boxes = [];
+        state.selected = -1;
+        syncWidget();
+        render();
+    }
+
     function onOk() {
         closeOverlay(true);
     }
@@ -833,6 +878,7 @@ function createRegionEditor(node) {
     kindSelect.addEventListener("change", onKindChange);
     okBtn.addEventListener("click", onOk);
     cancelBtn.addEventListener("click", onCancel);
+    clearBtn.addEventListener("click", onClearClick);
 
     const observer = new ResizeObserver(() => layout());
     observer.observe(stage);
@@ -856,6 +902,8 @@ function createRegionEditor(node) {
         kindSelect.removeEventListener("change", onKindChange);
         okBtn.removeEventListener("click", onOk);
         cancelBtn.removeEventListener("click", onCancel);
+        clearBtn.removeEventListener("click", onClearClick);
+        if (clearArm) clearTimeout(clearArm);
     }
 
     return { root, setup, loadFromWidget, layout, destroy };

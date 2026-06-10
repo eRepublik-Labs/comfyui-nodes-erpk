@@ -253,6 +253,7 @@ String manipulation and general utility nodes.
 - Canvas editor on the node: drag to draw, move, and resize regions; double-click to edit a region's description, kind (object or rendered text), and literal text; Delete removes
 - Regions keep stable identity colors; text regions preview their literal text in-frame
 - Status strip shows region count, selection, frame dimensions, and aspect ratio
+- Clear button in the status strip empties all regions (two-step confirm, no blocking dialog)
 - The prompt instructs the model to treat placement areas as invisible guides so boxes are not rendered into the image
 
 **Concatenate Strings features:**
