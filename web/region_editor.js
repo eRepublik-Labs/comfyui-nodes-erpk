@@ -554,6 +554,22 @@ function createRegionEditor(node) {
 
         ctx.fillStyle = color + (isSelected ? "2e" : "17");
         ctx.fillRect(x, y, w, h);
+
+        // Discrete diagonal hatching gives the fill a taped-off read.
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(x, y, w, h);
+        ctx.clip();
+        ctx.strokeStyle = color + (isSelected ? "2c" : "18");
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let d = -h; d < w; d += 9) {
+            ctx.moveTo(x + d, y + h);
+            ctx.lineTo(x + d + h, y);
+        }
+        ctx.stroke();
+        ctx.restore();
+
         ctx.strokeStyle = color;
         ctx.lineWidth = isSelected ? 2 : 1.5;
         ctx.strokeRect(x, y, w, h);
