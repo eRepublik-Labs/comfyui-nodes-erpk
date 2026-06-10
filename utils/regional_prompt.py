@@ -15,7 +15,9 @@ MIN_REGION_EXTENT = 0.005
 LAYOUT_HEADER = (
     "Layout: place each element exactly where specified. Each position gives a "
     'verbal placement plus its placement area as "box_2d = [ymin, xmin, ymax, xmax]" '
-    "on a 0-1000 grid with top-left origin."
+    "on a 0-1000 grid with top-left origin. Elements are listed from back to "
+    "front: where placement areas overlap, a later element appears in front of "
+    "an earlier one."
 )
 LAYOUT_FOOTER = (
     "Every element must stay fully inside its placement area and fill most of it. "

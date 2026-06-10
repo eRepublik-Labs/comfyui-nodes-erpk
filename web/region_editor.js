@@ -325,6 +325,14 @@ function createRegionEditor(node) {
     textInput.placeholder = "literal text to render";
     styleInput(textInput);
 
+    const depthRow = document.createElement("div");
+    depthRow.style.display = "flex";
+    depthRow.style.gap = "6px";
+    const backBtn = makeButton("Send back");
+    const frontBtn = makeButton("Bring forward");
+    depthRow.appendChild(backBtn);
+    depthRow.appendChild(frontBtn);
+
     const buttonRow = document.createElement("div");
     buttonRow.style.display = "flex";
     buttonRow.style.gap = "6px";
@@ -336,6 +344,7 @@ function createRegionEditor(node) {
     overlay.appendChild(makeField("Description", descInput));
     overlay.appendChild(makeField("Kind", kindSelect));
     overlay.appendChild(makeField("Text", textInput));
+    overlay.appendChild(makeField("Depth (back to front)", depthRow));
     overlay.appendChild(buttonRow);
     root.appendChild(overlay);
 
@@ -713,6 +722,25 @@ function createRegionEditor(node) {
         render();
     }
 
+    // Array order is depth: index 0 is backmost, the last region is frontmost.
+    // Draw order, hit-testing, numbering, and the prompt's back-to-front
+    // element list all follow it. Returns the region's new index.
+    function moveRegion(index, delta) {
+        const target = index + delta;
+        if (index < 0 || target < 0 || target >= state.boxes.length) return index;
+        const [box] = state.boxes.splice(index, 1);
+        state.boxes.splice(target, 0, box);
+        syncWidget();
+        return target;
+    }
+
+    function moveEditingRegion(delta) {
+        if (state.editing < 0) return;
+        state.editing = moveRegion(state.editing, delta);
+        state.selected = state.editing;
+        render();
+    }
+
     // --- Event handlers ----------------------------------------------------
     function onPointerDown(e) {
         if (e.button !== 0) return;
@@ -808,6 +836,17 @@ function createRegionEditor(node) {
             state.selected = -1;
             syncWidget();
             render();
+            return;
+        }
+        if (
+            (e.key === "[" || e.key === "]")
+            && state.selected >= 0
+            && state.editing < 0
+        ) {
+            e.preventDefault();
+            e.stopPropagation();
+            state.selected = moveRegion(state.selected, e.key === "]" ? 1 : -1);
+            render();
         }
     }
 
@@ -867,6 +906,14 @@ function createRegionEditor(node) {
         closeOverlay(false);
     }
 
+    function onSendBack() {
+        moveEditingRegion(-1);
+    }
+
+    function onBringForward() {
+        moveEditingRegion(1);
+    }
+
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerup", onPointerUp);
@@ -879,6 +926,8 @@ function createRegionEditor(node) {
     okBtn.addEventListener("click", onOk);
     cancelBtn.addEventListener("click", onCancel);
     clearBtn.addEventListener("click", onClearClick);
+    backBtn.addEventListener("click", onSendBack);
+    frontBtn.addEventListener("click", onBringForward);
 
     const observer = new ResizeObserver(() => layout());
     observer.observe(stage);
@@ -903,6 +952,8 @@ function createRegionEditor(node) {
         okBtn.removeEventListener("click", onOk);
         cancelBtn.removeEventListener("click", onCancel);
         clearBtn.removeEventListener("click", onClearClick);
+        backBtn.removeEventListener("click", onSendBack);
+        frontBtn.removeEventListener("click", onBringForward);
         if (clearArm) clearTimeout(clearArm);
     }
 

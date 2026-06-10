@@ -32,7 +32,9 @@ CANONICAL_PROMPT = (
     "\n"
     'Layout: place each element exactly where specified. Each position gives a '
     'verbal placement plus its placement area as "box_2d = [ymin, xmin, ymax, xmax]" '
-    "on a 0-1000 grid with top-left origin.\n"
+    "on a 0-1000 grid with top-left origin. Elements are listed from back to "
+    "front: where placement areas overlap, a later element appears in front of "
+    "an earlier one.\n"
     "1. a red vintage car: at the bottom-left, covering about 30% of the image "
     "width and 25% of its height. box_2d = [620, 40, 870, 340]\n"
     '2. The text "OPEN LATE", glowing neon letters: at the top-center, covering '
@@ -281,6 +283,13 @@ class TestBuildPrompt:
         prompt = build_prompt("", 1000, 1000, regions)
         assert "never draw boxes" in prompt
         assert "bounding box" not in prompt
+
+    def test_layout_declares_back_to_front_depth_order(self):
+        regions = [{"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
+                    "kind": "object", "desc": "a cat", "text": ""}]
+        prompt = build_prompt("", 1000, 1000, regions)
+        assert "listed from back to front" in prompt
+        assert "appears in front of an earlier one" in prompt
 
 
     def test_unicode_and_long_desc_round_trip(self):
