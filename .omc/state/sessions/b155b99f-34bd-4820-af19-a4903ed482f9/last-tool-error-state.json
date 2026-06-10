@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"cd /Users/alex.geana/GitHub/ComfyUI-Custom-Nodes\\necho \\\"=== how __init__ turns the import list into NODE_CLASS_MAPPINGS ===\\\"\\nrg -n 'NODE_CLASS_MAPPINGS|NODE_DISPLAY_NAME_MAPPINGS|for .*...",
-  "error": "Exit code 1\n=== how __init__ turns the import list into NODE_CLASS_MAPPINGS ===\n21:from .qwen_image_2_0_text_to_image import QwenImage20TextToImageNode\n22:from .qwen_image_2_0_edit import QwenImage20EditNode\n72:    QwenImage20TextToImageNode,\n73:    QwenImage20EditNode,\n\n=== confirm both classes resolve into the final mappings (import the package) ===\nTraceback (most recent call last):\n  File \"<stdin>\", line 2, in <module>\n  File \"/Users/alex.geana/.local/share/mise/installs/python/3.11.14/lib/p...",
-  "timestamp": "2026-06-09T11:43:06.293Z",
-  "retry_count": 1
-}
