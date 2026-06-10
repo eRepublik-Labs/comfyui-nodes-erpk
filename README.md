@@ -247,6 +247,20 @@ String manipulation and general utility nodes.
 - **Concatenate Strings** - Combine multiple text inputs with configurable delimiters. Supports up to 10 connectable inputs - drag STRING outputs from other nodes or enter text directly.
 - **Seed** - Generate a seed value with optional min/max range clamping. Connect the output to any node's seed input to share a single seed.
 - **Preview Anything** - Preview any value: text, markdown, image/video/audio/gif URLs, IMAGE tensors, and AUDIO dicts. Includes a Download button that saves the rendered content to your computer.
+- **Regional Prompt Builder** - Draw regions on a canvas and emit a layout-aware prompt for any image generation model: each region becomes a verbal placement plus box_2d coordinates (works with the Gemini, OpenAI, and Grok image nodes). Also outputs pixel-space `BOUNDING_BOX` regions compatible with core SAM3 Detect, Draw BBoxes, and Crop By BBoxes nodes.
+
+**Regional Prompt Builder features:**
+- Canvas editor on the node: drag to draw, move, and resize regions; shift-click or a shift-drag marquee selects multiple regions and dragging any selected region moves the whole selection; Ctrl/Cmd-drag force-draws over existing boxes; Alt-click cycles through overlapping regions; Delete removes the selection; Ctrl/Cmd+C/V/D copy, paste, and duplicate; H hides the boxes for a clear view of the frame. An inspector row under the canvas edits the selected region's description, kind (object or rendered text), and literal text live; double-click a region to jump to its description field
+- Right-click the canvas for a region list (top = front): click a row to select, drag rows to reorder depth, duplicate or delete per row
+- Regions keep identity colors; text regions preview their literal text in-frame
+- Depth control: regions layer back to front (number 1 is backmost). Reorder with `[` / `]` or the inspector's depth buttons; the prompt tells the model that later elements appear in front where regions overlap
+- Status strip shows region count, selection, frame dimensions, and aspect ratio
+- A `?` button in the status strip toggles a shortcuts cheat sheet over the canvas (Escape or an outside click dismisses it)
+- Clear button in the status strip empties all regions (two-step confirm, no blocking dialog)
+- Optional grid with a typed cell size in frame pixels (8-1024, default 64 - latent-friendly), a color picker plus opacity control, and snap-to-grid; drawing, moving, and resizing quantize to pixel multiples, and the preferences save with the workflow
+- Optional reference image input: the connected image displays under the regions (LoadImage shows immediately) and passes through unchanged on an `image` output, so the builder sits inline in image-edit chains
+- Dynamic descriptions: optional `desc_1`-`desc_6` STRING sockets override the matching region's description at execute time (numbered as on the canvas), so any text node can drive a region. Sockets stay hidden until exposed with the inspector's plug button (or already wired); socket labels carry the region's text, and the inspector locks a wired region's description field
+- The prompt instructs the model to treat placement areas as invisible guides so boxes are not rendered into the image
 
 **Concatenate Strings features:**
 - 10 connectable text inputs (Text 1 through Text 10)

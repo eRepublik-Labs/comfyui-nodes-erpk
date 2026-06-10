@@ -136,6 +136,7 @@ CONFIG_NODES = [
     ("gemini.nodes", "GeminiAPIConfig"),
     ("gemini.nodes", "GeminiSystemInstruction"),
     ("gemini.nodes", "GeminiSafetySettings"),
+    ("utils.regional_prompt", "RegionalPromptBuilder"),
     ("openai.nodes", "OpenAIAPIConfig"),
     ("openai.nodes", "OpenAISystemInstruction"),
 ]
