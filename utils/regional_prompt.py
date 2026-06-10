@@ -1,5 +1,5 @@
 # ABOUTME: Pure prompt-builder node that turns canvas-drawn regions into a layout-aware
-# ABOUTME: Gemini image prompt plus interoperable pixel bounding boxes.
+# ABOUTME: image-generation prompt plus interoperable pixel bounding boxes.
 
 import json
 import math
@@ -144,17 +144,17 @@ def regions_to_pixel_bboxes(regions, width, height):
     return [boxes]
 
 
-class GeminiRegionalPromptBuilder(IO.ComfyNode):
-    """Builds a layout-aware Gemini image prompt from canvas-drawn regions."""
+class RegionalPromptBuilder(IO.ComfyNode):
+    """Builds a layout-aware image prompt from canvas-drawn regions."""
 
     @classmethod
     def define_schema(cls):
         return IO.Schema(
-            node_id="GeminiRegionalPromptBuilder",
-            display_name="Gemini Regional Prompt Builder",
-            category="ERPK/Gemini",
+            node_id="RegionalPromptBuilder",
+            display_name="Regional Prompt Builder",
+            category="ERPK/utils",
             description="Draw regions on a canvas and emit a layout-aware prompt "
-                        "for Gemini image generation, plus pixel bounding boxes.",
+                        "for image generation models, plus pixel bounding boxes.",
             inputs=[
                 IO.Int.Input(
                     "width",

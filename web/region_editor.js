@@ -1,9 +1,9 @@
-// ABOUTME: Canvas region editor for the GeminiRegionalPromptBuilder node — draw, move, resize, and annotate boxes.
+// ABOUTME: Canvas region editor for the RegionalPromptBuilder node — draw, move, resize, and annotate boxes.
 // ABOUTME: Serializes normalized regions into the hidden regions_data widget that the Python prompt builder parses.
 
 import { app } from "../../../scripts/app.js";
 
-const NODE_ID = "GeminiRegionalPromptBuilder";
+const NODE_ID = "RegionalPromptBuilder";
 const MIN_REGION_SIZE = 0.01;   // normalized floor; Python skips regions at or below 0.005
 const HANDLE_HIT_PX = 7;
 const HANDLE_DRAW_PX = 6;
@@ -862,7 +862,7 @@ function createRegionEditor(node) {
 }
 
 app.registerExtension({
-    name: "erpk.gemini.regionEditor",
+    name: "erpk.regionEditor",
 
     async beforeRegisterNodeDef(nodeType, nodeData) {
         if (nodeData?.name !== NODE_ID) return;

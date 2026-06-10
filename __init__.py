@@ -61,6 +61,8 @@ _NODE_REPLACEMENTS = {
     "WaveSpeed Custom QwenImageT2I": "QwenImageTextToImageNode",
     "WaveSpeed Custom QwenImageEdit": "QwenImageEditNode",
     "WaveSpeed Custom QwenImageEditPlus": "QwenImageEditPlusNode",
+    # Regional prompt builder generalized beyond Gemini
+    "GeminiRegionalPromptBuilder": "RegionalPromptBuilder",
 }
 
 

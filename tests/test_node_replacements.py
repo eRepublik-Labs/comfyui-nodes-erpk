@@ -1,5 +1,5 @@
-# ABOUTME: Tests for V1→V3 NodeReplace mappings registered in ERPKExtension.on_load().
-# ABOUTME: Verifies that all 15 renamed nodes have correct replacement mappings.
+# ABOUTME: Tests for NodeReplace mappings registered in ERPKExtension.on_load().
+# ABOUTME: Verifies that all renamed nodes have correct replacement mappings.
 
 import asyncio
 import pytest
@@ -7,7 +7,7 @@ import pytest
 from tests.comfy_api_stub import ComfyAPI
 
 
-# Complete mapping of all V1 node IDs that changed during V3 migration.
+# Complete mapping of all node IDs that have replacement registrations.
 EXPECTED_REPLACEMENTS = {
     # WaveSpeed (15 nodes)
     "WaveSpeed Custom Client": "WaveSpeedAIAPIClient",
@@ -25,6 +25,8 @@ EXPECTED_REPLACEMENTS = {
     "WaveSpeed Custom QwenImageT2I": "QwenImageTextToImageNode",
     "WaveSpeed Custom QwenImageEdit": "QwenImageEditNode",
     "WaveSpeed Custom QwenImageEditPlus": "QwenImageEditPlusNode",
+    # Regional prompt builder generalized beyond Gemini
+    "GeminiRegionalPromptBuilder": "RegionalPromptBuilder",
 }
 
 
@@ -53,10 +55,10 @@ class TestNodeReplacements:
         assert len(registered) > 0, "on_load() should register node replacements"
 
     def test_replacement_count(self):
-        """Exactly 15 replacements should be registered."""
+        """Exactly the expected replacements should be registered."""
         registered = _run_on_load()
-        assert len(registered) == 15, (
-            f"Expected 15 replacements, got {len(registered)}"
+        assert len(registered) == len(EXPECTED_REPLACEMENTS), (
+            f"Expected {len(EXPECTED_REPLACEMENTS)} replacements, got {len(registered)}"
         )
 
     def test_all_expected_old_ids_present(self):

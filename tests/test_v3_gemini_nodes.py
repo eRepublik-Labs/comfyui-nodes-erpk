@@ -299,7 +299,7 @@ class TestGeminiProviderExport:
     def test_nodes_list_has_all_classes(self):
         import importlib
         mod = importlib.import_module("gemini")
-        assert len(mod.NODES) == 11, f"Expected 11 Gemini nodes, got {len(mod.NODES)}"
+        assert len(mod.NODES) == 10, f"Expected 10 Gemini nodes, got {len(mod.NODES)}"
 
     def test_nodes_list_all_comfy_nodes(self):
         import importlib

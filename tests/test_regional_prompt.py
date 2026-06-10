@@ -1,4 +1,4 @@
-# ABOUTME: Tests for GeminiRegionalPromptBuilder schema, region parsing, coordinate
+# ABOUTME: Tests for RegionalPromptBuilder schema, region parsing, coordinate
 # ABOUTME: conversions, prompt assembly, and pixel bounding-box outputs.
 
 import inspect
@@ -6,8 +6,8 @@ import json
 
 import pytest
 
-from gemini.regional_prompt import (
-    GeminiRegionalPromptBuilder,
+from utils.regional_prompt import (
+    RegionalPromptBuilder,
     aspect_ratio_string,
     box_2d,
     build_prompt,
@@ -52,24 +52,24 @@ CANONICAL_BBOXES = [[
 
 class TestSchema:
     def test_node_identity(self):
-        schema = GeminiRegionalPromptBuilder.define_schema()
-        assert schema.node_id == "GeminiRegionalPromptBuilder"
-        assert schema.display_name == "Gemini Regional Prompt Builder"
-        assert schema.category == "ERPK/Gemini"
+        schema = RegionalPromptBuilder.define_schema()
+        assert schema.node_id == "RegionalPromptBuilder"
+        assert schema.display_name == "Regional Prompt Builder"
+        assert schema.category == "ERPK/utils"
 
     def test_input_ids_and_order(self):
-        schema = GeminiRegionalPromptBuilder.define_schema()
+        schema = RegionalPromptBuilder.define_schema()
         assert [i.id for i in schema.inputs] == [
             "width", "height", "scene_description", "background", "style",
             "regions_data",
         ]
 
     def test_no_input_is_optional(self):
-        schema = GeminiRegionalPromptBuilder.define_schema()
+        schema = RegionalPromptBuilder.define_schema()
         assert all(not i.optional for i in schema.inputs)
 
     def test_dimension_widget_ranges(self):
-        schema = GeminiRegionalPromptBuilder.define_schema()
+        schema = RegionalPromptBuilder.define_schema()
         for input_id in ("width", "height"):
             widget = next(i for i in schema.inputs if i.id == input_id)
             assert widget.io_type == "INT"
@@ -79,7 +79,7 @@ class TestSchema:
             assert widget.step == 8
 
     def test_text_widget_shapes(self):
-        schema = GeminiRegionalPromptBuilder.define_schema()
+        schema = RegionalPromptBuilder.define_schema()
         multiline = {i.id: i.multiline for i in schema.inputs
                      if i.id in ("scene_description", "background", "style")}
         assert multiline == {
@@ -89,13 +89,13 @@ class TestSchema:
         }
 
     def test_regions_data_default_and_socketless(self):
-        schema = GeminiRegionalPromptBuilder.define_schema()
+        schema = RegionalPromptBuilder.define_schema()
         regions_input = next(i for i in schema.inputs if i.id == "regions_data")
         assert regions_input.default == "[]"
         assert regions_input.socketless is True
 
     def test_output_ids_order_and_io_types(self):
-        schema = GeminiRegionalPromptBuilder.define_schema()
+        schema = RegionalPromptBuilder.define_schema()
         assert [o.id for o in schema.outputs] == [
             "prompt", "bboxes", "width", "height",
         ]
@@ -104,21 +104,21 @@ class TestSchema:
         ]
 
     def test_no_seed_input(self):
-        schema = GeminiRegionalPromptBuilder.define_schema()
+        schema = RegionalPromptBuilder.define_schema()
         assert not [i for i in schema.inputs if i.id == "seed"]
 
     def test_no_fingerprint_inputs(self):
-        assert "fingerprint_inputs" not in GeminiRegionalPromptBuilder.__dict__
+        assert "fingerprint_inputs" not in RegionalPromptBuilder.__dict__
 
     def test_idempotent(self):
-        schema = GeminiRegionalPromptBuilder.define_schema()
+        schema = RegionalPromptBuilder.define_schema()
         assert not schema.not_idempotent
 
     def test_execute_is_not_async(self):
-        assert not inspect.iscoroutinefunction(GeminiRegionalPromptBuilder.execute)
+        assert not inspect.iscoroutinefunction(RegionalPromptBuilder.execute)
 
     def test_no_heavy_imports(self):
-        module_path = inspect.getsourcefile(GeminiRegionalPromptBuilder)
+        module_path = inspect.getsourcefile(RegionalPromptBuilder)
         with open(module_path) as f:
             source = f.read()
         for forbidden in ("torch", "numpy", "PIL"):
@@ -325,7 +325,7 @@ class TestRegionsToPixelBboxes:
 
 class TestExecute:
     def test_canonical_node_output(self):
-        out = GeminiRegionalPromptBuilder.execute(
+        out = RegionalPromptBuilder.execute(
             width=1000,
             height=1000,
             scene_description="A rainy neon city street at night",
@@ -336,7 +336,7 @@ class TestExecute:
         assert out.args == (CANONICAL_PROMPT, CANONICAL_BBOXES, 1000, 1000)
 
     def test_scene_only_outputs_empty_bboxes(self):
-        out = GeminiRegionalPromptBuilder.execute(
+        out = RegionalPromptBuilder.execute(
             width=1024, height=1024,
             scene_description="A quiet forest",
             background="", style="", regions_data="[]",
@@ -349,7 +349,7 @@ class TestExecute:
     def test_regions_only_is_valid(self):
         regions = [{"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2,
                     "kind": "object", "desc": "a cat", "text": ""}]
-        out = GeminiRegionalPromptBuilder.execute(
+        out = RegionalPromptBuilder.execute(
             width=1024, height=1024,
             scene_description="", background="", style="",
             regions_data=json.dumps(regions),
@@ -359,14 +359,14 @@ class TestExecute:
     def test_all_empty_raises_value_error(self):
         with pytest.raises(ValueError,
                            match="Describe the scene or add at least one region"):
-            GeminiRegionalPromptBuilder.execute(
+            RegionalPromptBuilder.execute(
                 width=1024, height=1024,
                 scene_description="  ", background="", style="\n",
                 regions_data="[]",
             )
 
     def test_invalid_regions_json_with_scene_still_builds(self):
-        out = GeminiRegionalPromptBuilder.execute(
+        out = RegionalPromptBuilder.execute(
             width=1024, height=1024,
             scene_description="A quiet forest",
             background="", style="", regions_data="not json",

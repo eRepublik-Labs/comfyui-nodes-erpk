@@ -152,7 +152,6 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Gemini Image Edit** - Edit and modify images with natural language prompts (up to 14 reference images, same model and resolution options)
 - **Gemini System Instruction** - Set persistent system-level instructions to guide model behavior
 - **Gemini Safety Settings** - Configure content safety filters (strict/balanced/permissive presets or custom)
-- **Gemini Regional Prompt Builder** - Draw regions on a canvas and emit a layout-aware prompt (verbal placement plus box_2d coordinates) for Gemini image generation, with a BOUNDING_BOX output for SAM3/crop/draw nodes
 
 #### Veo Video Generation Nodes
 
@@ -248,6 +247,13 @@ String manipulation and general utility nodes.
 - **Concatenate Strings** - Combine multiple text inputs with configurable delimiters. Supports up to 10 connectable inputs - drag STRING outputs from other nodes or enter text directly.
 - **Seed** - Generate a seed value with optional min/max range clamping. Connect the output to any node's seed input to share a single seed.
 - **Preview Anything** - Preview any value: text, markdown, image/video/audio/gif URLs, IMAGE tensors, and AUDIO dicts. Includes a Download button that saves the rendered content to your computer.
+- **Regional Prompt Builder** - Draw regions on a canvas and emit a layout-aware prompt for any image generation model: each region becomes a verbal placement plus box_2d coordinates (works with the Gemini, OpenAI, and Grok image nodes). Also outputs pixel-space `BOUNDING_BOX` regions compatible with core SAM3 Detect, Draw BBoxes, and Crop By BBoxes nodes.
+
+**Regional Prompt Builder features:**
+- Canvas editor on the node: drag to draw, move, and resize regions; double-click to edit a region's description, kind (object or rendered text), and literal text; Delete removes
+- Regions keep stable identity colors; text regions preview their literal text in-frame
+- Status strip shows region count, selection, frame dimensions, and aspect ratio
+- The prompt instructs the model to treat placement areas as invisible guides so boxes are not rendered into the image
 
 **Concatenate Strings features:**
 - 10 connectable text inputs (Text 1 through Text 10)
