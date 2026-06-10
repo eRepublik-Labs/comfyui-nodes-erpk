@@ -1435,13 +1435,15 @@ function createRegionEditor(node) {
         renderPanelRows();
     }
 
+    // The drag listens on window for its lifetime: pointer capture on the row
+    // itself is unreliable because insertBefore reparents the captured element
+    // mid-drag, which browsers may treat as capture loss.
     function onRowPointerDown(e, row) {
         if (e.button !== 0) return;
         e.stopPropagation();
         e.preventDefault();
         const startY = e.clientY;
         let dragging = false;
-        row.setPointerCapture(e.pointerId);
         panelRowDragging = true;
 
         function onRowMove(ev) {
@@ -1464,13 +1466,10 @@ function createRegionEditor(node) {
             else panelList.appendChild(row);
         }
 
-        function onRowUp(ev) {
-            row.removeEventListener("pointermove", onRowMove);
-            row.removeEventListener("pointerup", onRowUp);
-            row.removeEventListener("pointercancel", onRowUp);
-            if (row.hasPointerCapture?.(ev.pointerId)) {
-                row.releasePointerCapture(ev.pointerId);
-            }
+        function onRowUp() {
+            window.removeEventListener("pointermove", onRowMove, true);
+            window.removeEventListener("pointerup", onRowUp, true);
+            window.removeEventListener("pointercancel", onRowUp, true);
             row.style.opacity = "";
             panelRowDragging = false;
             if (dragging) {
@@ -1484,9 +1483,9 @@ function createRegionEditor(node) {
             }
         }
 
-        row.addEventListener("pointermove", onRowMove);
-        row.addEventListener("pointerup", onRowUp);
-        row.addEventListener("pointercancel", onRowUp);
+        window.addEventListener("pointermove", onRowMove, true);
+        window.addEventListener("pointerup", onRowUp, true);
+        window.addEventListener("pointercancel", onRowUp, true);
     }
 
     function buildPanelRow(index) {
