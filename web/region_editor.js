@@ -368,11 +368,7 @@ function createRegionEditor(node) {
     const snapBtn = makeStripButton("⌖");
     snapBtn.title = "Snap drawing, moving, and resizing to the grid";
     const helpBtn = makeStripButton("?");
-    helpBtn.title = "Drag to draw · Ctrl-drag force-draw · click select · "
-        + "shift-click toggle · shift-drag marquee · drag moves selection · "
-        + "Alt-click cycles overlap · double-click edits · right-click region list · "
-        + "Del removes selected · Ctrl/Cmd+C/V/D copy/paste/duplicate · "
-        + "[ ] depth · H hide boxes";
+    helpBtn.title = "Keyboard and mouse shortcuts";
     const clearBtn = makeStripButton("Clear all");
     clearBtn.classList.add("erpk-btn-danger");
     clearBtn.title = "Remove every region (click twice to confirm)";
@@ -1516,11 +1512,117 @@ function createRegionEditor(node) {
         moveSelectedRegion(1);
     }
 
-    // The help button is reference-only; eating the pointerdown keeps it
-    // from stealing focus or reaching the graph.
-    function onHelpPointerDown(e) {
-        e.preventDefault();
-        e.stopPropagation();
+    // --- Shortcuts overlay ------------------------------------------------
+    // The ? button toggles a cheat sheet anchored above the status strip;
+    // outside clicks and Escape dismiss it.
+    let helpPanel = null;
+
+    function syncHelpButton() {
+        const open = !!helpPanel;
+        helpBtn.classList.toggle("erpk-btn-active", open);
+        helpBtn.style.color = open ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
+        helpBtn.style.borderColor = open
+            ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
+    }
+
+    function closeHelp() {
+        if (!helpPanel) return;
+        document.removeEventListener("pointerdown", onHelpDocPointerDown, true);
+        document.removeEventListener("keydown", onHelpDocKeyDown, true);
+        helpPanel.remove();
+        helpPanel = null;
+        syncHelpButton();
+    }
+
+    // Presses on the button itself fall through to the click toggle; closing
+    // here too would make the toggle reopen on every press.
+    function onHelpDocPointerDown(e) {
+        if (!helpPanel || helpPanel.contains(e.target)
+            || helpBtn.contains(e.target)) return;
+        closeHelp();
+    }
+
+    function onHelpDocKeyDown(e) {
+        if (e.key === "Escape" && helpPanel) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeHelp();
+        }
+    }
+
+    function openHelp() {
+        closePanel();
+        helpPanel = document.createElement("div");
+        helpPanel.style.position = "absolute";
+        helpPanel.style.zIndex = "20";
+        helpPanel.style.boxSizing = "border-box";
+        helpPanel.style.padding = "4px";
+        helpPanel.style.background = PANEL_BG;
+        helpPanel.style.border = "1px solid " + HAIRLINE;
+        helpPanel.style.borderRadius = "6px";
+        helpPanel.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.45)";
+        helpPanel.style.maxHeight = Math.round(root.clientHeight * 0.8) + "px";
+        helpPanel.style.overflowY = "auto";
+        helpPanel.style.overflowX = "hidden";
+        helpPanel.style.scrollbarWidth = "thin";
+        helpPanel.style.scrollbarColor = "rgba(255, 255, 255, 0.25) transparent";
+
+        const header = document.createElement("div");
+        header.textContent = "Shortcuts";
+        header.style.font = "8px 'Segoe UI', sans-serif";
+        header.style.color = "rgba(255, 255, 255, 0.45)";
+        header.style.padding = "2px 6px 4px";
+        header.style.borderBottom = "1px solid " + HAIRLINE;
+        header.style.marginBottom = "3px";
+        helpPanel.appendChild(header);
+
+        const rows = [
+            ["drag", "draw a region"],
+            ["Ctrl+drag", "force-draw over a region"],
+            ["click", "select"],
+            ["Shift+click", "add or remove from selection"],
+            ["Shift+drag", "marquee select"],
+            ["drag a region", "move selection"],
+            ["Alt+click", "cycle overlapping regions"],
+            ["double-click", "edit description in the inspector"],
+            ["right-click", "region list and depth order"],
+            ["Del / Backspace", "delete selected"],
+            ["Ctrl/Cmd+C V D", "copy, paste, duplicate"],
+            ["[ and ]", "send back, bring forward"],
+            ["H", "hide region overlays"],
+        ];
+        const grid = document.createElement("div");
+        grid.style.display = "grid";
+        grid.style.gridTemplateColumns = "auto 1fr";
+        grid.style.gap = "3px 10px";
+        grid.style.padding = "2px 6px 3px";
+        grid.style.font = "8px 'Segoe UI', sans-serif";
+        for (const [keys, action] of rows) {
+            const key = document.createElement("span");
+            key.textContent = keys;
+            key.style.color = "rgba(255, 255, 255, 0.70)";
+            key.style.whiteSpace = "nowrap";
+            const act = document.createElement("span");
+            act.textContent = action;
+            act.style.color = "rgba(255, 255, 255, 0.45)";
+            grid.appendChild(key);
+            grid.appendChild(act);
+        }
+        helpPanel.appendChild(grid);
+        helpPanel.addEventListener("pointerdown", onPanelPointerDown);
+
+        root.appendChild(helpPanel);
+        helpPanel.style.right = "6px";
+        helpPanel.style.bottom = (root.offsetHeight - status.offsetTop + 4) + "px";
+
+        document.addEventListener("pointerdown", onHelpDocPointerDown, true);
+        document.addEventListener("keydown", onHelpDocKeyDown, true);
+        syncHelpButton();
+    }
+
+    function onHelpToggle() {
+        if (helpPanel) closeHelp();
+        else openHelp();
     }
 
     // --- Region list panel ----------------------------------------------
@@ -1791,6 +1893,7 @@ function createRegionEditor(node) {
 
     function openPanel(e) {
         closePanel();
+        closeHelp();
         panel = document.createElement("div");
         panel.className = "erpk-region-list";
         panel.style.position = "absolute";
@@ -1859,7 +1962,7 @@ function createRegionEditor(node) {
     canvas.addEventListener("dblclick", onDblClick);
     canvas.addEventListener("keydown", onKeyDown);
     canvas.addEventListener("contextmenu", onContextMenu);
-    helpBtn.addEventListener("pointerdown", onHelpPointerDown);
+    helpBtn.addEventListener("click", onHelpToggle);
     inspector.addEventListener("pointerdown", onInspectorPointerDown);
     inspector.addEventListener("keydown", onInspectorKeyDown);
     descInput.addEventListener("input", onDescInput);
@@ -1899,7 +2002,7 @@ function createRegionEditor(node) {
         canvas.removeEventListener("dblclick", onDblClick);
         canvas.removeEventListener("keydown", onKeyDown);
         canvas.removeEventListener("contextmenu", onContextMenu);
-        helpBtn.removeEventListener("pointerdown", onHelpPointerDown);
+        helpBtn.removeEventListener("click", onHelpToggle);
         inspector.removeEventListener("pointerdown", onInspectorPointerDown);
         inspector.removeEventListener("keydown", onInspectorKeyDown);
         descInput.removeEventListener("input", onDescInput);
@@ -1919,6 +2022,7 @@ function createRegionEditor(node) {
         gridAlphaInput.removeEventListener("keydown", onGridSizeKeyDown);
         snapBtn.removeEventListener("click", onSnapToggle);
         closePanel();
+        closeHelp();
         if (clearArm) clearTimeout(clearArm);
     }
 
