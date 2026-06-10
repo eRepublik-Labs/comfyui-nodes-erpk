@@ -16,15 +16,16 @@ const CHROME_HORIZONTAL_INSET = 16;
 // Absolute floor for degenerate aspect ratios; otherwise the canvas height
 // follows the frame aspect exactly so the canvas always spans the full width.
 const CANVAS_MIN_H = 60;
-// Twelfths subdivide both the rule-of-thirds guides and quarters cleanly.
-const GRID_DIVS = 12;
+// Grid densities the grid button cycles through; 0 is off. Twelfths subdivide
+// both the rule-of-thirds guides and quarters cleanly, so 12 is the sweet spot.
+const GRID_DIV_STEPS = [0, 6, 12, 24];
 // Horizontal padding the editor root carries inside the DOM widget wrapper.
-const ROOT_PADDING_H = 8;
+const ROOT_PADDING_H = 12;
 const STATUS_STRIP_H = 22;
 const INSPECTOR_H = 26;
-// Vertical chrome around the canvas inside the editor root: padding, canvas
-// border, the inspector row, the status strip, and the flex gaps between them.
-const EDITOR_CHROME_V = 66;
+// Vertical chrome around the canvas inside the editor root: panel padding,
+// canvas border, the inspector row, the status strip, and the flex gaps.
+const EDITOR_CHROME_V = 70;
 
 // The canvas is a stage for the image-to-be: dark like every ComfyUI content
 // preview, independent of the UI theme. Chrome around it follows the theme.
@@ -175,23 +176,28 @@ function createRegionEditor(node) {
         drag: null,      // {mode: "create"|"move"|"resize", ...}
         cssW: 0,
         cssH: 0,
-        gridOn: false,
+        gridDivs: 0,     // 0 = grid off; otherwise cells per axis
         snapOn: false,
     };
 
     // --- DOM scaffold -------------------------------------------------
+    // One continuous panel surface: canvas, inspector, and status strip all
+    // live on the same dark plate instead of floating on the node body.
     const root = document.createElement("div");
     root.className = "erpk-region-editor";
     root.style.position = "relative";
     root.style.display = "flex";
     root.style.flexDirection = "column";
     root.style.gap = "4px";
-    root.style.padding = "4px";
+    root.style.padding = "6px";
     root.style.boxSizing = "border-box";
     root.style.width = "100%";
     root.style.height = "100%";
     root.style.minHeight = "160px";
     root.style.overflow = "hidden";
+    root.style.background = PANEL_BG;
+    root.style.border = "1px solid rgba(255, 255, 255, 0.08)";
+    root.style.borderRadius = "6px";
 
     const stage = document.createElement("div");
     stage.className = "erpk-region-stage";
@@ -223,11 +229,8 @@ function createRegionEditor(node) {
     status.style.alignItems = "center";
     status.style.justifyContent = "space-between";
     status.style.gap = "8px";
-    status.style.padding = "0 8px";
+    status.style.padding = "0";
     status.style.boxSizing = "border-box";
-    status.style.background = PANEL_BG;
-    status.style.border = "1px solid rgba(255, 255, 255, 0.08)";
-    status.style.borderRadius = "3px";
     status.style.font = "10px ui-monospace, Menlo, monospace";
     status.style.color = "rgba(255, 255, 255, 0.65)";
     status.style.whiteSpace = "nowrap";
@@ -259,7 +262,7 @@ function createRegionEditor(node) {
     }
 
     const gridBtn = makeStripButton("⊞");
-    gridBtn.title = "Toggle the 12×12 grid";
+    gridBtn.title = "Grid density — click to cycle off / 6 / 12 / 24";
     const snapBtn = makeStripButton("⌖");
     snapBtn.title = "Snap drawing, moving, and resizing to the grid";
     const clearBtn = makeStripButton("✕");
@@ -516,8 +519,8 @@ function createRegionEditor(node) {
     }
 
     function snapCoord(v) {
-        if (!(state.gridOn && state.snapOn)) return v;
-        return clamp(Math.round(v * GRID_DIVS) / GRID_DIVS, 0, 1);
+        if (!(state.gridDivs && state.snapOn)) return v;
+        return clamp(Math.round(v * state.gridDivs) / state.gridDivs, 0, 1);
     }
 
     function snapPoint(p) {
@@ -525,11 +528,11 @@ function createRegionEditor(node) {
     }
 
     function drawGrid() {
-        if (!state.gridOn) return;
+        if (!state.gridDivs) return;
         ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
         ctx.lineWidth = 1;
-        for (let i = 1; i < GRID_DIVS; i++) {
-            const f = i / GRID_DIVS;
+        for (let i = 1; i < state.gridDivs; i++) {
+            const f = i / state.gridDivs;
             ctx.beginPath();
             ctx.moveTo(f * state.cssW, 0);
             ctx.lineTo(f * state.cssW, state.cssH);
@@ -888,13 +891,15 @@ function createRegionEditor(node) {
     // they travel with the workflow without touching the widget schema.
     function persistGridPrefs() {
         if (!node.properties) node.properties = {};
-        node.properties.erpk_region_grid = { grid: state.gridOn, snap: state.snapOn };
+        node.properties.erpk_region_grid = { divs: state.gridDivs, snap: state.snapOn };
     }
 
     function restoreGridPrefs() {
         const saved = node.properties?.erpk_region_grid;
         if (saved && typeof saved === "object") {
-            state.gridOn = !!saved.grid;
+            state.gridDivs = Number.isFinite(saved.divs)
+                ? saved.divs
+                : (saved.grid ? 12 : 0);
             state.snapOn = !!saved.snap;
         }
         syncToolButtons();
@@ -905,24 +910,27 @@ function createRegionEditor(node) {
         const off = "rgba(255, 255, 255, 0.65)";
         const onBorder = "rgba(255, 255, 255, 0.45)";
         const offBorder = "rgba(255, 255, 255, 0.14)";
-        gridBtn.style.color = state.gridOn ? on : off;
-        gridBtn.style.borderColor = state.gridOn ? onBorder : offBorder;
-        const snapActive = state.gridOn && state.snapOn;
-        snapBtn.style.opacity = state.gridOn ? "1" : "0.45";
-        snapBtn.style.cursor = state.gridOn ? "pointer" : "default";
+        const gridActive = state.gridDivs > 0;
+        gridBtn.textContent = gridActive ? `⊞ ${state.gridDivs}` : "⊞";
+        gridBtn.style.color = gridActive ? on : off;
+        gridBtn.style.borderColor = gridActive ? onBorder : offBorder;
+        const snapActive = gridActive && state.snapOn;
+        snapBtn.style.opacity = gridActive ? "1" : "0.45";
+        snapBtn.style.cursor = gridActive ? "pointer" : "default";
         snapBtn.style.color = snapActive ? on : off;
         snapBtn.style.borderColor = snapActive ? onBorder : offBorder;
     }
 
-    function onGridToggle() {
-        state.gridOn = !state.gridOn;
+    function onGridCycle() {
+        const i = GRID_DIV_STEPS.indexOf(state.gridDivs);
+        state.gridDivs = GRID_DIV_STEPS[(i + 1) % GRID_DIV_STEPS.length];
         persistGridPrefs();
         syncToolButtons();
         render();
     }
 
     function onSnapToggle() {
-        if (!state.gridOn) return;
+        if (!state.gridDivs) return;
         state.snapOn = !state.snapOn;
         persistGridPrefs();
         syncToolButtons();
@@ -979,7 +987,7 @@ function createRegionEditor(node) {
     clearBtn.addEventListener("click", onClearClick);
     backBtn.addEventListener("click", onSendBack);
     frontBtn.addEventListener("click", onBringForward);
-    gridBtn.addEventListener("click", onGridToggle);
+    gridBtn.addEventListener("click", onGridCycle);
     snapBtn.addEventListener("click", onSnapToggle);
 
     const observer = new ResizeObserver(() => layout());
@@ -1008,7 +1016,7 @@ function createRegionEditor(node) {
         clearBtn.removeEventListener("click", onClearClick);
         backBtn.removeEventListener("click", onSendBack);
         frontBtn.removeEventListener("click", onBringForward);
-        gridBtn.removeEventListener("click", onGridToggle);
+        gridBtn.removeEventListener("click", onGridCycle);
         snapBtn.removeEventListener("click", onSnapToggle);
         if (clearArm) clearTimeout(clearArm);
     }
