@@ -104,6 +104,15 @@ function hexToRgba(hex, alpha) {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+// Glyph ink on a tape chip: the chip's own hue scaled toward black reads as
+// a shade of the region color instead of a foreign white or black.
+function darkenHex(hex, factor) {
+    const r = Math.round(parseInt(hex.slice(1, 3), 16) * factor);
+    const g = Math.round(parseInt(hex.slice(3, 5), 16) * factor);
+    const b = Math.round(parseInt(hex.slice(5, 7), 16) * factor);
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
 function findWidget(node, name) {
     return node.widgets?.find((w) => w.name === name) ?? null;
 }
@@ -597,18 +606,19 @@ function createRegionEditor(node) {
         // Numbered tape tag in the region's hue, a plug chip when the
         // description is wired from a desc_N input, description alongside.
         const tag = String(index + 1);
+        const ink = darkenHex(color, 0.25);
         ctx.font = "bold 9px 'Segoe UI', sans-serif";
         const tagW = Math.ceil(ctx.measureText(tag).width) + 7;
         ctx.fillStyle = color;
         ctx.fillRect(x, y, tagW, 13);
-        ctx.fillStyle = "#fff";
+        ctx.fillStyle = ink;
         ctx.fillText(tag, x + 3.5, y + 9.5);
         let labelX = x + tagW;
         if (descWiredFor(box)) {
             const plugW = Math.ceil(ctx.measureText("⌁").width) + 7;
             ctx.fillStyle = color;
             ctx.fillRect(labelX + 1, y, plugW, 13);
-            ctx.fillStyle = "#fff";
+            ctx.fillStyle = ink;
             ctx.fillText("⌁", labelX + 4.5, y + 9.5);
             labelX += plugW + 1;
         }
