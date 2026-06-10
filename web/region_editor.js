@@ -960,27 +960,48 @@ function createRegionEditor(node) {
         node.properties.erpk_region_desc = [...set].sort((a, b) => a - b);
     }
 
-    // Hidden sockets keep the server contract intact while the node face only
-    // shows inputs that are exposed or wired; the labels carry the region's
-    // text so a depth reorder visibly remaps the wires.
+    // The node face only carries desc sockets that are exposed or wired. The
+    // Vue renderer ignores input.hidden, so unexposed sockets are physically
+    // removed and re-added on demand (removeInput fixes up link slot indices;
+    // wired sockets are never removed). Labels carry the region's text so a
+    // depth reorder visibly remaps the wires.
     function syncDescSockets() {
         if (!node.inputs) return;
         const exposed = exposedDescSet();
         let changed = false;
         for (const input of node.inputs) {
             const match = input.name?.match(/^desc_(\d+)$/);
-            if (!match) continue;
-            const n = parseInt(match[1]);
-            if (input.link != null && !exposed.has(n)) {
-                exposed.add(n);
+            if (match && input.link != null && !exposed.has(+match[1])) {
+                exposed.add(+match[1]);
                 changed = true;
             }
-            input.hidden = !exposed.has(n);
+        }
+        for (let i = node.inputs.length - 1; i >= 0; i--) {
+            const input = node.inputs[i];
+            const match = input.name?.match(/^desc_(\d+)$/);
+            if (match && !exposed.has(+match[1]) && input.link == null) {
+                node.removeInput(i);
+            }
+        }
+        for (const n of [...exposed].sort((a, b) => a - b)) {
+            if (n < 1 || n > REGION_DESC_INPUTS) continue;
+            if (!node.inputs.some((i) => i.name === `desc_${n}`)) {
+                node.addInput(`desc_${n}`, "STRING");
+            }
+        }
+        for (const input of node.inputs) {
+            const match = input.name?.match(/^desc_(\d+)$/);
+            if (!match) continue;
+            const n = +match[1];
             const box = state.boxes[n - 1];
             const text = box ? (box.desc || box.text || `region ${n}`) : "unused";
             input.label = `desc ${n} · ${text.length > 18 ? text.slice(0, 17) + "…" : text}`;
         }
         if (changed) persistExposedDesc(exposed);
+        const computed = node.computeSize?.();
+        if (computed && node.size[1] < computed[1]) {
+            node.setSize([node.size[0], computed[1]]);
+        }
     }
 
     function onPlugToggle() {
