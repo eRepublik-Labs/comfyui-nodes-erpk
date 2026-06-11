@@ -15,6 +15,7 @@ Draw regions on a canvas and emit a layout-aware prompt for any image generation
 | regions_data | String | [] | Managed by the canvas editor; JSON list of normalized regions. Do not edit by hand. |
 | image | IMAGE | optional | Reference image shown under the regions and passed through unchanged, so the builder sits inline in an image-edit chain. |
 | desc_1 … desc_6 | String | optional sockets | Override the matching region's description at execute time (numbered as on the canvas). Exposed via the inspector's plug button. |
+| ref_1 … ref_6 | IMAGE | optional sockets | Attach a reference image to the matching region. Exposed via the inspector's ▣ button; forwarded on image_refs in region order. |
 
 ## Outputs
 
@@ -25,6 +26,7 @@ Draw regions on a canvas and emit a layout-aware prompt for any image generation
 | width | INT | The frame width, passed through. |
 | height | INT | The frame height, passed through. |
 | image | IMAGE | The reference image, passed through unchanged. |
+| image_refs | ERPK_IMAGE_REFS | Wired region reference images in region order; connect to Gemini Image Edit's image_refs input. |
 
 ## Canvas editor
 
@@ -43,6 +45,10 @@ Regions layer back to front: number 1 is backmost, and the prompt tells the mode
 ## Dynamic descriptions
 
 Select a region and press the inspector's plug button to expose its `desc_N` socket, then wire any STRING node into it. A wired region shows a plug chip and diagonal hatching, and its description field locks. Wiring binds by canvas number, so reordering depth remaps which socket feeds which region.
+
+## Region reference images
+
+Select a region and press the inspector's ▣ button to expose its `ref_N` IMAGE socket, then wire any image into it. The region's prompt line gains "as shown in image N", and the wired images flow out on `image_refs` in region order. Connect that output to Gemini Image Edit's `image_refs` input: the node sends the edited image first (image 1), then the refs, so the prompt's numbering always matches what the model sees. Regions with a wired ref show a ▣ chip and a corner thumbnail on the canvas.
 
 ## Notes
 

@@ -19,6 +19,7 @@ Edits and modifies existing images using text prompts. Supports up to 14 referen
 | response_modalities | Combo | IMAGE | IMAGE (image only) or TEXT+IMAGE (image + text description) (optional) |
 | enable_google_search | Boolean | false | Enable Google Search grounding, Gemini 3 models only (optional) |
 | additional_images | IMAGE | - | Additional reference images, combined with primary input up to 14 total (optional) |
+| image_refs | ERPK_IMAGE_REFS | - | Ordered reference images from a Regional Prompt Builder; sent right after the primary image so the prompt's image numbers line up (optional) |
 
 ## Output
 
@@ -31,5 +32,5 @@ Edits and modifies existing images using text prompts. Supports up to 14 referen
 
 - Reference images in prompts by order ("the first image"), content ("the logo"), or role ("the style reference")
 - Gemini 3 Pro supports up to 14 reference images (up to 6 objects, up to 5 humans for character consistency)
-- Primary image input and additional_images are combined before sending to the API
+- Images are sent in order: primary image, then image_refs, then additional_images. The primary image is "the first image" in positional prompts
 - API key resolved from ComfyUI Settings or config.ini — connect a `client` from Gemini API Config only when you need shared safety/system-instruction state across nodes
