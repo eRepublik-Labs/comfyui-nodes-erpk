@@ -14,8 +14,8 @@ Draw regions on a canvas and emit a layout-aware prompt for any image generation
 | prompt | String | — | Scene description: subject, setting, background, style. Regions are placed on top of this scene. |
 | regions_data | String | [] | Managed by the canvas editor; JSON list of normalized regions. Do not edit by hand. |
 | image | IMAGE | optional | Reference image shown under the regions and passed through unchanged, so the builder sits inline in an image-edit chain. |
-| desc_1 … desc_6 | String | optional sockets | Override the matching region's description at execute time (numbered as on the canvas). Exposed via the inspector's plug button. |
-| ref_1 … ref_6 | IMAGE | optional sockets | Attach a reference image to the matching region. Exposed via the inspector's ▣ button; forwarded on image_refs in region order. |
+| desc_1 … desc_10 | String | optional sockets | Override the matching region's description at execute time (numbered as on the canvas). Exposed via the inspector's plug button. |
+| ref_1 … ref_10 | IMAGE | optional sockets | Attach a reference image to the matching region. Exposed via the inspector's ▣ button; forwarded on image_refs in region order. |
 
 ## Outputs
 

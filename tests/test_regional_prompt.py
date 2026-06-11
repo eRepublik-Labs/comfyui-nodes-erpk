@@ -62,8 +62,8 @@ class TestSchema:
         schema = RegionalPromptBuilder.define_schema()
         assert [i.id for i in schema.inputs] == [
             "width", "height", "prompt", "regions_data", "image",
-            "desc_1", "desc_2", "desc_3", "desc_4", "desc_5", "desc_6",
-            "ref_1", "ref_2", "ref_3", "ref_4", "ref_5", "ref_6",
+            *[f"desc_{n}" for n in range(1, 11)],
+            *[f"ref_{n}" for n in range(1, 11)],
         ]
 
     def test_ref_inputs_are_images(self):

@@ -10,11 +10,11 @@ REGION_KINDS = {"object", "text"}
 MIN_REGION_EXTENT = 0.005
 # Socket-only description overrides; desc_N feeds the region numbered N on
 # the canvas (numbers are depth order, so reordering remaps the wires).
-DESC_INPUT_COUNT = 6
+DESC_INPUT_COUNT = 10
 # Per-region reference images; ref_N attaches to the region numbered N. The
 # wired images flow out on image_refs in region order, and the prompt counts
 # them from 2 because the edit node's base image occupies slot 1.
-REF_INPUT_COUNT = 6
+REF_INPUT_COUNT = 10
 
 # "Bounding box" is detection-annotation vocabulary: models that know it from
 # vision training will happily RENDER yellow boxes around the elements. The

@@ -16,9 +16,9 @@ const CHROME_HORIZONTAL_INSET = 16;
 // Absolute floor for degenerate aspect ratios; otherwise the canvas height
 // follows the frame aspect exactly so the canvas always spans the full width.
 const CANVAS_MIN_H = 60;
-// Matches DESC_INPUT_COUNT on the Python side: desc_1..desc_6 sockets.
-const REGION_DESC_INPUTS = 6;
-const REGION_REF_INPUTS = 6;
+// Matches DESC_INPUT_COUNT / REF_INPUT_COUNT on the Python side.
+const REGION_DESC_INPUTS = 10;
+const REGION_REF_INPUTS = 10;
 
 // Grid cell size is expressed in frame pixels, so the grid quantizes to the
 // generated image's own pixel space (64 aligns with latent blocks).
@@ -1177,7 +1177,7 @@ function createRegionEditor(node) {
                 ? "Hide this region's description input"
                 : wireable
                     ? "Expose this region's description as an input"
-                    : "Only regions 1–6 can take a description input";
+                    : "Only regions 1–10 can take a description input";
         const refWired = !!box && refWiredFor(box);
         const refWireable = index >= 0 && index < REGION_REF_INPUTS;
         const refPlugged = refWireable
@@ -1195,7 +1195,7 @@ function createRegionEditor(node) {
                 ? "Hide this region's reference image input"
                 : refWireable
                     ? "Attach a reference image input to this region"
-                    : "Only regions 1–6 can take a reference image input";
+                    : "Only regions 1–10 can take a reference image input";
         if (box === inspected) return;
         inspected = box;
         descInput.value = box ? box.desc : "";
