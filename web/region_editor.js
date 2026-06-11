@@ -383,6 +383,10 @@ function createRegionEditor(node) {
     clearBtn.classList.add("erpk-btn-danger");
     clearBtn.dataset.tip = "Remove every region (click twice to confirm)";
     clearBtn.style.font = "bold 9px 'Segoe UI', sans-serif";
+    // The font override shrinks the box below its 12px siblings; pin it to
+    // their rendered height (12px line + 1px padding + 1px border per side).
+    clearBtn.style.height = "16px";
+    clearBtn.style.boxSizing = "border-box";
     clearBtn.style.color = DANGER_RED_DIM;
     clearBtn.style.borderColor = DANGER_RED_BORDER;
     status.appendChild(statusLeft);
