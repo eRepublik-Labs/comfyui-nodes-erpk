@@ -18,6 +18,7 @@ const CHROME_HORIZONTAL_INSET = 16;
 const CANVAS_MIN_H = 60;
 // Matches DESC_INPUT_COUNT on the Python side: desc_1..desc_6 sockets.
 const REGION_DESC_INPUTS = 6;
+const REGION_REF_INPUTS = 6;
 
 // Grid cell size is expressed in frame pixels, so the grid quantizes to the
 // generated image's own pixel space (64 aligns with latent blocks).
@@ -440,6 +441,8 @@ function createRegionEditor(node) {
 
     const plugBtn = makeStripButton("⌁");
     plugBtn.title = "Expose this region's description as an input";
+    const refBtn = makeStripButton("▣");
+    refBtn.title = "Attach a reference image input to this region";
     const backBtn = makeStripButton("▼");
     backBtn.title = "Send back — one layer toward the background ( [ )";
     const frontBtn = makeStripButton("▲");
@@ -449,6 +452,7 @@ function createRegionEditor(node) {
     inspector.appendChild(kindSelect);
     inspector.appendChild(textInput);
     inspector.appendChild(plugBtn);
+    inspector.appendChild(refBtn);
     inspector.appendChild(backBtn);
     inspector.appendChild(frontBtn);
     root.insertBefore(inspector, status);
@@ -645,6 +649,14 @@ function createRegionEditor(node) {
             ctx.fillText("⌁", labelX + 4.5, y + 9.5);
             labelX += plugW + 1;
         }
+        if (refWiredFor(box)) {
+            const chipW = Math.ceil(ctx.measureText("▣").width) + 7;
+            ctx.fillStyle = color;
+            ctx.fillRect(labelX + 1, y, chipW, 13);
+            ctx.fillStyle = ink;
+            ctx.fillText("▣", labelX + 4.5, y + 9.5);
+            labelX += chipW + 1;
+        }
         if (box.desc) {
             ctx.font = LABEL_FONT;
             // The label wraps inside the region: rows break at the box's
@@ -668,6 +680,21 @@ function createRegionEditor(node) {
             ctx.fillRect(bx, y + h - 16, 14, 14);
             ctx.fillStyle = INK_ON_TAPE;
             ctx.fillText("T", bx + 4, y + h - 5);
+        }
+
+        // Attached reference preview in the bottom-left corner; squashed to a
+        // square thumbnail (distortion is acceptable for a glanceable cue).
+        if (refWiredFor(box)) {
+            const thumb = upstreamImage(`ref_${index + 1}`);
+            if (thumb && thumb.complete && thumb.naturalWidth) {
+                const ts = clamp(Math.min(w, h) * 0.3, 14, 30);
+                ctx.drawImage(thumb, x + 3, y + h - ts - 3, ts, ts);
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1;
+                ctx.strokeRect(x + 3, y + h - ts - 3, ts, ts);
+            } else if (thumb) {
+                thumb.addEventListener("load", () => render(), { once: true });
+            }
         }
 
         // Corner handles only resolve to one box, so they only show for a
@@ -718,15 +745,20 @@ function createRegionEditor(node) {
         return { x: snapAxis(p.x, dims.w), y: snapAxis(p.y, dims.h) };
     }
 
-    // Draws the upstream image (LoadImage and executed preview nodes expose it
-    // client-side via node.imgs) stretched to the frame; a distorted reference
-    // is the cue that width/height do not match the source image.
-    function drawReference() {
-        const input = node.inputs?.find((i) => i.name === "image");
-        if (!input || input.link == null) return false;
+    // LoadImage and executed preview nodes expose their image client-side via
+    // node.imgs; follow the link on the named input to its origin node.
+    function upstreamImage(inputName) {
+        const input = node.inputs?.find((i) => i.name === inputName);
+        if (!input || input.link == null) return null;
         const link = node.graph?.links?.[input.link];
         const origin = link ? node.graph.getNodeById(link.origin_id) : null;
-        const img = origin?.imgs?.[0];
+        return origin?.imgs?.[0] ?? null;
+    }
+
+    // Draws the upstream image stretched to the frame; a distorted reference
+    // is the cue that width/height do not match the source image.
+    function drawReference() {
+        const img = upstreamImage("image");
         if (!img) return false;
         if (!img.complete || !img.naturalWidth) {
             img.addEventListener("load", () => render(), { once: true });
@@ -836,7 +868,7 @@ function createRegionEditor(node) {
         clearBtn.style.opacity = count ? "1" : "0.45";
         clearBtn.style.cursor = count ? "pointer" : "default";
         if (!count) disarmClear();
-        syncDescSockets();
+        syncRegionSockets();
         syncInspector();
     }
 
@@ -1014,36 +1046,43 @@ function createRegionEditor(node) {
     // loop never clobbers live typing or resets the cursor.
     let inspected = null;
 
-    // A connected desc_N socket owns that region's description; the field
-    // locks so typed text never silently loses to the wire at execute time.
-    function descWiredFor(box) {
+    // Socket families: desc_N strings override a region's description, ref_N
+    // images attach a numbered reference. A connected socket owns its
+    // region's slot; the node face only carries sockets that are exposed or
+    // wired, since the Vue renderer ignores input.hidden, so unexposed
+    // sockets are physically removed and re-added on demand (removeInput
+    // fixes up link slot indices; wired sockets are never removed). Labels
+    // carry the region's text so a depth reorder visibly remaps the wires.
+    const SOCKET_FAMILIES = {
+        desc: { ioType: "STRING", max: REGION_DESC_INPUTS, key: "erpk_region_desc" },
+        ref: { ioType: "IMAGE", max: REGION_REF_INPUTS, key: "erpk_region_ref" },
+    };
+
+    function socketWiredFor(prefix, box) {
         const index = state.boxes.indexOf(box);
         if (index < 0) return false;
-        const input = node.inputs?.find((i) => i.name === `desc_${index + 1}`);
+        const input = node.inputs?.find((i) => i.name === `${prefix}_${index + 1}`);
         return input?.link != null;
     }
 
-    function exposedDescSet() {
-        const saved = node.properties?.erpk_region_desc;
+    function exposedSocketSet(prefix) {
+        const saved = node.properties?.[SOCKET_FAMILIES[prefix].key];
         return new Set(Array.isArray(saved) ? saved : []);
     }
 
-    function persistExposedDesc(set) {
+    function persistExposedSockets(prefix, set) {
         if (!node.properties) node.properties = {};
-        node.properties.erpk_region_desc = [...set].sort((a, b) => a - b);
+        node.properties[SOCKET_FAMILIES[prefix].key] = [...set].sort((a, b) => a - b);
     }
 
-    // The node face only carries desc sockets that are exposed or wired. The
-    // Vue renderer ignores input.hidden, so unexposed sockets are physically
-    // removed and re-added on demand (removeInput fixes up link slot indices;
-    // wired sockets are never removed). Labels carry the region's text so a
-    // depth reorder visibly remaps the wires.
-    function syncDescSockets() {
+    function syncFamilySockets(prefix) {
         if (!node.inputs) return;
-        const exposed = exposedDescSet();
+        const family = SOCKET_FAMILIES[prefix];
+        const pattern = new RegExp(`^${prefix}_(\\d+)$`);
+        const exposed = exposedSocketSet(prefix);
         let changed = false;
         for (const input of node.inputs) {
-            const match = input.name?.match(/^desc_(\d+)$/);
+            const match = input.name?.match(pattern);
             if (match && input.link != null && !exposed.has(+match[1])) {
                 exposed.add(+match[1]);
                 changed = true;
@@ -1051,44 +1090,65 @@ function createRegionEditor(node) {
         }
         for (let i = node.inputs.length - 1; i >= 0; i--) {
             const input = node.inputs[i];
-            const match = input.name?.match(/^desc_(\d+)$/);
+            const match = input.name?.match(pattern);
             if (match && !exposed.has(+match[1]) && input.link == null) {
                 node.removeInput(i);
             }
         }
         for (const n of [...exposed].sort((a, b) => a - b)) {
-            if (n < 1 || n > REGION_DESC_INPUTS) continue;
-            if (!node.inputs.some((i) => i.name === `desc_${n}`)) {
-                node.addInput(`desc_${n}`, "STRING");
+            if (n < 1 || n > family.max) continue;
+            if (!node.inputs.some((i) => i.name === `${prefix}_${n}`)) {
+                node.addInput(`${prefix}_${n}`, family.ioType);
             }
         }
         for (const input of node.inputs) {
-            const match = input.name?.match(/^desc_(\d+)$/);
+            const match = input.name?.match(pattern);
             if (!match) continue;
             const n = +match[1];
             const box = state.boxes[n - 1];
             const text = box ? (box.desc || box.text || `region ${n}`) : "unused";
-            input.label = `desc ${n} · ${text.length > 18 ? text.slice(0, 17) + "…" : text}`;
+            input.label = `${prefix} ${n} · ${text.length > 18 ? text.slice(0, 17) + "…" : text}`;
         }
-        if (changed) persistExposedDesc(exposed);
+        if (changed) persistExposedSockets(prefix, exposed);
         const computed = node.computeSize?.();
         if (computed && node.size[1] < computed[1]) {
             node.setSize([node.size[0], computed[1]]);
         }
     }
 
-    function onPlugToggle() {
+    function toggleFamilySocket(prefix) {
         const index = primaryIndex();
-        if (index < 0 || index >= REGION_DESC_INPUTS) return;
-        if (descWiredFor(state.primary)) return;
+        if (index < 0 || index >= SOCKET_FAMILIES[prefix].max) return;
+        if (socketWiredFor(prefix, state.primary)) return;
         const n = index + 1;
-        const exposed = exposedDescSet();
+        const exposed = exposedSocketSet(prefix);
         if (exposed.has(n)) exposed.delete(n);
         else exposed.add(n);
-        persistExposedDesc(exposed);
-        syncDescSockets();
+        persistExposedSockets(prefix, exposed);
+        syncFamilySockets(prefix);
         node.setDirtyCanvas?.(true, true);
         render();
+    }
+
+    function descWiredFor(box) {
+        return socketWiredFor("desc", box);
+    }
+
+    function refWiredFor(box) {
+        return socketWiredFor("ref", box);
+    }
+
+    function syncRegionSockets() {
+        syncFamilySockets("desc");
+        syncFamilySockets("ref");
+    }
+
+    function onPlugToggle() {
+        toggleFamilySocket("desc");
+    }
+
+    function onRefToggle() {
+        toggleFamilySocket("ref");
     }
 
     function syncInspector() {
@@ -1103,7 +1163,7 @@ function createRegionEditor(node) {
             : "description — e.g. a red vintage car";
         const index = box ? state.boxes.indexOf(box) : -1;
         const wireable = index >= 0 && index < REGION_DESC_INPUTS;
-        const plugged = wireable && (wired || exposedDescSet().has(index + 1));
+        const plugged = wireable && (wired || exposedSocketSet("desc").has(index + 1));
         plugBtn.disabled = !wireable || wired;
         plugBtn.style.opacity = wireable ? "1" : "0.45";
         plugBtn.classList.toggle("erpk-btn-active", plugged);
@@ -1118,6 +1178,24 @@ function createRegionEditor(node) {
                 : wireable
                     ? "Expose this region's description as an input"
                     : "Only regions 1–6 can take a description input";
+        const refWired = !!box && refWiredFor(box);
+        const refWireable = index >= 0 && index < REGION_REF_INPUTS;
+        const refPlugged = refWireable
+            && (refWired || exposedSocketSet("ref").has(index + 1));
+        refBtn.disabled = !refWireable || refWired;
+        refBtn.style.opacity = refWireable ? "1" : "0.45";
+        refBtn.classList.toggle("erpk-btn-active", refPlugged);
+        refBtn.style.color = refPlugged
+            ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
+        refBtn.style.borderColor = refPlugged
+            ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
+        refBtn.title = refWired
+            ? "Reference image is wired — disconnect the input to unplug"
+            : refPlugged
+                ? "Hide this region's reference image input"
+                : refWireable
+                    ? "Attach a reference image input to this region"
+                    : "Only regions 1–6 can take a reference image input";
         if (box === inspected) return;
         inspected = box;
         descInput.value = box ? box.desc : "";
@@ -1871,6 +1949,13 @@ function createRegionEditor(node) {
         plug.textContent = "⌁";
         plug.style.display = descWiredFor(box) ? "" : "none";
 
+        const refMark = document.createElement("span");
+        refMark.style.flex = "0 0 auto";
+        refMark.style.color = regionColor(index);
+        refMark.title = "Reference image wired from a ref input";
+        refMark.textContent = "▣";
+        refMark.style.display = refWiredFor(box) ? "" : "none";
+
         const label = document.createElement("span");
         label.style.flex = "1 1 auto";
         label.style.minWidth = "0";
@@ -1901,6 +1986,7 @@ function createRegionEditor(node) {
         row.appendChild(swatch);
         row.appendChild(num);
         row.appendChild(plug);
+        row.appendChild(refMark);
         row.appendChild(label);
         row.appendChild(dupBtn);
         row.appendChild(delBtn);
@@ -2011,6 +2097,7 @@ function createRegionEditor(node) {
     backBtn.addEventListener("click", onSendBack);
     frontBtn.addEventListener("click", onBringForward);
     plugBtn.addEventListener("click", onPlugToggle);
+    refBtn.addEventListener("click", onRefToggle);
     gridBtn.addEventListener("click", onGridToggle);
     gridSizeInput.addEventListener("input", onGridSizeInput);
     gridSizeInput.addEventListener("blur", onGridSizeBlur);
@@ -2029,7 +2116,7 @@ function createRegionEditor(node) {
         hookDimensionWidget("width");
         hookDimensionWidget("height");
         restoreGridPrefs();
-        syncDescSockets();
+        syncRegionSockets();
     }
 
     function destroy() {
@@ -2051,6 +2138,7 @@ function createRegionEditor(node) {
         backBtn.removeEventListener("click", onSendBack);
         frontBtn.removeEventListener("click", onBringForward);
         plugBtn.removeEventListener("click", onPlugToggle);
+        refBtn.removeEventListener("click", onRefToggle);
         gridBtn.removeEventListener("click", onGridToggle);
         gridSizeInput.removeEventListener("input", onGridSizeInput);
         gridSizeInput.removeEventListener("blur", onGridSizeBlur);
