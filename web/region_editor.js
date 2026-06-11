@@ -2234,6 +2234,13 @@ function createRegionEditor(node) {
     function openPanel(e) {
         closePanel();
         closeHelp();
+        // Right-clicking a region targets it: it becomes the selection and
+        // the geometry fields appear; empty canvas opens just the list.
+        const hit = hitBox(pointerNorm(e));
+        if (hit >= 0) {
+            select(state.boxes[hit]);
+            render();
+        }
         panel = document.createElement("div");
         panel.className = "erpk-region-list";
         panel.style.position = "absolute";
@@ -2267,35 +2274,37 @@ function createRegionEditor(node) {
         header.style.marginBottom = "3px";
         panel.appendChild(header);
 
-        const dimRow = document.createElement("div");
-        dimRow.style.display = "flex";
-        dimRow.style.alignItems = "center";
-        dimRow.style.gap = "4px";
-        dimRow.style.padding = "2px 5px 4px";
-        dimRow.style.marginBottom = "3px";
-        dimRow.style.borderBottom = "1px solid " + HAIRLINE;
-        dimRow.style.font = "8px 'Segoe UI', sans-serif";
-        dimRow.style.color = "rgba(255, 255, 255, 0.45)";
-        panelDimFields = {};
-        for (const key of ["x", "y", "w", "h"]) {
-            const label = document.createElement("span");
-            label.textContent = key.toUpperCase();
-            const input = document.createElement("input");
-            input.type = "number";
-            input.step = "1";
-            styleInput(input);
-            input.style.width = "38px";
-            input.style.flex = "1 1 0";
-            input.style.minWidth = "0";
-            input.style.padding = "1px 3px";
-            input.style.fontSize = "9px";
-            input.addEventListener("input", () => applyPanelDim(key, input));
-            panelDimFields[key] = input;
-            dimRow.appendChild(label);
-            dimRow.appendChild(input);
+        if (hit >= 0) {
+            const dimRow = document.createElement("div");
+            dimRow.style.display = "flex";
+            dimRow.style.alignItems = "center";
+            dimRow.style.gap = "4px";
+            dimRow.style.padding = "2px 5px 4px";
+            dimRow.style.marginBottom = "3px";
+            dimRow.style.borderBottom = "1px solid " + HAIRLINE;
+            dimRow.style.font = "8px 'Segoe UI', sans-serif";
+            dimRow.style.color = "rgba(255, 255, 255, 0.45)";
+            panelDimFields = {};
+            for (const key of ["x", "y", "w", "h"]) {
+                const label = document.createElement("span");
+                label.textContent = key.toUpperCase();
+                const input = document.createElement("input");
+                input.type = "number";
+                input.step = "1";
+                styleInput(input);
+                input.style.width = "38px";
+                input.style.flex = "1 1 0";
+                input.style.minWidth = "0";
+                input.style.padding = "1px 3px";
+                input.style.fontSize = "9px";
+                input.addEventListener("input", () => applyPanelDim(key, input));
+                panelDimFields[key] = input;
+                dimRow.appendChild(label);
+                dimRow.appendChild(input);
+            }
+            dimRow.addEventListener("pointerdown", (e) => e.stopPropagation());
+            panel.appendChild(dimRow);
         }
-        dimRow.addEventListener("pointerdown", (e) => e.stopPropagation());
-        panel.appendChild(dimRow);
 
         panelList = document.createElement("div");
         panel.appendChild(panelList);
