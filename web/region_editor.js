@@ -338,12 +338,12 @@ function createRegionEditor(node) {
     }
 
     const gridBtn = makeStripButton("⊞");
-    gridBtn.title = "Show grid";
+    gridBtn.dataset.tip = "Show grid";
     const gridSizeInput = document.createElement("input");
     gridSizeInput.type = "number";
     gridSizeInput.min = String(GRID_MIN_CELL_PX);
     gridSizeInput.max = String(GRID_MAX_CELL_PX);
-    gridSizeInput.title = "Grid cell size in frame pixels (8–1024)";
+    gridSizeInput.dataset.tip = "Grid cell size in frame pixels (8–1024)";
     styleInput(gridSizeInput);
     gridSizeInput.style.width = "48px";
     gridSizeInput.style.flex = "0 0 auto";
@@ -353,7 +353,7 @@ function createRegionEditor(node) {
     const gridColorInput = document.createElement("input");
     gridColorInput.type = "color";
     gridColorInput.value = GRID_DEFAULT_COLOR;
-    gridColorInput.title = "Grid color";
+    gridColorInput.dataset.tip = "Grid color";
     gridColorInput.style.flex = "0 0 auto";
     gridColorInput.style.width = "22px";
     gridColorInput.style.height = "18px";
@@ -368,7 +368,7 @@ function createRegionEditor(node) {
     gridAlphaInput.type = "number";
     gridAlphaInput.min = "5";
     gridAlphaInput.max = "100";
-    gridAlphaInput.title = "Grid opacity in percent (5–100)";
+    gridAlphaInput.dataset.tip = "Grid opacity in percent (5–100)";
     styleInput(gridAlphaInput);
     gridAlphaInput.style.width = "40px";
     gridAlphaInput.style.flex = "0 0 auto";
@@ -376,12 +376,12 @@ function createRegionEditor(node) {
     gridAlphaInput.style.fontSize = "10px";
     gridAlphaInput.style.display = "none";
     const snapBtn = makeStripButton("⌖");
-    snapBtn.title = "Snap drawing, moving, and resizing to the grid";
+    snapBtn.dataset.tip = "Snap drawing, moving, and resizing to the grid";
     const helpBtn = makeStripButton("?");
-    helpBtn.title = "Keyboard and mouse shortcuts";
+    helpBtn.dataset.tip = "Keyboard and mouse shortcuts";
     const clearBtn = makeStripButton("Clear all");
     clearBtn.classList.add("erpk-btn-danger");
-    clearBtn.title = "Remove every region (click twice to confirm)";
+    clearBtn.dataset.tip = "Remove every region (click twice to confirm)";
     clearBtn.style.font = "bold 9px 'Segoe UI', sans-serif";
     clearBtn.style.color = DANGER_RED_DIM;
     clearBtn.style.borderColor = DANGER_RED_BORDER;
@@ -412,7 +412,7 @@ function createRegionEditor(node) {
     const descInput = document.createElement("input");
     descInput.type = "text";
     descInput.placeholder = "description — e.g. a red vintage car";
-    descInput.title = "Description of the selected region";
+    descInput.dataset.tip = "Description of the selected region";
     styleInput(descInput);
     descInput.style.width = "";
     descInput.style.flex = "2 1 0";
@@ -425,7 +425,7 @@ function createRegionEditor(node) {
         option.textContent = kind;
         kindSelect.appendChild(option);
     }
-    kindSelect.title = "Region kind: an object in the scene, or literal text to render";
+    kindSelect.dataset.tip = "Region kind: an object in the scene, or literal text to render";
     styleInput(kindSelect);
     kindSelect.style.width = "";
     kindSelect.style.flex = "0 0 auto";
@@ -433,20 +433,20 @@ function createRegionEditor(node) {
     const textInput = document.createElement("input");
     textInput.type = "text";
     textInput.placeholder = "text to render";
-    textInput.title = "Literal text the model should render inside this region";
+    textInput.dataset.tip = "Literal text the model should render inside this region";
     styleInput(textInput);
     textInput.style.width = "";
     textInput.style.flex = "1 1 0";
     textInput.style.minWidth = "0";
 
     const plugBtn = makeStripButton("⌁");
-    plugBtn.title = "Expose this region's description as an input";
+    plugBtn.dataset.tip = "Expose this region's description as an input";
     const refBtn = makeStripButton("▣");
-    refBtn.title = "Attach a reference image input to this region";
+    refBtn.dataset.tip = "Attach a reference image input to this region";
     const backBtn = makeStripButton("▼");
-    backBtn.title = "Send back — one layer toward the background ( [ )";
+    backBtn.dataset.tip = "Send back — one layer toward the background ( [ )";
     const frontBtn = makeStripButton("▲");
-    frontBtn.title = "Bring forward — one layer toward the front ( ] )";
+    frontBtn.dataset.tip = "Bring forward — one layer toward the front ( ] )";
 
     inspector.appendChild(descInput);
     inspector.appendChild(kindSelect);
@@ -1171,7 +1171,7 @@ function createRegionEditor(node) {
             ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
         plugBtn.style.borderColor = plugged
             ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
-        plugBtn.title = wired
+        plugBtn.dataset.tip = wired
             ? "Description is wired — disconnect the input to unplug"
             : plugged
                 ? "Hide this region's description input"
@@ -1189,7 +1189,7 @@ function createRegionEditor(node) {
             ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
         refBtn.style.borderColor = refPlugged
             ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
-        refBtn.title = refWired
+        refBtn.dataset.tip = refWired
             ? "Reference image is wired — disconnect the input to unplug"
             : refPlugged
                 ? "Hide this region's reference image input"
@@ -1742,6 +1742,84 @@ function createRegionEditor(node) {
         else openHelp();
     }
 
+    // --- Tooltips ---------------------------------------------------------
+    // Native title bubbles take ~1s to appear; [data-tip] elements get a
+    // styled tip after a short hover, placed above the control (below when
+    // clipped) and clamped inside the editor.
+    const TIP_DELAY_MS = 300;
+    let tipEl = null;
+    let tipTimer = null;
+    let tipTarget = null;
+
+    function hideTip() {
+        if (tipTimer) {
+            clearTimeout(tipTimer);
+            tipTimer = null;
+        }
+        tipTarget = null;
+        if (tipEl) {
+            tipEl.remove();
+            tipEl = null;
+        }
+    }
+
+    function showTip(target) {
+        const text = target.dataset.tip;
+        if (!text) return;
+        tipEl = document.createElement("div");
+        tipEl.textContent = text;
+        tipEl.style.position = "absolute";
+        tipEl.style.zIndex = "30";
+        tipEl.style.maxWidth = "240px";
+        tipEl.style.padding = "3px 7px";
+        tipEl.style.background = PANEL_BG;
+        tipEl.style.border = "1px solid " + HAIRLINE;
+        tipEl.style.borderRadius = "4px";
+        tipEl.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.45)";
+        tipEl.style.font = "9px 'Segoe UI', sans-serif";
+        tipEl.style.lineHeight = "1.5";
+        tipEl.style.color = "rgba(255, 255, 255, 0.85)";
+        tipEl.style.pointerEvents = "none";
+        root.appendChild(tipEl);
+        // Rects come in screen px; the editor lays out in its own px with
+        // the graph zoom in between, so rect deltas scale back to layout px.
+        const rootRect = root.getBoundingClientRect();
+        if (!rootRect.width) {
+            hideTip();
+            return;
+        }
+        const scale = root.offsetWidth / rootRect.width;
+        const t = target.getBoundingClientRect();
+        const left = (t.left + t.width / 2 - rootRect.left) * scale
+            - tipEl.offsetWidth / 2;
+        const maxX = root.offsetWidth - tipEl.offsetWidth - 4;
+        tipEl.style.left = Math.round(clamp(left, 4, Math.max(maxX, 4))) + "px";
+        let top = (t.top - rootRect.top) * scale - tipEl.offsetHeight - 5;
+        if (top < 4) top = (t.bottom - rootRect.top) * scale + 5;
+        tipEl.style.top = Math.round(top) + "px";
+    }
+
+    function onTipOver(e) {
+        const target = e.target.closest?.("[data-tip]");
+        if (!target || target === tipTarget) return;
+        hideTip();
+        tipTarget = target;
+        tipTimer = setTimeout(() => {
+            tipTimer = null;
+            showTip(target);
+        }, TIP_DELAY_MS);
+    }
+
+    function onTipOut(e) {
+        if (!tipTarget) return;
+        if (e.relatedTarget && tipTarget.contains(e.relatedTarget)) return;
+        if (tipTarget.contains(e.target)) hideTip();
+    }
+
+    root.addEventListener("pointerover", onTipOver);
+    root.addEventListener("pointerout", onTipOut);
+    root.addEventListener("pointerdown", hideTip, true);
+
     // --- Region list panel ----------------------------------------------
     // Right-click panel listing regions front-to-back with per-row select,
     // duplicate, delete, and pointer-drag depth reordering.
@@ -1945,14 +2023,14 @@ function createRegionEditor(node) {
         const plug = document.createElement("span");
         plug.style.flex = "0 0 auto";
         plug.style.color = regionColor(index);
-        plug.title = "Description wired from a desc input";
+        plug.dataset.tip = "Description wired from a desc input";
         plug.textContent = "⌁";
         plug.style.display = descWiredFor(box) ? "" : "none";
 
         const refMark = document.createElement("span");
         refMark.style.flex = "0 0 auto";
         refMark.style.color = regionColor(index);
-        refMark.title = "Reference image wired from a ref input";
+        refMark.dataset.tip = "Reference image wired from a ref input";
         refMark.textContent = "▣";
         refMark.style.display = refWiredFor(box) ? "" : "none";
 
@@ -1972,12 +2050,12 @@ function createRegionEditor(node) {
         }
 
         const dupBtn = makeStripButton("⧉");
-        dupBtn.title = "Duplicate region";
+        dupBtn.dataset.tip = "Duplicate region";
         dupBtn.style.fontSize = "10px";
         dupBtn.style.padding = "0 4px";
         const delBtn = makeStripButton("✕");
         delBtn.classList.add("erpk-btn-danger");
-        delBtn.title = "Delete region";
+        delBtn.dataset.tip = "Delete region";
         delBtn.style.fontSize = "10px";
         delBtn.style.padding = "0 4px";
         delBtn.style.color = DANGER_RED_DIM;
@@ -2039,7 +2117,7 @@ function createRegionEditor(node) {
 
         const header = document.createElement("div");
         header.textContent = "Regions · top = front";
-        header.title = "Click a row to select · drag rows to reorder depth · "
+        header.dataset.tip = "Click a row to select · drag rows to reorder depth · "
             + "⧉ duplicates · ✕ deletes";
         header.style.font = "8px 'Segoe UI', sans-serif";
         header.style.color = "rgba(255, 255, 255, 0.45)";
@@ -2148,6 +2226,10 @@ function createRegionEditor(node) {
         gridAlphaInput.removeEventListener("blur", onGridAlphaBlur);
         gridAlphaInput.removeEventListener("keydown", onGridSizeKeyDown);
         snapBtn.removeEventListener("click", onSnapToggle);
+        root.removeEventListener("pointerover", onTipOver);
+        root.removeEventListener("pointerout", onTipOut);
+        root.removeEventListener("pointerdown", hideTip, true);
+        hideTip();
         closePanel();
         closeHelp();
         if (clearArm) clearTimeout(clearArm);
