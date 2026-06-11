@@ -447,6 +447,8 @@ function createRegionEditor(node) {
     plugBtn.dataset.tip = "Expose this region's description as an input";
     const refBtn = makeStripButton("▣");
     refBtn.dataset.tip = "Attach a reference image input to this region";
+    const dimBtn = makeStripButton("⌗");
+    dimBtn.dataset.tip = "Set the region's exact position and size in pixels";
     const backBtn = makeStripButton("▼");
     backBtn.dataset.tip = "Send back — one layer toward the background ( [ )";
     const frontBtn = makeStripButton("▲");
@@ -457,6 +459,7 @@ function createRegionEditor(node) {
     inspector.appendChild(textInput);
     inspector.appendChild(plugBtn);
     inspector.appendChild(refBtn);
+    inspector.appendChild(dimBtn);
     inspector.appendChild(backBtn);
     inspector.appendChild(frontBtn);
     root.insertBefore(inspector, status);
@@ -874,6 +877,7 @@ function createRegionEditor(node) {
         if (!count) disarmClear();
         syncRegionSockets();
         syncInspector();
+        syncDimPanel();
     }
 
     function render() {
@@ -1200,6 +1204,14 @@ function createRegionEditor(node) {
                 : refWireable
                     ? "Attach a reference image input to this region"
                     : "Only regions 1–10 can take a reference image input";
+        const single = !!box && state.selection.size === 1;
+        dimBtn.disabled = !single;
+        dimBtn.style.opacity = single ? "1" : "0.45";
+        dimBtn.classList.toggle("erpk-btn-active", !!dimPanel);
+        dimBtn.style.color = dimPanel
+            ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
+        dimBtn.style.borderColor = dimPanel
+            ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
         if (box === inspected) return;
         inspected = box;
         descInput.value = box ? box.desc : "";
@@ -1428,6 +1440,34 @@ function createRegionEditor(node) {
             e.preventDefault();
             e.stopPropagation();
             if (state.selection.size) pasteRegions(selectionInOrder());
+            return;
+        }
+        // Arrow nudging in frame pixels: 1px, 10px with Shift; Alt resizes
+        // instead of moving. Bypasses snap — nudging IS the fine adjustment.
+        const arrow = {
+            ArrowLeft: [-1, 0],
+            ArrowRight: [1, 0],
+            ArrowUp: [0, -1],
+            ArrowDown: [0, 1],
+        }[e.key];
+        if (arrow && state.selection.size && !state.hideBoxes && !mod) {
+            e.preventDefault();
+            e.stopPropagation();
+            const dims = frameDims(node);
+            const step = e.shiftKey ? 10 : 1;
+            const dx = (arrow[0] * step) / dims.w;
+            const dy = (arrow[1] * step) / dims.h;
+            for (const box of state.selection) {
+                if (e.altKey) {
+                    box.w = clamp(box.w + dx, MIN_REGION_SIZE, 1 - box.x);
+                    box.h = clamp(box.h + dy, MIN_REGION_SIZE, 1 - box.y);
+                } else {
+                    box.x = clamp(box.x + dx, 0, 1 - box.w);
+                    box.y = clamp(box.y + dy, 0, 1 - box.h);
+                }
+            }
+            syncWidget();
+            render();
             return;
         }
         if (key === "h" && !mod && !e.altKey && !e.shiftKey) {
@@ -1674,6 +1714,7 @@ function createRegionEditor(node) {
 
     function openHelp() {
         closePanel();
+        closeDim();
         helpPanel = document.createElement("div");
         helpPanel.style.position = "absolute";
         helpPanel.style.zIndex = "20";
@@ -1709,6 +1750,8 @@ function createRegionEditor(node) {
             ["double-click", "edit description in the inspector"],
             ["right-click", "region list and depth order"],
             ["Del / Backspace", "delete selected"],
+            ["arrow keys", "nudge 1px, Shift for 10px"],
+            ["Alt+arrows", "resize 1px, Shift for 10px"],
             ["Ctrl/Cmd+C V D", "copy, paste, duplicate"],
             ["[ and ]", "send back, bring forward"],
             ["H", "hide region overlays"],
@@ -1745,6 +1788,126 @@ function createRegionEditor(node) {
     function onHelpToggle() {
         if (helpPanel) closeHelp();
         else openHelp();
+    }
+
+    // --- Geometry popover --------------------------------------------------
+    // The ⌗ button opens exact X/Y/W/H entry for the selected region, in
+    // frame pixels; values apply live and follow outside edits (drag, nudge).
+    let dimPanel = null;
+    let dimBox = null;
+    const dimFields = {};
+
+    function closeDim() {
+        if (!dimPanel) return;
+        document.removeEventListener("pointerdown", onDimDocPointerDown, true);
+        document.removeEventListener("keydown", onDimDocKeyDown, true);
+        dimPanel.remove();
+        dimPanel = null;
+        dimBox = null;
+        syncInspector();
+    }
+
+    function onDimDocPointerDown(e) {
+        if (!dimPanel || dimPanel.contains(e.target)
+            || dimBtn.contains(e.target)) return;
+        closeDim();
+    }
+
+    function onDimDocKeyDown(e) {
+        if ((e.key === "Escape" || e.key === "Enter") && dimPanel) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeDim();
+        }
+    }
+
+    function applyDimField(key) {
+        if (!dimBox) return;
+        const dims = frameDims(node);
+        const value = Number(dimFields[key].value);
+        if (!Number.isFinite(value)) return;
+        const box = dimBox;
+        if (key === "x") box.x = clamp(value / dims.w, 0, 1 - box.w);
+        if (key === "y") box.y = clamp(value / dims.h, 0, 1 - box.h);
+        if (key === "w") box.w = clamp(value / dims.w, MIN_REGION_SIZE, 1 - box.x);
+        if (key === "h") box.h = clamp(value / dims.h, MIN_REGION_SIZE, 1 - box.y);
+        syncWidget();
+        render();
+    }
+
+    function refreshDimFields() {
+        if (!dimBox) return;
+        const dims = frameDims(node);
+        const px = {
+            x: Math.round(dimBox.x * dims.w),
+            y: Math.round(dimBox.y * dims.h),
+            w: Math.round(dimBox.w * dims.w),
+            h: Math.round(dimBox.h * dims.h),
+        };
+        for (const key of Object.keys(dimFields)) {
+            if (document.activeElement !== dimFields[key]) {
+                dimFields[key].value = String(px[key]);
+            }
+        }
+    }
+
+    function openDim() {
+        closeDim();
+        closePanel();
+        closeHelp();
+        if (!state.primary || state.selection.size !== 1) return;
+        dimBox = state.primary;
+        dimPanel = document.createElement("div");
+        dimPanel.style.position = "absolute";
+        dimPanel.style.zIndex = "20";
+        dimPanel.style.display = "flex";
+        dimPanel.style.gap = "5px";
+        dimPanel.style.alignItems = "center";
+        dimPanel.style.boxSizing = "border-box";
+        dimPanel.style.padding = "5px 7px";
+        dimPanel.style.background = PANEL_BG;
+        dimPanel.style.border = "1px solid " + HAIRLINE;
+        dimPanel.style.borderRadius = "6px";
+        dimPanel.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.45)";
+        for (const key of ["x", "y", "w", "h"]) {
+            const label = document.createElement("span");
+            label.textContent = key.toUpperCase();
+            label.style.font = "8px 'Segoe UI', sans-serif";
+            label.style.color = "rgba(255, 255, 255, 0.45)";
+            const input = document.createElement("input");
+            input.type = "number";
+            input.step = "1";
+            styleInput(input);
+            input.style.width = "48px";
+            input.style.flex = "0 0 auto";
+            input.style.padding = "1px 4px";
+            input.style.fontSize = "10px";
+            input.addEventListener("input", () => applyDimField(key));
+            dimFields[key] = input;
+            dimPanel.appendChild(label);
+            dimPanel.appendChild(input);
+        }
+        refreshDimFields();
+        dimPanel.addEventListener("pointerdown", (e) => e.stopPropagation());
+        root.appendChild(dimPanel);
+        dimPanel.style.right = "6px";
+        dimPanel.style.bottom = (root.offsetHeight - inspector.offsetTop + 4) + "px";
+        document.addEventListener("pointerdown", onDimDocPointerDown, true);
+        document.addEventListener("keydown", onDimDocKeyDown, true);
+        syncInspector();
+    }
+
+    function onDimToggle() {
+        if (dimPanel) closeDim();
+        else openDim();
+    }
+
+    // Selection changes close the popover; outside geometry edits (drag,
+    // arrow nudge) refresh its fields instead of fighting them.
+    function syncDimPanel() {
+        if (!dimPanel) return;
+        if (state.primary !== dimBox || state.selection.size !== 1) closeDim();
+        else refreshDimFields();
     }
 
     // --- Tooltips ---------------------------------------------------------
@@ -2161,6 +2324,7 @@ function createRegionEditor(node) {
     function openPanel(e) {
         closePanel();
         closeHelp();
+        closeDim();
         panel = document.createElement("div");
         panel.className = "erpk-region-list";
         panel.style.position = "absolute";
@@ -2240,6 +2404,7 @@ function createRegionEditor(node) {
     frontBtn.addEventListener("click", onBringForward);
     plugBtn.addEventListener("click", onPlugToggle);
     refBtn.addEventListener("click", onRefToggle);
+    dimBtn.addEventListener("click", onDimToggle);
     gridBtn.addEventListener("click", onGridToggle);
     gridSizeInput.addEventListener("input", onGridSizeInput);
     gridSizeInput.addEventListener("blur", onGridSizeBlur);
@@ -2281,6 +2446,8 @@ function createRegionEditor(node) {
         frontBtn.removeEventListener("click", onBringForward);
         plugBtn.removeEventListener("click", onPlugToggle);
         refBtn.removeEventListener("click", onRefToggle);
+        dimBtn.removeEventListener("click", onDimToggle);
+        closeDim();
         gridBtn.removeEventListener("click", onGridToggle);
         gridSizeInput.removeEventListener("input", onGridSizeInput);
         gridSizeInput.removeEventListener("blur", onGridSizeBlur);
