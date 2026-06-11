@@ -333,10 +333,6 @@ function createRegionEditor(node) {
         btn.style.border = "1px solid rgba(255, 255, 255, 0.14)";
         btn.style.borderRadius = "3px";
         btn.style.padding = "1px 7px";
-        // One box height regardless of per-button font overrides, so the
-        // strip reads as a single row of controls.
-        btn.style.height = "16px";
-        btn.style.boxSizing = "border-box";
         btn.style.cursor = "pointer";
         return btn;
     }
@@ -2057,13 +2053,11 @@ function createRegionEditor(node) {
         dupBtn.dataset.tip = "Duplicate region";
         dupBtn.style.fontSize = "10px";
         dupBtn.style.padding = "0 4px";
-        dupBtn.style.height = "12px";
         const delBtn = makeStripButton("✕");
         delBtn.classList.add("erpk-btn-danger");
         delBtn.dataset.tip = "Delete region";
         delBtn.style.fontSize = "10px";
         delBtn.style.padding = "0 4px";
-        delBtn.style.height = "12px";
         delBtn.style.color = DANGER_RED_DIM;
         delBtn.style.borderColor = DANGER_RED_BORDER;
 
