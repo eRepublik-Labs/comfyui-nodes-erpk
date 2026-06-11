@@ -1315,6 +1315,7 @@ function createRegionEditor(node) {
     function onPointerMove(e) {
         if (!state.drag) {
             updateCursor(e);
+            trackRegionTip(e);
             return;
         }
         const p = pointerNorm(e);
@@ -1754,6 +1755,7 @@ function createRegionEditor(node) {
     let tipEl = null;
     let tipTimer = null;
     let tipTarget = null;
+    let tipBox = null;
 
     function hideTip() {
         if (tipTimer) {
@@ -1761,30 +1763,37 @@ function createRegionEditor(node) {
             tipTimer = null;
         }
         tipTarget = null;
+        tipBox = null;
         if (tipEl) {
             tipEl.remove();
             tipEl = null;
         }
     }
 
+    function makeTipEl(text) {
+        const el = document.createElement("div");
+        el.textContent = text;
+        el.style.position = "absolute";
+        el.style.zIndex = "30";
+        el.style.maxWidth = "240px";
+        el.style.padding = "3px 7px";
+        el.style.background = PANEL_BG;
+        el.style.border = "1px solid " + HAIRLINE;
+        el.style.borderRadius = "4px";
+        el.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.45)";
+        el.style.font = "9px 'Segoe UI', sans-serif";
+        el.style.lineHeight = "1.5";
+        el.style.color = "rgba(255, 255, 255, 0.85)";
+        el.style.whiteSpace = "pre-line";
+        el.style.pointerEvents = "none";
+        root.appendChild(el);
+        return el;
+    }
+
     function showTip(target) {
         const text = target.dataset.tip;
         if (!text) return;
-        tipEl = document.createElement("div");
-        tipEl.textContent = text;
-        tipEl.style.position = "absolute";
-        tipEl.style.zIndex = "30";
-        tipEl.style.maxWidth = "240px";
-        tipEl.style.padding = "3px 7px";
-        tipEl.style.background = PANEL_BG;
-        tipEl.style.border = "1px solid " + HAIRLINE;
-        tipEl.style.borderRadius = "4px";
-        tipEl.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.45)";
-        tipEl.style.font = "9px 'Segoe UI', sans-serif";
-        tipEl.style.lineHeight = "1.5";
-        tipEl.style.color = "rgba(255, 255, 255, 0.85)";
-        tipEl.style.pointerEvents = "none";
-        root.appendChild(tipEl);
+        tipEl = makeTipEl(text);
         // Rects come in screen px; the editor lays out in its own px with
         // the graph zoom in between, so rect deltas scale back to layout px.
         const rootRect = root.getBoundingClientRect();
@@ -1801,6 +1810,56 @@ function createRegionEditor(node) {
         let top = (t.top - rootRect.top) * scale - tipEl.offsetHeight - 5;
         if (top < 4) top = (t.bottom - rootRect.top) * scale + 5;
         tipEl.style.top = Math.round(top) + "px";
+    }
+
+    // Regions live on the canvas, not in the DOM, so their tips anchor to
+    // the pointer and are driven by the canvas hover tracking below.
+    function showRegionTip(text, clientX, clientY) {
+        tipEl = makeTipEl(text);
+        const rootRect = root.getBoundingClientRect();
+        if (!rootRect.width) {
+            hideTip();
+            return;
+        }
+        const scale = root.offsetWidth / rootRect.width;
+        const px = (clientX - rootRect.left) * scale;
+        const py = (clientY - rootRect.top) * scale;
+        let left = px + 10;
+        let top = py + 14;
+        const maxX = root.offsetWidth - tipEl.offsetWidth - 4;
+        const maxY = root.offsetHeight - tipEl.offsetHeight - 4;
+        if (left > maxX) left = px - tipEl.offsetWidth - 10;
+        if (top > maxY) top = py - tipEl.offsetHeight - 8;
+        tipEl.style.left = Math.round(clamp(left, 4, Math.max(maxX, 4))) + "px";
+        tipEl.style.top = Math.round(clamp(top, 4, Math.max(maxY, 4))) + "px";
+    }
+
+    function regionTipText(box) {
+        const index = state.boxes.indexOf(box);
+        const name = box.desc || (box.kind === "text" ? box.text : "") || "unnamed";
+        const lines = [`#${index + 1} · ${name}`];
+        if (box.kind === "text") lines.push(`renders: "${box.text}"`);
+        if (descWiredFor(box)) lines.push(`⌁ description wired from desc_${index + 1}`);
+        if (refWiredFor(box)) lines.push(`▣ reference image from ref_${index + 1}`);
+        return lines.join("\n");
+    }
+
+    function trackRegionTip(e) {
+        const hit = hitBox(pointerNorm(e));
+        const box = hit >= 0 ? state.boxes[hit] : null;
+        if (box === tipBox) return;
+        hideTip();
+        tipBox = box;
+        if (!box) return;
+        tipTimer = setTimeout(() => {
+            tipTimer = null;
+            if (state.drag || state.boxes.indexOf(box) < 0) return;
+            showRegionTip(regionTipText(box), e.clientX, e.clientY);
+        }, TIP_DELAY_MS);
+    }
+
+    function onCanvasTipLeave() {
+        hideTip();
     }
 
     function onTipOver(e) {
@@ -1823,6 +1882,7 @@ function createRegionEditor(node) {
     root.addEventListener("pointerover", onTipOver);
     root.addEventListener("pointerout", onTipOut);
     root.addEventListener("pointerdown", hideTip, true);
+    canvas.addEventListener("pointerleave", onCanvasTipLeave);
 
     // --- Region list panel ----------------------------------------------
     // Right-click panel listing regions front-to-back with per-row select,
@@ -2233,6 +2293,7 @@ function createRegionEditor(node) {
         root.removeEventListener("pointerover", onTipOver);
         root.removeEventListener("pointerout", onTipOut);
         root.removeEventListener("pointerdown", hideTip, true);
+        canvas.removeEventListener("pointerleave", onCanvasTipLeave);
         hideTip();
         closePanel();
         closeHelp();
