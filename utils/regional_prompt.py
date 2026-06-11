@@ -28,7 +28,9 @@ LAYOUT_HEADER = (
 )
 REFS_HEADER = (
     "Numbered images accompany this request: image 1 is the image being "
-    "edited, and elements below reference later images by number."
+    "edited, and elements below reference later images by number. Reproduce "
+    "each referenced item faithfully (shape, colors, materials, markings), "
+    "adapting it to the scene's lighting and perspective."
 )
 LAYOUT_FOOTER = (
     "Every element must stay fully inside its placement area and fill most of it. "
@@ -114,13 +116,22 @@ def _element_line(region):
         f"{placement}, covering about {round(region['w'] * 100)}% of the image "
         f"width and {round(region['h'] * 100)}% of its height. box_2d = {box}"
     )
+    # Referenced items use take-from-image phrasing: a trailing "as shown in"
+    # aside is weak enough that models follow the words and drop the picture.
     ref = region.get("ref_image")
-    shown = f", as shown in image {ref}" if ref else ""
     if region["kind"] == "text":
+        styled = f", styled as shown in image {ref}" if ref else ""
         if region["desc"]:
-            return f'The text "{region["text"]}", {region["desc"]}{shown}: {geometry}'
-        return f'The text "{region["text"]}"{shown}: {geometry}'
-    return f'{region["desc"] or "An element"}{shown}: {geometry}'
+            return f'The text "{region["text"]}", {region["desc"]}{styled}: {geometry}'
+        return f'The text "{region["text"]}"{styled}: {geometry}'
+    if ref:
+        subject = (
+            f"{region['desc']}, taken from image {ref} (reproduce that exact item)"
+            if region["desc"]
+            else f"The item shown in image {ref}, reproduced exactly"
+        )
+        return f"{subject}: {geometry}"
+    return f'{region["desc"] or "An element"}: {geometry}'
 
 
 def build_prompt(prompt, width, height, regions):

@@ -453,9 +453,21 @@ class TestImageRefs:
             ref_1=object(), ref_2=object(),
         )
         prompt = out.args[0]
-        assert "a red vintage car, as shown in image 2: at the bottom-left" in prompt
-        assert ('The text "OPEN LATE", glowing neon letters, as shown in '
-                "image 3: at the top-center") in prompt
+        assert ("a red vintage car, taken from image 2 (reproduce that exact "
+                "item): at the bottom-left") in prompt
+        assert ('The text "OPEN LATE", glowing neon letters, styled as shown '
+                "in image 3: at the top-center") in prompt
+
+    def test_ref_without_desc_makes_the_image_the_subject(self):
+        regions = [{"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2,
+                    "kind": "object", "desc": "", "text": ""}]
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=json.dumps(regions),
+            ref_1=object(),
+        )
+        assert ("1. The item shown in image 2, reproduced exactly: "
+                "at the center") in out.args[0]
 
     def test_unwired_regions_skip_numbering(self):
         sentinel = object()
@@ -467,7 +479,7 @@ class TestImageRefs:
         prompt, image_refs = out.args[0], out.args[5]
         assert image_refs == [sentinel]
         assert "a red vintage car: at the bottom-left" in prompt
-        assert "as shown in image 2: at the top-center" in prompt
+        assert "styled as shown in image 2: at the top-center" in prompt
 
     def test_header_explains_numbering_only_when_refs_exist(self):
         with_refs = RegionalPromptBuilder.execute(
@@ -480,7 +492,9 @@ class TestImageRefs:
             regions_data=json.dumps(CANONICAL_REGIONS),
         ).args[0]
         assert "image 1 is the image being edited" in with_refs
+        assert "Reproduce each referenced item faithfully" in with_refs
         assert "image 1 is the image being edited" not in without_refs
+        assert "Reproduce each referenced item" not in without_refs
 
     def test_ref_beyond_region_count_is_ignored(self):
         out = RegionalPromptBuilder.execute(
@@ -489,4 +503,5 @@ class TestImageRefs:
             ref_5=object(),
         )
         assert out.args[5] == []
-        assert "as shown in image" not in out.args[0]
+        assert "taken from image" not in out.args[0]
+        assert "styled as shown in" not in out.args[0]
