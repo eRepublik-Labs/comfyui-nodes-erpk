@@ -447,8 +447,6 @@ function createRegionEditor(node) {
     plugBtn.dataset.tip = "Expose this region's description as an input";
     const refBtn = makeStripButton("▣");
     refBtn.dataset.tip = "Attach a reference image input to this region";
-    const dimBtn = makeStripButton("⌗");
-    dimBtn.dataset.tip = "Set the region's exact position and size in pixels";
     const backBtn = makeStripButton("▼");
     backBtn.dataset.tip = "Send back — one layer toward the background ( [ )";
     const frontBtn = makeStripButton("▲");
@@ -459,7 +457,6 @@ function createRegionEditor(node) {
     inspector.appendChild(textInput);
     inspector.appendChild(plugBtn);
     inspector.appendChild(refBtn);
-    inspector.appendChild(dimBtn);
     inspector.appendChild(backBtn);
     inspector.appendChild(frontBtn);
     root.insertBefore(inspector, status);
@@ -877,7 +874,6 @@ function createRegionEditor(node) {
         if (!count) disarmClear();
         syncRegionSockets();
         syncInspector();
-        syncDimPanel();
     }
 
     function render() {
@@ -899,7 +895,7 @@ function createRegionEditor(node) {
         // Keyboard mutations (delete, paste, duplicate, depth) reach the open
         // panel through the shared render path; a row drag in flight owns the
         // row DOM and must not be rebuilt under the pointer.
-        if (panel && !panelRowDragging) renderPanelRows();
+        if (panel && !panelRowDragging && !panelDimFocused) renderPanelRows();
     }
 
     // --- Hit testing -----------------------------------------------------
@@ -1204,14 +1200,6 @@ function createRegionEditor(node) {
                 : refWireable
                     ? "Attach a reference image input to this region"
                     : "Only regions 1–10 can take a reference image input";
-        const single = !!box && state.selection.size === 1;
-        dimBtn.disabled = !single;
-        dimBtn.style.opacity = single ? "1" : "0.45";
-        dimBtn.classList.toggle("erpk-btn-active", !!dimPanel);
-        dimBtn.style.color = dimPanel
-            ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
-        dimBtn.style.borderColor = dimPanel
-            ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
         if (box === inspected) return;
         inspected = box;
         descInput.value = box ? box.desc : "";
@@ -1714,7 +1702,6 @@ function createRegionEditor(node) {
 
     function openHelp() {
         closePanel();
-        closeDim();
         helpPanel = document.createElement("div");
         helpPanel.style.position = "absolute";
         helpPanel.style.zIndex = "20";
@@ -1788,126 +1775,6 @@ function createRegionEditor(node) {
     function onHelpToggle() {
         if (helpPanel) closeHelp();
         else openHelp();
-    }
-
-    // --- Geometry popover --------------------------------------------------
-    // The ⌗ button opens exact X/Y/W/H entry for the selected region, in
-    // frame pixels; values apply live and follow outside edits (drag, nudge).
-    let dimPanel = null;
-    let dimBox = null;
-    const dimFields = {};
-
-    function closeDim() {
-        if (!dimPanel) return;
-        document.removeEventListener("pointerdown", onDimDocPointerDown, true);
-        document.removeEventListener("keydown", onDimDocKeyDown, true);
-        dimPanel.remove();
-        dimPanel = null;
-        dimBox = null;
-        syncInspector();
-    }
-
-    function onDimDocPointerDown(e) {
-        if (!dimPanel || dimPanel.contains(e.target)
-            || dimBtn.contains(e.target)) return;
-        closeDim();
-    }
-
-    function onDimDocKeyDown(e) {
-        if ((e.key === "Escape" || e.key === "Enter") && dimPanel) {
-            e.preventDefault();
-            e.stopPropagation();
-            closeDim();
-        }
-    }
-
-    function applyDimField(key) {
-        if (!dimBox) return;
-        const dims = frameDims(node);
-        const value = Number(dimFields[key].value);
-        if (!Number.isFinite(value)) return;
-        const box = dimBox;
-        if (key === "x") box.x = clamp(value / dims.w, 0, 1 - box.w);
-        if (key === "y") box.y = clamp(value / dims.h, 0, 1 - box.h);
-        if (key === "w") box.w = clamp(value / dims.w, MIN_REGION_SIZE, 1 - box.x);
-        if (key === "h") box.h = clamp(value / dims.h, MIN_REGION_SIZE, 1 - box.y);
-        syncWidget();
-        render();
-    }
-
-    function refreshDimFields() {
-        if (!dimBox) return;
-        const dims = frameDims(node);
-        const px = {
-            x: Math.round(dimBox.x * dims.w),
-            y: Math.round(dimBox.y * dims.h),
-            w: Math.round(dimBox.w * dims.w),
-            h: Math.round(dimBox.h * dims.h),
-        };
-        for (const key of Object.keys(dimFields)) {
-            if (document.activeElement !== dimFields[key]) {
-                dimFields[key].value = String(px[key]);
-            }
-        }
-    }
-
-    function openDim() {
-        closeDim();
-        closePanel();
-        closeHelp();
-        if (!state.primary || state.selection.size !== 1) return;
-        dimBox = state.primary;
-        dimPanel = document.createElement("div");
-        dimPanel.style.position = "absolute";
-        dimPanel.style.zIndex = "20";
-        dimPanel.style.display = "flex";
-        dimPanel.style.gap = "5px";
-        dimPanel.style.alignItems = "center";
-        dimPanel.style.boxSizing = "border-box";
-        dimPanel.style.padding = "5px 7px";
-        dimPanel.style.background = PANEL_BG;
-        dimPanel.style.border = "1px solid " + HAIRLINE;
-        dimPanel.style.borderRadius = "6px";
-        dimPanel.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.45)";
-        for (const key of ["x", "y", "w", "h"]) {
-            const label = document.createElement("span");
-            label.textContent = key.toUpperCase();
-            label.style.font = "8px 'Segoe UI', sans-serif";
-            label.style.color = "rgba(255, 255, 255, 0.45)";
-            const input = document.createElement("input");
-            input.type = "number";
-            input.step = "1";
-            styleInput(input);
-            input.style.width = "48px";
-            input.style.flex = "0 0 auto";
-            input.style.padding = "1px 4px";
-            input.style.fontSize = "10px";
-            input.addEventListener("input", () => applyDimField(key));
-            dimFields[key] = input;
-            dimPanel.appendChild(label);
-            dimPanel.appendChild(input);
-        }
-        refreshDimFields();
-        dimPanel.addEventListener("pointerdown", (e) => e.stopPropagation());
-        root.appendChild(dimPanel);
-        dimPanel.style.right = "6px";
-        dimPanel.style.bottom = (root.offsetHeight - inspector.offsetTop + 4) + "px";
-        document.addEventListener("pointerdown", onDimDocPointerDown, true);
-        document.addEventListener("keydown", onDimDocKeyDown, true);
-        syncInspector();
-    }
-
-    function onDimToggle() {
-        if (dimPanel) closeDim();
-        else openDim();
-    }
-
-    // Selection changes close the popover; outside geometry edits (drag,
-    // arrow nudge) refresh its fields instead of fighting them.
-    function syncDimPanel() {
-        if (!dimPanel) return;
-        if (state.primary !== dimBox || state.selection.size !== 1) closeDim();
-        else refreshDimFields();
     }
 
     // --- Tooltips ---------------------------------------------------------
@@ -2053,6 +1920,8 @@ function createRegionEditor(node) {
     let panel = null;
     let panelList = null;
     let panelRowDragging = false;
+    let panelDimBox = null;       // region with the geometry editor expanded
+    let panelDimFocused = false;  // a geometry field has focus; skip rebuilds
 
     // Pointer position in the root's layout pixels; the bounding rect is
     // scaled by the graph zoom, so divide it back out.
@@ -2072,6 +1941,8 @@ function createRegionEditor(node) {
         panel.remove();
         panel = null;
         panelList = null;
+        panelDimBox = null;
+        panelDimFocused = false;
     }
 
     function onDocPointerDown(e) {
@@ -2109,6 +1980,7 @@ function createRegionEditor(node) {
         if (index < 0) return;
         state.boxes.splice(index, 1);
         state.selection.delete(box);
+        if (panelDimBox === box) panelDimBox = null;
         if (state.primary === box) state.primary = lastSelected();
         syncWidget();
         render();
@@ -2120,7 +1992,10 @@ function createRegionEditor(node) {
     // reversed, so the reorder reads bottom row = index 0 (backmost).
     function commitPanelOrder() {
         if (!panelList) return;
-        const order = [...panelList.children].map((el) => el._erpkBox).reverse();
+        const order = [...panelList.children]
+            .filter((el) => el._erpkBox)
+            .map((el) => el._erpkBox)
+            .reverse();
         // A keyboard mutation mid-drag invalidates the row snapshot; refuse a
         // reorder that would add or drop regions and just rebuild the list.
         const valid = order.length === state.boxes.length
@@ -2141,6 +2016,16 @@ function createRegionEditor(node) {
         if (e.button !== 0) return;
         e.stopPropagation();
         e.preventDefault();
+        // The geometry editor row would sit inside the drag's row math;
+        // collapse it first and re-find the grabbed row after the rebuild.
+        if (panelDimBox) {
+            const grabbed = row._erpkBox;
+            panelDimBox = null;
+            panelDimFocused = false;
+            renderPanelRows();
+            row = [...panelList.children].find((el) => el._erpkBox === grabbed);
+            if (!row) return;
+        }
         const startY = e.clientY;
         let dragging = false;
         panelRowDragging = true;
@@ -2218,6 +2103,59 @@ function createRegionEditor(node) {
         window.addEventListener("pointercancel", onRowUp, true);
     }
 
+    // Expanded geometry editor under a region's row: X/Y/W/H in frame
+    // pixels, applied live. It carries no _erpkBox, so reorder logic and
+    // the drag's row math skip it.
+    function buildDimRow(box) {
+        const row = document.createElement("div");
+        row.style.display = "flex";
+        row.style.alignItems = "center";
+        row.style.gap = "4px";
+        row.style.padding = "2px 5px 3px 19px";
+        row.style.font = "8px 'Segoe UI', sans-serif";
+        row.style.color = "rgba(255, 255, 255, 0.45)";
+        const dims = frameDims(node);
+        const apply = {
+            x: (v) => { box.x = clamp(v / dims.w, 0, 1 - box.w); },
+            y: (v) => { box.y = clamp(v / dims.h, 0, 1 - box.h); },
+            w: (v) => { box.w = clamp(v / dims.w, MIN_REGION_SIZE, 1 - box.x); },
+            h: (v) => { box.h = clamp(v / dims.h, MIN_REGION_SIZE, 1 - box.y); },
+        };
+        const initial = {
+            x: Math.round(box.x * dims.w),
+            y: Math.round(box.y * dims.h),
+            w: Math.round(box.w * dims.w),
+            h: Math.round(box.h * dims.h),
+        };
+        for (const key of ["x", "y", "w", "h"]) {
+            const label = document.createElement("span");
+            label.textContent = key.toUpperCase();
+            const input = document.createElement("input");
+            input.type = "number";
+            input.step = "1";
+            styleInput(input);
+            input.style.width = "38px";
+            input.style.flex = "1 1 0";
+            input.style.minWidth = "0";
+            input.style.padding = "1px 3px";
+            input.style.fontSize = "9px";
+            input.value = String(initial[key]);
+            input.addEventListener("focus", () => { panelDimFocused = true; });
+            input.addEventListener("blur", () => { panelDimFocused = false; });
+            input.addEventListener("input", () => {
+                const v = Number(input.value);
+                if (input.value === "" || !Number.isFinite(v)) return;
+                apply[key](v);
+                syncWidget();
+                render();
+            });
+            row.appendChild(label);
+            row.appendChild(input);
+        }
+        row.addEventListener("pointerdown", (e) => e.stopPropagation());
+        return row;
+    }
+
     function buildPanelRow(index) {
         const box = state.boxes[index];
         const row = document.createElement("div");
@@ -2276,6 +2214,15 @@ function createRegionEditor(node) {
             label.style.color = "rgba(255, 255, 255, 0.4)";
         }
 
+        const geoBtn = makeStripButton("⌗");
+        geoBtn.dataset.tip = "Exact position and size in frame pixels";
+        geoBtn.style.fontSize = "10px";
+        geoBtn.style.padding = "0 4px";
+        if (box === panelDimBox) {
+            geoBtn.classList.add("erpk-btn-active");
+            geoBtn.style.color = ACTIVE_GREEN;
+            geoBtn.style.borderColor = ACTIVE_GREEN_BORDER;
+        }
         const dupBtn = makeStripButton("⧉");
         dupBtn.dataset.tip = "Duplicate region";
         dupBtn.style.fontSize = "10px";
@@ -2293,11 +2240,19 @@ function createRegionEditor(node) {
         row.appendChild(plug);
         row.appendChild(refMark);
         row.appendChild(label);
+        row.appendChild(geoBtn);
         row.appendChild(dupBtn);
         row.appendChild(delBtn);
 
         // Button presses must not start a row drag; their listeners die with
         // the row element on rebuild or panel close.
+        geoBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+        geoBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            panelDimBox = panelDimBox === box ? null : box;
+            panelDimFocused = false;
+            renderPanelRows();
+        });
         dupBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
         delBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
         dupBtn.addEventListener("click", (e) => {
@@ -2318,13 +2273,15 @@ function createRegionEditor(node) {
         panelList.textContent = "";
         for (let i = state.boxes.length - 1; i >= 0; i--) {
             panelList.appendChild(buildPanelRow(i));
+            if (state.boxes[i] === panelDimBox) {
+                panelList.appendChild(buildDimRow(state.boxes[i]));
+            }
         }
     }
 
     function openPanel(e) {
         closePanel();
         closeHelp();
-        closeDim();
         panel = document.createElement("div");
         panel.className = "erpk-region-list";
         panel.style.position = "absolute";
@@ -2346,7 +2303,7 @@ function createRegionEditor(node) {
         const header = document.createElement("div");
         header.textContent = "Regions · top = front";
         header.dataset.tip = "Click a row to select · drag rows to reorder depth · "
-            + "⧉ duplicates · ✕ deletes";
+            + "⌗ exact size · ⧉ duplicates · ✕ deletes";
         header.style.font = "8px 'Segoe UI', sans-serif";
         header.style.color = "rgba(255, 255, 255, 0.45)";
         header.style.padding = "2px 6px 4px";
@@ -2404,7 +2361,6 @@ function createRegionEditor(node) {
     frontBtn.addEventListener("click", onBringForward);
     plugBtn.addEventListener("click", onPlugToggle);
     refBtn.addEventListener("click", onRefToggle);
-    dimBtn.addEventListener("click", onDimToggle);
     gridBtn.addEventListener("click", onGridToggle);
     gridSizeInput.addEventListener("input", onGridSizeInput);
     gridSizeInput.addEventListener("blur", onGridSizeBlur);
@@ -2446,8 +2402,6 @@ function createRegionEditor(node) {
         frontBtn.removeEventListener("click", onBringForward);
         plugBtn.removeEventListener("click", onPlugToggle);
         refBtn.removeEventListener("click", onRefToggle);
-        dimBtn.removeEventListener("click", onDimToggle);
-        closeDim();
         gridBtn.removeEventListener("click", onGridToggle);
         gridSizeInput.removeEventListener("input", onGridSizeInput);
         gridSizeInput.removeEventListener("blur", onGridSizeBlur);
