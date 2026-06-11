@@ -493,8 +493,10 @@ class TestImageRefs:
         ).args[0]
         assert "image 1 is the image being edited" in with_refs
         assert "Reproduce each referenced item faithfully" in with_refs
+        assert "Keep everything else in image 1 unchanged" in with_refs
         assert "image 1 is the image being edited" not in without_refs
         assert "Reproduce each referenced item" not in without_refs
+        assert "Keep everything else" not in without_refs
 
     def test_ref_beyond_region_count_is_ignored(self):
         out = RegionalPromptBuilder.execute(

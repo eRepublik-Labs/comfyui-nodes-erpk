@@ -30,7 +30,8 @@ REFS_HEADER = (
     "Numbered images accompany this request: image 1 is the image being "
     "edited, and elements below reference later images by number. Reproduce "
     "each referenced item faithfully (shape, colors, materials, markings), "
-    "adapting it to the scene's lighting and perspective."
+    "adapting it to the scene's lighting and perspective. Keep everything "
+    "else in image 1 unchanged."
 )
 LAYOUT_FOOTER = (
     "Every element must stay fully inside its placement area and fill most of it. "
