@@ -895,7 +895,10 @@ function createRegionEditor(node) {
         // Keyboard mutations (delete, paste, duplicate, depth) reach the open
         // panel through the shared render path; a row drag in flight owns the
         // row DOM and must not be rebuilt under the pointer.
-        if (panel && !panelRowDragging && !panelDimFocused) renderPanelRows();
+        if (panel && !panelRowDragging) {
+            renderPanelRows();
+            refreshPanelDim();
+        }
     }
 
     // --- Hit testing -----------------------------------------------------
@@ -1920,8 +1923,7 @@ function createRegionEditor(node) {
     let panel = null;
     let panelList = null;
     let panelRowDragging = false;
-    let panelDimBox = null;       // region with the geometry editor expanded
-    let panelDimFocused = false;  // a geometry field has focus; skip rebuilds
+    let panelDimFields = null;    // X/Y/W/H inputs at the top of the panel
 
     // Pointer position in the root's layout pixels; the bounding rect is
     // scaled by the graph zoom, so divide it back out.
@@ -1941,8 +1943,7 @@ function createRegionEditor(node) {
         panel.remove();
         panel = null;
         panelList = null;
-        panelDimBox = null;
-        panelDimFocused = false;
+        panelDimFields = null;
     }
 
     function onDocPointerDown(e) {
@@ -1980,7 +1981,6 @@ function createRegionEditor(node) {
         if (index < 0) return;
         state.boxes.splice(index, 1);
         state.selection.delete(box);
-        if (panelDimBox === box) panelDimBox = null;
         if (state.primary === box) state.primary = lastSelected();
         syncWidget();
         render();
@@ -2016,16 +2016,6 @@ function createRegionEditor(node) {
         if (e.button !== 0) return;
         e.stopPropagation();
         e.preventDefault();
-        // The geometry editor row would sit inside the drag's row math;
-        // collapse it first and re-find the grabbed row after the rebuild.
-        if (panelDimBox) {
-            const grabbed = row._erpkBox;
-            panelDimBox = null;
-            panelDimFocused = false;
-            renderPanelRows();
-            row = [...panelList.children].find((el) => el._erpkBox === grabbed);
-            if (!row) return;
-        }
         const startY = e.clientY;
         let dragging = false;
         panelRowDragging = true;
@@ -2103,57 +2093,39 @@ function createRegionEditor(node) {
         window.addEventListener("pointercancel", onRowUp, true);
     }
 
-    // Expanded geometry editor under a region's row: X/Y/W/H in frame
-    // pixels, applied live. It carries no _erpkBox, so reorder logic and
-    // the drag's row math skip it.
-    function buildDimRow(box) {
-        const row = document.createElement("div");
-        row.style.display = "flex";
-        row.style.alignItems = "center";
-        row.style.gap = "4px";
-        row.style.padding = "2px 5px 3px 19px";
-        row.style.font = "8px 'Segoe UI', sans-serif";
-        row.style.color = "rgba(255, 255, 255, 0.45)";
+    // Geometry fields at the top of the panel edit the selected region in
+    // frame pixels; values apply live and follow selection changes.
+    function applyPanelDim(key, input) {
+        const box = state.primary;
+        if (!box) return;
+        const v = Number(input.value);
+        if (input.value === "" || !Number.isFinite(v)) return;
         const dims = frameDims(node);
-        const apply = {
-            x: (v) => { box.x = clamp(v / dims.w, 0, 1 - box.w); },
-            y: (v) => { box.y = clamp(v / dims.h, 0, 1 - box.h); },
-            w: (v) => { box.w = clamp(v / dims.w, MIN_REGION_SIZE, 1 - box.x); },
-            h: (v) => { box.h = clamp(v / dims.h, MIN_REGION_SIZE, 1 - box.y); },
-        };
-        const initial = {
+        if (key === "x") box.x = clamp(v / dims.w, 0, 1 - box.w);
+        if (key === "y") box.y = clamp(v / dims.h, 0, 1 - box.h);
+        if (key === "w") box.w = clamp(v / dims.w, MIN_REGION_SIZE, 1 - box.x);
+        if (key === "h") box.h = clamp(v / dims.h, MIN_REGION_SIZE, 1 - box.y);
+        syncWidget();
+        render();
+    }
+
+    function refreshPanelDim() {
+        if (!panelDimFields) return;
+        const box = state.primary;
+        const dims = frameDims(node);
+        const px = box ? {
             x: Math.round(box.x * dims.w),
             y: Math.round(box.y * dims.h),
             w: Math.round(box.w * dims.w),
             h: Math.round(box.h * dims.h),
-        };
-        for (const key of ["x", "y", "w", "h"]) {
-            const label = document.createElement("span");
-            label.textContent = key.toUpperCase();
-            const input = document.createElement("input");
-            input.type = "number";
-            input.step = "1";
-            styleInput(input);
-            input.style.width = "38px";
-            input.style.flex = "1 1 0";
-            input.style.minWidth = "0";
-            input.style.padding = "1px 3px";
-            input.style.fontSize = "9px";
-            input.value = String(initial[key]);
-            input.addEventListener("focus", () => { panelDimFocused = true; });
-            input.addEventListener("blur", () => { panelDimFocused = false; });
-            input.addEventListener("input", () => {
-                const v = Number(input.value);
-                if (input.value === "" || !Number.isFinite(v)) return;
-                apply[key](v);
-                syncWidget();
-                render();
-            });
-            row.appendChild(label);
-            row.appendChild(input);
+        } : null;
+        for (const key of Object.keys(panelDimFields)) {
+            const input = panelDimFields[key];
+            input.disabled = !box;
+            if (document.activeElement !== input) {
+                input.value = px ? String(px[key]) : "";
+            }
         }
-        row.addEventListener("pointerdown", (e) => e.stopPropagation());
-        return row;
     }
 
     function buildPanelRow(index) {
@@ -2214,15 +2186,6 @@ function createRegionEditor(node) {
             label.style.color = "rgba(255, 255, 255, 0.4)";
         }
 
-        const geoBtn = makeStripButton("⌗");
-        geoBtn.dataset.tip = "Exact position and size in frame pixels";
-        geoBtn.style.fontSize = "10px";
-        geoBtn.style.padding = "0 4px";
-        if (box === panelDimBox) {
-            geoBtn.classList.add("erpk-btn-active");
-            geoBtn.style.color = ACTIVE_GREEN;
-            geoBtn.style.borderColor = ACTIVE_GREEN_BORDER;
-        }
         const dupBtn = makeStripButton("⧉");
         dupBtn.dataset.tip = "Duplicate region";
         dupBtn.style.fontSize = "10px";
@@ -2240,19 +2203,11 @@ function createRegionEditor(node) {
         row.appendChild(plug);
         row.appendChild(refMark);
         row.appendChild(label);
-        row.appendChild(geoBtn);
         row.appendChild(dupBtn);
         row.appendChild(delBtn);
 
         // Button presses must not start a row drag; their listeners die with
         // the row element on rebuild or panel close.
-        geoBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
-        geoBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            panelDimBox = panelDimBox === box ? null : box;
-            panelDimFocused = false;
-            renderPanelRows();
-        });
         dupBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
         delBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
         dupBtn.addEventListener("click", (e) => {
@@ -2273,9 +2228,6 @@ function createRegionEditor(node) {
         panelList.textContent = "";
         for (let i = state.boxes.length - 1; i >= 0; i--) {
             panelList.appendChild(buildPanelRow(i));
-            if (state.boxes[i] === panelDimBox) {
-                panelList.appendChild(buildDimRow(state.boxes[i]));
-            }
         }
     }
 
@@ -2303,7 +2255,8 @@ function createRegionEditor(node) {
         const header = document.createElement("div");
         header.textContent = "Regions · top = front";
         header.dataset.tip = "Click a row to select · drag rows to reorder depth · "
-            + "⌗ exact size · ⧉ duplicates · ✕ deletes";
+            + "⧉ duplicates · ✕ deletes · the fields edit the selected "
+            + "region's geometry in frame pixels";
         header.style.font = "8px 'Segoe UI', sans-serif";
         header.style.color = "rgba(255, 255, 255, 0.45)";
         header.style.padding = "2px 6px 4px";
@@ -2314,9 +2267,40 @@ function createRegionEditor(node) {
         header.style.marginBottom = "3px";
         panel.appendChild(header);
 
+        const dimRow = document.createElement("div");
+        dimRow.style.display = "flex";
+        dimRow.style.alignItems = "center";
+        dimRow.style.gap = "4px";
+        dimRow.style.padding = "2px 5px 4px";
+        dimRow.style.marginBottom = "3px";
+        dimRow.style.borderBottom = "1px solid " + HAIRLINE;
+        dimRow.style.font = "8px 'Segoe UI', sans-serif";
+        dimRow.style.color = "rgba(255, 255, 255, 0.45)";
+        panelDimFields = {};
+        for (const key of ["x", "y", "w", "h"]) {
+            const label = document.createElement("span");
+            label.textContent = key.toUpperCase();
+            const input = document.createElement("input");
+            input.type = "number";
+            input.step = "1";
+            styleInput(input);
+            input.style.width = "38px";
+            input.style.flex = "1 1 0";
+            input.style.minWidth = "0";
+            input.style.padding = "1px 3px";
+            input.style.fontSize = "9px";
+            input.addEventListener("input", () => applyPanelDim(key, input));
+            panelDimFields[key] = input;
+            dimRow.appendChild(label);
+            dimRow.appendChild(input);
+        }
+        dimRow.addEventListener("pointerdown", (e) => e.stopPropagation());
+        panel.appendChild(dimRow);
+
         panelList = document.createElement("div");
         panel.appendChild(panelList);
         renderPanelRows();
+        refreshPanelDim();
 
         panel.addEventListener("pointerdown", onPanelPointerDown);
         panel.addEventListener("contextmenu", onPanelContextMenu);

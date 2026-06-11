@@ -251,7 +251,7 @@ String manipulation and general utility nodes.
 
 **Regional Prompt Builder features:**
 - Canvas editor on the node: drag to draw, move, and resize regions; shift-click or a shift-drag marquee selects multiple regions and dragging any selected region moves the whole selection; Ctrl/Cmd-drag force-draws over existing boxes; Alt-click cycles through overlapping regions; Delete removes the selection; Ctrl/Cmd+C/V/D copy, paste, and duplicate; H hides the boxes for a clear view of the frame. An inspector row under the canvas edits the selected region's description, kind (object or rendered text), and literal text live; double-click a region to jump to its description field
-- Exact geometry: each row in the right-click region list has a `⌗` toggle that expands X/Y/W/H fields in frame pixels, applied live; arrow keys nudge the selection by 1px (10px with Shift) and Alt+arrows resize
+- Exact geometry: the right-click region list carries X/Y/W/H fields at the top that edit the selected region in frame pixels, applied live; arrow keys nudge the selection by 1px (10px with Shift) and Alt+arrows resize
 - Right-click the canvas for a region list (top = front): click a row to select, drag rows to reorder depth, duplicate or delete per row
 - Regions keep identity colors; text regions preview their literal text in-frame
 - Depth control: regions layer back to front (number 1 is backmost). Reorder with `[` / `]` or the inspector's depth buttons; the prompt tells the model that later elements appear in front where regions overlap
