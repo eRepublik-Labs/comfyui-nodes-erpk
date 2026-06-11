@@ -213,6 +213,14 @@ class TestGeminiCustomTypes:
         assert addl[0].optional is True
         assert addl[0].io_type == "IMAGE"
 
+    def test_image_edit_has_image_refs_input(self):
+        cls = _import_node("nodes", "GeminiImageEdit")
+        schema = cls.define_schema()
+        refs = [i for i in schema.inputs if i.id == "image_refs"]
+        assert len(refs) == 1
+        assert refs[0].optional is True
+        assert refs[0].io_type == "ERPK_IMAGE_REFS"
+
     def test_veo_text_to_video_accepts_optional_client(self):
         # The client input is optional across all V3 provider nodes — the
         # key can be resolved from ComfyUI Settings, env var, or config.ini

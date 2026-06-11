@@ -1168,6 +1168,13 @@ class GeminiImageEdit(IO.ComfyNode):
                     optional=True,
                     tooltip="Optional additional reference images (combined with primary image input, up to 14 total)",
                 ),
+                IO.Custom("ERPK_IMAGE_REFS").Input(
+                    "image_refs",
+                    optional=True,
+                    tooltip="Ordered reference images from a Regional Prompt "
+                            "Builder; sent right after the primary image so "
+                            "the prompt's image numbers line up",
+                ),
                 IO.Int.Input(
                     "seed",
                     default=-1,
@@ -1202,6 +1209,7 @@ class GeminiImageEdit(IO.ComfyNode):
         response_modalities = kwargs.get("response_modalities", "IMAGE")
         enable_google_search = kwargs.get("enable_google_search", False)
         additional_images = kwargs.get("additional_images")
+        image_refs = kwargs.get("image_refs")
         seed = kwargs.get("seed", -1)
 
         if not prompt or not prompt.strip():
@@ -1224,6 +1232,10 @@ class GeminiImageEdit(IO.ComfyNode):
                 )
 
             pil_images = ImageConverter.tensors_to_pil_list(image)
+            # Refs precede additional_images so the prompt's image numbering
+            # (base image is 1, refs follow in region order) holds.
+            for ref in image_refs or []:
+                pil_images.extend(ImageConverter.tensors_to_pil_list(ref))
             if additional_images is not None:
                 pil_images.extend(ImageConverter.tensors_to_pil_list(additional_images))
             num_images = len(pil_images)
