@@ -63,7 +63,14 @@ class TestSchema:
         assert [i.id for i in schema.inputs] == [
             "width", "height", "prompt", "regions_data", "image",
             "desc_1", "desc_2", "desc_3", "desc_4", "desc_5", "desc_6",
+            "ref_1", "ref_2", "ref_3", "ref_4", "ref_5", "ref_6",
         ]
+
+    def test_ref_inputs_are_images(self):
+        schema = RegionalPromptBuilder.define_schema()
+        for i in schema.inputs:
+            if i.id.startswith("ref_"):
+                assert i.io_type == "IMAGE", i.id
 
     def test_only_sockets_are_optional(self):
         schema = RegionalPromptBuilder.define_schema()
@@ -102,10 +109,10 @@ class TestSchema:
     def test_output_ids_order_and_io_types(self):
         schema = RegionalPromptBuilder.define_schema()
         assert [o.id for o in schema.outputs] == [
-            "prompt", "bboxes", "width", "height", "image",
+            "prompt", "bboxes", "width", "height", "image", "image_refs",
         ]
         assert [o.io_type for o in schema.outputs] == [
-            "STRING", "BOUNDING_BOX", "INT", "INT", "IMAGE",
+            "STRING", "BOUNDING_BOX", "INT", "INT", "IMAGE", "ERPK_IMAGE_REFS",
         ]
 
     def test_no_seed_input(self):
@@ -340,18 +347,19 @@ class TestExecute:
                    "neon signs, cinematic photo",
             regions_data=json.dumps(CANONICAL_REGIONS),
         )
-        assert out.args == (CANONICAL_PROMPT, CANONICAL_BBOXES, 1000, 1000, None)
+        assert out.args == (CANONICAL_PROMPT, CANONICAL_BBOXES, 1000, 1000, None, [])
 
     def test_scene_only_outputs_empty_bboxes(self):
         out = RegionalPromptBuilder.execute(
             width=1024, height=1024,
             prompt="A quiet forest", regions_data="[]",
         )
-        prompt, bboxes, width, height, image = out.args
+        prompt, bboxes, width, height, image, image_refs = out.args
         assert "A quiet forest" in prompt
         assert bboxes == []
         assert (width, height) == (1024, 1024)
         assert image is None
+        assert image_refs == []
 
     def test_regions_only_is_valid(self):
         regions = [{"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2,
@@ -426,3 +434,59 @@ class TestExecute:
             desc_5="nothing to attach to",
         )
         assert "nothing to attach to" not in out.args[0]
+
+
+class TestImageRefs:
+    def test_refs_collect_in_region_order(self):
+        first, second = object(), object()
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+            ref_1=first, ref_2=second,
+        )
+        assert out.args[5] == [first, second]
+
+    def test_region_line_references_its_image_number(self):
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+            ref_1=object(), ref_2=object(),
+        )
+        prompt = out.args[0]
+        assert "a red vintage car, as shown in image 2: at the bottom-left" in prompt
+        assert ('The text "OPEN LATE", glowing neon letters, as shown in '
+                "image 3: at the top-center") in prompt
+
+    def test_unwired_regions_skip_numbering(self):
+        sentinel = object()
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+            ref_2=sentinel,
+        )
+        prompt, image_refs = out.args[0], out.args[5]
+        assert image_refs == [sentinel]
+        assert "a red vintage car: at the bottom-left" in prompt
+        assert "as shown in image 2: at the top-center" in prompt
+
+    def test_header_explains_numbering_only_when_refs_exist(self):
+        with_refs = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+            ref_1=object(),
+        ).args[0]
+        without_refs = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+        ).args[0]
+        assert "image 1 is the image being edited" in with_refs
+        assert "image 1 is the image being edited" not in without_refs
+
+    def test_ref_beyond_region_count_is_ignored(self):
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+            ref_5=object(),
+        )
+        assert out.args[5] == []
+        assert "as shown in image" not in out.args[0]

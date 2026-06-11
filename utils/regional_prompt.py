@@ -11,6 +11,10 @@ MIN_REGION_EXTENT = 0.005
 # Socket-only description overrides; desc_N feeds the region numbered N on
 # the canvas (numbers are depth order, so reordering remaps the wires).
 DESC_INPUT_COUNT = 6
+# Per-region reference images; ref_N attaches to the region numbered N. The
+# wired images flow out on image_refs in region order, and the prompt counts
+# them from 2 because the edit node's base image occupies slot 1.
+REF_INPUT_COUNT = 6
 
 # "Bounding box" is detection-annotation vocabulary: models that know it from
 # vision training will happily RENDER yellow boxes around the elements. The
@@ -21,6 +25,10 @@ LAYOUT_HEADER = (
     "on a 0-1000 grid with top-left origin. Elements are listed from back to "
     "front: where placement areas overlap, a later element appears in front of "
     "an earlier one."
+)
+REFS_HEADER = (
+    "Numbered images accompany this request: image 1 is the image being "
+    "edited, and elements below reference later images by number."
 )
 LAYOUT_FOOTER = (
     "Every element must stay fully inside its placement area and fill most of it. "
@@ -106,11 +114,13 @@ def _element_line(region):
         f"{placement}, covering about {round(region['w'] * 100)}% of the image "
         f"width and {round(region['h'] * 100)}% of its height. box_2d = {box}"
     )
+    ref = region.get("ref_image")
+    shown = f", as shown in image {ref}" if ref else ""
     if region["kind"] == "text":
         if region["desc"]:
-            return f'The text "{region["text"]}", {region["desc"]}: {geometry}'
-        return f'The text "{region["text"]}": {geometry}'
-    return f'{region["desc"] or "An element"}: {geometry}'
+            return f'The text "{region["text"]}", {region["desc"]}{shown}: {geometry}'
+        return f'The text "{region["text"]}"{shown}: {geometry}'
+    return f'{region["desc"] or "An element"}{shown}: {geometry}'
 
 
 def build_prompt(prompt, width, height, regions):
@@ -124,7 +134,10 @@ def build_prompt(prompt, width, height, regions):
     lines.append(f"Compose for a {width}x{height} frame (aspect ratio {ratio}).")
     if regions:
         lines.append("")
-        lines.append(LAYOUT_HEADER)
+        header = LAYOUT_HEADER
+        if any(region.get("ref_image") for region in regions):
+            header += " " + REFS_HEADER
+        lines.append(header)
         for index, region in enumerate(regions, start=1):
             lines.append(f"{index}. {_element_line(region)}")
         lines.append(LAYOUT_FOOTER)
@@ -203,6 +216,17 @@ class RegionalPromptBuilder(IO.ComfyNode):
                     )
                     for n in range(1, DESC_INPUT_COUNT + 1)
                 ],
+                *[
+                    IO.Image.Input(
+                        f"ref_{n}",
+                        optional=True,
+                        tooltip=f"Reference image for region {n}: forwarded on "
+                                "image_refs, and the region's prompt line cites "
+                                "its image number (regions numbered as on the "
+                                "canvas).",
+                    )
+                    for n in range(1, REF_INPUT_COUNT + 1)
+                ],
             ],
             outputs=[
                 IO.String.Output("prompt"),
@@ -210,6 +234,11 @@ class RegionalPromptBuilder(IO.ComfyNode):
                 IO.Int.Output("width"),
                 IO.Int.Output("height"),
                 IO.Image.Output("image"),
+                IO.Custom("ERPK_IMAGE_REFS").Output(
+                    "image_refs",
+                    tooltip="Per-region reference images in region order; "
+                            "connect to an image edit node's image_refs input.",
+                ),
             ],
         )
 
@@ -224,8 +253,14 @@ class RegionalPromptBuilder(IO.ComfyNode):
             override = kwargs.get(f"desc_{index + 1}")
             if isinstance(override, str) and override.strip():
                 region["desc"] = override.strip()
+        image_refs = []
+        for index, region in enumerate(regions[:REF_INPUT_COUNT]):
+            ref = kwargs.get(f"ref_{index + 1}")
+            if ref is not None:
+                image_refs.append(ref)
+                region["ref_image"] = len(image_refs) + 1
         if not regions and not prompt.strip():
             raise ValueError("Describe the scene or add at least one region")
         assembled = build_prompt(prompt, width, height, regions)
         bboxes = regions_to_pixel_bboxes(regions, width, height)
-        return IO.NodeOutput(assembled, bboxes, width, height, image)
+        return IO.NodeOutput(assembled, bboxes, width, height, image, image_refs)
