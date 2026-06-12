@@ -15,10 +15,14 @@ import math
 import pytest
 
 from utils.scan_engine import (
+    DEFAULT_ENGINE,
     DEPTH_SCHEMA,
     MIN_REGION_EXTENT as ENGINE_MIN_REGION_EXTENT,
     apply_depth_ranks,
     depth_prompt,
+    depth_ranks,
+    florence_to_objects,
+    local_scan,
     parse_depth_order,
     parse_segmentation,
     pixel_box_prompts,
@@ -279,6 +283,134 @@ class TestScanDispatch:
         assert result[0]["max_objects"] == 20
 
 
+class TestFlorenceToObjects:
+    """florence_to_objects normalizes Florence-2 <OD> pixel boxes into scan dicts."""
+
+    def _od(self, bboxes, labels):
+        return {"<OD>": {"bboxes": bboxes, "labels": labels}}
+
+    def test_single_object(self):
+        result = self._od([[100, 200, 500, 600]], ["red car"])
+        objects = florence_to_objects(result, 1000, 1000, 20)
+        assert len(objects) == 1
+        obj = objects[0]
+        assert obj["name"] == "red car"
+        assert obj["group"] == "red car"
+        assert obj["mask"] is None
+        assert obj["box"]["x"] == pytest.approx(0.1)
+        assert obj["box"]["y"] == pytest.approx(0.2)
+        assert obj["box"]["w"] == pytest.approx(0.4)
+        assert obj["box"]["h"] == pytest.approx(0.4)
+
+    def test_real_spike_boxes(self):
+        # The live <OD> result on /tmp/erpk_scan_1k.jpg (688x1024).
+        result = self._od(
+            [[345.72, 398.85, 498.46, 622.08], [115.24, 355.84, 531.48, 1022.46]],
+            ["human face", "man"],
+        )
+        objects = florence_to_objects(result, 688, 1024, 20)
+        assert [o["name"] for o in objects] == ["human face", "man"]
+        for obj in objects:
+            box = obj["box"]
+            assert 0.0 <= box["x"] <= 1.0 and 0.0 <= box["y"] <= 1.0
+            assert box["w"] > MIN_REGION_EXTENT and box["h"] > MIN_REGION_EXTENT
+
+    def test_clamps_out_of_frame(self):
+        result = self._od([[-50, -50, 2000, 2000]], ["thing"])
+        box = florence_to_objects(result, 1000, 1000, 20)[0]["box"]
+        for key in ("x", "y", "w", "h"):
+            assert 0.0 <= box[key] <= 1.0
+        assert box["x"] + box["w"] <= 1.0 + 1e-9
+        assert box["y"] + box["h"] <= 1.0 + 1e-9
+
+    def test_swaps_inverted_corners(self):
+        result = self._od([[500, 600, 100, 200]], ["thing"])
+        box = florence_to_objects(result, 1000, 1000, 20)[0]["box"]
+        assert box["x"] == pytest.approx(0.1)
+        assert box["y"] == pytest.approx(0.2)
+        assert box["w"] == pytest.approx(0.4)
+        assert box["h"] == pytest.approx(0.4)
+
+    def test_drops_degenerate_box(self):
+        result = self._od([[100, 100, 101, 800]], ["sliver"])
+        assert florence_to_objects(result, 1000, 1000, 20) == []
+
+    def test_caps_max_objects(self):
+        bboxes = [[0, 0, 500, 500] for _ in range(5)]
+        labels = [f"o{i}" for i in range(5)]
+        assert len(florence_to_objects(self._od(bboxes, labels), 1000, 1000, 3)) == 3
+
+    def test_non_numeric_box_skipped(self):
+        result = self._od([["x", 0, 500, 500], [0, 0, 500, 500]], ["bad", "good"])
+        objects = florence_to_objects(result, 1000, 1000, 20)
+        assert [o["name"] for o in objects] == ["good"]
+
+    def test_non_finite_box_skipped(self):
+        result = self._od([[0, 0, float("inf"), 500]], ["bad"])
+        assert florence_to_objects(result, 1000, 1000, 20) == []
+
+    def test_non_string_label_is_blank(self):
+        result = self._od([[0, 0, 500, 500]], [7])
+        obj = florence_to_objects(result, 1000, 1000, 20)[0]
+        assert obj["name"] == "" and obj["group"] == ""
+
+    def test_missing_od_key_returns_empty(self):
+        assert florence_to_objects({}, 1000, 1000, 20) == []
+
+    def test_empty_detection_returns_empty(self):
+        assert florence_to_objects(self._od([], []), 1000, 1000, 20) == []
+
+    def test_box_round_trips_through_parse_regions(self):
+        from utils.regional_prompt import parse_regions
+
+        obj = florence_to_objects(self._od([[100, 200, 500, 600]], ["cat"]),
+                                  1000, 1000, 20)[0]
+        region = {"kind": "object", "desc": obj["name"], **obj["box"]}
+        parsed = parse_regions(json.dumps([region]))
+        assert len(parsed) == 1
+        for key in ("x", "y", "w", "h"):
+            assert parsed[0][key] == pytest.approx(obj["box"][key])
+
+
+class TestDepthRanks:
+    """depth_ranks ranks by measured median (larger = nearer, rank 0 = farthest)."""
+
+    def _objs(self, names):
+        return [{"name": n, "group": n, "box": {}} for n in names]
+
+    def test_orders_smallest_median_first(self):
+        objects = self._objs(["a", "b", "c"])
+        result = depth_ranks(objects, [4.0, 0.0, 2.0])
+        assert [o["name"] for o in result] == ["b", "c", "a"]
+        assert [o["depth_rank"] for o in result] == [0, 1, 2]
+
+    def test_none_median_sorts_as_farthest(self):
+        objects = self._objs(["a", "b"])
+        result = depth_ranks(objects, [None, 3.0])
+        assert [o["name"] for o in result] == ["a", "b"]
+        assert result[0]["depth_rank"] == 0
+
+    def test_multiple_none_preserve_input_order(self):
+        objects = self._objs(["a", "b", "c"])
+        result = depth_ranks(objects, [None, 5.0, None])
+        assert [o["name"] for o in result] == ["a", "c", "b"]
+
+    def test_equal_medians_keep_input_order(self):
+        objects = self._objs(["a", "b"])
+        result = depth_ranks(objects, [2.0, 2.0])
+        assert [o["name"] for o in result] == ["a", "b"]
+
+    def test_empty(self):
+        assert depth_ranks([], []) == []
+
+
+class TestDefaultEngine:
+    """The default engine is the local pipeline; Gemini stays opt-in per scan."""
+
+    def test_default_engine_is_local(self):
+        assert DEFAULT_ENGINE is local_scan
+
+
 class TestPixelBoxPrompts:
     """Normalized scan boxes become integer pixel prompts for the segmenter."""
 
@@ -297,3 +429,14 @@ class TestPixelBoxPrompts:
                     "box": {"x": 0.5, "y": 0.5, "w": 0.001, "h": 0.001}}]
         x0, y0, x1, y1 = pixel_box_prompts(objects, 100, 100)[0]
         assert x1 > x0 and y1 > y0
+
+
+class TestFlorenceMalformedLabels:
+    """A malformed labels array keeps the boxes, mirroring parse_segmentation."""
+
+    def test_missing_labels_keep_boxes_with_blank_names(self):
+        od = {"<OD>": {"bboxes": [[10, 10, 200, 200], [300, 300, 500, 500]],
+                       "labels": "not a list"}}
+        objects = florence_to_objects(od, 1000, 1000, 20)
+        assert len(objects) == 2
+        assert all(obj["name"] == "" for obj in objects)

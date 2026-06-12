@@ -1,6 +1,7 @@
 # ABOUTME: Pluggable vision-scan engine: a PIL image becomes ranked scan objects with masks.
-# ABOUTME: Ships a Gemini segmentation + depth-ranking implementation; parse helpers stay torch/genai-free.
+# ABOUTME: Default local pipeline (Florence-2/SAM/Depth-Anything) plus a Gemini engine; parse helpers stay torch/genai-free.
 
+import asyncio
 import json
 import math
 
@@ -112,6 +113,61 @@ def parse_segmentation(text, max_objects):
     return objects[:max_objects]
 
 
+FLORENCE_DETECTION_TASK = "<OD>"
+
+
+def florence_to_objects(od_result, width, height, max_objects):
+    """Convert a Florence-2 <OD> result into normalized scan-object dicts.
+
+    Input is post_process_generation's {"<OD>": {"bboxes": [[x0,y0,x1,y1]...],
+    "labels": [...]}} where boxes are absolute pixels (top-left/bottom-right).
+    Output dicts are {name, box:{x,y,w,h}, mask:None, group}; masks come from the
+    SAM stage and depth_rank is added later. Boxes are clamped to the frame,
+    degenerate ones (w or h <= MIN_REGION_EXTENT) are dropped, and the result is
+    capped at max_objects. <OD> is class-agnostic and can return very few,
+    nested boxes, so callers must tolerate small counts.
+    """
+    detection = {}
+    if isinstance(od_result, dict):
+        detection = od_result.get(FLORENCE_DETECTION_TASK) or {}
+    bboxes = detection.get("bboxes") if isinstance(detection, dict) else None
+    labels = detection.get("labels") if isinstance(detection, dict) else None
+    if not isinstance(bboxes, (list, tuple)):
+        return []
+    if not isinstance(labels, (list, tuple)):
+        labels = [""] * len(bboxes)
+    objects = []
+    for box, label in zip(bboxes, labels):
+        if not isinstance(box, (list, tuple)) or len(box) != 4:
+            continue
+        try:
+            values = [float(value) for value in box]
+        except (TypeError, ValueError):
+            continue
+        if not all(math.isfinite(value) for value in values):
+            continue
+        x0, y0, x1, y1 = values
+        if x0 > x1:
+            x0, x1 = x1, x0
+        if y0 > y1:
+            y0, y1 = y1, y0
+        x0 = _clamp(x0 / width, 0.0, 1.0)
+        x1 = _clamp(x1 / width, 0.0, 1.0)
+        y0 = _clamp(y0 / height, 0.0, 1.0)
+        y1 = _clamp(y1 / height, 0.0, 1.0)
+        x, y, w, h = x0, y0, x1 - x0, y1 - y0
+        if w <= MIN_REGION_EXTENT or h <= MIN_REGION_EXTENT:
+            continue
+        name = label.strip() if isinstance(label, str) else ""
+        objects.append({
+            "name": name,
+            "box": {"x": x, "y": y, "w": w, "h": h},
+            "mask": None,
+            "group": name,
+        })
+    return objects[:max_objects]
+
+
 def depth_prompt(labels):
     """Build the depth-ranking request prompt for the found labels."""
     listed = ", ".join(labels)
@@ -143,12 +199,13 @@ def pixel_box_prompts(objects, width, height):
 def segment_objects(image, objects):
     """Fill each object's mask with a locally-computed segmentation.
 
-    Gemini supplies boxes and labels; the masks come from a box-prompted
-    segmentation model (one image embedding, one prompt per box) because
-    Gemini itself emits masks too unreliably to ship (omitted fields,
-    truncated multi-object responses). Masks are stored box-relative base64
-    PNGs per the regions contract. Any failure leaves masks None — the scan
-    survives, downstream falls back to rectangles, and the log says why.
+    The detector (Florence-2 locally, Gemini in the cloud) supplies boxes and
+    labels; masks always come from this box-prompted segmentation model (one
+    image embedding, one prompt per box) because vision-LLM mask output is too
+    unreliable to ship (omitted fields, truncated multi-object responses).
+    Masks are stored box-relative base64 PNGs per the regions contract. Any
+    failure leaves masks None — the scan survives, downstream falls back to
+    rectangles, and the log says why.
     """
     try:
         import base64
@@ -241,6 +298,31 @@ def apply_depth_ranks(objects, rank_map):
     return sorted(objects, key=lambda obj: obj["depth_rank"])
 
 
+def depth_ranks(objects, medians):
+    """Tag objects with a measured depth_rank and sort them back-to-front.
+
+    medians is parallel to objects: the median inverse-depth (disparity) sampled
+    inside each object. Depth-Anything-V2 emits disparity where LARGER = NEARER,
+    so depth_rank 0 = smallest median = farthest. None medians (no samples) sort
+    as farthest and preserve input order among themselves; equal medians keep
+    input order too (stable).
+    """
+    indexed = list(enumerate(zip(objects, medians)))
+
+    def sort_key(item):
+        index, (_obj, median) = item
+        if median is None:
+            return (0, 0.0, index)
+        return (1, median, index)
+
+    ordered = sorted(indexed, key=sort_key)
+    result = []
+    for rank, (_index, (obj, _median)) in enumerate(ordered):
+        obj["depth_rank"] = rank
+        result.append(obj)
+    return result
+
+
 async def gemini_scan(image, max_objects, model):
     """Gemini engine: one segmentation call plus one depth-ranking call.
 
@@ -302,9 +384,180 @@ async def gemini_scan(image, max_objects, model):
     return apply_depth_ranks(objects, rank_map)
 
 
+# Pinned revisions are the security mitigation for Florence-2's trust_remote_code
+# download: the revision is passed to BOTH from_pretrained calls. Depth-Anything
+# is native transformers and needs no remote code.
+FLORENCE_MODEL_ID = "microsoft/Florence-2-large-ft"
+FLORENCE_REVISION = "4a12a2b54b7016a48a22037fbd62da90cd566f2a"
+DEPTH_MODEL_ID = "depth-anything/Depth-Anything-V2-Small-hf"
+DEPTH_REVISION = "5426e4f0f36572d16453bbda7a8389317b1bef99"
+_florence = {}
+_depth = {}
+
+
+def _detect_florence(image):
+    """Run Florence-2 open-vocabulary detection, returning post_process output.
+
+    Loaded on CPU: MPS is ~2.5x slower here because use_cache=False (mandatory
+    under transformers 4.56.1 with this pinned revision) recomputes the whole
+    sequence per decode step and MPS launch overhead dominates that pattern.
+    attn_implementation='eager' is also mandatory or the model fails to load.
+    """
+    import torch
+    from transformers import AutoModelForCausalLM, AutoProcessor
+
+    if not _florence:
+        device = "cpu"
+        processor = AutoProcessor.from_pretrained(
+            FLORENCE_MODEL_ID, revision=FLORENCE_REVISION, trust_remote_code=True)
+        model = AutoModelForCausalLM.from_pretrained(
+            FLORENCE_MODEL_ID, revision=FLORENCE_REVISION, trust_remote_code=True,
+            attn_implementation="eager").to(device)
+        _florence["processor"] = processor
+        _florence["model"] = model
+        _florence["device"] = device
+        print(f"[ERPK scan] Florence-2 loaded on {device}")
+    processor = _florence["processor"]
+    model = _florence["model"]
+    device = _florence["device"]
+
+    rgb = image.convert("RGB")
+    inputs = processor(text=FLORENCE_DETECTION_TASK, images=rgb, return_tensors="pt")
+    inputs = {key: value.to(device) for key, value in inputs.items()}
+    inputs["pixel_values"] = inputs["pixel_values"].to(model.dtype)
+    with torch.no_grad():
+        generated_ids = model.generate(
+            input_ids=inputs["input_ids"],
+            pixel_values=inputs["pixel_values"],
+            max_new_tokens=1024,
+            num_beams=3,
+            do_sample=False,
+            use_cache=False,
+        )
+    text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
+    return processor.post_process_generation(
+        text, task=FLORENCE_DETECTION_TASK, image_size=(rgb.width, rgb.height))
+
+
+def _depth_map(image):
+    """Return an (H, W) numpy disparity map (larger = nearer) for the image.
+
+    Depth-Anything snaps the image to multiples of 14, so predicted_depth does
+    not match (H, W); it is interpolated back to the original size before the
+    SAM masks sample it, or the coordinates would not line up.
+    """
+    import numpy as np
+    import torch
+    from transformers import AutoImageProcessor, AutoModelForDepthEstimation
+
+    if not _depth:
+        device = "cpu"
+        processor = AutoImageProcessor.from_pretrained(
+            DEPTH_MODEL_ID, revision=DEPTH_REVISION)
+        model = AutoModelForDepthEstimation.from_pretrained(
+            DEPTH_MODEL_ID, revision=DEPTH_REVISION).to(device)
+        _depth["processor"] = processor
+        _depth["model"] = model
+        _depth["device"] = device
+        print(f"[ERPK scan] Depth-Anything loaded on {device}")
+    processor = _depth["processor"]
+    model = _depth["model"]
+    device = _depth["device"]
+
+    rgb = image.convert("RGB")
+    inputs = processor(images=rgb, return_tensors="pt").to(device)
+    with torch.no_grad():
+        predicted = model(**inputs).predicted_depth
+    resized = torch.nn.functional.interpolate(
+        predicted.unsqueeze(1),
+        size=(rgb.height, rgb.width),
+        mode="bicubic",
+        align_corners=False,
+    )[0, 0]
+    return resized.cpu().numpy()
+
+
+def _mask_region_medians(objects, depth_map):
+    """Median disparity inside each object: through its SAM mask, else its box.
+
+    The stored mask is box-relative (segment_objects crops it to the same pixel
+    box), so it is placed at the object's pixel box to select the matching depth
+    region. Objects with no usable samples get a None median (sort as farthest).
+    """
+    import base64
+    from io import BytesIO
+
+    import numpy as np
+    from PIL import Image
+
+    height, width = depth_map.shape
+    prompts = pixel_box_prompts(objects, width, height)
+    medians = []
+    for obj, (x0, y0, x1, y1) in zip(objects, prompts):
+        region = depth_map[y0:y1, x0:x1]
+        values = None
+        mask_b64 = obj.get("mask")
+        if mask_b64:
+            try:
+                raw = base64.b64decode(mask_b64)
+                mask = np.array(Image.open(BytesIO(raw)).convert("L"))
+                if mask.shape == region.shape:
+                    selected = region[mask > 127]
+                    if selected.size:
+                        values = selected
+            except Exception:
+                values = None
+        if values is None and region.size:
+            values = region.reshape(-1)
+        medians.append(float(np.median(values)) if values is not None and values.size
+                       else None)
+    return medians
+
+
+def _local_scan_sync(image, max_objects):
+    """Blocking local pipeline: Florence detect -> SAM masks -> depth ordering."""
+    try:
+        detection = _detect_florence(image)
+    except Exception as e:
+        # No boxes means no scan; surface as a hard failure (the route maps it
+        # to 502) rather than returning a silently empty result.
+        raise RuntimeError(f"Florence-2 detection failed: {e}") from e
+
+    rgb = image.convert("RGB")
+    objects = florence_to_objects(detection, rgb.width, rgb.height, max_objects)
+    if not objects:
+        print("[ERPK scan] 0 objects detected")
+        return []
+
+    segment_objects(image, objects)
+    masked = sum(1 for obj in objects if obj.get("mask"))
+    print(f"[ERPK scan] {len(objects)} objects, {masked} with masks")
+
+    try:
+        medians = _mask_region_medians(objects, _depth_map(image))
+    except Exception as e:
+        print(f"[ERPK scan] Warning: depth ordering unavailable ({e}); "
+              "keeping Florence detection order")
+        medians = [None] * len(objects)
+    return depth_ranks(objects, medians)
+
+
+async def local_scan(image, max_objects, model):
+    """Local engine: Florence-2 detection, SAM masks, Depth-Anything ordering.
+
+    The model param is ignored: model selection is a cloud-provider concept
+    (Gemini's MODELS list). The local pipeline's models are pinned by revision,
+    so there is nothing to choose. It stays in the signature for engine-contract
+    parity. The blocking torch work runs in a thread so it never stalls the
+    event loop when two scans share it.
+    """
+    return await asyncio.to_thread(_local_scan_sync, image, max_objects)
+
+
 # The single indirection point a future Moondream engine plugs into: any
 # coroutine (PIL.Image, max_objects:int, model:str|None) -> list[scan-object].
-DEFAULT_ENGINE = gemini_scan
+# The scan button defaults to the local pipeline; Gemini stays opt-in per scan.
+DEFAULT_ENGINE = local_scan
 
 
 async def scan(image, max_objects=DEFAULT_MAX_OBJECTS, model=None, engine=None):
