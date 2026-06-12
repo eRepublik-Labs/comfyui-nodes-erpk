@@ -41,7 +41,10 @@ REPOSITION_HEADER = (
     'xmax]" on a 0-1000 grid with top-left origin), scaling it to fit, and '
     "reconstruct the background it leaves behind."
 )
-ANCHORS_LINE = "Every other element in the image stays exactly where it is."
+ANCHORS_LINE = (
+    "Every other element in the image stays exactly where it is — do not "
+    "remove, add, or alter anything else."
+)
 LAYOUT_FOOTER = (
     "Every element must stay fully inside its placement area and fill most of it. "
     "Do not add other prominent subjects. The placement areas are invisible "
@@ -188,11 +191,20 @@ def _element_line(region):
 
 
 def _move_line(region):
+    # Hybrid phrasing, same doctrine as placement lines: the verbal
+    # destination drives the model, the coordinates pin it.
     src = region["src"]
     origin = box_2d(src["x"], src["y"], src["w"], src["h"])
     target = box_2d(region["x"], region["y"], region["w"], region["h"])
+    placement = placement_phrase(region["x"], region["y"],
+                                 region["w"], region["h"])
+    where = placement.replace("at the", "to the", 1)
     subject = region["desc"] or "The element"
-    return f"{subject}: from box_2d = {origin} to box_2d = {target}"
+    return (
+        f"{subject}: from box_2d = {origin} {where}, covering about "
+        f"{round(region['w'] * 100)}% of the image width and "
+        f"{round(region['h'] * 100)}% of its height — box_2d = {target}"
+    )
 
 
 def _classify_regions(regions):

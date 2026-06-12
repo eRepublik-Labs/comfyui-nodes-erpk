@@ -787,8 +787,19 @@ class TestMovedRegions:
         prompt = build_prompt("", 1000, 1000, [self._moved_region()])
         assert "Reposition" in prompt
         assert "a hippo: from box_2d = [100, 100, 300, 300]" in prompt
-        assert "to box_2d = [600, 600, 800, 800]" in prompt
+        assert "box_2d = [600, 600, 800, 800]" in prompt
         assert "reconstruct" in prompt.lower()
+
+    def test_move_destination_keeps_verbal_placement(self):
+        # The hybrid doctrine: words drive the model, coordinates pin it.
+        prompt = build_prompt("", 1000, 1000, [self._moved_region()])
+        assert "to the bottom-right" in prompt
+        assert "covering about 20% of the image width" in prompt
+
+    def test_anchor_sentence_forbids_removal(self):
+        prompt = build_prompt("", 1000, 1000,
+                              [self._anchor_region(), self._moved_region()])
+        assert "do not remove" in prompt.lower()
 
     def test_moves_lead_the_layout_section(self):
         hand_drawn = {"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2, "kind": "object",
