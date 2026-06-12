@@ -1756,6 +1756,7 @@ function createRegionEditor(node) {
         if (e.key === "Escape" && helpPanel) {
             e.preventDefault();
             e.stopPropagation();
+            e._erpkEscapeClosedPopover = true;
             closeHelp();
         }
     }
@@ -2016,6 +2017,7 @@ function createRegionEditor(node) {
         if (e.key === "Escape" && panel) {
             e.preventDefault();
             e.stopPropagation();
+            e._erpkEscapeClosedPopover = true;
             closePanel();
         }
     }
@@ -2415,14 +2417,25 @@ function createRegionEditor(node) {
             : "Expand the editor to fill the window (F · Esc to exit)";
     }
 
-    // Capture phase so it runs alongside the popover Escape handlers; the
-    // !helpPanel && !panel guard hands Escape to an open popover first.
+    // Capture phase so it sees Escape regardless of focus. Each Escape goes
+    // to one consumer: an open popover (the live check covers popovers that
+    // register after this handler; the event marker covers ones that ran
+    // before it on this same event), then a focused text field (blur), and
+    // only then the overlay itself.
     function onFsDocKeyDown(e) {
-        if (e.key === "Escape" && root._erpkExpanded && !helpPanel && !panel) {
+        if (e.key !== "Escape" || !root._erpkExpanded) return;
+        if (e._erpkEscapeClosedPopover || helpPanel || panel) return;
+        const field = document.activeElement;
+        if (field && root.contains(field)
+            && (field.tagName === "INPUT" || field.tagName === "TEXTAREA")) {
             e.preventDefault();
             e.stopPropagation();
-            collapse();
+            field.blur();
+            return;
         }
+        e.preventDefault();
+        e.stopPropagation();
+        collapse();
     }
 
     function expand() {
