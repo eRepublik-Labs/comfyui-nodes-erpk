@@ -36,7 +36,7 @@ Draw regions on a canvas and emit a layout-aware prompt for any image generation
 - **Click** selects; **Shift-click** toggles; **Shift-drag** marquees; dragging any selected region moves the whole selection; corner handles resize a single selection.
 - **Alt-click** cycles overlapping regions; **double-click** jumps to the description field.
 - **Right-click** opens the region list (top = front): click selects, drag rows to reorder depth, duplicate or delete per row.
-- **Del** removes the selection; **Ctrl/Cmd+C/V/D** copy, paste, duplicate; **[ ]** change depth; **H** hides the boxes; **F** (or the ⤢ button) expands the editor to fill the window, Esc exits. The `?` button shows the full cheat sheet.
+- **Del** removes the selection; **Ctrl/Cmd+C/V/D** copy, paste, duplicate; **Ctrl/Cmd+Z** undoes any region change (Shift redoes — a whole scan or Clear all reverts as one step); **[ ]** change depth; **H** hides the boxes; **F** (or the ⤢ button) expands the editor to fill the window, Esc exits. The `?` button shows the full cheat sheet.
 - The inspector row edits the selected region's description, kind (object or rendered text), and literal text. Text regions preview their string in-frame.
 - Optional grid with a typed cell size in frame pixels, color and opacity controls, and snap-to-grid. Preferences save with the workflow.
 

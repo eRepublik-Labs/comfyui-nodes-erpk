@@ -590,15 +590,71 @@ function createRegionEditor(node) {
     root.insertBefore(inspector, status);
 
     // --- Widget plumbing ----------------------------------------------
+    // Undo snapshots the serialized regions string inside syncWidget — the
+    // single write path every mutation funnels through — so no gesture can
+    // escape history. Pushes within the coalesce window merge into one step
+    // (typing, arrow nudges); restores must not record themselves.
+    const UNDO_LIMIT = 50;
+    const UNDO_COALESCE_MS = 800;
+    const undoStack = [];
+    const redoStack = [];
+    let undoLastPush = 0;
+    let undoRestoring = false;
+
     function syncWidget() {
         const widget = findWidget(node, "regions_data");
-        if (widget) widget.value = serializeRegions(state.boxes);
+        if (widget) {
+            const next = serializeRegions(state.boxes);
+            const prev = widget.value;
+            if (!undoRestoring && typeof prev === "string" && prev !== next) {
+                const now = performance.now();
+                if (now - undoLastPush > UNDO_COALESCE_MS) {
+                    undoStack.push(prev);
+                    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+                }
+                undoLastPush = now;
+                redoStack.length = 0;
+            }
+            widget.value = next;
+        }
         node.setDirtyCanvas?.(true, true);
+    }
+
+    function restoreSnapshot(snapshot) {
+        state.boxes = parseRegions(snapshot);
+        clearSelection();
+        undoRestoring = true;
+        syncWidget();
+        undoRestoring = false;
+        render();
+    }
+
+    function undoRegions() {
+        const widget = findWidget(node, "regions_data");
+        if (!widget) return;
+        const current = widget.value;
+        while (undoStack.length && undoStack[undoStack.length - 1] === current) {
+            undoStack.pop();
+        }
+        if (!undoStack.length) return;
+        redoStack.push(current);
+        restoreSnapshot(undoStack.pop());
+    }
+
+    function redoRegions() {
+        const widget = findWidget(node, "regions_data");
+        if (!widget || !redoStack.length) return;
+        undoStack.push(widget.value);
+        restoreSnapshot(redoStack.pop());
     }
 
     function loadFromWidget() {
         const widget = findWidget(node, "regions_data");
         state.boxes = parseRegions(widget?.value ?? "[]");
+        // A (re)loaded workflow is a fresh document; stale history would
+        // restore another graph's regions.
+        undoStack.length = 0;
+        redoStack.length = 0;
         clearSelection();
         render();
     }
@@ -1764,6 +1820,13 @@ function createRegionEditor(node) {
             moveSelectedRegion(e.key === "]" ? 1 : -1);
             return;
         }
+        if (mod && key === "z") {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.shiftKey) redoRegions();
+            else undoRegions();
+            return;
+        }
         if (mod && key === "c" && state.selection.size) {
             e.preventDefault();
             e.stopPropagation();
@@ -2218,6 +2281,7 @@ function createRegionEditor(node) {
             ["arrow keys", "nudge 1px, Shift for 10px"],
             ["Alt+arrows", "resize 1px, Shift for 10px"],
             ["Ctrl/Cmd+C V D", "copy, paste, duplicate"],
+            ["Ctrl/Cmd+Z / +Shift+Z", "undo, redo region changes"],
             ["[ and ]", "send back, bring forward"],
             ["H", "hide region overlays"],
             ["F", "expand editor, Esc to exit"],
