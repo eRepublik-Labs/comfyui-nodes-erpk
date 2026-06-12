@@ -148,6 +148,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Gemini Text Generation** - General-purpose text generation with model selection (Gemini 3.1 Pro, 3 Pro, 3 Flash, 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite)
 - **Gemini Chat** - Multi-turn conversations with automatic context preservation
 - **Gemini Vision** - Analyze images with multimodal capabilities
+- **Gemini Detect** - Open-vocabulary object detection: name objects (or leave empty to detect everything prominent) and get normalized regions on an `ERPK_REGIONS` output that wires into the Regional Prompt Builder's `regions` input
 - **Gemini Image Generation** - Generate images from text descriptions (3.1 Flash, 3 Pro, 2.5 Flash models; up to 4K resolution, 14 aspect ratios, Google Search grounding)
 - **Gemini Image Edit** - Edit and modify images with natural language prompts (up to 14 reference images, same model and resolution options)
 - **Gemini System Instruction** - Set persistent system-level instructions to guide model behavior
@@ -262,6 +263,7 @@ String manipulation and general utility nodes.
 - Optional reference image input: the connected image displays under the regions (LoadImage shows immediately) and passes through unchanged on an `image` output, so the builder sits inline in image-edit chains. When the image's aspect differs from the frame, a `⚠ match` chip in the status strip sets width/height to the image with one click
 - Dynamic descriptions: optional `desc_1`-`desc_10` STRING sockets override the matching region's description at execute time (numbered as on the canvas), so any text node can drive a region. Sockets stay hidden until exposed with the inspector's plug button (or already wired); socket labels carry the region's text, and the inspector locks a wired region's description field
 - Per-region reference images: optional `ref_1`-`ref_10` IMAGE sockets attach a reference to the matching region (inspector ▣ button, same flow as descriptions; 10 matches Gemini's high-fidelity object budget). Wired refs flow out on the `image_refs` output in region order; connect it to Gemini Image Edit's `image_refs` input and each region's prompt line cites its image number, with the edited image always image 1. Ref-wired regions show a ▣ chip and a corner thumbnail
+- Wired regions: an optional `regions` input accepts detected regions (e.g. from Gemini Detect) and appends them after the canvas-drawn regions at execute time - the canvas stays untouched, `desc_N`/`ref_N` keep binding canvas regions only, and appended regions render in front where they overlap
 - The prompt instructs the model to treat placement areas as invisible guides so boxes are not rendered into the image
 
 **Concatenate Strings features:**

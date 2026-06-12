@@ -2,7 +2,7 @@
 # ABOUTME: Validates V3 compliance, custom types, model COMBO lists, and provider export.
 
 """
-V3 tests for Gemini provider nodes (10 nodes total).
+V3 tests for Gemini provider nodes (11 nodes total).
 
 Validates:
 - All classes inherit from IO.ComfyNode
@@ -37,6 +37,8 @@ GEMINI_NODES = [
      "Gemini Chat", "ERPK/Gemini", True, False),
     ("nodes", "GeminiVision", "GeminiVision",
      "Gemini Vision", "ERPK/Gemini", True, False),
+    ("nodes", "GeminiDetect", "GeminiDetect",
+     "Gemini Detect", "ERPK/Gemini", True, False),
     ("nodes", "GeminiSystemInstruction", "GeminiSystemInstruction",
      "Gemini System Instruction", "ERPK/Gemini", False, False),
     ("nodes", "GeminiSafetySettings", "GeminiSafetySettings",
@@ -307,7 +309,7 @@ class TestGeminiProviderExport:
     def test_nodes_list_has_all_classes(self):
         import importlib
         mod = importlib.import_module("gemini")
-        assert len(mod.NODES) == 10, f"Expected 10 Gemini nodes, got {len(mod.NODES)}"
+        assert len(mod.NODES) == 11, f"Expected 11 Gemini nodes, got {len(mod.NODES)}"
 
     def test_nodes_list_all_comfy_nodes(self):
         import importlib

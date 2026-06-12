@@ -20,6 +20,7 @@ API_NODES = [
     ("gemini.nodes", "GeminiTextGeneration"),
     ("gemini.nodes", "GeminiChat"),
     ("gemini.nodes", "GeminiVision"),
+    ("gemini.nodes", "GeminiDetect"),
     ("gemini.nodes", "GeminiImageGeneration"),
     ("gemini.nodes", "GeminiImageEdit"),
     ("gemini.veo_nodes", "VeoTextToVideo"),

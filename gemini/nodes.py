@@ -2,10 +2,19 @@
 # ABOUTME: Provides text generation, vision, chat, image gen/edit, and configuration nodes.
 
 import asyncio
+import json
+import math
 
 from comfy_api.latest import IO
 
 from .gemini_api.client import GeminiClient
+
+# Degenerate-box floor for detections, mirroring utils/regional_prompt's
+# MIN_REGION_EXTENT (the regions contract). It is duplicated rather than imported
+# because this module is imported as a top-level package in the test harness,
+# where a module-level cross-package relative import ("from ..utils ...") raises
+# "beyond top-level package". test_gemini_detect asserts the two stay in sync.
+MIN_REGION_EXTENT = 0.005
 
 GEMINI_MAX_STOP_SEQUENCES = 5
 
@@ -107,6 +116,88 @@ def _build_thinking_config(thinking_level, model):
 # --- Model lists for COMBO inputs ---
 TEXT_MODELS = list(GeminiClient.MODELS.keys())
 IMAGE_MODELS = GeminiClient.IMAGE_MODELS
+
+
+# Structured-output schema for object detection: a flat list of boxes, each on
+# Gemini's 0-1000 grid as box_2d = [ymin, xmin, ymax, xmax] plus a short label.
+DETECTION_SCHEMA = {
+    "type": "ARRAY",
+    "items": {
+        "type": "OBJECT",
+        "properties": {
+            "box_2d": {"type": "ARRAY", "items": {"type": "INTEGER"}},
+            "label": {"type": "STRING"},
+        },
+        "required": ["box_2d", "label"],
+    },
+}
+
+
+def detection_prompt(objects, max_objects):
+    """Build the detection request prompt from the objects widget text.
+
+    The list-restriction sentence only applies when the user named objects;
+    in detect-everything mode it would contradict the opening instruction.
+    """
+    labels = [line.strip() for line in objects.split("\n") if line.strip()]
+    if labels:
+        prompt = f"Detect the following objects in the image: {', '.join(labels)}. "
+        restriction = " Only include objects from the list and omit anything not present."
+    else:
+        prompt = "Detect all prominent objects in the image. "
+        restriction = ""
+    return prompt + (
+        "For each detected instance, return its 2D bounding box as "
+        "box_2d = [ymin, xmin, ymax, xmax] on a 0-1000 grid with the origin "
+        "at the top-left, and a short label naming the object. Detect at most "
+        f"{max_objects} instances total." + restriction
+    )
+
+
+def detections_to_regions(text, max_objects):
+    """Convert Gemini's detection JSON into clamped, normalized region dicts.
+
+    Input is the model's structured output: a list of {box_2d, label} where
+    box_2d is [ymin, xmin, ymax, xmax] on a 0-1000 grid (top-left origin).
+    Output dicts match utils/regional_prompt.parse_regions exactly. An empty
+    list is valid (model found nothing); malformed or non-list JSON raises.
+    """
+    try:
+        raw = json.loads(text)
+    except (TypeError, ValueError):
+        raise ValueError("Gemini returned malformed detection JSON")
+    if not isinstance(raw, list):
+        raise ValueError("Gemini returned malformed detection JSON")
+    regions = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        box = entry.get("box_2d")
+        if not isinstance(box, (list, tuple)) or len(box) != 4:
+            continue
+        try:
+            values = [float(value) for value in box]
+        except (TypeError, ValueError):
+            continue
+        if not all(math.isfinite(value) for value in values):
+            continue
+        ymin, xmin, ymax, xmax = (value / 1000.0 for value in values)
+        if xmin > xmax:
+            xmin, xmax = xmax, xmin
+        if ymin > ymax:
+            ymin, ymax = ymax, ymin
+        xmin = max(0.0, min(1.0, xmin))
+        xmax = max(0.0, min(1.0, xmax))
+        ymin = max(0.0, min(1.0, ymin))
+        ymax = max(0.0, min(1.0, ymax))
+        x, y, w, h = xmin, ymin, xmax - xmin, ymax - ymin
+        if w <= MIN_REGION_EXTENT or h <= MIN_REGION_EXTENT:
+            continue
+        label = entry.get("label")
+        desc = label.strip() if isinstance(label, str) else ""
+        regions.append({"x": x, "y": y, "w": w, "h": h,
+                        "kind": "object", "desc": desc, "text": ""})
+    return regions[:max_objects]
 
 
 class GeminiAPIConfig(IO.ComfyNode):
@@ -715,6 +806,130 @@ class GeminiVision(IO.ComfyNode):
 
         except Exception as e:
             error_msg = f"Failed to analyze image: {str(e)}"
+            print(f"[Gemini] Error: {error_msg}")
+            raise ValueError(error_msg)
+
+
+class GeminiDetect(IO.ComfyNode):
+    """Detects objects in an image and emits their bounding boxes as ERPK_REGIONS."""
+
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="GeminiDetect",
+            display_name="Gemini Detect",
+            category="ERPK/Gemini",
+            description="Detect objects in an image and emit their bounding boxes "
+                        "as regions for the Regional Prompt Builder.",
+            not_idempotent=True,
+            inputs=[
+                IO.Image.Input(
+                    "image",
+                    tooltip="Image to detect objects in (ComfyUI tensor)",
+                ),
+                IO.String.Input(
+                    "objects",
+                    multiline=True,
+                    default="",
+                    tooltip="Objects to detect, one per line (e.g. 'red car'). "
+                            "Leave empty to detect all prominent objects.",
+                ),
+                IO.Custom("GEMINI_API_CLIENT").Input(
+                    "client",
+                    optional=True,
+                    tooltip="Gemini API client from Gemini API Config node (optional if API key is configured in Settings)",
+                ),
+                IO.Combo.Input(
+                    "model",
+                    options=TEXT_MODELS,
+                    default=GeminiClient.DEFAULT_MODEL,
+                    optional=True,
+                    tooltip="Gemini model to use for detection",
+                ),
+                IO.Float.Input(
+                    "temperature",
+                    default=0.0,
+                    min=0.0,
+                    max=2.0,
+                    step=0.05,
+                    optional=True,
+                    tooltip="Lower = more deterministic detection",
+                ),
+                IO.Int.Input(
+                    "max_objects",
+                    default=20,
+                    min=1,
+                    max=100,
+                    step=1,
+                    optional=True,
+                    tooltip="Maximum number of regions to return",
+                ),
+                IO.Int.Input(
+                    "seed",
+                    default=-1,
+                    min=-1,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip="Seed for reproducible detection. Randomizes by default.",
+                ),
+            ],
+            outputs=[
+                IO.Custom("ERPK_REGIONS").Output(
+                    "regions",
+                    tooltip="Detected regions as JSON for the Regional Prompt Builder's regions input.",
+                ),
+            ],
+        )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
+
+    @classmethod
+    async def execute(cls, **kwargs) -> IO.NodeOutput:
+        from .gemini_api.utils import ImageConverter
+
+        image = kwargs.get("image")
+        objects = kwargs.get("objects", "")
+        client = kwargs.get("client")
+        model = kwargs.get("model")
+        temperature = kwargs.get("temperature", 0.0)
+        max_objects = kwargs.get("max_objects", 20)
+        seed = kwargs.get("seed", -1)
+
+        if model is None:
+            model = GeminiClient.DEFAULT_MODEL
+        if client is None:
+            client = GeminiClient(api_key=None)
+
+        prompt = detection_prompt(objects, max_objects)
+
+        try:
+            pil_images = [ImageConverter.tensor_to_pil(image)]
+
+            response = await client.generate_content(
+                prompt=prompt,
+                images=pil_images,
+                temperature=temperature,
+                model=model,
+                response_mime_type="application/json",
+                response_schema=DETECTION_SCHEMA,
+                seed=seed if seed != -1 else None,
+            )
+
+            if response.get("blocked", False):
+                error_msg = f"Response blocked by safety filters. Reason: {response.get('finish_reason', 'UNKNOWN')}"
+                print(f"[Gemini] Warning: {error_msg}")
+                raise ValueError(error_msg)
+
+            regions = detections_to_regions(response.get("text", ""), max_objects)
+            print(f"[Gemini] Detected {len(regions)} region(s)")
+
+            return IO.NodeOutput(json.dumps(regions))
+
+        except Exception as e:
+            error_msg = f"Failed to detect objects: {str(e)}"
             print(f"[Gemini] Error: {error_msg}")
             raise ValueError(error_msg)
 
