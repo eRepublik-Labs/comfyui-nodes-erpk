@@ -294,6 +294,7 @@ function createRegionEditor(node) {
         selection: new Set(),  // selected region objects — identity survives reorder
         primary: null,         // most recently selected region; inspector binds to it
         drag: null,      // {mode: "create"|"move"|"resize"|"marquee", ...}
+        hoverIndex: -1,  // region under the cursor (mask-aware); its mask glows
         cssW: 0,
         cssH: 0,
         hideBoxes: false,      // view-only: skip drawing and hit-testing boxes
@@ -717,13 +718,15 @@ function createRegionEditor(node) {
         }
 
         ctx.strokeStyle = color;
-        ctx.lineWidth = isSelected ? 2 : 1.5;
+        ctx.lineWidth = isSelected || index === state.hoverIndex ? 2 : 1.5;
         ctx.strokeRect(x, y, w, h);
 
         // The scanned segmentation mask overlays the region in its own hue. The
         // mask is box-relative, so it maps 1:1 onto the box rect; multiplying
         // the region color through the probability map keeps the mask's shape.
-        if (state.showMasks && box.mask) {
+        // Hovering a region glows its mask even when the overlay is off.
+        const isHovered = index === state.hoverIndex;
+        if ((state.showMasks || isHovered) && box.mask) {
             let maskImg = box._erpkMaskImg;
             if (!maskImg) {
                 maskImg = new Image();
@@ -735,7 +738,7 @@ function createRegionEditor(node) {
                 ctx.beginPath();
                 ctx.rect(x, y, w, h);
                 ctx.clip();
-                ctx.globalAlpha = 0.4;
+                ctx.globalAlpha = isHovered ? 0.6 : 0.4;
                 ctx.fillStyle = color;
                 ctx.fillRect(x, y, w, h);
                 ctx.globalCompositeOperation = "multiply";
@@ -1147,10 +1150,46 @@ function createRegionEditor(node) {
     }
 
     // Topmost box wins.
-    function hitBox(p) {
+    // True when the region's segmentation covers the point, false when the
+    // point falls in the empty part of the mask, null when there is no usable
+    // mask. Pixel data decodes once per region into a cached ImageData.
+    function maskPixelHit(box, p) {
+        if (!box.mask) return null;
+        let img = box._erpkMaskImg;
+        if (!img) {
+            img = new Image();
+            img.src = "data:image/png;base64," + box.mask;
+            box._erpkMaskImg = img;
+        }
+        if (!img.complete || !img.naturalWidth) return null;
+        if (!box._erpkMaskData) {
+            const off = document.createElement("canvas");
+            off.width = img.naturalWidth;
+            off.height = img.naturalHeight;
+            const offCtx = off.getContext("2d", { willReadFrequently: true });
+            offCtx.drawImage(img, 0, 0);
+            box._erpkMaskData = offCtx.getImageData(0, 0, off.width, off.height);
+        }
+        const u = (p.x - box.x) / box.w;
+        const v = (p.y - box.y) / box.h;
+        if (u < 0 || u > 1 || v < 0 || v > 1) return false;
+        const data = box._erpkMaskData;
+        const col = Math.min(data.width - 1, Math.floor(u * data.width));
+        const row = Math.min(data.height - 1, Math.floor(v * data.height));
+        return data.data[(row * data.width + col) * 4] > 127;
+    }
+
+    // Front-to-back pick that lets clicks pass through the empty part of a
+    // scanned region's mask: a maskless region keeps plain rectangle
+    // semantics, a masked one claims the point only where its object is.
+    function maskAwareHit(p) {
         if (state.hideBoxes) return -1;
         const hits = boxesAt(p);
-        return hits.length ? state.boxes.indexOf(hits[0]) : -1;
+        if (!hits.length) return -1;
+        for (const box of hits) {
+            if (maskPixelHit(box, p) !== false) return state.boxes.indexOf(box);
+        }
+        return state.boxes.indexOf(hits[0]);
     }
 
     function resizeAnchor(box, handleId) {
@@ -1171,7 +1210,7 @@ function createRegionEditor(node) {
                 handleId === "nw" || handleId === "se" ? "nwse-resize" : "nesw-resize";
             return;
         }
-        const hit = hitBox(pointerNorm(e));
+        const hit = maskAwareHit(pointerNorm(e));
         if (hit >= 0 && state.selection.has(state.boxes[hit])) {
             canvas.style.cursor = "move";
         } else if (hit >= 0) {
@@ -1451,7 +1490,7 @@ function createRegionEditor(node) {
         // Shift toggles membership on a box, or starts a marquee on empty
         // canvas.
         if (e.shiftKey) {
-            const hit = hitBox(p);
+            const hit = maskAwareHit(p);
             if (hit >= 0) {
                 select(state.boxes[hit], { toggle: true });
             } else {
@@ -1478,7 +1517,7 @@ function createRegionEditor(node) {
             const box = state.primary;
             state.drag = { mode: "resize", box, anchor: resizeAnchor(box, handleId) };
         } else {
-            const hit = hitBox(p);
+            const hit = maskAwareHit(p);
             if (hit >= 0) {
                 const box = state.boxes[hit];
                 const wasSelected = state.selection.has(box);
@@ -1514,6 +1553,11 @@ function createRegionEditor(node) {
         if (!state.drag) {
             updateCursor(e);
             trackRegionTip(e);
+            const hover = maskAwareHit(pointerNorm(e));
+            if (hover !== state.hoverIndex) {
+                state.hoverIndex = hover;
+                render();
+            }
             return;
         }
         const p = pointerNorm(e);
@@ -1583,7 +1627,7 @@ function createRegionEditor(node) {
 
     function onDblClick(e) {
         e.stopPropagation();
-        const hit = hitBox(pointerNorm(e));
+        const hit = maskAwareHit(pointerNorm(e));
         if (hit < 0) return;
         select(state.boxes[hit]);
         render();
@@ -2194,7 +2238,7 @@ function createRegionEditor(node) {
     }
 
     function trackRegionTip(e) {
-        const hit = hitBox(pointerNorm(e));
+        const hit = maskAwareHit(pointerNorm(e));
         const box = hit >= 0 ? state.boxes[hit] : null;
         if (box === tipBox) return;
         hideTip();
@@ -2209,6 +2253,10 @@ function createRegionEditor(node) {
 
     function onCanvasTipLeave() {
         hideTip();
+        if (state.hoverIndex !== -1) {
+            state.hoverIndex = -1;
+            render();
+        }
     }
 
     function onTipOver(e) {
@@ -2553,7 +2601,7 @@ function createRegionEditor(node) {
         closeHelp();
         // Right-clicking a region targets it: it becomes the selection and
         // the geometry fields appear; empty canvas opens just the list.
-        const hit = hitBox(pointerNorm(e));
+        const hit = maskAwareHit(pointerNorm(e));
         if (hit >= 0) {
             select(state.boxes[hit]);
             render();

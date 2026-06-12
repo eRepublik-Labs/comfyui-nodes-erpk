@@ -60,6 +60,8 @@ The `regions` input accepts detected regions (JSON) from a detector node. They a
 
 With an image connected, a ✦ button floats in the canvas's upper-left. Pressing it sends the image to the ComfyUI server, which runs Gemini (key from Settings — it never reaches the browser) to find the prominent objects. Each found object becomes a real, editable canvas region: its description is the object's label, same-class objects share a color family, and the model orders the scene back to front so depth comes pre-assigned. Regions arrive with segmentation masks, drawn as a toggleable overlay (the mask button next to the scan button) and emitted on the `masks` output. Scanned regions append after anything already drawn; objects the model misses can be drawn by hand as usual.
 
+Hovering the canvas glows the mask of the object under the cursor, and clicking selects by mask: a click in the empty part of a scanned region's box passes through to whatever is actually under the pointer, so overlapping objects stay individually selectable. Hand-drawn regions keep plain rectangle behavior, and Alt-click still cycles the stack explicitly. The Region Mask node picks one region's mask out of the `masks` batch by canvas number for inpainting chains.
+
 ## Notes
 
 - The prompt calls regions invisible "placement areas" and forbids drawing them; detection vocabulary makes some models paint the boxes into the image. If a generation still shows rectangles, re-queue with a different seed.
