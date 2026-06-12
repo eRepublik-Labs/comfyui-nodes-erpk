@@ -102,6 +102,10 @@ const HAIRLINE = "rgba(255, 255, 255, 0.10)";
 const HAIRLINE_STRONG = "rgba(255, 255, 255, 0.25)";
 const INK_ON_TAPE = "#0b0b0e";
 
+// Visibility toggle glyphs: filled disc reads as shown, crossed disc as hidden.
+const EYE_SHOWN = "◉";
+const EYE_HIDDEN = "⊘";
+
 // Regions cycle through gaffer-tape hues so each keeps a stable identity on
 // the stage; kind is marked by the T badge and rendered text, not by color.
 const TAPE_COLORS = ["#4cc9f0", "#f9a826", "#f15bb5", "#9ef01a", "#9b5de5", "#ff6d5a"];
@@ -238,6 +242,9 @@ function parseRegions(text) {
         // backward compatible.
         if (typeof entry.mask === "string" && entry.mask) region.mask = entry.mask;
         if (typeof entry.group === "string" && entry.group) region.group = entry.group;
+        // View-only flag: a hidden region skips drawing and hit-testing but
+        // still feeds the prompt, bbox, and mask outputs.
+        if (entry.hidden === true) region.hidden = true;
         if (entry.src && typeof entry.src === "object") {
             const sn = [entry.src.x, entry.src.y, entry.src.w, entry.src.h]
                 .map((v) => Number(v ?? NaN));
@@ -276,6 +283,7 @@ function serializeRegions(boxes) {
         // keeps hand-drawn regions' serialized payload compact.
         if (b.mask) out.mask = b.mask;
         if (b.group) out.group = b.group;
+        if (b.hidden) out.hidden = true;
         if (b.src) {
             out.src = { x: round4(b.src.x), y: round4(b.src.y),
                         w: round4(b.src.w), h: round4(b.src.h) };
@@ -487,6 +495,8 @@ function createRegionEditor(node) {
     snapBtn.dataset.tip = "Snap drawing, moving, and resizing to the grid";
     const helpBtn = makeStripButton("?");
     helpBtn.dataset.tip = "Keyboard and mouse shortcuts";
+    const gearBtn = makeStripButton("⚙");
+    gearBtn.dataset.tip = "Scan options";
     const fsBtn = makeStripButton("⤢");
     fsBtn.dataset.tip = "Expand the editor to fill the window (F · Esc to exit)";
     floatOnStage(fsBtn, "right");
@@ -502,7 +512,7 @@ function createRegionEditor(node) {
     // Scans the connected image for objects. Floats in the stage's upper-left
     // rather than the strip, and only shows when an image is connected.
     const scanBtn = makeStripButton("✦");
-    scanBtn.dataset.tip = "Scan the connected image for objects (Shift: Gemini cloud)";
+    scanBtn.dataset.tip = "Scan the connected image for objects";
     floatOnStage(scanBtn, "left");
     scanBtn.style.display = "none";
     const clearBtn = makeStripButton("Clear all");
@@ -525,6 +535,7 @@ function createRegionEditor(node) {
     status.appendChild(gridAlphaInput);
     status.appendChild(snapBtn);
     status.appendChild(helpBtn);
+    status.appendChild(gearBtn);
     status.appendChild(clearBtn);
 
     root.appendChild(stage);
@@ -773,6 +784,7 @@ function createRegionEditor(node) {
     }
 
     function drawBox(box, index) {
+        if (box.hidden) return;
         const x = box.x * state.cssW;
         const y = box.y * state.cssH;
         const w = box.w * state.cssW;
@@ -1222,6 +1234,7 @@ function createRegionEditor(node) {
         if (panel && !panelRowDragging) {
             renderPanelRows();
             refreshPanelDim();
+            refreshPanelDetail();
         }
     }
 
@@ -1268,6 +1281,7 @@ function createRegionEditor(node) {
         const hits = [];
         for (let i = state.boxes.length - 1; i >= 0; i--) {
             const b = state.boxes[i];
+            if (b.hidden) continue;
             if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
                 hits.push(b);
             }
@@ -2097,10 +2111,10 @@ function createRegionEditor(node) {
     }
 
     // --- Vision scan -------------------------------------------------------
-    // Appends the engine's objects on top of the existing regions, ordered
-    // back-to-front by depth_rank so array order stays z-order. Coordinates
-    // are re-clamped and degenerate boxes dropped, mirroring the Python and
-    // route-side guards; mask/group ride along when present.
+    // Replaces the canvas with the engine's objects, ordered back-to-front by
+    // depth_rank so array order stays z-order. Coordinates are re-clamped and
+    // degenerate boxes dropped, mirroring the Python and route-side guards;
+    // mask/caption/name ride along when present.
     function applyScanResults(objects) {
         const sorted = (Array.isArray(objects) ? objects.slice() : [])
             .sort((a, b) => (Number(a?.depth_rank) || 0) - (Number(b?.depth_rank) || 0));
@@ -2115,14 +2129,18 @@ function createRegionEditor(node) {
             const w = clamp(nums[2], 0, 1 - x);
             const h = clamp(nums[3], 0, 1 - y);
             if (w <= 0.005 || h <= 0.005) continue;
+            const name = typeof obj.name === "string" ? obj.name : "";
+            const caption = typeof obj.caption === "string" ? obj.caption : "";
             const region = {
                 x, y, w, h,
                 kind: "object",
-                desc: typeof obj.name === "string" ? obj.name : "",
+                // The per-region caption feeds the generation prompt; the short
+                // name is the layer label and its color family.
+                desc: caption || name,
                 text: "",
             };
             if (typeof obj.mask === "string" && obj.mask) region.mask = obj.mask;
-            if (typeof obj.group === "string" && obj.group) region.group = obj.group;
+            if (name) region.group = name;
             // Origin box: where the object's pixels live in the source image.
             // Moving the region away from it turns the prompt into a
             // relocation and drives the cut-out drag preview.
@@ -2133,15 +2151,18 @@ function createRegionEditor(node) {
             state.scanError = "Scan found no objects";
             return;
         }
-        state.boxes.push(...added);
-        state.selection = new Set(added);
-        state.primary = added[added.length - 1];
+        // A scan replaces the canvas: clear every existing region, then drop in
+        // the scanned set with nothing selected so dragging one region doesn't
+        // drag them all. One syncWidget keeps the replace a single undo step.
+        state.boxes = added;
+        state.selection = new Set();
+        state.primary = null;
         syncWidget();
     }
 
-    async function onScanClick(e) {
+    async function onScanClick() {
         if (state.scanning) return;
-        const engine = e && e.shiftKey ? "gemini" : "local";
+        const model = node.properties?.erpkScanModel;
         const img = upstreamImage("image");
         if (!img || !img.complete || !img.naturalWidth) {
             state.scanError = "No loaded image to scan";
@@ -2174,10 +2195,12 @@ function createRegionEditor(node) {
         state.scanAbort = new AbortController();
         scanFxLoop();
         try {
+            const body = { image: dataUrl, max_objects: SCAN_MAX_OBJECTS, engine: "gemini" };
+            if (model) body.model = model;
             const res = await fetch("/erpk/scan", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ image: dataUrl, max_objects: SCAN_MAX_OBJECTS, engine }),
+                body: JSON.stringify(body),
                 signal: state.scanAbort.signal,
             });
             const json = await res.json().catch(() => ({}));
@@ -2276,7 +2299,7 @@ function createRegionEditor(node) {
             ["drag a region", "move selection"],
             ["Alt+click", "cycle overlapping regions"],
             ["double-click", "edit description in the inspector"],
-            ["right-click", "region list and depth order"],
+            ["right-click", "region details, list, and depth order"],
             ["Del / Backspace", "delete selected"],
             ["arrow keys", "nudge 1px, Shift for 10px"],
             ["Alt+arrows", "resize 1px, Shift for 10px"],
@@ -2318,6 +2341,153 @@ function createRegionEditor(node) {
     function onHelpToggle() {
         if (helpPanel) closeHelp();
         else openHelp();
+    }
+
+    // --- Scan options popover --------------------------------------------
+    // The gear button opens a small popover with the scan model picker. The
+    // model list is fetched once and cached; the choice persists in node
+    // properties and rides along with the scan request.
+    let optionsPanel = null;
+    let scanModels = null;        // {models:[...], default:"..."} cached after a good fetch
+    let scanModelSelect = null;
+
+    function syncOptionsButton() {
+        const open = !!optionsPanel;
+        gearBtn.classList.toggle("erpk-btn-active", open);
+        gearBtn.style.color = open ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
+        gearBtn.style.borderColor = open
+            ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
+    }
+
+    function closeOptions() {
+        if (!optionsPanel) return;
+        document.removeEventListener("pointerdown", onOptionsDocPointerDown, true);
+        document.removeEventListener("keydown", onOptionsDocKeyDown, true);
+        optionsPanel.remove();
+        optionsPanel = null;
+        scanModelSelect = null;
+        syncOptionsButton();
+    }
+
+    function onOptionsDocPointerDown(e) {
+        if (!optionsPanel || optionsPanel.contains(e.target)
+            || gearBtn.contains(e.target)) return;
+        closeOptions();
+    }
+
+    function onOptionsDocKeyDown(e) {
+        if (e.key === "Escape" && optionsPanel) {
+            e.preventDefault();
+            e.stopPropagation();
+            e._erpkEscapeClosedPopover = true;
+            closeOptions();
+        }
+    }
+
+    function populateScanModels() {
+        if (!scanModelSelect) return;
+        scanModelSelect.textContent = "";
+        if (!scanModels) {
+            // Fetch failed: a value-less placeholder so selecting it persists
+            // nothing (the scan then omits "model" and the server default runs).
+            const opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = "server default (list unavailable)";
+            opt.selected = true;
+            scanModelSelect.appendChild(opt);
+            return;
+        }
+        const models = scanModels.models;
+        const chosen = node.properties?.erpkScanModel || scanModels.default || models[0];
+        for (const m of models) {
+            const opt = document.createElement("option");
+            opt.value = m;
+            opt.textContent = m;
+            if (m === chosen) opt.selected = true;
+            scanModelSelect.appendChild(opt);
+        }
+    }
+
+    // Only a real response is cached; a failed fetch shows the default and
+    // retries the next time the popover opens.
+    async function loadScanModels() {
+        if (scanModels) { populateScanModels(); return; }
+        let data = null;
+        try {
+            const res = await fetch("/erpk/scan/models");
+            const json = await res.json();
+            if (json && Array.isArray(json.models) && json.models.length) data = json;
+        } catch (_) { /* fall through to the default-only list */ }
+        if (data) scanModels = data;
+        populateScanModels();
+    }
+
+    function openOptions() {
+        closePanel();
+        closeHelp();
+        optionsPanel = document.createElement("div");
+        optionsPanel.style.position = "absolute";
+        optionsPanel.style.zIndex = "20";
+        optionsPanel.style.boxSizing = "border-box";
+        optionsPanel.style.width = "200px";
+        optionsPanel.style.padding = "6px";
+        optionsPanel.style.background = PANEL_BG;
+        optionsPanel.style.border = "1px solid " + HAIRLINE;
+        optionsPanel.style.borderRadius = "6px";
+        optionsPanel.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.45)";
+
+        const header = document.createElement("div");
+        header.textContent = "Scan options";
+        header.style.font = "8px 'Segoe UI', sans-serif";
+        header.style.color = "rgba(255, 255, 255, 0.45)";
+        header.style.padding = "2px 4px 4px";
+        header.style.borderBottom = "1px solid " + HAIRLINE;
+        header.style.marginBottom = "5px";
+        optionsPanel.appendChild(header);
+
+        const label = document.createElement("div");
+        label.textContent = "Scan model";
+        label.style.font = "9px 'Segoe UI', sans-serif";
+        label.style.color = "rgba(255, 255, 255, 0.7)";
+        label.style.padding = "0 4px 3px";
+        optionsPanel.appendChild(label);
+
+        scanModelSelect = document.createElement("select");
+        styleInput(scanModelSelect);
+        scanModelSelect.style.fontSize = "11px";
+        scanModelSelect.addEventListener("change", () => {
+            if (!node.properties) node.properties = {};
+            if (scanModelSelect.value) {
+                node.properties.erpkScanModel = scanModelSelect.value;
+            } else {
+                delete node.properties.erpkScanModel;
+            }
+        });
+        optionsPanel.appendChild(scanModelSelect);
+
+        const hint = document.createElement("div");
+        hint.textContent = "Gemini detects the regions; SAM builds the masks.";
+        hint.style.font = "8px 'Segoe UI', sans-serif";
+        hint.style.color = "rgba(255, 255, 255, 0.4)";
+        hint.style.padding = "5px 4px 1px";
+        optionsPanel.appendChild(hint);
+
+        optionsPanel.addEventListener("pointerdown", onPanelPointerDown);
+
+        root.appendChild(optionsPanel);
+        optionsPanel.style.right = "6px";
+        optionsPanel.style.bottom = (root.offsetHeight - status.offsetTop + 4) + "px";
+
+        loadScanModels();
+
+        document.addEventListener("pointerdown", onOptionsDocPointerDown, true);
+        document.addEventListener("keydown", onOptionsDocKeyDown, true);
+        syncOptionsButton();
+    }
+
+    function onOptionsToggle() {
+        if (optionsPanel) closeOptions();
+        else openOptions();
     }
 
     // --- Tooltips ---------------------------------------------------------
@@ -2467,7 +2637,11 @@ function createRegionEditor(node) {
     let panel = null;
     let panelList = null;
     let panelRowDragging = false;
-    let panelDimFields = null;    // X/Y/W/H inputs at the top of the panel
+    let panelDimFields = null;    // X/Y/W/H inputs in the region detail section
+    let panelNameInput = null;    // layer name (region.group) field
+    let panelDescInput = null;    // prompt (region.desc) textarea
+    let panelEyeBtn = null;       // per-region hide/show toggle in the detail
+    let panelThumb = null;        // mask thumbnail canvas
 
     // Pointer position in the root's layout pixels; the bounding rect is
     // scaled by the graph zoom, so divide it back out.
@@ -2488,6 +2662,10 @@ function createRegionEditor(node) {
         panel = null;
         panelList = null;
         panelDimFields = null;
+        panelNameInput = null;
+        panelDescInput = null;
+        panelEyeBtn = null;
+        panelThumb = null;
     }
 
     function onDocPointerDown(e) {
@@ -2673,6 +2851,85 @@ function createRegionEditor(node) {
         }
     }
 
+    // The detail section's name field edits the layer label, which also drives
+    // the region's color family; clearing it drops back to the index color.
+    function applyPanelName(input) {
+        const box = state.primary;
+        if (!box) return;
+        const v = input.value.trim();
+        if (v) box.group = v;
+        else delete box.group;
+        syncWidget();
+        render();
+    }
+
+    // The prompt textarea edits region.desc, the text that feeds generation.
+    function applyPanelDesc(input) {
+        const box = state.primary;
+        if (!box) return;
+        box.desc = input.value;
+        syncWidget();
+        render();
+    }
+
+    // Per-region visibility: a hidden region skips drawing and hit-testing but
+    // still feeds the prompt and mask outputs.
+    function toggleRegionHidden(box) {
+        if (!box) return;
+        box.hidden = !box.hidden;
+        syncWidget();
+        render();
+    }
+
+    // Tinted mask silhouette in the detail thumbnail, or a flat color wash when
+    // the region carries no mask.
+    function drawPanelThumb(box) {
+        if (!panelThumb) return;
+        const tctx = panelThumb.getContext("2d");
+        const w = panelThumb.width;
+        const h = panelThumb.height;
+        tctx.clearRect(0, 0, w, h);
+        if (!box) return;
+        const color = colorForRegion(box, state.boxes.indexOf(box));
+        if (box.mask) {
+            let m = box._erpkMaskImg;
+            if (!m) {
+                m = new Image();
+                m.src = "data:image/png;base64," + box.mask;
+                box._erpkMaskImg = m;
+            }
+            if (m.complete && m.naturalWidth) {
+                tctx.fillStyle = color;
+                tctx.fillRect(0, 0, w, h);
+                tctx.globalCompositeOperation = "destination-in";
+                tctx.drawImage(m, 0, 0, w, h);
+                tctx.globalCompositeOperation = "source-over";
+                return;
+            }
+            m.addEventListener("load", () => {
+                if (panelThumb && state.primary === box) drawPanelThumb(box);
+            }, { once: true });
+        }
+        tctx.fillStyle = hexToRgba(color, 0.28);
+        tctx.fillRect(0, 0, w, h);
+    }
+
+    function refreshPanelDetail() {
+        const box = state.primary;
+        if (panelNameInput && document.activeElement !== panelNameInput) {
+            panelNameInput.value = box ? (box.group || "") : "";
+        }
+        if (panelDescInput && document.activeElement !== panelDescInput) {
+            panelDescInput.value = box ? (box.desc || "") : "";
+        }
+        if (panelEyeBtn) {
+            const hidden = !!(box && box.hidden);
+            panelEyeBtn.textContent = hidden ? EYE_HIDDEN : EYE_SHOWN;
+            panelEyeBtn.dataset.tip = hidden ? "Show region" : "Hide region";
+        }
+        drawPanelThumb(box);
+    }
+
     function buildPanelRow(index) {
         const box = state.boxes[index];
         const row = document.createElement("div");
@@ -2722,14 +2979,22 @@ function createRegionEditor(node) {
         label.style.overflow = "hidden";
         label.style.textOverflow = "ellipsis";
         label.style.whiteSpace = "nowrap";
-        const text = box.kind === "text" ? box.text : box.desc;
-        if (text) {
-            label.textContent = text;
+        // Layer name first, then the prompt, falling back to a kind + number.
+        const caption = box.group || (box.kind === "text" ? box.text : box.desc);
+        if (caption) {
+            label.textContent = caption;
         } else {
-            label.textContent = "(empty)";
+            label.textContent = box.kind + " " + (index + 1);
             label.style.fontStyle = "italic";
             label.style.color = "rgba(255, 255, 255, 0.4)";
         }
+        // A hidden region reads as dimmed in the list.
+        if (box.hidden) label.style.color = "rgba(255, 255, 255, 0.35)";
+
+        const eyeBtn = makeStripButton(box.hidden ? EYE_HIDDEN : EYE_SHOWN);
+        eyeBtn.dataset.tip = box.hidden ? "Show region" : "Hide region";
+        eyeBtn.style.fontSize = "10px";
+        eyeBtn.style.padding = "0 4px";
 
         const dupBtn = makeStripButton("⧉");
         dupBtn.dataset.tip = "Duplicate region";
@@ -2748,13 +3013,19 @@ function createRegionEditor(node) {
         row.appendChild(plug);
         row.appendChild(refMark);
         row.appendChild(label);
+        row.appendChild(eyeBtn);
         row.appendChild(dupBtn);
         row.appendChild(delBtn);
 
         // Button presses must not start a row drag; their listeners die with
         // the row element on rebuild or panel close.
+        eyeBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
         dupBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
         delBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+        eyeBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleRegionHidden(box);
+        });
         dupBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             duplicateRegion(box);
@@ -2805,28 +3076,89 @@ function createRegionEditor(node) {
         panel.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.45)";
 
         const header = document.createElement("div");
-        header.textContent = "Regions · top = front";
-        header.dataset.tip = "Click a row to select · drag rows to reorder depth · "
-            + "⧉ duplicates · ✕ deletes · the fields edit the selected "
-            + "region's geometry in frame pixels";
-        header.style.font = "8px 'Segoe UI', sans-serif";
-        header.style.color = "rgba(255, 255, 255, 0.45)";
-        header.style.padding = "2px 6px 4px";
-        header.style.whiteSpace = "nowrap";
-        header.style.overflow = "hidden";
-        header.style.textOverflow = "ellipsis";
+        header.style.display = "flex";
+        header.style.alignItems = "center";
+        header.style.gap = "5px";
+        header.style.padding = "2px 4px 4px";
         header.style.borderBottom = "1px solid " + HAIRLINE;
         header.style.marginBottom = "3px";
+
+        const headerLabel = document.createElement("span");
+        headerLabel.textContent = "Regions · top = front";
+        headerLabel.dataset.tip = "Click a row to select · drag rows to reorder "
+            + "depth · the eye hides a region · ⧉ duplicates · ✕ deletes";
+        headerLabel.style.flex = "1 1 auto";
+        headerLabel.style.minWidth = "0";
+        headerLabel.style.font = "8px 'Segoe UI', sans-serif";
+        headerLabel.style.color = "rgba(255, 255, 255, 0.45)";
+        headerLabel.style.whiteSpace = "nowrap";
+        headerLabel.style.overflow = "hidden";
+        headerLabel.style.textOverflow = "ellipsis";
+
+        const hideAllBtn = makeStripButton(state.hideBoxes ? EYE_HIDDEN : EYE_SHOWN);
+        hideAllBtn.dataset.tip = state.hideBoxes
+            ? "Show all region overlays (H)" : "Hide all region overlays (H)";
+        hideAllBtn.style.flex = "0 0 auto";
+        hideAllBtn.style.fontSize = "10px";
+        hideAllBtn.style.padding = "0 5px";
+        hideAllBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+        hideAllBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            state.hideBoxes = !state.hideBoxes;
+            hideAllBtn.textContent = state.hideBoxes ? EYE_HIDDEN : EYE_SHOWN;
+            hideAllBtn.dataset.tip = state.hideBoxes
+                ? "Show all region overlays (H)" : "Hide all region overlays (H)";
+            render();
+        });
+
+        header.appendChild(headerLabel);
+        header.appendChild(hideAllBtn);
         panel.appendChild(header);
 
+        // Right-clicking a region shows its detail above the list: a mask
+        // thumbnail, the layer name, the X/Y/W/H pixel fields, the prompt, and
+        // hide / delete actions. Empty-canvas right-clicks open just the list.
         if (hit >= 0) {
+            const detail = document.createElement("div");
+            detail.style.display = "flex";
+            detail.style.flexDirection = "column";
+            detail.style.gap = "4px";
+            detail.style.padding = "2px 5px 5px";
+            detail.style.marginBottom = "3px";
+            detail.style.borderBottom = "1px solid " + HAIRLINE;
+
+            const topRow = document.createElement("div");
+            topRow.style.display = "flex";
+            topRow.style.alignItems = "center";
+            topRow.style.gap = "6px";
+
+            panelThumb = document.createElement("canvas");
+            panelThumb.width = 40;
+            panelThumb.height = 40;
+            panelThumb.style.flex = "0 0 auto";
+            panelThumb.style.width = "40px";
+            panelThumb.style.height = "40px";
+            panelThumb.style.borderRadius = "3px";
+            panelThumb.style.border = "1px solid " + HAIRLINE;
+            panelThumb.style.background = PANEL_INPUT_BG;
+
+            panelNameInput = document.createElement("input");
+            panelNameInput.type = "text";
+            panelNameInput.placeholder = "name";
+            panelNameInput.dataset.tip = "Layer name — same-named regions share a color";
+            styleInput(panelNameInput);
+            panelNameInput.style.flex = "1 1 auto";
+            panelNameInput.style.fontSize = "11px";
+            panelNameInput.addEventListener("input", () => applyPanelName(panelNameInput));
+
+            topRow.appendChild(panelThumb);
+            topRow.appendChild(panelNameInput);
+            detail.appendChild(topRow);
+
             const dimRow = document.createElement("div");
             dimRow.style.display = "flex";
             dimRow.style.alignItems = "center";
             dimRow.style.gap = "4px";
-            dimRow.style.padding = "2px 5px 4px";
-            dimRow.style.marginBottom = "3px";
-            dimRow.style.borderBottom = "1px solid " + HAIRLINE;
             dimRow.style.font = "8px 'Segoe UI', sans-serif";
             dimRow.style.color = "rgba(255, 255, 255, 0.45)";
             panelDimFields = {};
@@ -2847,14 +3179,60 @@ function createRegionEditor(node) {
                 dimRow.appendChild(label);
                 dimRow.appendChild(input);
             }
-            dimRow.addEventListener("pointerdown", (e) => e.stopPropagation());
-            panel.appendChild(dimRow);
+            detail.appendChild(dimRow);
+
+            panelDescInput = document.createElement("textarea");
+            panelDescInput.rows = 2;
+            panelDescInput.placeholder = "prompt";
+            panelDescInput.dataset.tip = "Region prompt — feeds generation for this layer";
+            styleInput(panelDescInput);
+            panelDescInput.style.fontSize = "10px";
+            panelDescInput.style.resize = "vertical";
+            panelDescInput.style.minHeight = "30px";
+            panelDescInput.addEventListener("input", () => applyPanelDesc(panelDescInput));
+            detail.appendChild(panelDescInput);
+
+            const actions = document.createElement("div");
+            actions.style.display = "flex";
+            actions.style.justifyContent = "flex-end";
+            actions.style.gap = "5px";
+
+            panelEyeBtn = makeStripButton(EYE_SHOWN);
+            panelEyeBtn.style.fontSize = "11px";
+            panelEyeBtn.style.padding = "0 6px";
+            panelEyeBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                toggleRegionHidden(state.primary);
+            });
+
+            const detDelBtn = makeStripButton("✕");
+            detDelBtn.classList.add("erpk-btn-danger");
+            detDelBtn.dataset.tip = "Delete region";
+            detDelBtn.style.fontSize = "11px";
+            detDelBtn.style.padding = "0 6px";
+            detDelBtn.style.color = DANGER_RED_DIM;
+            detDelBtn.style.borderColor = DANGER_RED_BORDER;
+            detDelBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                deleteRegion(state.primary);
+            });
+
+            actions.appendChild(panelEyeBtn);
+            actions.appendChild(detDelBtn);
+            detail.appendChild(actions);
+
+            // Keep presses and typing inside the detail from starting a row
+            // drag or reaching the canvas and ComfyUI's global hotkeys.
+            detail.addEventListener("pointerdown", (e) => e.stopPropagation());
+            detail.addEventListener("keydown", (e) => e.stopPropagation());
+            panel.appendChild(detail);
         }
 
         panelList = document.createElement("div");
         panel.appendChild(panelList);
         renderPanelRows();
         refreshPanelDim();
+        refreshPanelDetail();
 
         panel.addEventListener("pointerdown", onPanelPointerDown);
         panel.addEventListener("contextmenu", onPanelContextMenu);
@@ -2989,6 +3367,7 @@ function createRegionEditor(node) {
     canvas.addEventListener("keydown", onKeyDown);
     canvas.addEventListener("contextmenu", onContextMenu);
     helpBtn.addEventListener("click", onHelpToggle);
+    gearBtn.addEventListener("click", onOptionsToggle);
     fsBtn.addEventListener("click", onToggleFullscreen);
     inspector.addEventListener("pointerdown", onInspectorPointerDown);
     inspector.addEventListener("keydown", onInspectorKeyDown);
@@ -3037,6 +3416,7 @@ function createRegionEditor(node) {
         canvas.removeEventListener("keydown", onKeyDown);
         canvas.removeEventListener("contextmenu", onContextMenu);
         helpBtn.removeEventListener("click", onHelpToggle);
+        gearBtn.removeEventListener("click", onOptionsToggle);
         fsBtn.removeEventListener("click", onToggleFullscreen);
         inspector.removeEventListener("pointerdown", onInspectorPointerDown);
         inspector.removeEventListener("keydown", onInspectorKeyDown);
@@ -3068,6 +3448,7 @@ function createRegionEditor(node) {
         hideTip();
         closePanel();
         closeHelp();
+        closeOptions();
         if (clearArm) clearTimeout(clearArm);
     }
 

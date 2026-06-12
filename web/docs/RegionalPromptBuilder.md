@@ -35,7 +35,7 @@ Draw regions on a canvas and emit a layout-aware prompt for any image generation
 - **Draw** by dragging on empty space; **Ctrl/Cmd-drag** force-draws over existing boxes.
 - **Click** selects; **Shift-click** toggles; **Shift-drag** marquees; dragging any selected region moves the whole selection; corner handles resize a single selection.
 - **Alt-click** cycles overlapping regions; **double-click** jumps to the description field.
-- **Right-click** opens the region list (top = front): click selects, drag rows to reorder depth, duplicate or delete per row.
+- **Right-click a region** opens its detail view above the list: a mask thumbnail, an editable layer **name**, the X/Y/W/H pixel fields, the region **prompt**, an eye toggle that hides just that region, and a delete button. **Right-click empty canvas** opens just the list (top = front): click selects, drag rows to reorder depth, each row has an eye toggle plus duplicate and delete. The list header's eye hides or shows every region at once (same as **H**).
 - **Del** removes the selection; **Ctrl/Cmd+C/V/D** copy, paste, duplicate; **Ctrl/Cmd+Z** undoes any region change (Shift redoes — a whole scan or Clear all reverts as one step); **[ ]** change depth; **H** hides the boxes; **F** (or the ⤢ button) expands the editor to fill the window, Esc exits. The `?` button shows the full cheat sheet.
 - The inspector row edits the selected region's description, kind (object or rendered text), and literal text. Text regions preview their string in-frame.
 - Optional grid with a typed cell size in frame pixels, color and opacity controls, and snap-to-grid. Preferences save with the workflow.
@@ -58,7 +58,9 @@ The `regions` input accepts detected regions (JSON) from a detector node. They a
 
 ## Object scan
 
-With an image connected, a ✦ button floats in the canvas's upper-left. Pressing it sends the image to the ComfyUI server, which runs a fully local detect-segment-depth pipeline (model weights download once on the first scan) to find the objects in the scene. Shift-click instead runs Gemini in the cloud (key from Settings — it never reaches the browser). Each found object becomes a real, editable canvas region: its description is the object's label, same-class objects share a color family, and the model orders the scene back to front so depth comes pre-assigned. Segmentation masks are computed locally by a box-prompted segmentation model (weights download once on the first scan), drawn as a toggleable overlay (the mask button next to the scan button) and emitted on the `masks` output. Scanned regions append after anything already drawn; objects the model misses can be drawn by hand as usual.
+With an image connected, a ✦ button floats in the canvas's upper-left. Pressing it sends the image to the ComfyUI server, where Gemini detects the objects in the scene — boxes, labels, a short per-object caption, and a back-to-front depth ranking (the key comes from Settings and never reaches the browser). Segmentation masks are then computed locally by a box-prompted segmentation model (weights download once on the first scan), drawn as a toggleable overlay (the mask button next to the scan button) and emitted on the `masks` output. The ⚙ options window in the status strip picks which Gemini model runs the scan; the choice saves with the workflow.
+
+Each found object becomes a real, editable canvas region: its **prompt** is the caption (what feeds generation), its layer **name** is the short label, and same-named objects share a color family. The scan **replaces** whatever is on the canvas — one scan is a single undo step, and it leaves nothing selected so dragging one region no longer drags them all. Objects the model misses can be drawn by hand as usual.
 
 Hovering the canvas glows the mask of the object under the cursor, and clicking selects by mask: a click in the empty part of a scanned region's box passes through to whatever is actually under the pointer, so overlapping objects stay individually selectable. Hand-drawn regions keep plain rectangle behavior, and Alt-click still cycles the stack explicitly. The Region Mask node picks one region's mask out of the `masks` batch by canvas number for inpainting chains.
 
@@ -66,6 +68,8 @@ Scanned objects can be repositioned: drag or scale a scanned region and its mask
 
 ## Notes
 
+- A region's **prompt** (the text in the detail view, fed from `desc`) is what reaches generation; its **name** is only the layer label shown in the list and the color family. They start identical for hand-drawn regions and differ after a scan.
+- Hiding a region — its eye toggle, or **H** / the list-header eye for all of them — is visual only: hidden regions skip drawing and clicking but still contribute to the `prompt`, `bboxes`, and `masks` outputs.
 - The prompt calls regions invisible "placement areas" and forbids drawing them; detection vocabulary makes some models paint the boxes into the image. If a generation still shows rectangles, re-queue with a different seed.
 - An empty canvas with an empty prompt raises an error; describe the scene or add at least one region.
 - The node is a pure prompt builder: it makes no API calls and caches like any config node.
