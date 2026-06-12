@@ -19,6 +19,9 @@ const CANVAS_MIN_H = 60;
 // Matches DESC_INPUT_COUNT / REF_INPUT_COUNT on the Python side.
 const REGION_DESC_INPUTS = 10;
 const REGION_REF_INPUTS = 10;
+// Upper bound the vision scan asks the engine for; mirrors the route default.
+const SCAN_MAX_OBJECTS = 20;
+const SCAN_MAX_EDGE_PX = 1536;
 
 // Grid cell size is expressed in frame pixels, so the grid quantizes to the
 // generated image's own pixel space (64 aligns with latent blocks).
@@ -84,6 +87,25 @@ const TAPE_COLORS = ["#4cc9f0", "#f9a826", "#f15bb5", "#9ef01a", "#9b5de5", "#ff
 
 function regionColor(index) {
     return TAPE_COLORS[index % TAPE_COLORS.length];
+}
+
+// Deterministic small hash so a class label always maps to the same hue.
+function hashString(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) {
+        h = (h * 31 + str.charCodeAt(i)) | 0;
+    }
+    return h;
+}
+
+// Scanned regions carry a class label in box.group; same-label regions share a
+// hue so the object layer reads as classes. Hand-drawn regions keep their
+// index-cycled identity color.
+function colorForRegion(box, index) {
+    if (box.group) {
+        return TAPE_COLORS[Math.abs(hashString(box.group)) % TAPE_COLORS.length];
+    }
+    return regionColor(index);
 }
 
 // Copy buffer of plain region data; module-level so clones carry between
@@ -184,26 +206,38 @@ function parseRegions(text) {
         const w = clamp(nums[2], 0, 1 - x);
         const h = clamp(nums[3], 0, 1 - y);
         if (w <= 0.005 || h <= 0.005) continue;
-        regions.push({
+        const region = {
             x, y, w, h,
             kind: entry.kind === "text" ? "text" : "object",
             desc: typeof entry.desc === "string" ? entry.desc : "",
             text: typeof entry.text === "string" ? entry.text : "",
-        });
+        };
+        // Scan-produced optionals: a box-relative base64 PNG mask and a class
+        // label. Absent for hand-drawn regions, which stay backward compatible.
+        if (typeof entry.mask === "string" && entry.mask) region.mask = entry.mask;
+        if (typeof entry.group === "string" && entry.group) region.group = entry.group;
+        regions.push(region);
     }
     return regions;
 }
 
 function serializeRegions(boxes) {
-    return JSON.stringify(boxes.map((b) => ({
-        x: round4(b.x),
-        y: round4(b.y),
-        w: round4(b.w),
-        h: round4(b.h),
-        kind: b.kind,
-        desc: b.desc,
-        text: b.text,
-    })));
+    return JSON.stringify(boxes.map((b) => {
+        const out = {
+            x: round4(b.x),
+            y: round4(b.y),
+            w: round4(b.w),
+            h: round4(b.h),
+            kind: b.kind,
+            desc: b.desc,
+            text: b.text,
+        };
+        // Only scanned regions carry these; spreading them only when truthy
+        // keeps hand-drawn regions' serialized payload compact.
+        if (b.mask) out.mask = b.mask;
+        if (b.group) out.group = b.group;
+        return out;
+    }));
 }
 
 // Axis-aligned rect from two corner points (both already clamped to the unit
@@ -252,6 +286,10 @@ function createRegionEditor(node) {
         gridColor: GRID_DEFAULT_COLOR,
         gridAlpha: 1,
         snapOn: false,
+        scanning: false,      // a vision scan request is in flight
+        showMasks: false,      // overlay the scan's segmentation masks
+        scanError: null,       // last scan failure, surfaced in the status strip
+        scanAbort: null,       // AbortController for the in-flight scan
     };
 
     // --- DOM scaffold -------------------------------------------------
@@ -275,6 +313,8 @@ function createRegionEditor(node) {
 
     const stage = document.createElement("div");
     stage.className = "erpk-region-stage";
+    // Positioned so the floating scan button anchors to the stage corner.
+    stage.style.position = "relative";
     stage.style.flex = "1 1 0";
     stage.style.minHeight = "0";
     stage.style.display = "flex";
@@ -387,6 +427,20 @@ function createRegionEditor(node) {
     matchBtn.style.color = "rgba(249, 168, 38, 0.85)";
     matchBtn.style.borderColor = "rgba(249, 168, 38, 0.45)";
     matchBtn.style.display = "none";
+    // Toggles the segmentation-mask overlay; enabled only when a region
+    // actually carries a scanned mask.
+    const maskBtn = makeStripButton("◐");
+    maskBtn.dataset.tip = "Show segmentation masks";
+    // Scans the connected image for objects. Floats in the stage's upper-left
+    // rather than the strip, and only shows when an image is connected.
+    const scanBtn = makeStripButton("✦");
+    scanBtn.dataset.tip = "Scan the connected image for objects";
+    scanBtn.style.position = "absolute";
+    scanBtn.style.left = "6px";
+    scanBtn.style.top = "6px";
+    scanBtn.style.zIndex = "10";
+    scanBtn.style.display = "none";
+    stage.appendChild(scanBtn);
     const clearBtn = makeStripButton("Clear all");
     clearBtn.classList.add("erpk-btn-danger");
     clearBtn.dataset.tip = "Remove every region (click twice to confirm)";
@@ -400,6 +454,7 @@ function createRegionEditor(node) {
     status.appendChild(statusLeft);
     status.appendChild(statusRight);
     status.appendChild(matchBtn);
+    status.appendChild(maskBtn);
     status.appendChild(gridBtn);
     status.appendChild(gridSizeInput);
     status.appendChild(gridColorInput);
@@ -603,7 +658,7 @@ function createRegionEditor(node) {
         const y = box.y * state.cssH;
         const w = box.w * state.cssW;
         const h = box.h * state.cssH;
-        const color = regionColor(index);
+        const color = colorForRegion(box, index);
         const isSelected = state.selection.has(box);
 
         ctx.fillStyle = color + (isSelected ? "2e" : "17");
@@ -630,6 +685,32 @@ function createRegionEditor(node) {
         ctx.strokeStyle = color;
         ctx.lineWidth = isSelected ? 2 : 1.5;
         ctx.strokeRect(x, y, w, h);
+
+        // The scanned segmentation mask overlays the region in its own hue. The
+        // mask is box-relative, so it maps 1:1 onto the box rect; multiplying
+        // the region color through the probability map keeps the mask's shape.
+        if (state.showMasks && box.mask) {
+            let maskImg = box._erpkMaskImg;
+            if (!maskImg) {
+                maskImg = new Image();
+                maskImg.src = "data:image/png;base64," + box.mask;
+                box._erpkMaskImg = maskImg;
+            }
+            if (maskImg.complete && maskImg.naturalWidth) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(x, y, w, h);
+                ctx.clip();
+                ctx.globalAlpha = 0.4;
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, w, h);
+                ctx.globalCompositeOperation = "multiply";
+                ctx.drawImage(maskImg, x, y, w, h);
+                ctx.restore();
+            } else {
+                maskImg.addEventListener("load", () => render(), { once: true });
+            }
+        }
 
         // Text regions preview their literal text like a signage mock.
         if (box.kind === "text" && box.text) {
@@ -883,8 +964,16 @@ function createRegionEditor(node) {
                 ? (box.text || box.desc || "text")
                 : (box.desc || "unnamed");
             sel.textContent = ` · #${index + 1} ${name}`;
-            sel.style.color = regionColor(index);
+            sel.style.color = colorForRegion(box, index);
             statusLeft.appendChild(sel);
+        }
+        // A scan failure lives in state so it survives the rebuild-on-render;
+        // it clears on the next scan attempt.
+        if (state.scanError) {
+            const err = document.createElement("span");
+            err.textContent = ` · ${state.scanError}`;
+            err.style.color = DANGER_RED;
+            statusLeft.appendChild(err);
         }
         const w = Number(findWidget(node, "width")?.value) || 1024;
         const h = Number(findWidget(node, "height")?.value) || 1024;
@@ -907,6 +996,23 @@ function createRegionEditor(node) {
                 + `connected image ${refImg.naturalWidth}×${refImg.naturalHeight}`
                 + ` — click to set ${matchDims.w}×${matchDims.h}`;
         }
+        // The scan button only shows once a loaded image is connected, and
+        // swaps to a spinner glyph while a scan is in flight.
+        const scanReady = !!(refImg?.naturalWidth && refImg?.naturalHeight);
+        scanBtn.style.display = scanReady ? "" : "none";
+        scanBtn.disabled = state.scanning || !scanReady;
+        scanBtn.textContent = state.scanning ? "…" : "✦";
+        scanBtn.style.opacity = state.scanning ? "0.5" : "1";
+        scanBtn.style.cursor = state.scanning ? "default" : "pointer";
+        // The mask toggle is enabled only when a region carries a scanned mask.
+        const hasMask = state.boxes.some((b) => b.mask);
+        const masksOn = hasMask && state.showMasks;
+        maskBtn.disabled = !hasMask;
+        maskBtn.style.opacity = hasMask ? "1" : "0.45";
+        maskBtn.style.cursor = hasMask ? "pointer" : "default";
+        maskBtn.classList.toggle("erpk-btn-active", masksOn);
+        maskBtn.style.color = masksOn ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
+        maskBtn.style.borderColor = masksOn ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
         clearBtn.disabled = !count;
         clearBtn.style.opacity = count ? "1" : "0.45";
         clearBtn.style.cursor = count ? "pointer" : "default";
@@ -1722,6 +1828,107 @@ function createRegionEditor(node) {
         moveSelectedRegion(1);
     }
 
+    // --- Vision scan -------------------------------------------------------
+    // Appends the engine's objects on top of the existing regions, ordered
+    // back-to-front by depth_rank so array order stays z-order. Coordinates
+    // are re-clamped and degenerate boxes dropped, mirroring the Python and
+    // route-side guards; mask/group ride along when present.
+    function applyScanResults(objects) {
+        const sorted = (Array.isArray(objects) ? objects.slice() : [])
+            .sort((a, b) => (Number(a?.depth_rank) || 0) - (Number(b?.depth_rank) || 0));
+        const added = [];
+        for (const obj of sorted) {
+            const src = obj?.box;
+            if (!src || typeof src !== "object") continue;
+            const nums = [src.x, src.y, src.w, src.h].map((v) => Number(v ?? 0));
+            if (!nums.every(Number.isFinite)) continue;
+            const x = clamp(nums[0], 0, 1);
+            const y = clamp(nums[1], 0, 1);
+            const w = clamp(nums[2], 0, 1 - x);
+            const h = clamp(nums[3], 0, 1 - y);
+            if (w <= 0.005 || h <= 0.005) continue;
+            const region = {
+                x, y, w, h,
+                kind: "object",
+                desc: typeof obj.name === "string" ? obj.name : "",
+                text: "",
+            };
+            if (typeof obj.mask === "string" && obj.mask) region.mask = obj.mask;
+            if (typeof obj.group === "string" && obj.group) region.group = obj.group;
+            added.push(region);
+        }
+        if (!added.length) {
+            state.scanError = "Scan found no objects";
+            return;
+        }
+        state.boxes.push(...added);
+        state.selection = new Set(added);
+        state.primary = added[added.length - 1];
+        syncWidget();
+    }
+
+    async function onScanClick() {
+        if (state.scanning) return;
+        const img = upstreamImage("image");
+        if (!img || !img.complete || !img.naturalWidth) {
+            state.scanError = "No loaded image to scan";
+            render();
+            return;
+        }
+        // Draw the already-loaded image into an offscreen canvas; toDataURL
+        // taints and throws on a cross-origin source, which we surface.
+        // Downscaled JPEG: vision models resample internally, so full-res
+        // lossless uploads only cost bandwidth; white fill keeps any alpha
+        // from encoding as black.
+        let dataUrl;
+        try {
+            const scale = Math.min(1, SCAN_MAX_EDGE_PX / Math.max(img.naturalWidth, img.naturalHeight));
+            const off = document.createElement("canvas");
+            off.width = Math.max(1, Math.round(img.naturalWidth * scale));
+            off.height = Math.max(1, Math.round(img.naturalHeight * scale));
+            const offCtx = off.getContext("2d");
+            offCtx.fillStyle = "#fff";
+            offCtx.fillRect(0, 0, off.width, off.height);
+            offCtx.drawImage(img, 0, 0, off.width, off.height);
+            dataUrl = off.toDataURL("image/jpeg", 0.85);
+        } catch (err) {
+            state.scanError = "Can't read image (cross-origin?)";
+            render();
+            return;
+        }
+        state.scanError = null;
+        state.scanning = true;
+        state.scanAbort = new AbortController();
+        render();
+        try {
+            const res = await fetch("/erpk/scan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image: dataUrl, max_objects: SCAN_MAX_OBJECTS }),
+                signal: state.scanAbort.signal,
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || json.error) {
+                state.scanError = json.error || `Scan failed (${res.status})`;
+            } else {
+                applyScanResults(json.objects);
+            }
+        } catch (err) {
+            if (err.name === "AbortError") return;
+            state.scanError = `Scan failed: ${err.message}`;
+        } finally {
+            state.scanning = false;
+            state.scanAbort = null;
+            render();
+        }
+    }
+
+    function onMaskToggle() {
+        if (!state.boxes.some((b) => b.mask)) return;
+        state.showMasks = !state.showMasks;
+        render();
+    }
+
     // --- Shortcuts overlay ------------------------------------------------
     // The ? button toggles a cheat sheet anchored above the status strip;
     // outside clicks and Escape dismiss it.
@@ -2525,6 +2732,8 @@ function createRegionEditor(node) {
     gridAlphaInput.addEventListener("blur", onGridAlphaBlur);
     gridAlphaInput.addEventListener("keydown", onGridSizeKeyDown);
     snapBtn.addEventListener("click", onSnapToggle);
+    scanBtn.addEventListener("click", onScanClick);
+    maskBtn.addEventListener("click", onMaskToggle);
 
     const observer = new ResizeObserver(() => layout());
     observer.observe(stage);
@@ -2571,6 +2780,9 @@ function createRegionEditor(node) {
         gridAlphaInput.removeEventListener("blur", onGridAlphaBlur);
         gridAlphaInput.removeEventListener("keydown", onGridSizeKeyDown);
         snapBtn.removeEventListener("click", onSnapToggle);
+        scanBtn.removeEventListener("click", onScanClick);
+        maskBtn.removeEventListener("click", onMaskToggle);
+        state.scanAbort?.abort();
         root.removeEventListener("pointerover", onTipOver);
         root.removeEventListener("pointerout", onTipOut);
         root.removeEventListener("pointerdown", hideTip, true);

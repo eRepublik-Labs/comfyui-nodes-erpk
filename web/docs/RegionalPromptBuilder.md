@@ -28,6 +28,7 @@ Draw regions on a canvas and emit a layout-aware prompt for any image generation
 | height | INT | The frame height, passed through. |
 | image | IMAGE | The reference image, passed through unchanged. |
 | image_refs | ERPK_IMAGE_REFS | Wired region reference images in region order; connect to Gemini Image Edit's image_refs input. |
+| masks | MASK | A frame-sized mask batch, one per region in region order. Scanned regions use their stored segmentation; all other regions get filled rectangles. |
 
 ## Canvas editor
 
@@ -54,6 +55,10 @@ Select a region and press the inspector's ▣ button to expose its `ref_N` IMAGE
 ## Wired regions
 
 The `regions` input accepts detected regions (JSON) from a detector node. They are appended after the canvas regions at execute time, so the canvas is never modified and detected regions are not visible on the canvas preview. Because numbering runs back to front, detected regions take the highest numbers and render in front of canvas regions where boxes overlap. The `desc_N` and `ref_N` overrides bind canvas regions only — they never apply to wired regions.
+
+## Object scan
+
+With an image connected, a ✦ button floats in the canvas's upper-left. Pressing it sends the image to the ComfyUI server, which runs Gemini (key from Settings — it never reaches the browser) to find the prominent objects. Each found object becomes a real, editable canvas region: its description is the object's label, same-class objects share a color family, and the model orders the scene back to front so depth comes pre-assigned. Regions arrive with segmentation masks, drawn as a toggleable overlay (the mask button next to the scan button) and emitted on the `masks` output. Scanned regions append after anything already drawn; objects the model misses can be drawn by hand as usual.
 
 ## Notes
 
