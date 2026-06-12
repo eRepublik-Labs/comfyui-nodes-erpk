@@ -24,45 +24,47 @@ DEPTH_SCHEMA = {
     "required": ["order"],
 }
 
+# Structured-output schema for detection: one entry per prominent object with a
+# 0-1000 box, a short label, and a one-sentence description. Gemini supplies no
+# masks here (the SAM stage does), so structured output is safe.
+DETECTION_SCHEMA = {
+    "type": "ARRAY",
+    "items": {
+        "type": "OBJECT",
+        "properties": {
+            "box_2d": {"type": "ARRAY", "items": {"type": "INTEGER"}},
+            "label": {"type": "STRING"},
+            "description": {"type": "STRING"},
+        },
+        "required": ["box_2d", "label", "description"],
+    },
+}
+
 
 def _clamp(value, lower, upper):
     return max(lower, min(upper, value))
 
 
-def strip_data_url(value):
-    """Return prefix-free base64 from a possible data URL; non-str/empty -> None."""
-    if not isinstance(value, str):
-        return None
-    text = value.strip()
-    if not text:
-        return None
-    if text.startswith("data:"):
-        comma = text.find(",")
-        if comma == -1:
-            return None
-        text = text[comma + 1:].strip()
-    return text or None
-
-
-def segmentation_prompt(max_objects):
-    """Build the segmentation request prompt for the vision model."""
+def detection_prompt(max_objects):
+    """Build the detection request prompt for the vision model."""
     return (
-        "Segment the prominent objects in the image. For each instance, return "
+        "Detect the prominent objects in the image. For each instance, return "
         "its 2D bounding box as box_2d = [ymin, xmin, ymax, xmax] on a 0-1000 "
         "grid with the origin at the top-left, a short label naming the object, "
-        "and a base64-encoded PNG segmentation mask whose pixels are relative to "
-        "the bounding box (the mask covers only the box, not the full image). "
-        f"Segment at most {max_objects} instances total."
+        "and a one-sentence description of what is visible inside that box. "
+        f"Return at most {max_objects} instances total."
     )
 
 
-def parse_segmentation(text, max_objects):
-    """Convert the model's segmentation JSON into normalized scan-object dicts.
+def parse_detection(text, max_objects):
+    """Convert the model's detection JSON into normalized scan-object dicts.
 
-    Input is a list of {box_2d, label, mask?} where box_2d is
+    Input is a list of {box_2d, label, description} where box_2d is
     [ymin, xmin, ymax, xmax] on a 0-1000 grid (top-left origin). Output dicts are
-    {name, box:{x,y,w,h}, mask:str|None, group}; depth_rank is added later.
-    Malformed or non-list JSON yields [] (the scan must never fail on parse).
+    {name, box:{x,y,w,h}, mask:None, group, caption}; masks come from the SAM
+    stage and depth_rank is added later. caption is the stripped description (""
+    when missing/non-string). Malformed or non-list JSON yields [] (the scan must
+    never fail on parse).
     """
     if isinstance(text, str):
         stripped = text.strip()
@@ -104,11 +106,14 @@ def parse_segmentation(text, max_objects):
             continue
         label = entry.get("label")
         name = label.strip() if isinstance(label, str) else ""
+        description = entry.get("description")
+        caption = description.strip() if isinstance(description, str) else ""
         objects.append({
             "name": name,
             "box": {"x": x, "y": y, "w": w, "h": h},
-            "mask": strip_data_url(entry.get("mask")),
+            "mask": None,
             "group": name,
+            "caption": caption,
         })
     return objects[:max_objects]
 
@@ -121,11 +126,13 @@ def florence_to_objects(od_result, width, height, max_objects):
 
     Input is post_process_generation's {"<OD>": {"bboxes": [[x0,y0,x1,y1]...],
     "labels": [...]}} where boxes are absolute pixels (top-left/bottom-right).
-    Output dicts are {name, box:{x,y,w,h}, mask:None, group}; masks come from the
-    SAM stage and depth_rank is added later. Boxes are clamped to the frame,
-    degenerate ones (w or h <= MIN_REGION_EXTENT) are dropped, and the result is
-    capped at max_objects. <OD> is class-agnostic and can return very few,
-    nested boxes, so callers must tolerate small counts.
+    Output dicts are {name, box:{x,y,w,h}, mask:None, group, caption}; masks come
+    from the SAM stage and depth_rank is added later. caption is left "" because
+    Florence-2 emits no per-object description, keeping the scan-object contract
+    uniform with the Gemini engine. Boxes are clamped to the frame, degenerate
+    ones (w or h <= MIN_REGION_EXTENT) are dropped, and the result is capped at
+    max_objects. <OD> is class-agnostic and can return very few, nested boxes, so
+    callers must tolerate small counts.
     """
     detection = {}
     if isinstance(od_result, dict):
@@ -164,6 +171,7 @@ def florence_to_objects(od_result, width, height, max_objects):
             "box": {"x": x, "y": y, "w": w, "h": h},
             "mask": None,
             "group": name,
+            "caption": "",
         })
     return objects[:max_objects]
 
@@ -324,11 +332,13 @@ def depth_ranks(objects, medians):
 
 
 async def gemini_scan(image, max_objects, model):
-    """Gemini engine: one segmentation call plus one depth-ranking call.
+    """Gemini engine: one detection call, SAM masks, one depth-ranking call.
 
-    GeminiClient is imported lazily so this module stays genai-free at import
-    time (the test harness never reaches this code). The key resolves through the
-    standard 3-tier chain via GeminiClient(api_key=None).
+    Gemini supplies boxes, labels, and per-object captions; the SAM stage fills
+    masks (vision-LLM mask output is too unreliable to ship). GeminiClient is
+    imported lazily so this module stays genai-free at import time (the test
+    harness never reaches this code). The key resolves through the standard
+    3-tier chain via GeminiClient(api_key=None).
     """
     from ..gemini.gemini_api.client import GeminiClient
 
@@ -336,22 +346,22 @@ async def gemini_scan(image, max_objects, model):
     model_to_use = resolve_model(model, GeminiClient.MODELS,
                                  GeminiClient.DEFAULT_MODEL)
 
-    # No response_schema here: forcing structured output suppresses Gemini's
-    # segmentation-mask generation (masks come back omitted or the result is
-    # empty). The prompt specifies the JSON shape; parsing is defensive.
-    segmentation = await client.generate_content(
-        segmentation_prompt(max_objects),
+    # response_schema is safe here: Gemini is not asked for masks (the SAM stage
+    # produces them), so structured output does not suppress anything.
+    detection = await client.generate_content(
+        detection_prompt(max_objects),
         images=[image],
         temperature=0.0,
         model=model_to_use,
         response_mime_type="application/json",
+        response_schema=DETECTION_SCHEMA,
     )
-    if segmentation.get("blocked"):
+    if detection.get("blocked"):
         raise RuntimeError(
-            segmentation.get("error") or "Gemini segmentation request was blocked"
+            detection.get("error") or "Gemini detection request was blocked"
         )
-    raw_text = segmentation.get("text", "")
-    objects = parse_segmentation(raw_text, max_objects)
+    raw_text = detection.get("text", "")
+    objects = parse_detection(raw_text, max_objects)
     if not objects:
         print(f"[ERPK scan] 0 objects; raw response head: {raw_text[:400]!r}")
         return []
@@ -377,7 +387,7 @@ async def gemini_scan(image, max_objects, model):
         response_mime_type="application/json",
         response_schema=DEPTH_SCHEMA,
     )
-    # A blocked/empty depth call degrades to the segmentation order rather than
+    # A blocked/empty depth call degrades to the detection order rather than
     # failing the whole scan.
     depth_text = "" if depth.get("blocked") else depth.get("text", "")
     rank_map = parse_depth_order(depth_text, labels)
@@ -556,8 +566,8 @@ async def local_scan(image, max_objects, model):
 
 # The single indirection point a future Moondream engine plugs into: any
 # coroutine (PIL.Image, max_objects:int, model:str|None) -> list[scan-object].
-# The scan button defaults to the local pipeline; Gemini stays opt-in per scan.
-DEFAULT_ENGINE = local_scan
+# The scan button defaults to Gemini; the local pipeline stays opt-in per scan.
+DEFAULT_ENGINE = gemini_scan
 
 
 async def scan(image, max_objects=DEFAULT_MAX_OBJECTS, model=None, engine=None):

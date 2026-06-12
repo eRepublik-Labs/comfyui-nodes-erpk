@@ -199,11 +199,11 @@ class TestEngineSelector:
         monkeypatch.setattr(scan_engine, "scan", fake_scan)
         return seen
 
-    def test_default_engine_is_local(self, monkeypatch):
+    def test_default_engine_is_gemini(self, monkeypatch):
         seen = self._capture_engine(monkeypatch)
         resp = asyncio.run(handle_scan(FakeRequest({"image": _png_data_url()})))
         assert resp.status == 200
-        assert seen["engine"] is scan_engine.local_scan
+        assert seen["engine"] is scan_engine.gemini_scan
 
     def test_explicit_local_engine(self, monkeypatch):
         seen = self._capture_engine(monkeypatch)
@@ -232,6 +232,33 @@ class TestEngineSelector:
         assert _body(resp)["error"] == "Unknown engine"
 
 
+class TestScanModels:
+    """GET /erpk/scan/models reports the Gemini model list and default.
+
+    The handler does a relative `..gemini` import, so it is loaded through the
+    synthetic `erpk` package (conftest) where that import resolves, mirroring
+    how the Gemini-touching modules are exercised elsewhere.
+    """
+
+    def _handler(self):
+        from erpk.utils.scan_route import handle_scan_models
+
+        return handle_scan_models
+
+    def test_returns_models_and_default(self):
+        from gemini.gemini_api.client import GeminiClient
+
+        resp = asyncio.run(self._handler()(FakeRequest({})))
+        assert resp.status == 200
+        body = _body(resp)
+        assert body["models"] == list(GeminiClient.MODELS)
+        assert body["default"] == GeminiClient.DEFAULT_MODEL
+
+    def test_default_is_in_models(self):
+        body = _body(asyncio.run(self._handler()(FakeRequest({}))))
+        assert body["default"] in body["models"]
+
+
 class TestRegister:
     def test_register_adds_post_route(self):
         from aiohttp import web
@@ -247,6 +274,23 @@ class TestRegister:
         registered = list(routes)
         assert any(
             getattr(r, "path", None) == "/erpk/scan" and r.method == "POST"
+            for r in registered
+        )
+
+    def test_register_adds_models_get_route(self):
+        from aiohttp import web
+
+        routes = web.RouteTableDef()
+
+        class FakeServer:
+            pass
+
+        server = FakeServer()
+        server.routes = routes
+        register(server)
+        registered = list(routes)
+        assert any(
+            getattr(r, "path", None) == "/erpk/scan/models" and r.method == "GET"
             for r in registered
         )
 

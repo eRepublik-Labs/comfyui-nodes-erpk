@@ -1,8 +1,8 @@
 # ABOUTME: Tests for the pluggable scan engine's torch-free parse/clamp/rank helpers.
-# ABOUTME: Covers segmentation parsing, mask data-URL stripping, depth ranking, and engine dispatch.
+# ABOUTME: Covers detection parsing, depth ranking, and engine dispatch.
 
 """
-Validates utils.scan_engine's pure helpers (parse_segmentation, strip_data_url,
+Validates utils.scan_engine's pure helpers (parse_detection, strip_data_url,
 parse_depth_order, apply_depth_ranks) and the engine dispatch indirection. The
 Gemini engine itself hits the network and is exercised only via dispatch with an
 injected fake coroutine, mirroring the torch/genai-free testing constraint.
@@ -17,29 +17,30 @@ import pytest
 from utils.scan_engine import (
     DEFAULT_ENGINE,
     DEPTH_SCHEMA,
+    DETECTION_SCHEMA,
     MIN_REGION_EXTENT as ENGINE_MIN_REGION_EXTENT,
     apply_depth_ranks,
+    detection_prompt,
     depth_prompt,
     depth_ranks,
     florence_to_objects,
+    gemini_scan,
     local_scan,
     parse_depth_order,
-    parse_segmentation,
+    parse_detection,
     pixel_box_prompts,
     resolve_model,
     scan,
-    segmentation_prompt,
-    strip_data_url,
 )
 from utils.regional_prompt import MIN_REGION_EXTENT
 
 
 class TestSchemas:
-    """The structured-output schema matches the depth-ranking contract.
+    """The structured-output schemas match the depth and detection contracts.
 
-    The segmentation call deliberately has NO response schema: structured
-    output suppresses Gemini's mask generation, so the prompt specifies the
-    JSON shape and parse_segmentation validates defensively.
+    The detection call asks for boxes, labels, and one-sentence descriptions
+    with a response schema (Gemini supplies no masks here, so structured output
+    is safe); parse_detection still validates defensively.
     """
 
     def test_depth_schema_shape(self):
@@ -47,82 +48,76 @@ class TestSchemas:
         assert DEPTH_SCHEMA["properties"]["order"]["type"] == "ARRAY"
         assert DEPTH_SCHEMA["required"] == ["order"]
 
-
-class TestStripDataUrl:
-    """strip_data_url returns prefix-free base64 or None."""
-
-    def test_plain_base64_passthrough(self):
-        assert strip_data_url("iVBORw0K") == "iVBORw0K"
-
-    def test_strips_data_url_prefix(self):
-        assert strip_data_url("data:image/png;base64,iVBORw0K") == "iVBORw0K"
-
-    def test_strips_arbitrary_image_mime(self):
-        assert strip_data_url("data:image/webp;base64,QUJD") == "QUJD"
-
-    def test_none_for_non_string(self):
-        assert strip_data_url(None) is None
-        assert strip_data_url(123) is None
-
-    def test_none_for_empty(self):
-        assert strip_data_url("") is None
-        assert strip_data_url("   ") is None
-
-    def test_none_for_prefix_without_comma(self):
-        assert strip_data_url("data:image/png;base64") is None
+    def test_detection_schema_shape(self):
+        assert DETECTION_SCHEMA["type"] == "ARRAY"
+        item = DETECTION_SCHEMA["items"]
+        assert item["type"] == "OBJECT"
+        assert item["properties"]["box_2d"]["type"] == "ARRAY"
+        assert item["properties"]["box_2d"]["items"]["type"] == "INTEGER"
+        assert item["properties"]["label"]["type"] == "STRING"
+        assert item["properties"]["description"]["type"] == "STRING"
+        assert item["required"] == ["box_2d", "label", "description"]
 
 
-class TestSegmentationPrompt:
-    """The segmentation request prompt names the box grid, label, mask, and cap."""
+class TestDetectionPrompt:
+    """The detection request prompt names the box grid, label, description, cap."""
 
-    def test_mentions_grid_label_mask_and_cap(self):
-        prompt = segmentation_prompt(20)
+    def test_mentions_grid_label_description_and_cap(self):
+        prompt = detection_prompt(20)
         assert "box_2d" in prompt
         assert "0-1000" in prompt
-        assert "mask" in prompt.lower()
+        assert "label" in prompt.lower()
+        assert "description" in prompt.lower()
         assert "at most 20" in prompt
 
 
-class TestParseSegmentation:
-    """parse_segmentation normalizes, clamps, drops degenerate, and caps."""
+class TestParseDetection:
+    """parse_detection normalizes, clamps, drops degenerate, captions, and caps."""
 
     def test_single_object(self):
-        payload = '[{"box_2d":[100,200,500,600],"label":"red car","mask":"QUJD"}]'
-        objects = parse_segmentation(payload, 20)
+        payload = ('[{"box_2d":[100,200,500,600],"label":"red car",'
+                   '"description":"a red car parked on the street"}]')
+        objects = parse_detection(payload, 20)
         assert len(objects) == 1
         obj = objects[0]
         assert obj["name"] == "red car"
         assert obj["group"] == "red car"
-        assert obj["mask"] == "QUJD"
+        assert obj["mask"] is None
+        assert obj["caption"] == "a red car parked on the street"
         assert obj["box"]["x"] == pytest.approx(0.2)
         assert obj["box"]["y"] == pytest.approx(0.1)
         assert obj["box"]["w"] == pytest.approx(0.4)
         assert obj["box"]["h"] == pytest.approx(0.4)
 
-    def test_mask_data_url_is_stripped(self):
-        payload = '[{"box_2d":[0,0,400,400],"label":"x","mask":"data:image/png;base64,QUJD"}]'
-        assert parse_segmentation(payload, 20)[0]["mask"] == "QUJD"
+    def test_mask_is_always_none(self):
+        payload = '[{"box_2d":[0,0,400,400],"label":"x","description":"thing"}]'
+        assert parse_detection(payload, 20)[0]["mask"] is None
 
     def test_markdown_fenced_json_is_unwrapped(self):
-        # Without a response schema the model may fence its JSON.
         payload = ('```json\n'
-                   '[{"box_2d":[100,200,500,600],"label":"red car","mask":"QUJD"}]\n'
+                   '[{"box_2d":[100,200,500,600],"label":"red car",'
+                   '"description":"a red car"}]\n'
                    '```')
-        objects = parse_segmentation(payload, 20)
+        objects = parse_detection(payload, 20)
         assert len(objects) == 1
         assert objects[0]["name"] == "red car"
 
-    def test_missing_mask_is_none(self):
+    def test_missing_description_is_blank_caption(self):
         payload = '[{"box_2d":[0,0,400,400],"label":"x"}]'
-        assert parse_segmentation(payload, 20)[0]["mask"] is None
+        assert parse_detection(payload, 20)[0]["caption"] == ""
 
-    def test_nonstring_mask_is_none(self):
-        payload = '[{"box_2d":[0,0,400,400],"label":"x","mask":7}]'
-        assert parse_segmentation(payload, 20)[0]["mask"] is None
+    def test_nonstring_description_is_blank_caption(self):
+        payload = '[{"box_2d":[0,0,400,400],"label":"x","description":7}]'
+        assert parse_detection(payload, 20)[0]["caption"] == ""
+
+    def test_caption_is_stripped(self):
+        payload = ('[{"box_2d":[0,0,400,400],"label":"x",'
+                   '"description":"  a cat  "}]')
+        assert parse_detection(payload, 20)[0]["caption"] == "a cat"
 
     def test_clamp_and_swap(self):
-        payload = '[{"box_2d":[-50,1100,2000,-10],"label":"thing"}]'
-        for obj in parse_segmentation(payload, 20):
+        payload = '[{"box_2d":[-50,1100,2000,-10],"label":"thing","description":"d"}]'
+        for obj in parse_detection(payload, 20):
             box = obj["box"]
             for key in ("x", "y", "w", "h"):
                 assert 0.0 <= box[key] <= 1.0
@@ -130,37 +125,40 @@ class TestParseSegmentation:
             assert box["y"] + box["h"] <= 1.0 + 1e-9
 
     def test_drop_degenerate_height(self):
-        payload = '[{"box_2d":[100,100,101,800],"label":"sliver"}]'
-        assert parse_segmentation(payload, 20) == []
+        payload = '[{"box_2d":[100,100,101,800],"label":"sliver","description":"d"}]'
+        assert parse_detection(payload, 20) == []
 
     def test_drop_zero_width(self):
-        payload = '[{"box_2d":[100,300,500,300],"label":"line"}]'
-        assert parse_segmentation(payload, 20) == []
+        payload = '[{"box_2d":[100,300,500,300],"label":"line","description":"d"}]'
+        assert parse_detection(payload, 20) == []
 
     def test_max_objects_cap(self):
-        boxes = [{"box_2d": [0, 0, 500, 500], "label": f"o{i}"} for i in range(5)]
-        assert len(parse_segmentation(json.dumps(boxes), 3)) == 3
+        boxes = [{"box_2d": [0, 0, 500, 500], "label": f"o{i}", "description": "d"}
+                 for i in range(5)]
+        assert len(parse_detection(json.dumps(boxes), 3)) == 3
 
     def test_empty_list(self):
-        assert parse_segmentation("[]", 20) == []
+        assert parse_detection("[]", 20) == []
 
     def test_malformed_json_returns_empty(self):
-        assert parse_segmentation("not json", 20) == []
+        assert parse_detection("not json", 20) == []
 
     def test_non_list_returns_empty(self):
-        assert parse_segmentation('{"box_2d":[0,0,500,500]}', 20) == []
+        assert parse_detection('{"box_2d":[0,0,500,500]}', 20) == []
 
     def test_missing_label_is_blank(self):
-        payload = '[{"box_2d":[100,200,500,600]},{"box_2d":[0,0,400,400],"label":7}]'
-        objects = parse_segmentation(payload, 20)
+        payload = ('[{"box_2d":[100,200,500,600]},'
+                   '{"box_2d":[0,0,400,400],"label":7}]')
+        objects = parse_detection(payload, 20)
         assert all(obj["name"] == "" and obj["group"] == "" for obj in objects)
 
     def test_box_round_trips_through_parse_regions(self):
         from utils.regional_prompt import parse_regions
 
-        payload = '[{"box_2d":[100,200,500,600],"label":"cat","mask":"QUJD"}]'
-        obj = parse_segmentation(payload, 20)[0]
-        region = {"kind": "object", "desc": obj["name"], **obj["box"]}
+        payload = ('[{"box_2d":[100,200,500,600],"label":"cat",'
+                   '"description":"a cat"}]')
+        obj = parse_detection(payload, 20)[0]
+        region = {"kind": "object", "desc": obj["caption"], **obj["box"]}
         parsed = parse_regions(json.dumps([region]))
         assert len(parsed) == 1
         for key in ("x", "y", "w", "h"):
@@ -297,6 +295,7 @@ class TestFlorenceToObjects:
         assert obj["name"] == "red car"
         assert obj["group"] == "red car"
         assert obj["mask"] is None
+        assert obj["caption"] == ""
         assert obj["box"]["x"] == pytest.approx(0.1)
         assert obj["box"]["y"] == pytest.approx(0.2)
         assert obj["box"]["w"] == pytest.approx(0.4)
@@ -405,10 +404,10 @@ class TestDepthRanks:
 
 
 class TestDefaultEngine:
-    """The default engine is the local pipeline; Gemini stays opt-in per scan."""
+    """The default engine is Gemini-first; the local pipeline stays opt-in."""
 
-    def test_default_engine_is_local(self):
-        assert DEFAULT_ENGINE is local_scan
+    def test_default_engine_is_gemini(self):
+        assert DEFAULT_ENGINE is gemini_scan
 
 
 class TestPixelBoxPrompts:

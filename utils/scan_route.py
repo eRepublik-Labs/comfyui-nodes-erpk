@@ -12,9 +12,10 @@ SCAN_MAX_BODY_BYTES = 24 * 1024 * 1024
 
 # Engine name -> scan_engine coroutine attribute. The attribute is resolved at
 # request time (not imported) so this module loads even before the local engine
-# exists. "local" is the default; Shift-click in the editor selects "gemini".
+# exists. "gemini" is the default; "local" stays reachable for the local
+# Florence/Depth-Anything pipeline.
 SCAN_ENGINES = {"local": "local_scan", "gemini": "gemini_scan"}
-DEFAULT_SCAN_ENGINE = "local"
+DEFAULT_SCAN_ENGINE = "gemini"
 
 
 def clamp_max_objects(value):
@@ -91,6 +92,21 @@ async def handle_scan(request):
         return web.json_response({"error": str(e)}, status=500)
 
 
+async def handle_scan_models(request):
+    """Return the selectable Gemini scan models and the default as JSON."""
+    from aiohttp import web
+
+    # GeminiClient imports lazily (genai-free until ComfyUI runtime), mirroring
+    # the engine: the model list is the editor's source of truth for the picker.
+    from ..gemini.gemini_api.client import GeminiClient
+
+    return web.json_response({
+        "models": list(GeminiClient.MODELS),
+        "default": GeminiClient.DEFAULT_MODEL,
+    })
+
+
 def register(server):
-    """Attach the scan route to the PromptServer's aiohttp route table."""
+    """Attach the scan routes to the PromptServer's aiohttp route table."""
     server.routes.post("/erpk/scan")(handle_scan)
+    server.routes.get("/erpk/scan/models")(handle_scan_models)
