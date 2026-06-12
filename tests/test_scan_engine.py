@@ -17,7 +17,6 @@ import pytest
 from utils.scan_engine import (
     DEPTH_SCHEMA,
     MIN_REGION_EXTENT as ENGINE_MIN_REGION_EXTENT,
-    SEGMENTATION_SCHEMA,
     apply_depth_ranks,
     depth_prompt,
     parse_depth_order,
@@ -31,14 +30,12 @@ from utils.regional_prompt import MIN_REGION_EXTENT
 
 
 class TestSchemas:
-    """The structured-output schemas match the segmentation/depth contract."""
+    """The structured-output schema matches the depth-ranking contract.
 
-    def test_segmentation_schema_shape(self):
-        assert SEGMENTATION_SCHEMA["type"] == "ARRAY"
-        props = SEGMENTATION_SCHEMA["items"]["properties"]
-        assert set(props) == {"box_2d", "label", "mask"}
-        # mask is tolerated-missing so models that omit it still validate.
-        assert SEGMENTATION_SCHEMA["items"]["required"] == ["box_2d", "label"]
+    The segmentation call deliberately has NO response schema: structured
+    output suppresses Gemini's mask generation, so the prompt specifies the
+    JSON shape and parse_segmentation validates defensively.
+    """
 
     def test_depth_schema_shape(self):
         assert DEPTH_SCHEMA["type"] == "OBJECT"
@@ -100,6 +97,15 @@ class TestParseSegmentation:
     def test_mask_data_url_is_stripped(self):
         payload = '[{"box_2d":[0,0,400,400],"label":"x","mask":"data:image/png;base64,QUJD"}]'
         assert parse_segmentation(payload, 20)[0]["mask"] == "QUJD"
+
+    def test_markdown_fenced_json_is_unwrapped(self):
+        # Without a response schema the model may fence its JSON.
+        payload = ('```json\n'
+                   '[{"box_2d":[100,200,500,600],"label":"red car","mask":"QUJD"}]\n'
+                   '```')
+        objects = parse_segmentation(payload, 20)
+        assert len(objects) == 1
+        assert objects[0]["name"] == "red car"
 
     def test_missing_mask_is_none(self):
         payload = '[{"box_2d":[0,0,400,400],"label":"x"}]'

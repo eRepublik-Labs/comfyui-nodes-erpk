@@ -13,22 +13,6 @@ MIN_REGION_EXTENT = 0.005
 DEFAULT_MAX_OBJECTS = 20
 MAX_OBJECTS_CEILING = 100
 
-# Structured-output schema for segmentation: each entry carries box_2d on the
-# 0-1000 grid, a label, and a base64 PNG mask. "mask" is intentionally NOT
-# required so a model that omits it still validates (rectangle fallback later).
-SEGMENTATION_SCHEMA = {
-    "type": "ARRAY",
-    "items": {
-        "type": "OBJECT",
-        "properties": {
-            "box_2d": {"type": "ARRAY", "items": {"type": "INTEGER"}},
-            "label": {"type": "STRING"},
-            "mask": {"type": "STRING"},
-        },
-        "required": ["box_2d", "label"],
-    },
-}
-
 # Structured-output schema for depth ranking: the found labels reordered
 # background-to-foreground.
 DEPTH_SCHEMA = {
@@ -79,6 +63,13 @@ def parse_segmentation(text, max_objects):
     {name, box:{x,y,w,h}, mask:str|None, group}; depth_rank is added later.
     Malformed or non-list JSON yields [] (the scan must never fail on parse).
     """
+    if isinstance(text, str):
+        stripped = text.strip()
+        if stripped.startswith("```"):
+            stripped = stripped.split("\n", 1)[-1]
+            if stripped.rstrip().endswith("```"):
+                stripped = stripped.rstrip()[:-3]
+            text = stripped
     try:
         raw = json.loads(text)
     except (TypeError, ValueError):
@@ -192,19 +183,27 @@ async def gemini_scan(image, max_objects, model):
     model_to_use = resolve_model(model, GeminiClient.MODELS,
                                  GeminiClient.DEFAULT_MODEL)
 
+    # No response_schema here: forcing structured output suppresses Gemini's
+    # segmentation-mask generation (masks come back omitted or the result is
+    # empty). The prompt specifies the JSON shape; parsing is defensive.
     segmentation = await client.generate_content(
         segmentation_prompt(max_objects),
         images=[image],
         temperature=0.0,
         model=model_to_use,
         response_mime_type="application/json",
-        response_schema=SEGMENTATION_SCHEMA,
     )
     if segmentation.get("blocked"):
         raise RuntimeError(
             segmentation.get("error") or "Gemini segmentation request was blocked"
         )
-    objects = parse_segmentation(segmentation.get("text", ""), max_objects)
+    raw_text = segmentation.get("text", "")
+    objects = parse_segmentation(raw_text, max_objects)
+    masked = sum(1 for obj in objects if obj.get("mask"))
+    print(f"[ERPK scan] {len(objects)} objects, {masked} with masks "
+          f"(response {len(raw_text)} chars)")
+    if not objects or not masked:
+        print(f"[ERPK scan] raw response head: {raw_text[:400]!r}")
     if not objects:
         return []
 
