@@ -62,6 +62,8 @@ With an image connected, a ✦ button floats in the canvas's upper-left. Pressin
 
 Hovering the canvas glows the mask of the object under the cursor, and clicking selects by mask: a click in the empty part of a scanned region's box passes through to whatever is actually under the pointer, so overlapping objects stay individually selectable. Hand-drawn regions keep plain rectangle behavior, and Alt-click still cycles the stack explicitly. The Region Mask node picks one region's mask out of the `masks` batch by canvas number for inpainting chains.
 
+Scanned objects can be repositioned: drag or scale a scanned region and its masked cut-out follows, with a dashed ghost marking the origin. The prompt then tells the model to move the object there and reconstruct the vacated background — the canvas previews the intent, and the edit model performs the actual move at generation time. Moving a region back to its origin restores the plain placement line.
+
 ## Notes
 
 - The prompt calls regions invisible "placement areas" and forbids drawing them; detection vocabulary makes some models paint the boxes into the image. If a generation still shows rectangles, re-queue with a different seed.

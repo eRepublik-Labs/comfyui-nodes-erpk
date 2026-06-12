@@ -267,6 +267,7 @@ String manipulation and general utility nodes.
 - Object scan: with an image connected, a ✦ button in the canvas corner runs a server-side Gemini scan that turns the prominent objects into real editable regions - labels become descriptions, same-class objects share a color family, the model ranks the scene back-to-front for depth, and segmentation masks render as a toggleable overlay
 - A `masks` output emits a frame-sized MASK batch (one per region, in region order): scanned regions use their segmentation, hand-drawn regions get filled rectangles - ready for inpainting chains; the **Region Mask** node picks a single region's mask out of the batch by canvas number
 - Mask-aware selection: hovering the canvas glows the object's mask under the cursor, and clicks pass through the empty corners of scanned regions to whatever is really under the pointer - overlapping objects stay individually clickable
+- Object move/scale: drag a scanned object and its masked cut-out follows live with a dashed ghost at the origin; the prompt instructs the edit model to relocate the object and reconstruct the background it leaves behind
 - The prompt instructs the model to treat placement areas as invisible guides so boxes are not rendered into the image
 
 **Concatenate Strings features:**

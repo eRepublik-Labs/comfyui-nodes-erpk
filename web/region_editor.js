@@ -228,10 +228,24 @@ function parseRegions(text) {
             desc: typeof entry.desc === "string" ? entry.desc : "",
             text: typeof entry.text === "string" ? entry.text : "",
         };
-        // Scan-produced optionals: a box-relative base64 PNG mask and a class
-        // label. Absent for hand-drawn regions, which stay backward compatible.
+        // Scan-produced optionals: a box-relative base64 PNG mask, a class
+        // label, and the origin box. Absent for hand-drawn regions, which stay
+        // backward compatible.
         if (typeof entry.mask === "string" && entry.mask) region.mask = entry.mask;
         if (typeof entry.group === "string" && entry.group) region.group = entry.group;
+        if (entry.src && typeof entry.src === "object") {
+            const sn = [entry.src.x, entry.src.y, entry.src.w, entry.src.h]
+                .map((v) => Number(v ?? NaN));
+            if (sn.every(Number.isFinite)) {
+                const sx = clamp(sn[0], 0, 1);
+                const sy = clamp(sn[1], 0, 1);
+                const sw = clamp(sn[2], 0, 1 - sx);
+                const sh = clamp(sn[3], 0, 1 - sy);
+                if (sw > 0.005 && sh > 0.005) {
+                    region.src = { x: sx, y: sy, w: sw, h: sh };
+                }
+            }
+        }
         regions.push(region);
     }
     return regions;
@@ -252,6 +266,10 @@ function serializeRegions(boxes) {
         // keeps hand-drawn regions' serialized payload compact.
         if (b.mask) out.mask = b.mask;
         if (b.group) out.group = b.group;
+        if (b.src) {
+            out.src = { x: round4(b.src.x), y: round4(b.src.y),
+                        w: round4(b.src.w), h: round4(b.src.h) };
+        }
         return out;
     }));
 }
@@ -695,6 +713,23 @@ function createRegionEditor(node) {
         const h = box.h * state.cssH;
         const color = colorForRegion(box, index);
         const isSelected = state.selection.has(box);
+
+        // A moved scanned region previews its relocation: the masked cut-out
+        // from the origin follows the box, and a dashed ghost marks where the
+        // object still sits in the source image.
+        if (box.mask && regionMoved(box)) {
+            const cutout = cutoutFor(box);
+            if (cutout) ctx.drawImage(cutout, x, y, w, h);
+            ctx.save();
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = color + "66";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(
+                box.src.x * state.cssW, box.src.y * state.cssH,
+                box.src.w * state.cssW, box.src.h * state.cssH,
+            );
+            ctx.restore();
+        }
 
         ctx.fillStyle = color + (isSelected ? "2e" : "17");
         ctx.fillRect(x, y, w, h);
@@ -1150,6 +1185,47 @@ function createRegionEditor(node) {
     }
 
     // Topmost box wins.
+    // True when the region's geometry has left its scan origin box.
+    function regionMoved(box) {
+        if (!box.src) return false;
+        return ["x", "y", "w", "h"].some(
+            (k) => Math.abs(box.src[k] - box[k]) > 0.005,
+        );
+    }
+
+    // The masked object pixels cropped from the source image at the origin
+    // box, for the drag preview of a moved region. Built once per region.
+    function cutoutFor(box) {
+        if (box._erpkCutout) return box._erpkCutout;
+        const img = upstreamImage("image");
+        if (!img || !img.complete || !img.naturalWidth) return null;
+        let maskImg = box._erpkMaskImg;
+        if (!maskImg) {
+            maskImg = new Image();
+            maskImg.src = "data:image/png;base64," + box.mask;
+            box._erpkMaskImg = maskImg;
+        }
+        if (!maskImg.complete || !maskImg.naturalWidth) {
+            maskImg.addEventListener("load", () => render(), { once: true });
+            return null;
+        }
+        const pw = Math.max(1, Math.round(box.src.w * img.naturalWidth));
+        const ph = Math.max(1, Math.round(box.src.h * img.naturalHeight));
+        const off = document.createElement("canvas");
+        off.width = pw;
+        off.height = ph;
+        const offCtx = off.getContext("2d");
+        offCtx.drawImage(
+            img,
+            box.src.x * img.naturalWidth, box.src.y * img.naturalHeight,
+            pw, ph, 0, 0, pw, ph,
+        );
+        offCtx.globalCompositeOperation = "destination-in";
+        offCtx.drawImage(maskImg, 0, 0, pw, ph);
+        box._erpkCutout = off;
+        return off;
+    }
+
     // True when the region's segmentation covers the point, false when the
     // point falls in the empty part of the mask, null when there is no usable
     // mask. Pixel data decodes once per region into a cached ImageData.
@@ -1949,6 +2025,10 @@ function createRegionEditor(node) {
             };
             if (typeof obj.mask === "string" && obj.mask) region.mask = obj.mask;
             if (typeof obj.group === "string" && obj.group) region.group = obj.group;
+            // Origin box: where the object's pixels live in the source image.
+            // Moving the region away from it turns the prompt into a
+            // relocation and drives the cut-out drag preview.
+            region.src = { x, y, w, h };
             added.push(region);
         }
         if (!added.length) {
