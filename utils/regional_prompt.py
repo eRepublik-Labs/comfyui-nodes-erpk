@@ -193,6 +193,14 @@ def _element_line(region):
     return f'{region["desc"] or "An element"}: {geometry}'
 
 
+def _boxes_overlap(a, b):
+    """Fraction of box b's area that box a covers (normalized region dicts)."""
+    ix = max(0.0, min(a["x"] + a["w"], b["x"] + b["w"]) - max(a["x"], b["x"]))
+    iy = max(0.0, min(a["y"] + a["h"], b["y"] + b["h"]) - max(a["y"], b["y"]))
+    area = b["w"] * b["h"]
+    return (ix * iy) / area if area > 0 else 0.0
+
+
 def _move_line(region):
     # Hybrid phrasing, same doctrine as placement lines: the verbal
     # placement drives the model, the coordinates pin it.
@@ -202,6 +210,27 @@ def _move_line(region):
     placement = placement_phrase(region["x"], region["y"],
                                  region["w"], region["h"])
     subject = region["desc"] or "The element"
+    # When the destination covers the origin, the paste hides the old copy:
+    # there is no duplicate to remove, and asking for one invites cutting a
+    # hole through the pasted object.
+    if _boxes_overlap(region, src) > 0.9:
+        return (
+            f"{subject}: blend the one {placement} (box_2d = {target}) "
+            f"naturally into the scene — match lighting, shadows, and "
+            f"perspective."
+        )
+    # When the destination overlaps the origin, "remove the duplicate at
+    # [src]" would also remove the kept copy — the instruction is
+    # self-contradicting and models resolve it by doing nothing. Erasing
+    # only what sticks out beyond the kept copy is geometrically truthful.
+    if _boxes_overlap(src, region) > 0.25:
+        return (
+            f"{subject}: the old, larger copy overlaps the kept one — "
+            f"erase every part of it outside box_2d = {target} and fill "
+            f"those areas with the scene's background. Keep the copy "
+            f"{placement} (box_2d = {target}), blending it naturally into "
+            f"the scene — match lighting, shadows, and perspective."
+        )
     return (
         f"{subject}: remove the duplicate at box_2d = {origin} and fill "
         f"that area with the scene's background. Keep the one {placement} "

@@ -905,3 +905,38 @@ class TestCompositeMovedRegions:
         image = self._image(torch)
         composite_moved_regions(image, [self._moved()])
         assert float(image[0, 12, 12, 0]) == 0.0
+
+
+class TestOverlappingMoves:
+    """A destination overlapping its origin needs erase-outside phrasing:
+    "remove the duplicate at [src]" would also remove the kept copy."""
+
+    @staticmethod
+    def _overlapping_move():
+        # Destination sits inside the origin, like shrinking a subject in place.
+        return {"x": 0.35, "y": 0.35, "w": 0.2, "h": 0.2, "kind": "object",
+                "desc": "a safari guide", "text": "",
+                "src": {"x": 0.2, "y": 0.1, "w": 0.5, "h": 0.8}}
+
+    def test_overlapping_move_erases_outside_the_kept_copy(self):
+        prompt = build_prompt("", 1000, 1000, [self._overlapping_move()])
+        assert "erase every part of it outside box_2d = [350, 350, 550, 550]" in prompt
+        assert "remove the duplicate at" not in prompt
+
+    def test_disjoint_move_keeps_remove_duplicate_phrasing(self):
+        region = self._overlapping_move()
+        region["src"] = {"x": 0.0, "y": 0.0, "w": 0.2, "h": 0.2}
+        prompt = build_prompt("", 1000, 1000, [region])
+        assert "remove the duplicate at box_2d = [0, 0, 200, 200]" in prompt
+        assert "erase every part" not in prompt
+
+    def test_growing_in_place_asks_only_for_blending(self):
+        # Destination covers the origin: the paste hides the old copy, so
+        # there is no duplicate to remove.
+        region = {"x": 0.1, "y": 0.1, "w": 0.6, "h": 0.6, "kind": "object",
+                  "desc": "a safari guide", "text": "",
+                  "src": {"x": 0.3, "y": 0.3, "w": 0.2, "h": 0.2}}
+        prompt = build_prompt("", 1000, 1000, [region])
+        assert "blend" in prompt.lower()
+        assert "remove the duplicate" not in prompt
+        assert "erase every part" not in prompt
