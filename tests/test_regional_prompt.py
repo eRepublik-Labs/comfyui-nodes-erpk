@@ -17,6 +17,7 @@ from utils.regional_prompt import (
     parse_regions,
     placement_phrase,
     region_has_stored_mask,
+    region_moved,
     regions_to_pixel_bboxes,
 )
 
@@ -731,3 +732,74 @@ class TestWiredRegions:
         )
         assert "a barking dog" in out.args[0]
         assert len(out.args[1][0]) == 1
+
+
+class TestMovedRegions:
+    """Scanned regions carry their origin box; moving one switches the prompt
+    line to relocation language and raises the reposition header."""
+
+    @staticmethod
+    def _moved_region():
+        return {"x": 0.6, "y": 0.6, "w": 0.2, "h": 0.2, "kind": "object",
+                "desc": "a hippo", "text": "",
+                "src": {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}}
+
+    def test_parse_preserves_valid_src(self):
+        regions = parse_regions(json.dumps([self._moved_region()]))
+        assert regions[0]["src"] == {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}
+
+    def test_parse_clamps_src(self):
+        entry = self._moved_region()
+        entry["src"] = {"x": -0.5, "y": 0.0, "w": 2.0, "h": 0.5}
+        regions = parse_regions(json.dumps([entry]))
+        assert regions[0]["src"] == {"x": 0.0, "y": 0.0, "w": 1.0, "h": 0.5}
+
+    def test_parse_drops_malformed_src_keeps_region(self):
+        for bad in ("nope", {"x": 0.1}, {"x": "a", "y": 0, "w": 1, "h": 1},
+                    {"x": 0.1, "y": 0.1, "w": 0.001, "h": 0.001}):
+            entry = self._moved_region()
+            entry["src"] = bad
+            regions = parse_regions(json.dumps([entry]))
+            assert len(regions) == 1
+            assert "src" not in regions[0]
+
+    def test_region_moved_true_when_geometry_differs(self):
+        assert region_moved(self._moved_region())
+
+    def test_region_moved_false_in_place(self):
+        region = self._moved_region()
+        region["src"] = {"x": 0.6, "y": 0.6, "w": 0.2, "h": 0.2}
+        assert not region_moved(region)
+
+    def test_region_moved_false_without_src(self):
+        assert not region_moved(
+            {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
+             "kind": "object", "desc": "", "text": ""})
+
+    def test_moved_line_relocates_from_origin(self):
+        prompt = build_prompt("", 1000, 1000, [self._moved_region()])
+        assert "a hippo, currently at box_2d = [100, 100, 300, 300]" in prompt
+        assert "move it to:" in prompt
+        assert "box_2d = [600, 600, 800, 800]" in prompt
+
+    def test_moved_header_present_only_with_moved_regions(self):
+        moved = build_prompt("", 1000, 1000, [self._moved_region()])
+        assert "reconstruct the background" in moved.lower()
+        still = self._moved_region()
+        still["src"] = dict(x=still["x"], y=still["y"], w=still["w"], h=still["h"])
+        unmoved = build_prompt("", 1000, 1000, [still])
+        assert "reconstruct the background" not in unmoved.lower()
+
+    def test_unmoved_scanned_region_keeps_plain_line(self):
+        still = self._moved_region()
+        still["src"] = dict(x=still["x"], y=still["y"], w=still["w"], h=still["h"])
+        prompt = build_prompt("", 1000, 1000, [still])
+        assert "move it to" not in prompt
+        assert "a hippo: " in prompt
+
+    def test_ref_image_wins_over_move_phrasing(self):
+        region = self._moved_region()
+        region["ref_image"] = 2
+        prompt = build_prompt("", 1000, 1000, [region])
+        assert "taken from image 2" in prompt
+        assert "move it to" not in prompt

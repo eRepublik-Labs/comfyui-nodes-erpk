@@ -33,6 +33,12 @@ REFS_HEADER = (
     "adapting it to the scene's lighting and perspective. Keep everything "
     "else in image 1 unchanged."
 )
+MOVED_HEADER = (
+    "Some elements are being repositioned: their lines give the element's "
+    "current location and the placement area to move it to. Move each one, "
+    "scaling it to fit its new area, and reconstruct the background it "
+    "leaves behind."
+)
 LAYOUT_FOOTER = (
     "Every element must stay fully inside its placement area and fill most of it. "
     "Do not add other prominent subjects. The placement areas are invisible "
@@ -91,8 +97,42 @@ def parse_regions(regions_json):
         group = entry.get("group")
         if isinstance(group, str) and group:
             region["group"] = group
+        src = _parse_src_box(entry.get("src"))
+        if src is not None:
+            region["src"] = src
         regions.append(region)
     return regions
+
+
+def _parse_src_box(value):
+    """Validate and clamp a region's origin box; None when unusable."""
+    if not isinstance(value, dict):
+        return None
+    try:
+        x = float(value.get("x"))
+        y = float(value.get("y"))
+        w = float(value.get("w"))
+        h = float(value.get("h"))
+    except (TypeError, ValueError):
+        return None
+    if not all(math.isfinite(v) for v in (x, y, w, h)):
+        return None
+    x = _clamp(x, 0.0, 1.0)
+    y = _clamp(y, 0.0, 1.0)
+    w = _clamp(w, 0.0, 1.0 - x)
+    h = _clamp(h, 0.0, 1.0 - y)
+    if w <= MIN_REGION_EXTENT or h <= MIN_REGION_EXTENT:
+        return None
+    return {"x": x, "y": y, "w": w, "h": h}
+
+
+def region_moved(region):
+    """True when a region carries an origin box it has moved away from."""
+    src = region.get("src")
+    if not isinstance(src, dict):
+        return False
+    return any(abs(src[k] - region[k]) > MIN_REGION_EXTENT
+               for k in ("x", "y", "w", "h"))
 
 
 def box_2d(x, y, w, h):
@@ -141,6 +181,11 @@ def _element_line(region):
             else f"The item shown in image {ref}, reproduced exactly"
         )
         return f"{subject}: {geometry}"
+    if region_moved(region):
+        src = region["src"]
+        origin = box_2d(src["x"], src["y"], src["w"], src["h"])
+        subject = region["desc"] or "An element"
+        return f"{subject}, currently at box_2d = {origin} — move it to: {geometry}"
     return f'{region["desc"] or "An element"}: {geometry}'
 
 
@@ -158,6 +203,8 @@ def build_prompt(prompt, width, height, regions):
         header = LAYOUT_HEADER
         if any(region.get("ref_image") for region in regions):
             header += " " + REFS_HEADER
+        if any(region_moved(r) and not r.get("ref_image") for r in regions):
+            header += " " + MOVED_HEADER
         lines.append(header)
         for index, region in enumerate(regions, start=1):
             lines.append(f"{index}. {_element_line(region)}")
