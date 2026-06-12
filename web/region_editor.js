@@ -607,10 +607,6 @@ function createRegionEditor(node) {
     textInput.style.flex = "1 1 0";
     textInput.style.minWidth = "0";
 
-    const plugBtn = makeStripButton("⌁");
-    plugBtn.dataset.tip = "Expose this region's description as an input";
-    const refBtn = makeStripButton("▣");
-    refBtn.dataset.tip = "Attach a reference image input to this region";
     const backBtn = makeStripButton("▼");
     backBtn.dataset.tip = "Send back — one layer toward the background ( [ )";
     const frontBtn = makeStripButton("▲");
@@ -619,8 +615,6 @@ function createRegionEditor(node) {
     inspector.appendChild(descInput);
     inspector.appendChild(kindSelect);
     inspector.appendChild(textInput);
-    inspector.appendChild(plugBtn);
-    inspector.appendChild(refBtn);
     inspector.appendChild(backBtn);
     inspector.appendChild(frontBtn);
     root.insertBefore(inspector, status);
@@ -1231,29 +1225,39 @@ function createRegionEditor(node) {
     // the Gemini brand colors glides over a softly dimmed frame, additively
     // blended so it glows instead of veiling.
     function drawScanSweep() {
+        // A section scan sweeps only its host region; a full scan, the frame.
+        const b = state.scanBounds;
+        const rx = b ? b.x * state.cssW : 0;
+        const ry = b ? b.y * state.cssH : 0;
+        const rw = b ? b.w * state.cssW : state.cssW;
+        const rh = b ? b.h * state.cssH : state.cssH;
         const phase = (performance.now() % 2400) / 2400;
         // Cosine ping-pong: glides to the bottom and back with soft turns.
         const t = (1 - Math.cos(phase * 2 * Math.PI)) / 2;
-        const y = t * (state.cssH + 120) - 60;
-        ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
-        ctx.fillRect(0, 0, state.cssW, state.cssH);
+        const y = ry + t * rh;
+        const half = Math.min(80, rh * 0.45);
         ctx.save();
+        ctx.beginPath();
+        ctx.rect(rx, ry, rw, rh);
+        ctx.clip();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+        ctx.fillRect(rx, ry, rw, rh);
         ctx.globalCompositeOperation = "lighter";
-        const band = ctx.createLinearGradient(0, y - 80, 0, y + 80);
+        const band = ctx.createLinearGradient(0, y - half, 0, y + half);
         band.addColorStop(0, "rgba(66, 133, 244, 0)");
         band.addColorStop(0.35, "rgba(66, 133, 244, 0.16)");
         band.addColorStop(0.5, "rgba(155, 114, 203, 0.22)");
         band.addColorStop(0.65, "rgba(217, 101, 112, 0.16)");
         band.addColorStop(1, "rgba(217, 101, 112, 0)");
         ctx.fillStyle = band;
-        ctx.fillRect(0, y - 80, state.cssW, 160);
+        ctx.fillRect(rx, y - half, rw, half * 2);
         // Leading edge: a thin line running the Gemini gradient horizontally.
-        const edge = ctx.createLinearGradient(0, 0, state.cssW, 0);
+        const edge = ctx.createLinearGradient(rx, 0, rx + rw, 0);
         edge.addColorStop(0, "rgba(66, 133, 244, 0.75)");
         edge.addColorStop(0.5, "rgba(155, 114, 203, 0.85)");
         edge.addColorStop(1, "rgba(217, 101, 112, 0.75)");
         ctx.fillStyle = edge;
-        ctx.fillRect(0, y - 1, state.cssW, 2);
+        ctx.fillRect(rx, y - 1, rw, 2);
         ctx.restore();
     }
 
@@ -1752,6 +1756,35 @@ function createRegionEditor(node) {
         toggleFamilySocket("ref");
     }
 
+    // Styles a ⌁/▣ socket toggle for the given region: active green when the
+    // socket is exposed or wired, disabled past the socket-family cap.
+    function syncSocketToggle(btn, prefix, box) {
+        const wiredFor = prefix === "desc" ? descWiredFor : refWiredFor;
+        const cap = prefix === "desc" ? REGION_DESC_INPUTS : REGION_REF_INPUTS;
+        const noun = prefix === "desc" ? "description" : "reference image";
+        const index = box ? state.boxes.indexOf(box) : -1;
+        const wired = !!box && wiredFor(box);
+        const wireable = index >= 0 && index < cap;
+        const plugged = wireable
+            && (wired || exposedSocketSet(prefix).has(index + 1));
+        btn.disabled = !wireable || wired;
+        btn.style.opacity = wireable ? "1" : "0.45";
+        btn.classList.toggle("erpk-btn-active", plugged);
+        btn.style.color = plugged
+            ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
+        btn.style.borderColor = plugged
+            ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
+        btn.dataset.tip = wired
+            ? `The ${noun} is wired — disconnect the input to unplug`
+            : plugged
+                ? `Hide this region's ${noun} input`
+                : wireable
+                    ? prefix === "desc"
+                        ? "Expose this region's description as an input"
+                        : "Attach a reference image input to this region"
+                    : `Only regions 1–${cap} can take a ${noun} input`;
+    }
+
     function syncInspector() {
         const box = state.primary;
         const showText = !!box && box.kind === "text";
@@ -1762,41 +1795,6 @@ function createRegionEditor(node) {
         descInput.placeholder = wired
             ? `wired from the desc_${state.boxes.indexOf(box) + 1} input`
             : "description — e.g. a red vintage car";
-        const index = box ? state.boxes.indexOf(box) : -1;
-        const wireable = index >= 0 && index < REGION_DESC_INPUTS;
-        const plugged = wireable && (wired || exposedSocketSet("desc").has(index + 1));
-        plugBtn.disabled = !wireable || wired;
-        plugBtn.style.opacity = wireable ? "1" : "0.45";
-        plugBtn.classList.toggle("erpk-btn-active", plugged);
-        plugBtn.style.color = plugged
-            ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
-        plugBtn.style.borderColor = plugged
-            ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
-        plugBtn.dataset.tip = wired
-            ? "Description is wired — disconnect the input to unplug"
-            : plugged
-                ? "Hide this region's description input"
-                : wireable
-                    ? "Expose this region's description as an input"
-                    : "Only regions 1–10 can take a description input";
-        const refWired = !!box && refWiredFor(box);
-        const refWireable = index >= 0 && index < REGION_REF_INPUTS;
-        const refPlugged = refWireable
-            && (refWired || exposedSocketSet("ref").has(index + 1));
-        refBtn.disabled = !refWireable || refWired;
-        refBtn.style.opacity = refWireable ? "1" : "0.45";
-        refBtn.classList.toggle("erpk-btn-active", refPlugged);
-        refBtn.style.color = refPlugged
-            ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
-        refBtn.style.borderColor = refPlugged
-            ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
-        refBtn.dataset.tip = refWired
-            ? "Reference image is wired — disconnect the input to unplug"
-            : refPlugged
-                ? "Hide this region's reference image input"
-                : refWireable
-                    ? "Attach a reference image input to this region"
-                    : "Only regions 1–10 can take a reference image input";
         if (box === inspected) return;
         inspected = box;
         descInput.value = box ? box.desc : "";
@@ -2867,6 +2865,11 @@ function createRegionEditor(node) {
     let panelDescInput = null;    // prompt (region.desc) textarea
     let panelEyeBtn = null;       // per-region hide/show toggle in the detail
     let panelThumb = null;        // mask thumbnail canvas
+    let panelKindSelect = null;   // object/text selector in the detail
+    let panelTextInput = null;    // literal text field (text regions only)
+    let panelPlugBtn = null;      // desc_N socket toggle in the detail
+    let panelRefBtn = null;       // ref_N socket toggle in the detail
+    let panelScanBtn = null;      // detect-inside-this-region button
 
     // Pointer position in the root's layout pixels; the bounding rect is
     // scaled by the graph zoom, so divide it back out.
@@ -2891,6 +2894,11 @@ function createRegionEditor(node) {
         panelDescInput = null;
         panelEyeBtn = null;
         panelThumb = null;
+        panelKindSelect = null;
+        panelTextInput = null;
+        panelPlugBtn = null;
+        panelRefBtn = null;
+        panelScanBtn = null;
     }
 
     function onDocPointerDown(e) {
@@ -3097,6 +3105,126 @@ function createRegionEditor(node) {
         render();
     }
 
+    function applyPanelText(input) {
+        const box = state.primary;
+        if (!box) return;
+        box.text = input.value;
+        syncWidget();
+        render();
+    }
+
+    function onPanelKindChange() {
+        const box = state.primary;
+        if (!box || !panelKindSelect) return;
+        box.kind = panelKindSelect.value === "text" ? "text" : "object";
+        syncWidget();
+        render();
+        refreshPanelDetail();
+    }
+
+    // Detect objects inside one region: the crop scans like a tiny image and
+    // the results map back through the host box into frame space. Findings
+    // append; the host region is left for the user to keep or delete.
+    async function onSectionScan(host) {
+        if (!host || state.scanning) return;
+        const img = upstreamImage("image");
+        if (!img || !img.complete || !img.naturalWidth) {
+            state.scanError = "No loaded image to scan";
+            render();
+            return;
+        }
+        const frame = { x: host.x, y: host.y, w: host.w, h: host.h };
+        const sw = Math.max(1, Math.round(frame.w * img.naturalWidth));
+        const sh = Math.max(1, Math.round(frame.h * img.naturalHeight));
+        let dataUrl;
+        try {
+            const scale = Math.min(1, SCAN_MAX_EDGE_PX / Math.max(sw, sh));
+            const off = document.createElement("canvas");
+            off.width = Math.max(1, Math.round(sw * scale));
+            off.height = Math.max(1, Math.round(sh * scale));
+            const offCtx = off.getContext("2d");
+            offCtx.fillStyle = "#fff";
+            offCtx.fillRect(0, 0, off.width, off.height);
+            offCtx.drawImage(
+                img,
+                frame.x * img.naturalWidth, frame.y * img.naturalHeight,
+                sw, sh, 0, 0, off.width, off.height,
+            );
+            dataUrl = off.toDataURL("image/jpeg", 0.85);
+        } catch (err) {
+            state.scanError = "Can't read image (cross-origin?)";
+            render();
+            return;
+        }
+        state.scanError = null;
+        state.scanning = true;
+        state.scanBounds = frame;
+        state.scanAbort = new AbortController();
+        scanFxLoop();
+        try {
+            const model = node.properties?.erpkScanModel;
+            const body = { image: dataUrl, max_objects: SCAN_MAX_OBJECTS, engine: "gemini" };
+            if (model) body.model = model;
+            const res = await fetch("/erpk/scan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+                signal: state.scanAbort.signal,
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || json.error) {
+                state.scanError = json.error || `Scan failed (${res.status})`;
+            } else {
+                applySectionResults(json.objects, frame);
+            }
+        } catch (err) {
+            if (err.name !== "AbortError") {
+                state.scanError = `Scan failed: ${err.message}`;
+            }
+        } finally {
+            state.scanning = false;
+            state.scanBounds = null;
+            state.scanAbort = null;
+            render();
+        }
+    }
+
+    // Maps crop-space scan objects back into frame space and appends them.
+    function applySectionResults(objects, frame) {
+        const sorted = (Array.isArray(objects) ? objects.slice() : [])
+            .sort((a, b) => (Number(a?.depth_rank) || 0) - (Number(b?.depth_rank) || 0));
+        const added = [];
+        for (const obj of sorted) {
+            const src = obj?.box;
+            if (!src || typeof src !== "object") continue;
+            const nums = [src.x, src.y, src.w, src.h].map((v) => Number(v ?? 0));
+            if (!nums.every(Number.isFinite)) continue;
+            const x = clamp(frame.x + nums[0] * frame.w, 0, 1);
+            const y = clamp(frame.y + nums[1] * frame.h, 0, 1);
+            const w = clamp(nums[2] * frame.w, 0, 1 - x);
+            const h = clamp(nums[3] * frame.h, 0, 1 - y);
+            if (w <= 0.005 || h <= 0.005) continue;
+            const region = {
+                x, y, w, h,
+                kind: "object",
+                desc: (typeof obj.caption === "string" && obj.caption)
+                    || (typeof obj.name === "string" ? obj.name : ""),
+                text: "",
+            };
+            if (typeof obj.name === "string" && obj.name) region.group = obj.name;
+            if (typeof obj.mask === "string" && obj.mask) region.mask = obj.mask;
+            region.src = { x, y, w, h };
+            added.push(region);
+        }
+        if (!added.length) {
+            state.scanError = "Scan found no objects in the region";
+            return;
+        }
+        state.boxes.push(...added);
+        clearSelection();
+        syncWidget();
+    }
+
     // Per-region visibility: a hidden region skips drawing and hit-testing but
     // still feeds the prompt and mask outputs.
     function toggleRegionHidden(box) {
@@ -3154,6 +3282,23 @@ function createRegionEditor(node) {
             const hidden = !!(box && box.hidden);
             setEyeIcon(panelEyeBtn, hidden);
             panelEyeBtn.dataset.tip = hidden ? "Show region" : "Hide region";
+        }
+        if (panelKindSelect && document.activeElement !== panelKindSelect) {
+            panelKindSelect.value = box?.kind === "text" ? "text" : "object";
+        }
+        if (panelTextInput) {
+            const showText = box?.kind === "text";
+            panelTextInput.style.display = showText ? "" : "none";
+            if (showText && document.activeElement !== panelTextInput) {
+                panelTextInput.value = box.text || "";
+            }
+        }
+        if (panelPlugBtn) syncSocketToggle(panelPlugBtn, "desc", box);
+        if (panelRefBtn) syncSocketToggle(panelRefBtn, "ref", box);
+        if (panelScanBtn) {
+            const ready = !state.scanning && !!upstreamImage("image");
+            panelScanBtn.disabled = !ready;
+            panelScanBtn.style.opacity = ready ? "1" : "0.45";
         }
         drawPanelThumb(box);
     }
@@ -3404,10 +3549,72 @@ function createRegionEditor(node) {
             panelDescInput.addEventListener("input", () => applyPanelDesc(panelDescInput));
             detail.appendChild(panelDescInput);
 
+            panelKindSelect = document.createElement("select");
+            for (const kind of ["object", "text"]) {
+                const option = document.createElement("option");
+                option.value = kind;
+                option.textContent = kind;
+                panelKindSelect.appendChild(option);
+            }
+            panelKindSelect.dataset.tip =
+                "Region kind: an object in the scene, or literal text to render";
+            styleInput(panelKindSelect);
+            panelKindSelect.style.fontSize = "10px";
+            panelKindSelect.style.flex = "0 0 auto";
+            panelKindSelect.addEventListener("change", onPanelKindChange);
+
+            panelTextInput = document.createElement("input");
+            panelTextInput.type = "text";
+            panelTextInput.placeholder = "text to render";
+            panelTextInput.dataset.tip =
+                "Literal text the model should render inside this region";
+            styleInput(panelTextInput);
+            panelTextInput.style.flex = "1 1 auto";
+            panelTextInput.style.minWidth = "0";
+            panelTextInput.style.fontSize = "10px";
+            panelTextInput.addEventListener("input",
+                () => applyPanelText(panelTextInput));
+
+            const kindRow = document.createElement("div");
+            kindRow.style.display = "flex";
+            kindRow.style.alignItems = "center";
+            kindRow.style.gap = "4px";
+            kindRow.appendChild(panelKindSelect);
+            kindRow.appendChild(panelTextInput);
+            detail.appendChild(kindRow);
+
             const actions = document.createElement("div");
             actions.style.display = "flex";
             actions.style.justifyContent = "flex-end";
             actions.style.gap = "5px";
+
+            panelScanBtn = makeStripButton("✦");
+            panelScanBtn.dataset.tip =
+                "Detect objects inside this region only";
+            panelScanBtn.style.fontSize = "11px";
+            panelScanBtn.style.padding = "0 6px";
+            panelScanBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                onSectionScan(state.primary);
+            });
+
+            panelPlugBtn = makeStripButton("⌁");
+            panelPlugBtn.style.fontSize = "11px";
+            panelPlugBtn.style.padding = "0 6px";
+            panelPlugBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                onPlugToggle();
+                refreshPanelDetail();
+            });
+
+            panelRefBtn = makeStripButton("▣");
+            panelRefBtn.style.fontSize = "11px";
+            panelRefBtn.style.padding = "0 6px";
+            panelRefBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                onRefToggle();
+                refreshPanelDetail();
+            });
 
             panelEyeBtn = makeStripButton("");
             setEyeIcon(panelEyeBtn, false);
@@ -3430,6 +3637,9 @@ function createRegionEditor(node) {
                 deleteRegion(state.primary);
             });
 
+            actions.appendChild(panelScanBtn);
+            actions.appendChild(panelPlugBtn);
+            actions.appendChild(panelRefBtn);
             actions.appendChild(panelEyeBtn);
             actions.appendChild(detDelBtn);
             detail.appendChild(actions);
@@ -3591,8 +3801,6 @@ function createRegionEditor(node) {
     matchBtn.addEventListener("click", onMatchClick);
     backBtn.addEventListener("click", onSendBack);
     frontBtn.addEventListener("click", onBringForward);
-    plugBtn.addEventListener("click", onPlugToggle);
-    refBtn.addEventListener("click", onRefToggle);
     gridBtn.addEventListener("click", onGridToggle);
     gridSizeInput.addEventListener("input", onGridSizeInput);
     gridSizeInput.addEventListener("blur", onGridSizeBlur);
@@ -3641,8 +3849,6 @@ function createRegionEditor(node) {
         matchBtn.removeEventListener("click", onMatchClick);
         backBtn.removeEventListener("click", onSendBack);
         frontBtn.removeEventListener("click", onBringForward);
-        plugBtn.removeEventListener("click", onPlugToggle);
-        refBtn.removeEventListener("click", onRefToggle);
         gridBtn.removeEventListener("click", onGridToggle);
         gridSizeInput.removeEventListener("input", onGridSizeInput);
         gridSizeInput.removeEventListener("blur", onGridSizeBlur);
