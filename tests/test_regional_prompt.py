@@ -1,6 +1,7 @@
 # ABOUTME: Tests for RegionalPromptBuilder schema, region parsing, coordinate
 # ABOUTME: conversions, prompt assembly, and pixel bounding-box outputs.
 
+import ast
 import inspect
 import json
 
@@ -11,8 +12,11 @@ from utils.regional_prompt import (
     aspect_ratio_string,
     box_2d,
     build_prompt,
+    build_region_masks,
+    mask_pixel_box,
     parse_regions,
     placement_phrase,
+    region_has_stored_mask,
     regions_to_pixel_bboxes,
 )
 
@@ -116,11 +120,18 @@ class TestSchema:
     def test_output_ids_order_and_io_types(self):
         schema = RegionalPromptBuilder.define_schema()
         assert [o.id for o in schema.outputs] == [
-            "prompt", "bboxes", "width", "height", "image", "image_refs",
+            "prompt", "bboxes", "width", "height", "image", "image_refs", "masks",
         ]
         assert [o.io_type for o in schema.outputs] == [
             "STRING", "BOUNDING_BOX", "INT", "INT", "IMAGE", "ERPK_IMAGE_REFS",
+            "MASK",
         ]
+
+    def test_masks_output_is_appended_last(self):
+        schema = RegionalPromptBuilder.define_schema()
+        last = schema.outputs[-1]
+        assert last.id == "masks"
+        assert last.io_type == "MASK"
 
     def test_no_seed_input(self):
         schema = RegionalPromptBuilder.define_schema()
@@ -136,12 +147,19 @@ class TestSchema:
     def test_execute_is_not_async(self):
         assert not inspect.iscoroutinefunction(RegionalPromptBuilder.execute)
 
-    def test_no_heavy_imports(self):
+    def test_no_module_level_heavy_imports(self):
+        # torch/numpy/PIL may be imported lazily inside build_region_masks, but
+        # the module must import without the ComfyUI runtime present.
         module_path = inspect.getsourcefile(RegionalPromptBuilder)
         with open(module_path) as f:
-            source = f.read()
-        for forbidden in ("torch", "numpy", "PIL"):
-            assert forbidden not in source
+            tree = ast.parse(f.read())
+        forbidden = {"torch", "numpy", "PIL"}
+        for node in tree.body:
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    assert alias.name.split(".")[0] not in forbidden
+            elif isinstance(node, ast.ImportFrom):
+                assert (node.module or "").split(".")[0] not in forbidden
 
 
 class TestParseRegions:
@@ -216,6 +234,29 @@ class TestParseRegions:
                '{"x": Infinity, "y": 0.1, "w": 0.2, "h": 0.2}, ' \
                '{"x": 0.1, "y": -Infinity, "w": 0.2, "h": 0.2}]'
         assert parse_regions(data) == []
+
+    def test_scan_mask_and_group_are_preserved(self):
+        data = json.dumps([{"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
+                            "kind": "object", "desc": "car", "text": "",
+                            "mask": "iVBORw0K", "group": "car"}])
+        region = parse_regions(data)[0]
+        assert region["mask"] == "iVBORw0K"
+        assert region["group"] == "car"
+
+    def test_hand_drawn_regions_carry_no_mask_or_group(self):
+        data = json.dumps([{"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}])
+        region = parse_regions(data)[0]
+        assert "mask" not in region
+        assert "group" not in region
+
+    def test_blank_or_non_string_mask_and_group_are_dropped(self):
+        data = json.dumps([{"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
+                            "mask": "", "group": 7},
+                           {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
+                            "mask": 123, "group": ["car"]}])
+        for region in parse_regions(data):
+            assert "mask" not in region
+            assert "group" not in region
 
 
 class TestBox2d:
@@ -345,6 +386,103 @@ class TestRegionsToPixelBboxes:
         ]]
 
 
+class TestMaskPixelBox:
+    def test_canonical_region_pixel_bounds(self):
+        region = {"x": 0.04, "y": 0.62, "w": 0.30, "h": 0.25}
+        assert mask_pixel_box(region, 1000, 1000) == (40, 620, 340, 870)
+
+    def test_bounds_scale_with_frame_size(self):
+        region = {"x": 0.5, "y": 0.25, "w": 0.25, "h": 0.5}
+        assert mask_pixel_box(region, 1920, 1080) == (960, 270, 1440, 810)
+
+    def test_bounds_clamped_to_frame(self):
+        region = {"x": 0.95, "y": 0.95, "w": 0.2, "h": 0.2}
+        assert mask_pixel_box(region, 100, 100) == (95, 95, 100, 100)
+
+    def test_sub_pixel_region_still_encloses_a_pixel(self):
+        region = {"x": 0.0, "y": 0.0, "w": 0.006, "h": 0.006}
+        x0, y0, x1, y1 = mask_pixel_box(region, 64, 64)
+        assert x1 > x0
+        assert y1 > y0
+
+
+class TestRegionHasStoredMask:
+    def test_non_empty_string_is_stored(self):
+        assert region_has_stored_mask({"mask": "iVBORw0K"}) is True
+
+    @pytest.mark.parametrize("region", [
+        {},
+        {"mask": ""},
+        {"mask": None},
+        {"mask": 123},
+        {"mask": ["iVBORw0K"]},
+    ])
+    def test_missing_blank_or_non_string_is_not_stored(self, region):
+        assert region_has_stored_mask(region) is False
+
+
+def _png_base64(array):
+    import base64
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.fromarray(np.asarray(array, dtype="uint8"), mode="L").save(
+        buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+class TestBuildRegionMasks:
+    def test_empty_regions_yield_one_zero_mask(self):
+        torch = pytest.importorskip("torch")
+        masks = build_region_masks([], 1024, 768)
+        assert masks.shape == (1, 768, 1024)
+        assert float(masks.sum()) == 0.0
+
+    def test_maskless_region_fills_its_rectangle(self):
+        pytest.importorskip("torch")
+        region = {"x": 0.25, "y": 0.25, "w": 0.5, "h": 0.5}
+        masks = build_region_masks([region], 100, 100)
+        assert masks.shape == (1, 100, 100)
+        assert float(masks[0, 50, 50]) == 1.0
+        assert float(masks[0, 0, 0]) == 0.0
+        assert float(masks[0, 90, 90]) == 0.0
+
+    def test_stored_mask_is_decoded_box_relative(self):
+        import numpy as np
+        pytest.importorskip("torch")
+        glyph = np.zeros((10, 10), dtype="uint8")
+        glyph[:, :5] = 255  # left half opaque, right half transparent
+        region = {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0,
+                  "mask": _png_base64(glyph)}
+        masks = build_region_masks([region], 20, 20)
+        assert float(masks[0, 10, 2]) == 1.0
+        assert float(masks[0, 10, 18]) == 0.0
+
+    def test_malformed_mask_falls_back_to_rectangle(self):
+        pytest.importorskip("torch")
+        region = {"x": 0.25, "y": 0.25, "w": 0.5, "h": 0.5,
+                  "mask": "@@@not-a-png@@@"}
+        masks = build_region_masks([region], 100, 100)
+        assert float(masks[0, 50, 50]) == 1.0
+        assert float(masks[0, 0, 0]) == 0.0
+
+    def test_one_mask_per_region_in_order(self):
+        pytest.importorskip("torch")
+        regions = [
+            {"x": 0.0, "y": 0.0, "w": 0.3, "h": 0.3},
+            {"x": 0.5, "y": 0.5, "w": 0.4, "h": 0.4},
+        ]
+        masks = build_region_masks(regions, 100, 100)
+        assert masks.shape == (2, 100, 100)
+        assert float(masks[0, 10, 10]) == 1.0
+        assert float(masks[0, 70, 70]) == 0.0
+        assert float(masks[1, 70, 70]) == 1.0
+        assert float(masks[1, 10, 10]) == 0.0
+
+
 class TestExecute:
     def test_canonical_node_output(self):
         out = RegionalPromptBuilder.execute(
@@ -354,19 +492,23 @@ class TestExecute:
                    "neon signs, cinematic photo",
             regions_data=json.dumps(CANONICAL_REGIONS),
         )
-        assert out.args == (CANONICAL_PROMPT, CANONICAL_BBOXES, 1000, 1000, None, [])
+        assert out.args[:6] == (CANONICAL_PROMPT, CANONICAL_BBOXES, 1000, 1000, None, [])
+        assert out.args[6].shape == (2, 1000, 1000)
 
     def test_scene_only_outputs_empty_bboxes(self):
         out = RegionalPromptBuilder.execute(
             width=1024, height=1024,
             prompt="A quiet forest", regions_data="[]",
         )
-        prompt, bboxes, width, height, image, image_refs = out.args
+        prompt, bboxes, width, height, image, image_refs, masks = out.args
         assert "A quiet forest" in prompt
         assert bboxes == []
         assert (width, height) == (1024, 1024)
         assert image is None
         assert image_refs == []
+        # No regions: one all-zero placeholder mask keeps the batch ComfyUI-friendly.
+        assert masks.shape == (1, 1024, 1024)
+        assert float(masks.sum()) == 0.0
 
     def test_regions_only_is_valid(self):
         regions = [{"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2,

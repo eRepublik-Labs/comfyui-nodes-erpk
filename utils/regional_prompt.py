@@ -81,8 +81,17 @@ def parse_regions(regions_json):
         text = entry.get("text", "")
         if not isinstance(text, str):
             text = ""
-        regions.append({"x": x, "y": y, "w": w, "h": h,
-                        "kind": kind, "desc": desc, "text": text})
+        region = {"x": x, "y": y, "w": w, "h": h,
+                  "kind": kind, "desc": desc, "text": text}
+        # Scan-produced regions carry a box-relative base64 PNG segmentation mask
+        # and a class-label group; hand-drawn regions omit both and stay compact.
+        mask = entry.get("mask")
+        if isinstance(mask, str) and mask:
+            region["mask"] = mask
+        group = entry.get("group")
+        if isinstance(group, str) and group:
+            region["group"] = group
+        regions.append(region)
     return regions
 
 
@@ -166,6 +175,62 @@ def regions_to_pixel_bboxes(regions, width, height):
               "height": round(region["h"] * height)}
              for region in regions]
     return [boxes]
+
+
+def mask_pixel_box(region, width, height):
+    """Integer pixel bounds (x0, y0, x1, y1) for a normalized region, clamped to
+    the frame and guaranteed to enclose at least one pixel."""
+    x0 = _clamp(round(region["x"] * width), 0, width - 1)
+    y0 = _clamp(round(region["y"] * height), 0, height - 1)
+    x1 = _clamp(round((region["x"] + region["w"]) * width), x0 + 1, width)
+    y1 = _clamp(round((region["y"] + region["h"]) * height), y0 + 1, height)
+    return (x0, y0, x1, y1)
+
+
+def region_has_stored_mask(region):
+    """True when the region carries a non-empty base64 segmentation mask."""
+    mask = region.get("mask")
+    return isinstance(mask, str) and bool(mask)
+
+
+def build_region_masks(regions, width, height):
+    """Render one [height, width] mask per region into an [N, height, width] tensor.
+
+    Regions with a stored segmentation mask are decoded, thresholded at 127, and
+    placed at their box offset; regions without one (or whose mask fails to
+    decode) fall back to a filled rectangle so a scan never fails the build. With
+    no regions, returns a single all-zero mask as a ComfyUI-friendly placeholder.
+    """
+    # Imported lazily so the module stays importable without the ComfyUI runtime;
+    # this is the only torch/numpy/PIL touch in the file.
+    import base64
+    from io import BytesIO
+
+    import numpy as np
+    import torch
+    from PIL import Image
+
+    if not regions:
+        return torch.zeros((1, height, width))
+    frames = []
+    for region in regions:
+        frame = np.zeros((height, width), dtype=np.float32)
+        x0, y0, x1, y1 = mask_pixel_box(region, width, height)
+        rendered = False
+        if region_has_stored_mask(region):
+            try:
+                raw = base64.b64decode(region["mask"])
+                glyph = Image.open(BytesIO(raw)).convert("L")
+                glyph = glyph.resize((x1 - x0, y1 - y0))
+                probs = np.asarray(glyph, dtype=np.float32)
+                frame[y0:y1, x0:x1] = (probs > 127).astype(np.float32)
+                rendered = True
+            except Exception:
+                rendered = False
+        if not rendered:
+            frame[y0:y1, x0:x1] = 1.0
+        frames.append(frame)
+    return torch.from_numpy(np.stack(frames)).float()
 
 
 class RegionalPromptBuilder(IO.ComfyNode):
@@ -258,6 +323,12 @@ class RegionalPromptBuilder(IO.ComfyNode):
                     tooltip="Per-region reference images in region order; "
                             "connect to an image edit node's image_refs input.",
                 ),
+                IO.Mask.Output(
+                    "masks",
+                    tooltip="One mask per region in region order [N, height, "
+                            "width]; regions without a stored segmentation get a "
+                            "filled-rectangle mask.",
+                ),
             ],
         )
 
@@ -283,6 +354,7 @@ class RegionalPromptBuilder(IO.ComfyNode):
         regions += parse_regions(kwargs.get("regions"))
         if not regions and not prompt.strip():
             raise ValueError("Describe the scene or add at least one region")
+        masks = build_region_masks(regions, width, height)
         assembled = build_prompt(prompt, width, height, regions)
         bboxes = regions_to_pixel_bboxes(regions, width, height)
-        return IO.NodeOutput(assembled, bboxes, width, height, image, image_refs)
+        return IO.NodeOutput(assembled, bboxes, width, height, image, image_refs, masks)
