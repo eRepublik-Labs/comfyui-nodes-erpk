@@ -147,7 +147,8 @@ function desiredEditorHeight(node) {
 // width explicitly on every "size has changed" path.
 function pinRootWidth(node) {
     const root = node?._erpkRegionEditor?.root;
-    if (!root) return;
+    // While expanded the root is a viewport overlay, not a node-width box.
+    if (!root || root._erpkExpanded) return;
     const w = Math.max((node.size?.[0] ?? MIN_NODE_WIDTH) - CHROME_HORIZONTAL_INSET, 100);
     root.style.width = w + "px";
     root.style.maxWidth = w + "px";
@@ -379,6 +380,8 @@ function createRegionEditor(node) {
     snapBtn.dataset.tip = "Snap drawing, moving, and resizing to the grid";
     const helpBtn = makeStripButton("?");
     helpBtn.dataset.tip = "Keyboard and mouse shortcuts";
+    const fsBtn = makeStripButton("⤢");
+    fsBtn.dataset.tip = "Expand the editor to fill the window (F · Esc to exit)";
     const matchBtn = makeStripButton("⚠ match");
     matchBtn.style.font = "bold 9px 'Segoe UI', sans-serif";
     matchBtn.style.color = "rgba(249, 168, 38, 0.85)";
@@ -403,6 +406,7 @@ function createRegionEditor(node) {
     status.appendChild(gridAlphaInput);
     status.appendChild(snapBtn);
     status.appendChild(helpBtn);
+    status.appendChild(fsBtn);
     status.appendChild(clearBtn);
 
     root.appendChild(stage);
@@ -532,12 +536,13 @@ function createRegionEditor(node) {
         const availW = stage.clientWidth - STAGE_PADDING_PX;
         const availH = stage.clientHeight - STAGE_PADDING_PX;
         if (availW <= 0 || availH <= 0) return;
-        // Width is authoritative: the canvas always spans the stage, and its
-        // height follows the frame aspect (availH only trims rounding slack,
-        // since the widget height is pinned to this same geometry).
+        // Fit the frame aspect inside the stage on whichever axis binds: in the
+        // node the height is pinned to width/aspect so width wins, and in the
+        // fullscreen overlay either axis can bind. The stage centers the result,
+        // letterboxing the spare axis.
         const aspect = frameAspect(node);
-        const cw = availW;
-        const ch = Math.min(cw / aspect, availH);
+        const cw = Math.min(availW, availH * aspect);
+        const ch = cw / aspect;
         const dpr = window.devicePixelRatio || 1;
         state.cssW = cw;
         state.cssH = ch;
@@ -1501,6 +1506,11 @@ function createRegionEditor(node) {
             state.hideBoxes = !state.hideBoxes;
             render();
         }
+        if (key === "f" && !mod && !e.altKey && !e.shiftKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleFullscreen();
+        }
     }
 
     function onInspectorPointerDown(e) {
@@ -1792,6 +1802,7 @@ function createRegionEditor(node) {
             ["Ctrl/Cmd+C V D", "copy, paste, duplicate"],
             ["[ and ]", "send back, bring forward"],
             ["H", "hide region overlays"],
+            ["F", "expand editor, Esc to exit"],
         ];
         const grid = document.createElement("div");
         grid.style.display = "grid";
@@ -2383,6 +2394,95 @@ function createRegionEditor(node) {
         else openPanel(e);
     }
 
+    // --- Fullscreen overlay -----------------------------------------------
+    // ComfyUI rewrites the DOM-widget wrapper's transform/position every frame,
+    // and that transform makes the wrapper the containing block for any fixed
+    // descendant. Reparenting root into document.body lifts it out of both the
+    // per-frame writes and the transform so a fixed overlay resolves against
+    // the viewport. Expanded state lives on root so module-level pinRootWidth
+    // can see it across the closure boundary.
+    let fsSaved = null;
+
+    function syncFsButton() {
+        const on = !!root._erpkExpanded;
+        fsBtn.classList.toggle("erpk-btn-active", on);
+        fsBtn.style.color = on ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
+        fsBtn.style.borderColor = on
+            ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
+        fsBtn.textContent = on ? "⤡" : "⤢";
+        fsBtn.dataset.tip = on
+            ? "Restore the editor to the node (F · Esc to exit)"
+            : "Expand the editor to fill the window (F · Esc to exit)";
+    }
+
+    // Capture phase so it runs alongside the popover Escape handlers; the
+    // !helpPanel && !panel guard hands Escape to an open popover first.
+    function onFsDocKeyDown(e) {
+        if (e.key === "Escape" && root._erpkExpanded && !helpPanel && !panel) {
+            e.preventDefault();
+            e.stopPropagation();
+            collapse();
+        }
+    }
+
+    function expand() {
+        if (root._erpkExpanded) return;
+        fsSaved = {
+            parent: root.parentNode,
+            nextSibling: root.nextSibling,
+            position: root.style.position,
+            inset: root.style.inset,
+            width: root.style.width,
+            maxWidth: root.style.maxWidth,
+            height: root.style.height,
+            zIndex: root.style.zIndex,
+            bodyOverflow: document.body.style.overflow,
+        };
+        root._erpkExpanded = true;
+        document.body.appendChild(root);
+        root.style.position = "fixed";
+        root.style.inset = "0";
+        root.style.width = "100vw";
+        root.style.maxWidth = "100vw";
+        root.style.height = "100vh";
+        root.style.zIndex = "9999";
+        document.body.style.overflow = "hidden";
+        document.addEventListener("keydown", onFsDocKeyDown, true);
+        syncFsButton();
+        // Entry via the button leaves focus on the button; hand it to the
+        // canvas so F toggles back out.
+        canvas.focus();
+        requestAnimationFrame(() => layout());
+    }
+
+    function collapse() {
+        if (!root._erpkExpanded) return;
+        root._erpkExpanded = false;
+        document.removeEventListener("keydown", onFsDocKeyDown, true);
+        document.body.style.overflow = fsSaved.bodyOverflow;
+        root.style.position = fsSaved.position;
+        root.style.inset = fsSaved.inset;
+        root.style.width = fsSaved.width;
+        root.style.maxWidth = fsSaved.maxWidth;
+        root.style.height = fsSaved.height;
+        root.style.zIndex = fsSaved.zIndex;
+        const parent = fsSaved.parent;
+        if (parent) {
+            const ref = fsSaved.nextSibling && fsSaved.nextSibling.parentNode === parent
+                ? fsSaved.nextSibling : null;
+            parent.insertBefore(root, ref);
+        }
+        fsSaved = null;
+        syncFsButton();
+        pinRootWidth(node);
+        requestAnimationFrame(() => layout());
+    }
+
+    function onToggleFullscreen() {
+        if (root._erpkExpanded) collapse();
+        else expand();
+    }
+
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerup", onPointerUp);
@@ -2391,6 +2491,7 @@ function createRegionEditor(node) {
     canvas.addEventListener("keydown", onKeyDown);
     canvas.addEventListener("contextmenu", onContextMenu);
     helpBtn.addEventListener("click", onHelpToggle);
+    fsBtn.addEventListener("click", onToggleFullscreen);
     inspector.addEventListener("pointerdown", onInspectorPointerDown);
     inspector.addEventListener("keydown", onInspectorKeyDown);
     descInput.addEventListener("input", onDescInput);
@@ -2424,6 +2525,9 @@ function createRegionEditor(node) {
     }
 
     function destroy() {
+        // Exit expand mode first so the document Escape listener and the body
+        // overflow style are dropped even if the node is removed while expanded.
+        collapse();
         observer.disconnect();
         canvas.removeEventListener("pointerdown", onPointerDown);
         canvas.removeEventListener("pointermove", onPointerMove);
@@ -2433,6 +2537,7 @@ function createRegionEditor(node) {
         canvas.removeEventListener("keydown", onKeyDown);
         canvas.removeEventListener("contextmenu", onContextMenu);
         helpBtn.removeEventListener("click", onHelpToggle);
+        fsBtn.removeEventListener("click", onToggleFullscreen);
         inspector.removeEventListener("pointerdown", onInspectorPointerDown);
         inspector.removeEventListener("keydown", onInspectorKeyDown);
         descInput.removeEventListener("input", onDescInput);
