@@ -64,7 +64,14 @@ class TestSchema:
             "width", "height", "prompt", "regions_data", "image",
             *[f"desc_{n}" for n in range(1, 11)],
             *[f"ref_{n}" for n in range(1, 11)],
+            "regions",
         ]
+
+    def test_regions_input_type_and_optional(self):
+        schema = RegionalPromptBuilder.define_schema()
+        regions_input = next(i for i in schema.inputs if i.id == "regions")
+        assert regions_input.io_type == "ERPK_REGIONS"
+        assert regions_input.optional is True
 
     def test_ref_inputs_are_images(self):
         schema = RegionalPromptBuilder.define_schema()
@@ -507,3 +514,78 @@ class TestImageRefs:
         assert out.args[5] == []
         assert "taken from image" not in out.args[0]
         assert "styled as shown in" not in out.args[0]
+
+
+WIRED_REGION = {"x": 0.7, "y": 0.7, "w": 0.2, "h": 0.2,
+                "kind": "object", "desc": "a barking dog", "text": ""}
+
+
+class TestWiredRegions:
+    def test_wired_regions_append_after_canvas(self):
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+            regions=json.dumps([WIRED_REGION]),
+        )
+        prompt, bboxes = out.args[0], out.args[1]
+        assert "1. a red vintage car" in prompt
+        assert '2. The text "OPEN LATE"' in prompt
+        assert "3. a barking dog" in prompt
+        assert len(bboxes[0]) == 3
+
+    def test_desc_override_binds_canvas_only(self):
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+            regions=json.dumps([WIRED_REGION]),
+            desc_3="should not apply",
+        )
+        prompt = out.args[0]
+        assert "3. a barking dog" in prompt
+        assert "should not apply" not in prompt
+
+    def test_ref_override_binds_canvas_only(self):
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+            regions=json.dumps([WIRED_REGION]),
+            ref_3=object(),
+        )
+        prompt, image_refs = out.args[0], out.args[5]
+        assert image_refs == []
+        assert "3. a barking dog: at the bottom-right" in prompt
+        assert "taken from image" not in prompt
+
+    def test_wired_regions_go_through_parse_regions(self):
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="A scene",
+            regions_data="[]",
+            regions=json.dumps([
+                {"x": -0.5, "y": 0.5, "w": 2.0, "h": 0.2,
+                 "kind": "object", "desc": "clamped", "text": ""},
+                {"x": 0.1, "y": 0.1, "w": 0.004, "h": 0.5,
+                 "kind": "object", "desc": "degenerate", "text": ""},
+            ]),
+        )
+        bboxes = out.args[1]
+        assert len(bboxes[0]) == 1
+        assert bboxes[0][0] == {"x": 0, "y": 500, "width": 1000, "height": 200}
+        assert "degenerate" not in out.args[0]
+
+    def test_malformed_wired_regions_are_ignored(self):
+        out = RegionalPromptBuilder.execute(
+            width=1024, height=1024, prompt="A scene",
+            regions_data="[]",
+            regions="not json {",
+        )
+        assert out.args[1] == []
+        assert "Layout:" not in out.args[0]
+
+    def test_wired_regions_satisfy_all_empty_guard(self):
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data="[]",
+            regions=json.dumps([WIRED_REGION]),
+        )
+        assert "a barking dog" in out.args[0]
+        assert len(out.args[1][0]) == 1

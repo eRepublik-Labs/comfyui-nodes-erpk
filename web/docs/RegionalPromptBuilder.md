@@ -16,6 +16,7 @@ Draw regions on a canvas and emit a layout-aware prompt for any image generation
 | image | IMAGE | optional | Reference image shown under the regions and passed through unchanged, so the builder sits inline in an image-edit chain. |
 | desc_1 … desc_10 | String | optional sockets | Override the matching region's description at execute time (numbered as on the canvas). Exposed via the inspector's plug button. |
 | ref_1 … ref_10 | IMAGE | optional sockets | Attach a reference image to the matching region. Exposed via the inspector's ▣ button; forwarded on image_refs in region order. |
+| regions | ERPK_REGIONS | optional | Detected regions (JSON) appended after the canvas regions at execute time. Wire from a detector node. |
 
 ## Outputs
 
@@ -49,6 +50,10 @@ Select a region and press the inspector's plug button to expose its `desc_N` soc
 ## Region reference images
 
 Select a region and press the inspector's ▣ button to expose its `ref_N` IMAGE socket, then wire any image into it. The region's prompt line becomes "taken from image N (reproduce that exact item)", and the wired images flow out on `image_refs` in region order. Keep the region's description consistent with the attached image — when the words and the picture disagree, models tend to follow the words. Connect that output to Gemini Image Edit's `image_refs` input: the node sends the edited image first (image 1), then the refs, so the prompt's numbering always matches what the model sees. Regions with a wired ref show a ▣ chip and a corner thumbnail on the canvas.
+
+## Wired regions
+
+The `regions` input accepts detected regions (JSON) from a detector node. They are appended after the canvas regions at execute time, so the canvas is never modified and detected regions are not visible on the canvas preview. Because numbering runs back to front, detected regions take the highest numbers and render in front of canvas regions where boxes overlap. The `desc_N` and `ref_N` overrides bind canvas regions only — they never apply to wired regions.
 
 ## Notes
 

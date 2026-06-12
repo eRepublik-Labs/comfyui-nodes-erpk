@@ -239,6 +239,13 @@ class RegionalPromptBuilder(IO.ComfyNode):
                     )
                     for n in range(1, REF_INPUT_COUNT + 1)
                 ],
+                IO.Custom("ERPK_REGIONS").Input(
+                    "regions",
+                    optional=True,
+                    tooltip="Detected regions (JSON) appended after the canvas "
+                            "regions at execute time. The canvas is unchanged, "
+                            "and desc_N/ref_N bind canvas regions only.",
+                ),
             ],
             outputs=[
                 IO.String.Output("prompt"),
@@ -271,6 +278,9 @@ class RegionalPromptBuilder(IO.ComfyNode):
             if ref is not None:
                 image_refs.append(ref)
                 region["ref_image"] = len(image_refs) + 1
+        # Appended after the override loops so desc_N/ref_N bind canvas regions
+        # only; wired detections always land past the canvas indices.
+        regions += parse_regions(kwargs.get("regions"))
         if not regions and not prompt.strip():
             raise ValueError("Describe the scene or add at least one region")
         assembled = build_prompt(prompt, width, height, regions)
