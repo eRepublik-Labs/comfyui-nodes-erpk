@@ -3548,7 +3548,7 @@ function createRegionEditor(node) {
             const microLabel = (text) => {
                 const el = document.createElement("span");
                 el.textContent = text;
-                el.style.font = "8px 'Segoe UI', sans-serif";
+                el.style.font = "9px 'Segoe UI', sans-serif";
                 el.style.letterSpacing = "0.6px";
                 el.style.textTransform = "uppercase";
                 el.style.color = "rgba(255, 255, 255, 0.45)";
@@ -3605,6 +3605,16 @@ function createRegionEditor(node) {
                 kindGroup.appendChild(btn);
             }
 
+            panelEyeBtn = makeStripButton("");
+            setEyeIcon(panelEyeBtn, false);
+            panelEyeBtn.style.flex = "0 0 auto";
+            panelEyeBtn.style.padding = "0 5px";
+            panelEyeBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                toggleRegionHidden(state.primary);
+            });
+
+            topRow.appendChild(panelEyeBtn);
             topRow.appendChild(panelThumb);
             topRow.appendChild(panelNameInput);
             topRow.appendChild(kindGroup);
@@ -3701,15 +3711,6 @@ function createRegionEditor(node) {
             const spacer = document.createElement("span");
             spacer.style.flex = "1 1 auto";
 
-            panelEyeBtn = makeStripButton("");
-            setEyeIcon(panelEyeBtn, false);
-            panelEyeBtn.style.fontSize = "11px";
-            panelEyeBtn.style.padding = "0 6px";
-            panelEyeBtn.addEventListener("click", (e) => {
-                e.stopPropagation();
-                toggleRegionHidden(state.primary);
-            });
-
             const detDelBtn = makeStripButton("✕");
             detDelBtn.classList.add("erpk-btn-danger");
             detDelBtn.dataset.tip = "Delete region";
@@ -3726,7 +3727,6 @@ function createRegionEditor(node) {
             actions.appendChild(panelPlugBtn);
             actions.appendChild(panelRefBtn);
             actions.appendChild(spacer);
-            actions.appendChild(panelEyeBtn);
             actions.appendChild(detDelBtn);
             detail.appendChild(actions);
 
