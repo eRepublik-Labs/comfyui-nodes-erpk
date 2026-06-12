@@ -122,6 +122,77 @@ def depth_prompt(labels):
     )
 
 
+SEGMENTER_MODEL_ID = "facebook/sam-vit-base"
+_segmenter = {}
+
+
+def pixel_box_prompts(objects, width, height):
+    """Convert normalized scan boxes into integer [x0, y0, x1, y1] pixel
+    prompts, clamped to the frame with at least one pixel of extent."""
+    prompts = []
+    for obj in objects:
+        box = obj["box"]
+        x0 = _clamp(round(box["x"] * width), 0, width - 1)
+        y0 = _clamp(round(box["y"] * height), 0, height - 1)
+        x1 = _clamp(round((box["x"] + box["w"]) * width), x0 + 1, width)
+        y1 = _clamp(round((box["y"] + box["h"]) * height), y0 + 1, height)
+        prompts.append([x0, y0, x1, y1])
+    return prompts
+
+
+def segment_objects(image, objects):
+    """Fill each object's mask with a locally-computed segmentation.
+
+    Gemini supplies boxes and labels; the masks come from a box-prompted
+    segmentation model (one image embedding, one prompt per box) because
+    Gemini itself emits masks too unreliably to ship (omitted fields,
+    truncated multi-object responses). Masks are stored box-relative base64
+    PNGs per the regions contract. Any failure leaves masks None — the scan
+    survives, downstream falls back to rectangles, and the log says why.
+    """
+    try:
+        import base64
+        from io import BytesIO
+
+        import numpy as np
+        import torch
+        from PIL import Image
+        from transformers import SamModel, SamProcessor
+
+        if not _segmenter:
+            # CPU on purpose: the segmentation pipeline materializes float64
+            # tensors, which MPS rejects; the model is small enough that CPU
+            # stays interactive.
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            _segmenter["processor"] = SamProcessor.from_pretrained(SEGMENTER_MODEL_ID)
+            _segmenter["model"] = SamModel.from_pretrained(SEGMENTER_MODEL_ID).to(device)
+            _segmenter["device"] = device
+            print(f"[ERPK scan] segmenter loaded on {device}")
+        processor = _segmenter["processor"]
+        model = _segmenter["model"]
+        device = _segmenter["device"]
+
+        rgb = image.convert("RGB")
+        prompts = pixel_box_prompts(objects, rgb.width, rgb.height)
+        inputs = processor(rgb, input_boxes=[prompts], return_tensors="pt").to(device)
+        with torch.no_grad():
+            outputs = model(**inputs, multimask_output=False)
+        masks = processor.image_processor.post_process_masks(
+            outputs.pred_masks.cpu(),
+            inputs["original_sizes"].cpu(),
+            inputs["reshaped_input_sizes"].cpu(),
+        )[0]
+        for obj, prompt, mask in zip(objects, prompts, masks):
+            x0, y0, x1, y1 = prompt
+            crop = mask[0, y0:y1, x0:x1].numpy().astype(np.uint8) * 255
+            buf = BytesIO()
+            Image.fromarray(crop, mode="L").save(buf, format="PNG")
+            obj["mask"] = base64.b64encode(buf.getvalue()).decode()
+    except Exception as e:
+        print(f"[ERPK scan] Warning: local segmentation unavailable ({e}); "
+              "masks fall back to rectangles")
+
+
 def resolve_model(model, known_models, default):
     """Pick the requested model when it is a known name, else the default.
 
@@ -199,13 +270,12 @@ async def gemini_scan(image, max_objects, model):
         )
     raw_text = segmentation.get("text", "")
     objects = parse_segmentation(raw_text, max_objects)
-    masked = sum(1 for obj in objects if obj.get("mask"))
-    print(f"[ERPK scan] {len(objects)} objects, {masked} with masks "
-          f"(response {len(raw_text)} chars)")
-    if not objects or not masked:
-        print(f"[ERPK scan] raw response head: {raw_text[:400]!r}")
     if not objects:
+        print(f"[ERPK scan] 0 objects; raw response head: {raw_text[:400]!r}")
         return []
+    segment_objects(image, objects)
+    masked = sum(1 for obj in objects if obj.get("mask"))
+    print(f"[ERPK scan] {len(objects)} objects, {masked} with masks")
 
     labels = []
     seen = set()

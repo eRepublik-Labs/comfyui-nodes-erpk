@@ -21,6 +21,7 @@ from utils.scan_engine import (
     depth_prompt,
     parse_depth_order,
     parse_segmentation,
+    pixel_box_prompts,
     resolve_model,
     scan,
     segmentation_prompt,
@@ -276,3 +277,23 @@ class TestScanDispatch:
         result = asyncio.run(scan("IMG"))
         assert result[0]["name"] == "default"
         assert result[0]["max_objects"] == 20
+
+
+class TestPixelBoxPrompts:
+    """Normalized scan boxes become integer pixel prompts for the segmenter."""
+
+    def test_converts_and_rounds(self):
+        objects = [{"name": "car", "group": "car", "mask": None,
+                    "box": {"x": 0.1, "y": 0.2, "w": 0.5, "h": 0.25}}]
+        assert pixel_box_prompts(objects, 1000, 800) == [[100, 160, 600, 360]]
+
+    def test_clamps_to_frame(self):
+        objects = [{"name": "x", "group": "x", "mask": None,
+                    "box": {"x": 0.9, "y": 0.9, "w": 0.1, "h": 0.1}}]
+        assert pixel_box_prompts(objects, 100, 100) == [[90, 90, 100, 100]]
+
+    def test_degenerate_box_keeps_one_pixel(self):
+        objects = [{"name": "x", "group": "x", "mask": None,
+                    "box": {"x": 0.5, "y": 0.5, "w": 0.001, "h": 0.001}}]
+        x0, y0, x1, y1 = pixel_box_prompts(objects, 100, 100)[0]
+        assert x1 > x0 and y1 > y0
