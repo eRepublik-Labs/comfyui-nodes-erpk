@@ -10,6 +10,12 @@ from . import scan_engine
 # legitimate scan request.
 SCAN_MAX_BODY_BYTES = 24 * 1024 * 1024
 
+# Engine name -> scan_engine coroutine attribute. The attribute is resolved at
+# request time (not imported) so this module loads even before the local engine
+# exists. "local" is the default; Shift-click in the editor selects "gemini".
+SCAN_ENGINES = {"local": "local_scan", "gemini": "gemini_scan"}
+DEFAULT_SCAN_ENGINE = "local"
+
 
 def clamp_max_objects(value):
     """Coerce the request's max_objects into the supported 1..ceiling range."""
@@ -51,6 +57,12 @@ async def handle_scan(request):
         if not isinstance(body, dict):
             return web.json_response({"error": "Invalid JSON body"}, status=400)
 
+        engine_name = body.get("engine")
+        if engine_name is None:
+            engine_name = DEFAULT_SCAN_ENGINE
+        if engine_name not in SCAN_ENGINES:
+            return web.json_response({"error": "Unknown engine"}, status=400)
+
         try:
             image_bytes = decode_data_url(body.get("image"))
         except ValueError as e:
@@ -68,8 +80,9 @@ async def handle_scan(request):
         except Exception:
             return web.json_response({"error": "Could not decode image"}, status=400)
 
+        engine = getattr(scan_engine, SCAN_ENGINES[engine_name])
         try:
-            objects = await scan_engine.scan(image, max_objects, model)
+            objects = await scan_engine.scan(image, max_objects, model, engine=engine)
         except Exception as e:
             return web.json_response({"error": str(e)}, status=502)
 

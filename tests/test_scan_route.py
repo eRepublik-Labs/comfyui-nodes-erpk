@@ -47,6 +47,21 @@ def _body(response):
     return json.loads(response.body.decode())
 
 
+@pytest.fixture(autouse=True)
+def ensure_local_engine(monkeypatch):
+    """Guarantee scan_engine.local_scan exists while the engine lands in parallel.
+
+    handle_scan resolves the default engine via getattr at request time; this
+    stub keeps the route's dispatch tests deterministic before the real
+    local_scan ships, and steps aside once it does.
+    """
+    if not hasattr(scan_engine, "local_scan"):
+        async def _stub(image, max_objects, model):
+            return []
+
+        monkeypatch.setattr(scan_engine, "local_scan", _stub, raising=False)
+
+
 class TestClampMaxObjects:
     def test_default_for_missing(self):
         assert clamp_max_objects(None) == scan_engine.DEFAULT_MAX_OBJECTS
@@ -94,7 +109,7 @@ class TestHandleScan:
         assert "error" in _body(resp)
 
     def test_success_returns_objects(self, monkeypatch):
-        async def fake_scan(image, max_objects, model):
+        async def fake_scan(image, max_objects, model, engine=None):
             return [{"name": "car", "box": {"x": 0, "y": 0, "w": 0.5, "h": 0.5},
                      "mask": None, "group": "car", "depth_rank": 0}]
 
@@ -107,7 +122,7 @@ class TestHandleScan:
     def test_max_objects_clamped_before_engine(self, monkeypatch):
         seen = {}
 
-        async def fake_scan(image, max_objects, model):
+        async def fake_scan(image, max_objects, model, engine=None):
             seen["max_objects"] = max_objects
             seen["model"] = model
             return []
@@ -121,7 +136,7 @@ class TestHandleScan:
     def test_blank_model_becomes_none(self, monkeypatch):
         seen = {}
 
-        async def fake_scan(image, max_objects, model):
+        async def fake_scan(image, max_objects, model, engine=None):
             seen["model"] = model
             return []
 
@@ -133,7 +148,7 @@ class TestHandleScan:
     def test_explicit_model_forwarded(self, monkeypatch):
         seen = {}
 
-        async def fake_scan(image, max_objects, model):
+        async def fake_scan(image, max_objects, model, engine=None):
             seen["model"] = model
             return []
 
@@ -162,13 +177,59 @@ class TestHandleScan:
         assert resp.status == 400
 
     def test_engine_failure_is_502(self, monkeypatch):
-        async def boom(image, max_objects, model):
+        async def boom(image, max_objects, model, engine=None):
             raise RuntimeError("Gemini blocked")
 
         monkeypatch.setattr(scan_engine, "scan", boom)
         resp = asyncio.run(handle_scan(FakeRequest({"image": _png_data_url()})))
         assert resp.status == 502
         assert "Gemini blocked" in _body(resp)["error"]
+
+
+class TestEngineSelector:
+    """The route maps the request's engine name to a scan_engine coroutine."""
+
+    def _capture_engine(self, monkeypatch):
+        seen = {}
+
+        async def fake_scan(image, max_objects, model, engine=None):
+            seen["engine"] = engine
+            return []
+
+        monkeypatch.setattr(scan_engine, "scan", fake_scan)
+        return seen
+
+    def test_default_engine_is_local(self, monkeypatch):
+        seen = self._capture_engine(monkeypatch)
+        resp = asyncio.run(handle_scan(FakeRequest({"image": _png_data_url()})))
+        assert resp.status == 200
+        assert seen["engine"] is scan_engine.local_scan
+
+    def test_explicit_local_engine(self, monkeypatch):
+        seen = self._capture_engine(monkeypatch)
+        req = FakeRequest({"image": _png_data_url(), "engine": "local"})
+        asyncio.run(handle_scan(req))
+        assert seen["engine"] is scan_engine.local_scan
+
+    def test_explicit_gemini_engine(self, monkeypatch):
+        seen = self._capture_engine(monkeypatch)
+        req = FakeRequest({"image": _png_data_url(), "engine": "gemini"})
+        asyncio.run(handle_scan(req))
+        assert seen["engine"] is scan_engine.gemini_scan
+
+    def test_unknown_engine_is_400(self, monkeypatch):
+        self._capture_engine(monkeypatch)
+        req = FakeRequest({"image": _png_data_url(), "engine": "moondream"})
+        resp = asyncio.run(handle_scan(req))
+        assert resp.status == 400
+        assert _body(resp)["error"] == "Unknown engine"
+
+    def test_non_string_engine_is_400(self, monkeypatch):
+        self._capture_engine(monkeypatch)
+        req = FakeRequest({"image": _png_data_url(), "engine": 7})
+        resp = asyncio.run(handle_scan(req))
+        assert resp.status == 400
+        assert _body(resp)["error"] == "Unknown engine"
 
 
 class TestRegister:

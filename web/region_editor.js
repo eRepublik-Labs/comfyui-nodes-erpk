@@ -502,7 +502,7 @@ function createRegionEditor(node) {
     // Scans the connected image for objects. Floats in the stage's upper-left
     // rather than the strip, and only shows when an image is connected.
     const scanBtn = makeStripButton("✦");
-    scanBtn.dataset.tip = "Scan the connected image for objects";
+    scanBtn.dataset.tip = "Scan the connected image for objects (Shift: Gemini cloud)";
     floatOnStage(scanBtn, "left");
     scanBtn.style.display = "none";
     const clearBtn = makeStripButton("Clear all");
@@ -2076,8 +2076,9 @@ function createRegionEditor(node) {
         syncWidget();
     }
 
-    async function onScanClick() {
+    async function onScanClick(e) {
         if (state.scanning) return;
+        const engine = e && e.shiftKey ? "gemini" : "local";
         const img = upstreamImage("image");
         if (!img || !img.complete || !img.naturalWidth) {
             state.scanError = "No loaded image to scan";
@@ -2113,7 +2114,7 @@ function createRegionEditor(node) {
             const res = await fetch("/erpk/scan", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ image: dataUrl, max_objects: SCAN_MAX_OBJECTS }),
+                body: JSON.stringify({ image: dataUrl, max_objects: SCAN_MAX_OBJECTS, engine }),
                 signal: state.scanAbort.signal,
             });
             const json = await res.json().catch(() => ({}));
