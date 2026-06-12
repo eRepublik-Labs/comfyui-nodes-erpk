@@ -65,12 +65,12 @@ hoverStyles.textContent = `
 @keyframes erpk-spin { to { transform: rotate(360deg); } }
 .erpk-spinner {
     display: inline-block;
-    width: 11px;
-    height: 11px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.25);
-    border-top-color: rgba(255, 255, 255, 0.9);
-    animation: erpk-spin 0.8s linear infinite;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #fff;
+    animation: erpk-spin 0.7s linear infinite;
 }
 `;
 document.head.appendChild(hoverStyles);
@@ -392,17 +392,21 @@ function createRegionEditor(node) {
     // visual language; the canvas backdrop needs the slight fill for contrast.
     function floatOnStage(btn, side) {
         btn.style.position = "absolute";
-        btn.style[side] = "6px";
-        btn.style.top = "6px";
+        btn.style[side] = "8px";
+        btn.style.top = "8px";
         btn.style.zIndex = "10";
-        btn.style.width = "26px";
-        btn.style.height = "26px";
+        btn.style.width = "30px";
+        btn.style.height = "30px";
         btn.style.padding = "0";
         btn.style.display = "flex";
         btn.style.alignItems = "center";
         btn.style.justifyContent = "center";
-        btn.style.fontSize = "13px";
-        btn.style.background = "rgba(20, 20, 20, 0.75)";
+        btn.style.fontSize = "16px";
+        btn.style.color = "rgba(255, 255, 255, 0.9)";
+        btn.style.background = "rgba(15, 15, 15, 0.9)";
+        btn.style.border = "1px solid rgba(255, 255, 255, 0.35)";
+        btn.style.borderRadius = "6px";
+        btn.style.boxShadow = "0 1px 6px rgba(0, 0, 0, 0.5)";
         stage.appendChild(btn);
     }
 
@@ -2650,9 +2654,9 @@ function createRegionEditor(node) {
     function syncFsButton() {
         const on = !!root._erpkExpanded;
         fsBtn.classList.toggle("erpk-btn-active", on);
-        fsBtn.style.color = on ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
+        fsBtn.style.color = on ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.9)";
         fsBtn.style.borderColor = on
-            ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
+            ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.35)";
         fsBtn.textContent = on ? "⤡" : "⤢";
         fsBtn.dataset.tip = on
             ? "Restore the editor to the node (F · Esc to exit)"
