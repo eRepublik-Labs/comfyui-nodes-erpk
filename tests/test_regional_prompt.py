@@ -940,3 +940,38 @@ class TestOverlappingMoves:
         assert "blend" in prompt.lower()
         assert "remove the duplicate" not in prompt
         assert "erase every part" not in prompt
+
+
+class TestRegionGroups:
+    """Regions carry optional stable ids and parent links for layer groups.
+    Groups are organizational: prompt, bboxes, and masks stay flat."""
+
+    def test_parse_preserves_id_and_parent(self):
+        data = json.dumps([
+            {"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.5, "id": "abc123"},
+            {"x": 0.2, "y": 0.2, "w": 0.1, "h": 0.1, "id": "def456",
+             "parent": "abc123"},
+        ])
+        regions = parse_regions(data)
+        assert regions[0]["id"] == "abc123"
+        assert "parent" not in regions[0]
+        assert regions[1]["parent"] == "abc123"
+
+    def test_non_string_id_and_parent_dropped(self):
+        data = json.dumps([
+            {"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.5, "id": 7, "parent": []},
+        ])
+        regions = parse_regions(data)
+        assert "id" not in regions[0]
+        assert "parent" not in regions[0]
+
+    def test_groups_do_not_change_prompt_or_bboxes(self):
+        flat = [{"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.5, "kind": "object",
+                 "desc": "a man", "text": ""}]
+        grouped = [dict(flat[0], id="a1"),
+                   {"x": 0.15, "y": 0.12, "w": 0.1, "h": 0.1,
+                    "kind": "object", "desc": "a hat", "text": "",
+                    "id": "b2", "parent": "a1"}]
+        prompt = build_prompt("", 1000, 1000, grouped)
+        assert "a man" in prompt and "a hat" in prompt
+        assert len(regions_to_pixel_bboxes(grouped, 100, 100)[0]) == 2

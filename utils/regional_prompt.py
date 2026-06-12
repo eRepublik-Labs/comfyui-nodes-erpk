@@ -106,6 +106,14 @@ def parse_regions(regions_json):
         group = entry.get("group")
         if isinstance(group, str) and group:
             region["group"] = group
+        # Layer-group links: a stable id and an optional parent id. Groups
+        # are organizational only — prompt, bboxes, and masks stay flat.
+        region_id = entry.get("id")
+        if isinstance(region_id, str) and region_id:
+            region["id"] = region_id
+        parent = entry.get("parent")
+        if isinstance(parent, str) and parent:
+            region["parent"] = parent
         src = _parse_src_box(entry.get("src"))
         if src is not None:
             region["src"] = src
