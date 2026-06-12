@@ -1346,6 +1346,29 @@ function createRegionEditor(node) {
         ctx.restore();
     }
 
+    // SAM masks are opaque grayscale PNGs: brightness encodes the shape but
+    // alpha is 1 everywhere, so compositing against the raw image clips
+    // nothing. This converts luminance into a real alpha channel (thresholded
+    // like the Python composite) once per region.
+    function maskAlphaCanvas(box) {
+        if (box._erpkMaskAlpha) return box._erpkMaskAlpha;
+        const img = box._erpkMaskImg;
+        if (!img || !img.complete || !img.naturalWidth) return null;
+        const off = document.createElement("canvas");
+        off.width = img.naturalWidth;
+        off.height = img.naturalHeight;
+        const offCtx = off.getContext("2d", { willReadFrequently: true });
+        offCtx.drawImage(img, 0, 0);
+        const data = offCtx.getImageData(0, 0, off.width, off.height);
+        const px = data.data;
+        for (let i = 0; i < px.length; i += 4) {
+            px[i + 3] = px[i] > 127 ? 255 : 0;
+        }
+        offCtx.putImageData(data, 0, 0);
+        box._erpkMaskAlpha = off;
+        return off;
+    }
+
     // 14px transparency-checker tile, built once and shared as a pattern.
     let checkerTile = null;
     function checkerPattern(target) {
@@ -1371,8 +1394,8 @@ function createRegionEditor(node) {
         const ph = Math.max(1, Math.round(gh));
         const cached = box._erpkGhostChecker;
         if (cached && cached.width === pw && cached.height === ph) return cached;
-        const maskImg = box._erpkMaskImg;
-        if (!maskImg || !maskImg.complete || !maskImg.naturalWidth) return null;
+        const alpha = maskAlphaCanvas(box);
+        if (!alpha) return null;
         const off = document.createElement("canvas");
         off.width = pw;
         off.height = ph;
@@ -1380,7 +1403,7 @@ function createRegionEditor(node) {
         offCtx.fillStyle = checkerPattern(offCtx);
         offCtx.fillRect(0, 0, pw, ph);
         offCtx.globalCompositeOperation = "destination-in";
-        offCtx.drawImage(maskImg, 0, 0, pw, ph);
+        offCtx.drawImage(alpha, 0, 0, pw, ph);
         box._erpkGhostChecker = off;
         return off;
     }
@@ -1455,8 +1478,11 @@ function createRegionEditor(node) {
             box.src.x * img.naturalWidth, box.src.y * img.naturalHeight,
             pw, ph, 0, 0, pw, ph,
         );
-        offCtx.globalCompositeOperation = "destination-in";
-        offCtx.drawImage(maskImg, 0, 0, pw, ph);
+        const alpha = maskAlphaCanvas(box);
+        if (alpha) {
+            offCtx.globalCompositeOperation = "destination-in";
+            offCtx.drawImage(alpha, 0, 0, pw, ph);
+        }
         box._erpkCutout = off;
         return off;
     }
@@ -3079,11 +3105,14 @@ function createRegionEditor(node) {
                 box._erpkMaskImg = m;
             }
             if (m.complete && m.naturalWidth) {
+                const alpha = maskAlphaCanvas(box);
                 tctx.fillStyle = color;
                 tctx.fillRect(0, 0, w, h);
-                tctx.globalCompositeOperation = "destination-in";
-                tctx.drawImage(m, 0, 0, w, h);
-                tctx.globalCompositeOperation = "source-over";
+                if (alpha) {
+                    tctx.globalCompositeOperation = "destination-in";
+                    tctx.drawImage(alpha, 0, 0, w, h);
+                    tctx.globalCompositeOperation = "source-over";
+                }
                 return;
             }
             m.addEventListener("load", () => {
