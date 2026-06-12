@@ -823,26 +823,8 @@ function createRegionEditor(node) {
             const gy = box.src.y * state.cssH;
             const gw = box.src.w * state.cssW;
             const gh = box.src.h * state.cssH;
-            if (cutout) {
-                ctx.save();
-                ctx.globalAlpha = 0.45;
-                ctx.filter = "grayscale(1) brightness(0.55)";
-                ctx.drawImage(cutout, gx, gy, gw, gh);
-                ctx.restore();
-                ctx.save();
-                ctx.beginPath();
-                ctx.rect(gx, gy, gw, gh);
-                ctx.clip();
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                for (let d = -gh; d < gw; d += 9) {
-                    ctx.moveTo(gx + d, gy + gh);
-                    ctx.lineTo(gx + d + gh, gy);
-                }
-                ctx.stroke();
-                ctx.restore();
-            }
+            const ghost = ghostCheckerFor(box, gw, gh);
+            if (ghost) ctx.drawImage(ghost, gx, gy, gw, gh);
             ctx.save();
             ctx.setLineDash([4, 4]);
             ctx.strokeStyle = color + "66";
@@ -1364,6 +1346,45 @@ function createRegionEditor(node) {
         ctx.restore();
     }
 
+    // 14px transparency-checker tile, built once and shared as a pattern.
+    let checkerTile = null;
+    function checkerPattern(target) {
+        if (!checkerTile) {
+            checkerTile = document.createElement("canvas");
+            checkerTile.width = 14;
+            checkerTile.height = 14;
+            const tctx = checkerTile.getContext("2d");
+            tctx.fillStyle = "rgba(186, 186, 186, 0.92)";
+            tctx.fillRect(0, 0, 14, 14);
+            tctx.fillStyle = "rgba(118, 118, 118, 0.92)";
+            tctx.fillRect(0, 0, 7, 7);
+            tctx.fillRect(7, 7, 7, 7);
+        }
+        return target.createPattern(checkerTile, "repeat");
+    }
+
+    // The erase-preview at a moved region's origin: a transparency checker
+    // clipped to the object's silhouette, reading as "already cut out".
+    // Rebuilt only when the rendered size changes.
+    function ghostCheckerFor(box, gw, gh) {
+        const pw = Math.max(1, Math.round(gw));
+        const ph = Math.max(1, Math.round(gh));
+        const cached = box._erpkGhostChecker;
+        if (cached && cached.width === pw && cached.height === ph) return cached;
+        const maskImg = box._erpkMaskImg;
+        if (!maskImg || !maskImg.complete || !maskImg.naturalWidth) return null;
+        const off = document.createElement("canvas");
+        off.width = pw;
+        off.height = ph;
+        const offCtx = off.getContext("2d");
+        offCtx.fillStyle = checkerPattern(offCtx);
+        offCtx.fillRect(0, 0, pw, ph);
+        offCtx.globalCompositeOperation = "destination-in";
+        offCtx.drawImage(maskImg, 0, 0, pw, ph);
+        box._erpkGhostChecker = off;
+        return off;
+    }
+
     // Thin arrow from the origin's center to the displaced box's center,
     // tying the erase-preview to the destination at a glance.
     function drawMoveArrow(box, color) {
@@ -1809,7 +1830,12 @@ function createRegionEditor(node) {
         const handleId = hitHandle(pointerPx(e));
         if (handleId) {
             const box = state.primary;
-            state.drag = { mode: "resize", box, anchor: resizeAnchor(box, handleId) };
+            state.drag = {
+                mode: "resize", box,
+                anchor: resizeAnchor(box, handleId),
+                // Aspect at grab time, for Shift-constrained resizing.
+                aspect: box.h > 0 ? box.w / box.h : 1,
+            };
         } else {
             const hit = maskAwareHit(p);
             if (hit >= 0) {
@@ -1892,7 +1918,22 @@ function createRegionEditor(node) {
             }
         } else if (d.mode === "resize") {
             if (!d.box) return;
-            Object.assign(d.box, rectFrom(d.anchor, snapPoint(p)));
+            let corner = snapPoint(p);
+            // Shift constrains to the aspect the box had when grabbed; the
+            // larger drag axis wins so the gesture feels dominant-direction.
+            if (e.shiftKey && d.aspect > 0) {
+                const dx = corner.x - d.anchor.x;
+                const dy = corner.y - d.anchor.y;
+                let aw = Math.abs(dx);
+                let ah = Math.abs(dy);
+                if (aw / Math.max(ah, 1e-6) > d.aspect) ah = aw / d.aspect;
+                else aw = ah * d.aspect;
+                corner = {
+                    x: clamp(d.anchor.x + Math.sign(dx || 1) * aw, 0, 1),
+                    y: clamp(d.anchor.y + Math.sign(dy || 1) * ah, 0, 1),
+                };
+            }
+            Object.assign(d.box, rectFrom(d.anchor, corner));
         }
         render();
     }
@@ -2431,6 +2472,7 @@ function createRegionEditor(node) {
             ["click", "select"],
             ["Shift+click", "add or remove from selection"],
             ["Shift+drag", "marquee select"],
+            ["Shift while resizing", "keep the aspect ratio"],
             ["drag a region", "move selection"],
             ["Alt+click", "cycle overlapping regions"],
             ["double-click", "edit description in the inspector"],
