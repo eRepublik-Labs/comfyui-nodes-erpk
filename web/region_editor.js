@@ -2581,7 +2581,7 @@ function createRegionEditor(node) {
     function openHelp() {
         closePanel();
         helpPanel = document.createElement("div");
-        popoverZoom(helpPanel);
+        popoverZoom(helpPanel, "top right");
         helpPanel.style.position = "absolute";
         helpPanel.style.zIndex = "20";
         helpPanel.style.boxSizing = "border-box";
@@ -2743,7 +2743,7 @@ function createRegionEditor(node) {
         closePanel();
         closeHelp();
         optionsPanel = document.createElement("div");
-        popoverZoom(optionsPanel);
+        popoverZoom(optionsPanel, "top right");
         optionsPanel.style.position = "absolute";
         optionsPanel.style.zIndex = "20";
         optionsPanel.style.boxSizing = "border-box";
@@ -3678,8 +3678,9 @@ function createRegionEditor(node) {
                 if (!panel) return;
                 const nx = startLeft + (ev.clientX - startX) * scale;
                 const ny = startTop + (ev.clientY - startY) * scale;
-                const maxX = Math.max(root.clientWidth - panel.offsetWidth - 4, 0);
-                const maxY = Math.max(root.clientHeight - panel.offsetHeight - 4, 0);
+                const pz = popoverScale();
+                const maxX = Math.max(root.clientWidth - panel.offsetWidth * pz - 4, 0);
+                const maxY = Math.max(root.clientHeight - panel.offsetHeight * pz - 4, 0);
                 panel.style.left = Math.round(Math.min(Math.max(nx, 4), maxX)) + "px";
                 panel.style.top = Math.round(Math.min(Math.max(ny, 4), maxY)) + "px";
             };
@@ -3911,8 +3912,9 @@ function createRegionEditor(node) {
         // inside the root.
         root.appendChild(panel);
         const pt = panelPoint(e);
-        const maxX = Math.max(root.clientWidth - panel.offsetWidth - 4, 0);
-        const maxY = Math.max(root.clientHeight - panel.offsetHeight - 4, 0);
+        const pz = popoverScale();
+        const maxX = Math.max(root.clientWidth - panel.offsetWidth * pz - 4, 0);
+        const maxY = Math.max(root.clientHeight - panel.offsetHeight * pz - 4, 0);
         panel.style.left = Math.round(Math.min(Math.max(pt.x, 4), maxX)) + "px";
         panel.style.top = Math.round(Math.min(Math.max(pt.y, 4), maxY)) + "px";
 
@@ -3958,8 +3960,17 @@ function createRegionEditor(node) {
     // In the node, ComfyUI's graph zoom magnifies the editor's fixed pixel
     // sizes; the fullscreen overlay escapes that transform, so popovers
     // compensate or they read tiny beside a wall-sized canvas.
-    function popoverZoom(el) {
-        el.style.zoom = root._erpkExpanded ? "1.45" : "";
+    function popoverScale() {
+        return root._erpkExpanded ? 1.45 : 1;
+    }
+
+    // transform, not CSS zoom: zoom multiplies the element's own left/top so
+    // positioned popovers land at the wrong place; a scale transform keeps
+    // positioning in parent pixels (only clamp math sees the factor).
+    function popoverZoom(el, origin = "top left") {
+        const z = popoverScale();
+        el.style.transformOrigin = origin;
+        el.style.transform = z !== 1 ? `scale(${z})` : "";
     }
 
     function onFsDocKeyDown(e) {
