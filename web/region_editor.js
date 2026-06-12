@@ -62,6 +62,16 @@ hoverStyles.textContent = `
     color: #6fe39a !important;
     border-color: #6fe39a !important;
 }
+@keyframes erpk-spin { to { transform: rotate(360deg); } }
+.erpk-spinner {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-top-color: rgba(255, 255, 255, 0.9);
+    animation: erpk-spin 0.8s linear infinite;
+}
 `;
 document.head.appendChild(hoverStyles);
 // Horizontal padding the editor root carries inside the DOM widget wrapper.
@@ -378,6 +388,24 @@ function createRegionEditor(node) {
         return btn;
     }
 
+    // Square buttons floating over the stage corners share the strip buttons'
+    // visual language; the canvas backdrop needs the slight fill for contrast.
+    function floatOnStage(btn, side) {
+        btn.style.position = "absolute";
+        btn.style[side] = "6px";
+        btn.style.top = "6px";
+        btn.style.zIndex = "10";
+        btn.style.width = "26px";
+        btn.style.height = "26px";
+        btn.style.padding = "0";
+        btn.style.display = "flex";
+        btn.style.alignItems = "center";
+        btn.style.justifyContent = "center";
+        btn.style.fontSize = "13px";
+        btn.style.background = "rgba(20, 20, 20, 0.75)";
+        stage.appendChild(btn);
+    }
+
     const gridBtn = makeStripButton("⊞");
     gridBtn.dataset.tip = "Show grid";
     const gridSizeInput = document.createElement("input");
@@ -422,6 +450,7 @@ function createRegionEditor(node) {
     helpBtn.dataset.tip = "Keyboard and mouse shortcuts";
     const fsBtn = makeStripButton("⤢");
     fsBtn.dataset.tip = "Expand the editor to fill the window (F · Esc to exit)";
+    floatOnStage(fsBtn, "right");
     const matchBtn = makeStripButton("⚠ match");
     matchBtn.style.font = "bold 9px 'Segoe UI', sans-serif";
     matchBtn.style.color = "rgba(249, 168, 38, 0.85)";
@@ -435,12 +464,8 @@ function createRegionEditor(node) {
     // rather than the strip, and only shows when an image is connected.
     const scanBtn = makeStripButton("✦");
     scanBtn.dataset.tip = "Scan the connected image for objects";
-    scanBtn.style.position = "absolute";
-    scanBtn.style.left = "6px";
-    scanBtn.style.top = "6px";
-    scanBtn.style.zIndex = "10";
+    floatOnStage(scanBtn, "left");
     scanBtn.style.display = "none";
-    stage.appendChild(scanBtn);
     const clearBtn = makeStripButton("Clear all");
     clearBtn.classList.add("erpk-btn-danger");
     clearBtn.dataset.tip = "Remove every region (click twice to confirm)";
@@ -461,7 +486,6 @@ function createRegionEditor(node) {
     status.appendChild(gridAlphaInput);
     status.appendChild(snapBtn);
     status.appendChild(helpBtn);
-    status.appendChild(fsBtn);
     status.appendChild(clearBtn);
 
     root.appendChild(stage);
@@ -1001,8 +1025,19 @@ function createRegionEditor(node) {
         const scanReady = !!(refImg?.naturalWidth && refImg?.naturalHeight);
         scanBtn.style.display = scanReady ? "" : "none";
         scanBtn.disabled = state.scanning || !scanReady;
-        scanBtn.textContent = state.scanning ? "…" : "✦";
-        scanBtn.style.opacity = state.scanning ? "0.5" : "1";
+        // Swap content only on state edges: render() runs per frame, and
+        // recreating the spinner each pass would restart its animation.
+        const busy = scanBtn.dataset.busy === "1";
+        if (state.scanning && !busy) {
+            scanBtn.dataset.busy = "1";
+            scanBtn.textContent = "";
+            const spin = document.createElement("span");
+            spin.className = "erpk-spinner";
+            scanBtn.appendChild(spin);
+        } else if (!state.scanning && busy) {
+            delete scanBtn.dataset.busy;
+            scanBtn.textContent = "✦";
+        }
         scanBtn.style.cursor = state.scanning ? "default" : "pointer";
         // The mask toggle is enabled only when a region carries a scanned mask.
         const hasMask = state.boxes.some((b) => b.mask);
