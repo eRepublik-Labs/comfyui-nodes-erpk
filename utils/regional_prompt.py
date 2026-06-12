@@ -35,12 +35,14 @@ REFS_HEADER = (
 )
 # Edits lead the prompt: buried inside a long placement list that mostly
 # matches the existing image, move instructions lose to "reproduce the input".
-# Each move is decomposed into erase + repaint: edit models execute the two
-# primitive operations far more reliably than an abstract "move".
+# The move itself is already composited into the image the model receives
+# (composite_moved_regions), so the prompt only asks for what edit models do
+# reliably: remove the original and blend the pasted copy.
 REPOSITION_HEADER = (
-    "Make these edits to the image (areas are "
-    '"box_2d = [ymin, xmin, ymax, xmax]" on a 0-1000 grid with top-left '
-    "origin):"
+    "Elements in this image were repositioned by pasting them at their new "
+    "locations, so each still has a leftover duplicate at its old position. "
+    'Make these edits (areas are "box_2d = [ymin, xmin, ymax, xmax]" on a '
+    "0-1000 grid with top-left origin):"
 )
 ANCHORS_LINE = (
     "Every other element in the image stays exactly where it is — do not "
@@ -193,19 +195,18 @@ def _element_line(region):
 
 def _move_line(region):
     # Hybrid phrasing, same doctrine as placement lines: the verbal
-    # destination drives the model, the coordinates pin it.
+    # placement drives the model, the coordinates pin it.
     src = region["src"]
     origin = box_2d(src["x"], src["y"], src["w"], src["h"])
     target = box_2d(region["x"], region["y"], region["w"], region["h"])
     placement = placement_phrase(region["x"], region["y"],
                                  region["w"], region["h"])
-    where = placement.replace("at the", "to the", 1)
     subject = region["desc"] or "The element"
     return (
-        f"{subject}: erase it from box_2d = {origin} and fill that area "
-        f"with the scene's background, then paint it again {where}, "
-        f"covering about {round(region['w'] * 100)}% of the image width "
-        f"and {round(region['h'] * 100)}% of its height — box_2d = {target}"
+        f"{subject}: remove the duplicate at box_2d = {origin} and fill "
+        f"that area with the scene's background. Keep the one {placement} "
+        f"(box_2d = {target}), blending it naturally into the scene — "
+        f"match lighting, shadows, and perspective."
     )
 
 
@@ -288,6 +289,53 @@ def region_has_stored_mask(region):
     """True when the region carries a non-empty base64 segmentation mask."""
     mask = region.get("mask")
     return isinstance(mask, str) and bool(mask)
+
+
+def composite_moved_regions(image, regions):
+    """Paste each moved region's source pixels at its destination.
+
+    The canvas previews moves with a masked cut-out; this makes the move real
+    in the image tensor itself, so the edit model receives the relocation as
+    fact and only has to remove the original and blend — operations it
+    performs far more reliably than coordinate-addressed moves. Returns the
+    input unchanged when there is nothing to composite; never mutates it.
+    """
+    moved = [r for r in regions
+             if region_moved(r) and r["kind"] != "text"
+             and not r.get("ref_image")]
+    if image is None or not moved:
+        return image
+    # Imported lazily, mirroring build_region_masks: the only torch touch.
+    import base64
+    from io import BytesIO
+
+    import numpy as np
+    import torch
+    from PIL import Image
+
+    result = image.clone()
+    height, width = int(result.shape[1]), int(result.shape[2])
+    for region in moved:
+        sx0, sy0, sx1, sy1 = mask_pixel_box(region["src"], width, height)
+        dx0, dy0, dx1, dy1 = mask_pixel_box(region, width, height)
+        dw, dh = dx1 - dx0, dy1 - dy0
+        patch = image[:, sy0:sy1, sx0:sx1, :].permute(0, 3, 1, 2)
+        patch = torch.nn.functional.interpolate(
+            patch, size=(dh, dw), mode="bilinear", align_corners=False,
+        ).permute(0, 2, 3, 1)
+        alpha = torch.ones((dh, dw))
+        if region_has_stored_mask(region):
+            try:
+                glyph = Image.open(BytesIO(base64.b64decode(region["mask"])))
+                glyph = glyph.convert("L").resize((dw, dh))
+                probs = np.asarray(glyph, dtype=np.float32) / 255.0
+                alpha = torch.from_numpy((probs > 0.5).astype(np.float32))
+            except Exception:
+                pass
+        blend = alpha.reshape(1, dh, dw, 1)
+        target = result[:, dy0:dy1, dx0:dx1, :]
+        result[:, dy0:dy1, dx0:dx1, :] = patch * blend + target * (1 - blend)
+    return result
 
 
 def build_region_masks(regions, width, height):
@@ -451,6 +499,7 @@ class RegionalPromptBuilder(IO.ComfyNode):
         regions += parse_regions(kwargs.get("regions"))
         if not regions and not prompt.strip():
             raise ValueError("Describe the scene or add at least one region")
+        image = composite_moved_regions(image, regions)
         masks = build_region_masks(regions, width, height)
         assembled = build_prompt(prompt, width, height, regions)
         bboxes = regions_to_pixel_bboxes(regions, width, height)

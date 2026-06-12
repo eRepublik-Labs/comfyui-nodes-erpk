@@ -26,7 +26,7 @@ Draw regions on a canvas and emit a layout-aware prompt for any image generation
 | bboxes | BOUNDING_BOX | Pixel-space boxes for the drawn regions, compatible with core bbox nodes. |
 | width | INT | The frame width, passed through. |
 | height | INT | The frame height, passed through. |
-| image | IMAGE | The reference image, passed through unchanged. |
+| image | IMAGE | The reference image, passed through. When scanned regions have been moved, their masked cut-outs are composited at the destinations first, so the edit model receives the move as fact. |
 | image_refs | ERPK_IMAGE_REFS | Wired region reference images in region order; connect to Gemini Image Edit's image_refs input. |
 | masks | MASK | A frame-sized mask batch, one per region in region order. Scanned regions use their stored segmentation; all other regions get filled rectangles. |
 
@@ -65,7 +65,7 @@ Each found object becomes a real, editable canvas region: its **prompt** is the 
 
 Hovering the canvas glows the mask of the object under the cursor, and clicking selects by mask: a click in the empty part of a scanned region's box passes through to whatever is actually under the pointer, so overlapping objects stay individually selectable. Hand-drawn regions keep plain rectangle behavior, and Alt-click still cycles the stack explicitly. The Region Mask node picks one region's mask out of the `masks` batch by canvas number for inpainting chains.
 
-Scanned objects can be repositioned: drag or scale a scanned region and its masked cut-out follows, with a dashed ghost marking the origin. The prompt then leads with the move instructions (from-box to to-box, reconstruct the vacated background) while scanned regions you did not touch are summarized as "every other element stays exactly where it is" — re-describing them line by line invites the model to re-render the scene instead of editing it. The canvas previews the intent; the edit model performs the actual move at generation time. Moving a region back to its origin returns it to the silent stay-put group.
+Scanned objects can be repositioned: drag or scale a scanned region and its masked cut-out follows, with a dashed ghost marking the origin. At execute time the move is made real deterministically — the cut-out is composited into the `image` output at its destination, pixel-exact where you dragged it — and the prompt only asks the model for what it does reliably: remove the leftover duplicate at the origin and blend the pasted copy (lighting, shadows, perspective). Scanned regions you did not touch are summarized as "every other element stays exactly where it is". Moving a region back to its origin returns it to the silent stay-put group and the image passes through untouched.
 
 ## Notes
 

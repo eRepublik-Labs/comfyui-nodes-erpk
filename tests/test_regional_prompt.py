@@ -12,6 +12,7 @@ from utils.regional_prompt import (
     aspect_ratio_string,
     box_2d,
     build_prompt,
+    composite_moved_regions,
     build_region_masks,
     mask_pixel_box,
     parse_regions,
@@ -783,20 +784,22 @@ class TestMovedRegions:
                 "desc": desc, "text": "",
                 "src": {"x": 0.1, "y": 0.7, "w": 0.2, "h": 0.2}}
 
-    def test_move_block_decomposes_into_erase_and_repaint(self):
-        # Edit models execute remove + add far more reliably than "move".
+    def test_move_block_asks_for_duplicate_removal(self):
+        # The move is already composited into the image; the model only cleans up.
         prompt = build_prompt("", 1000, 1000, [self._moved_region()])
         assert "Make these edits" in prompt
-        assert "a hippo: erase it from box_2d = [100, 100, 300, 300]" in prompt
-        assert "paint it again" in prompt
+        assert "a hippo: remove the duplicate at box_2d = [100, 100, 300, 300]" in prompt
+        assert "Keep the one" in prompt
+        assert "blending it naturally" in prompt
         assert "box_2d = [600, 600, 800, 800]" in prompt
         assert "background" in prompt.lower()
 
     def test_move_destination_keeps_verbal_placement(self):
         # The hybrid doctrine: words drive the model, coordinates pin it.
+        # No size phrasing — the composited paste already fixes the size.
         prompt = build_prompt("", 1000, 1000, [self._moved_region()])
-        assert "to the bottom-right" in prompt
-        assert "covering about 20% of the image width" in prompt
+        assert "at the bottom-right" in prompt
+        assert "box_2d = [600, 600, 800, 800]" in prompt
 
     def test_anchor_sentence_forbids_removal(self):
         prompt = build_prompt("", 1000, 1000,
@@ -837,3 +840,68 @@ class TestMovedRegions:
         prompt = build_prompt("", 1000, 1000, [region])
         assert "taken from image 2" in prompt
         assert "Make these edits" not in prompt
+
+
+class TestCompositeMovedRegions:
+    """Moved regions paste their source pixels at the destination so the
+    edit model receives the move as fact and only cleans up."""
+
+    @staticmethod
+    def _image(torch):
+        # 20x20 black frame with a solid white 5x5 patch at the top-left.
+        image = torch.zeros((1, 20, 20, 3))
+        image[:, 0:5, 0:5, :] = 1.0
+        return image
+
+    @staticmethod
+    def _moved(extra=None):
+        region = {"x": 0.5, "y": 0.5, "w": 0.25, "h": 0.25, "kind": "object",
+                  "desc": "patch", "text": "",
+                  "src": {"x": 0.0, "y": 0.0, "w": 0.25, "h": 0.25}}
+        region.update(extra or {})
+        return region
+
+    def test_identity_without_moves(self):
+        torch = pytest.importorskip("torch")
+        image = self._image(torch)
+        anchor = self._moved({"x": 0.0, "y": 0.0})
+        assert composite_moved_regions(image, [anchor]) is image
+
+    def test_none_image_passes_through(self):
+        assert composite_moved_regions(None, [self._moved()]) is None
+
+    def test_maskless_move_pastes_the_source_rectangle(self):
+        torch = pytest.importorskip("torch")
+        out = composite_moved_regions(self._image(torch), [self._moved()])
+        assert float(out[0, 12, 12, 0]) == 1.0   # pasted at destination
+        assert float(out[0, 2, 2, 0]) == 1.0     # source pixels untouched
+        assert float(out[0, 12, 2, 0]) == 0.0    # elsewhere unchanged
+
+    def test_move_scales_the_patch_to_the_destination(self):
+        torch = pytest.importorskip("torch")
+        big = self._moved({"w": 0.5, "h": 0.5, "x": 0.5, "y": 0.5})
+        out = composite_moved_regions(self._image(torch), [big])
+        assert float(out[0, 18, 18, 0]) == 1.0   # 5x5 grew to fill 10x10
+
+    def test_mask_gates_the_paste(self):
+        torch = pytest.importorskip("torch")
+        Image = pytest.importorskip("PIL.Image")
+        import base64
+        from io import BytesIO
+        # Left half of the mask is opaque, right half empty.
+        mask = Image.new("L", (5, 5), 0)
+        for yy in range(5):
+            for xx in range(2):
+                mask.putpixel((xx, yy), 255)
+        buf = BytesIO()
+        mask.save(buf, format="PNG")
+        region = self._moved({"mask": base64.b64encode(buf.getvalue()).decode()})
+        out = composite_moved_regions(self._image(torch), [region])
+        assert float(out[0, 12, 10, 0]) == 1.0   # inside the opaque half
+        assert float(out[0, 12, 14, 0]) == 0.0   # masked-out half untouched
+
+    def test_input_tensor_is_not_mutated(self):
+        torch = pytest.importorskip("torch")
+        image = self._image(torch)
+        composite_moved_regions(image, [self._moved()])
+        assert float(image[0, 12, 12, 0]) == 0.0
