@@ -2581,6 +2581,7 @@ function createRegionEditor(node) {
     function openHelp() {
         closePanel();
         helpPanel = document.createElement("div");
+        popoverZoom(helpPanel);
         helpPanel.style.position = "absolute";
         helpPanel.style.zIndex = "20";
         helpPanel.style.boxSizing = "border-box";
@@ -2742,6 +2743,7 @@ function createRegionEditor(node) {
         closePanel();
         closeHelp();
         optionsPanel = document.createElement("div");
+        popoverZoom(optionsPanel);
         optionsPanel.style.position = "absolute";
         optionsPanel.style.zIndex = "20";
         optionsPanel.style.boxSizing = "border-box";
@@ -3619,6 +3621,7 @@ function createRegionEditor(node) {
         }
         panel = document.createElement("div");
         panel.className = "erpk-region-list";
+        popoverZoom(panel);
         panel.style.position = "absolute";
         panel.style.zIndex = "20";
         panel.style.minWidth = "170px";
@@ -3952,6 +3955,13 @@ function createRegionEditor(node) {
     // register after this handler; the event marker covers ones that ran
     // before it on this same event), then a focused text field (blur), and
     // only then the overlay itself.
+    // In the node, ComfyUI's graph zoom magnifies the editor's fixed pixel
+    // sizes; the fullscreen overlay escapes that transform, so popovers
+    // compensate or they read tiny beside a wall-sized canvas.
+    function popoverZoom(el) {
+        el.style.zoom = root._erpkExpanded ? "1.45" : "";
+    }
+
     function onFsDocKeyDown(e) {
         if (e.key !== "Escape" || !root._erpkExpanded) return;
         if (e._erpkEscapeClosedPopover || helpPanel || panel) return;
