@@ -813,20 +813,43 @@ function createRegionEditor(node) {
         const isSelected = state.selection.has(box);
 
         // A moved scanned region previews its relocation: the masked cut-out
-        // from the origin follows the box, and a dashed ghost marks where the
-        // object still sits in the source image.
+        // from the origin follows the box; the origin shows an erase-preview
+        // (the silhouette dimmed and hatched — "this gets removed"), and an
+        // arrow ties origin to destination. Clicking the ghost snaps back.
         if (box.mask && regionMoved(box)) {
             const cutout = cutoutFor(box);
             if (cutout) ctx.drawImage(cutout, x, y, w, h);
+            const gx = box.src.x * state.cssW;
+            const gy = box.src.y * state.cssH;
+            const gw = box.src.w * state.cssW;
+            const gh = box.src.h * state.cssH;
+            if (cutout) {
+                ctx.save();
+                ctx.globalAlpha = 0.45;
+                ctx.filter = "grayscale(1) brightness(0.55)";
+                ctx.drawImage(cutout, gx, gy, gw, gh);
+                ctx.restore();
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(gx, gy, gw, gh);
+                ctx.clip();
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                for (let d = -gh; d < gw; d += 9) {
+                    ctx.moveTo(gx + d, gy + gh);
+                    ctx.lineTo(gx + d + gh, gy);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
             ctx.save();
             ctx.setLineDash([4, 4]);
             ctx.strokeStyle = color + "66";
             ctx.lineWidth = 1;
-            ctx.strokeRect(
-                box.src.x * state.cssW, box.src.y * state.cssH,
-                box.src.w * state.cssW, box.src.h * state.cssH,
-            );
+            ctx.strokeRect(gx, gy, gw, gh);
             ctx.restore();
+            drawMoveArrow(box, color);
         }
 
         ctx.fillStyle = color + (isSelected ? "2e" : "17");
@@ -1255,6 +1278,7 @@ function createRegionEditor(node) {
             state.boxes.forEach((box, i) => drawBox(box, i));
         }
         if (state.drag?.mode === "create" || state.drag?.mode === "marquee") drawPending();
+        if (state.drag?.mode === "resize") drawResizeBadge(state.drag.box);
         if (state.scanning) drawScanSweep();
         renderStatus();
         // Keyboard mutations (delete, paste, duplicate, depth) reach the open
@@ -1319,6 +1343,62 @@ function createRegionEditor(node) {
     }
 
     // Topmost box wins.
+    // Live scale readout while resizing a scanned region: percentages are
+    // relative to the origin box, making "scaled to fit" visible.
+    function drawResizeBadge(box) {
+        if (!box?.src) return;
+        const pw = Math.round((box.w / box.src.w) * 100);
+        const ph = Math.round((box.h / box.src.h) * 100);
+        const text = pw === ph ? `${pw}%` : `${pw}% × ${ph}%`;
+        const bx = (box.x + box.w) * state.cssW + 6;
+        const by = (box.y + box.h) * state.cssH + 14;
+        ctx.save();
+        ctx.font = "bold 11px 'Segoe UI', sans-serif";
+        const tw = ctx.measureText(text).width;
+        const px = Math.min(bx, state.cssW - tw - 12);
+        const py = Math.min(by, state.cssH - 6);
+        ctx.fillStyle = "rgba(8, 8, 10, 0.85)";
+        ctx.fillRect(px - 5, py - 11, tw + 10, 16);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
+        ctx.fillText(text, px, py);
+        ctx.restore();
+    }
+
+    // Thin arrow from the origin's center to the displaced box's center,
+    // tying the erase-preview to the destination at a glance.
+    function drawMoveArrow(box, color) {
+        const sx = (box.src.x + box.src.w / 2) * state.cssW;
+        const sy = (box.src.y + box.src.h / 2) * state.cssH;
+        const dx = (box.x + box.w / 2) * state.cssW;
+        const dy = (box.y + box.h / 2) * state.cssH;
+        const len = Math.hypot(dx - sx, dy - sy);
+        if (len < 28) return;
+        const ux = (dx - sx) / len;
+        const uy = (dy - sy) / len;
+        // Stop short of both centers so the arrow reads as a connector.
+        const ax = sx + ux * 10;
+        const ay = sy + uy * 10;
+        const bx = dx - ux * 14;
+        const by = dy - uy * 14;
+        ctx.save();
+        ctx.strokeStyle = color + "aa";
+        ctx.fillStyle = color + "aa";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(bx + ux * 7, by + uy * 7);
+        ctx.lineTo(bx - uy * 4, by + ux * 4);
+        ctx.lineTo(bx + uy * 4, by - ux * 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+    }
+
     // True when the region's geometry has left its scan origin box.
     function regionMoved(box) {
         if (!box.src) return false;
@@ -1755,6 +1835,23 @@ function createRegionEditor(node) {
                     collapseTo: wasSelected && state.selection.size > 1 ? box : null,
                 };
             } else {
+                // Clicking a moved region's erase-preview ghost cancels the
+                // move: the region snaps back to its origin.
+                const ghost = state.hideBoxes ? null : state.boxes.find(
+                    (b) => b.mask && regionMoved(b)
+                        && p.x >= b.src.x && p.x <= b.src.x + b.src.w
+                        && p.y >= b.src.y && p.y <= b.src.y + b.src.h,
+                );
+                if (ghost) {
+                    Object.assign(ghost, {
+                        x: ghost.src.x, y: ghost.src.y,
+                        w: ghost.src.w, h: ghost.src.h,
+                    });
+                    select(ghost);
+                    syncWidget();
+                    render();
+                    return;
+                }
                 clearSelection();
                 const anchor = snapPoint(p);
                 state.drag = { mode: "create", anchor, current: anchor };
