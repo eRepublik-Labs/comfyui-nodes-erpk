@@ -416,6 +416,13 @@ function createRegionEditor(node) {
 
     const canvas = document.createElement("canvas");
     canvas.tabIndex = 0;
+    // ComfyUI's ChangeTracker binds window-capture keydown at app init —
+    // before any widget can — and runs its undo in a requestAnimationFrame,
+    // so no listener ordering can block it. Its guard, however, skips any
+    // focused element whose `type` reads "textarea" (duck-typed input
+    // check); this expando makes the focused canvas pass that guard so the
+    // editor's own undo stack owns Ctrl/Cmd+Z, not the graph's.
+    canvas.type = "textarea";
     canvas.style.outline = "none";
     canvas.style.background = STAGE_BG;
     canvas.style.border = "1px solid " + HAIRLINE;
