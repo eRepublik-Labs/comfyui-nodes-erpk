@@ -3485,6 +3485,38 @@ function createRegionEditor(node) {
         header.appendChild(headerLabel);
         panel.appendChild(header);
 
+        // The header doubles as a drag handle; clientX deltas are scaled
+        // back through the graph zoom like panelPoint does.
+        header.style.cursor = "grab";
+        header.addEventListener("pointerdown", (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const startLeft = panel.offsetLeft;
+            const startTop = panel.offsetTop;
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const r = root.getBoundingClientRect();
+            const scale = r.width ? root.offsetWidth / r.width : 1;
+            const move = (ev) => {
+                if (!panel) return;
+                const nx = startLeft + (ev.clientX - startX) * scale;
+                const ny = startTop + (ev.clientY - startY) * scale;
+                const maxX = Math.max(root.clientWidth - panel.offsetWidth - 4, 0);
+                const maxY = Math.max(root.clientHeight - panel.offsetHeight - 4, 0);
+                panel.style.left = Math.round(Math.min(Math.max(nx, 4), maxX)) + "px";
+                panel.style.top = Math.round(Math.min(Math.max(ny, 4), maxY)) + "px";
+            };
+            const up = () => {
+                document.removeEventListener("pointermove", move);
+                document.removeEventListener("pointerup", up);
+                header.style.cursor = "grab";
+            };
+            header.style.cursor = "grabbing";
+            document.addEventListener("pointermove", move);
+            document.addEventListener("pointerup", up);
+        });
+
         // Right-clicking a region shows its detail above the list: a mask
         // thumbnail, the layer name, the X/Y/W/H pixel fields, the prompt, and
         // hide / delete actions. Empty-canvas right-clicks open just the list.
@@ -3518,7 +3550,8 @@ function createRegionEditor(node) {
             panelNameInput.dataset.tip = "Layer name — same-named regions share a color";
             styleInput(panelNameInput);
             panelNameInput.style.flex = "1 1 auto";
-            panelNameInput.style.fontSize = "11px";
+            panelNameInput.style.fontSize = "10px";
+            panelNameInput.style.padding = "2px 6px";
             panelNameInput.addEventListener("input", () => applyPanelName(panelNameInput));
 
             topRow.appendChild(panelThumb);
@@ -3598,7 +3631,7 @@ function createRegionEditor(node) {
 
             const actions = document.createElement("div");
             actions.style.display = "flex";
-            actions.style.justifyContent = "flex-end";
+            actions.style.justifyContent = "space-between";
             actions.style.gap = "5px";
 
             panelScanBtn = makeStripButton("✦");
@@ -3655,7 +3688,8 @@ function createRegionEditor(node) {
             actions.appendChild(panelRefBtn);
             actions.appendChild(panelEyeBtn);
             actions.appendChild(detDelBtn);
-            detail.appendChild(actions);
+            // Actions lead the detail view, above the name row.
+            detail.insertBefore(actions, detail.firstChild);
 
             // Keep presses and typing inside the detail from starting a row
             // drag or reaching the canvas and ComfyUI's global hotkeys.
