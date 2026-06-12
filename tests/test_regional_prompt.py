@@ -783,12 +783,14 @@ class TestMovedRegions:
                 "desc": desc, "text": "",
                 "src": {"x": 0.1, "y": 0.7, "w": 0.2, "h": 0.2}}
 
-    def test_move_block_gives_from_and_to(self):
+    def test_move_block_decomposes_into_erase_and_repaint(self):
+        # Edit models execute remove + add far more reliably than "move".
         prompt = build_prompt("", 1000, 1000, [self._moved_region()])
-        assert "Reposition" in prompt
-        assert "a hippo: from box_2d = [100, 100, 300, 300]" in prompt
+        assert "Make these edits" in prompt
+        assert "a hippo: erase it from box_2d = [100, 100, 300, 300]" in prompt
+        assert "paint it again" in prompt
         assert "box_2d = [600, 600, 800, 800]" in prompt
-        assert "reconstruct" in prompt.lower()
+        assert "background" in prompt.lower()
 
     def test_move_destination_keeps_verbal_placement(self):
         # The hybrid doctrine: words drive the model, coordinates pin it.
@@ -806,7 +808,7 @@ class TestMovedRegions:
                       "desc": "a brass lantern", "text": ""}
         prompt = build_prompt("", 1000, 1000,
                               [hand_drawn, self._moved_region()])
-        assert prompt.index("Reposition") < prompt.index("Layout:")
+        assert prompt.index("Make these edits") < prompt.index("Layout:")
         assert "a brass lantern" in prompt
 
     def test_anchor_regions_emit_no_element_line(self):
@@ -821,7 +823,7 @@ class TestMovedRegions:
         prompt = build_prompt("a zoo scene", 1000, 1000,
                               [self._anchor_region()])
         assert "Layout:" not in prompt
-        assert "Reposition" not in prompt
+        assert "Make these edits" not in prompt
         assert "a sleeping otter" not in prompt
         assert "a zoo scene" in prompt
 
@@ -834,4 +836,4 @@ class TestMovedRegions:
         region["ref_image"] = 2
         prompt = build_prompt("", 1000, 1000, [region])
         assert "taken from image 2" in prompt
-        assert "Reposition" not in prompt
+        assert "Make these edits" not in prompt

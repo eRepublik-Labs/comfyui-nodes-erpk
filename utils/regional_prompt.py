@@ -35,11 +35,12 @@ REFS_HEADER = (
 )
 # Edits lead the prompt: buried inside a long placement list that mostly
 # matches the existing image, move instructions lose to "reproduce the input".
+# Each move is decomposed into erase + repaint: edit models execute the two
+# primitive operations far more reliably than an abstract "move".
 REPOSITION_HEADER = (
-    "Reposition these elements in the image: move each one from its current "
-    'area to its destination area (areas are "box_2d = [ymin, xmin, ymax, '
-    'xmax]" on a 0-1000 grid with top-left origin), scaling it to fit, and '
-    "reconstruct the background it leaves behind."
+    "Make these edits to the image (areas are "
+    '"box_2d = [ymin, xmin, ymax, xmax]" on a 0-1000 grid with top-left '
+    "origin):"
 )
 ANCHORS_LINE = (
     "Every other element in the image stays exactly where it is — do not "
@@ -201,9 +202,10 @@ def _move_line(region):
     where = placement.replace("at the", "to the", 1)
     subject = region["desc"] or "The element"
     return (
-        f"{subject}: from box_2d = {origin} {where}, covering about "
-        f"{round(region['w'] * 100)}% of the image width and "
-        f"{round(region['h'] * 100)}% of its height — box_2d = {target}"
+        f"{subject}: erase it from box_2d = {origin} and fill that area "
+        f"with the scene's background, then paint it again {where}, "
+        f"covering about {round(region['w'] * 100)}% of the image width "
+        f"and {round(region['h'] * 100)}% of its height — box_2d = {target}"
     )
 
 
