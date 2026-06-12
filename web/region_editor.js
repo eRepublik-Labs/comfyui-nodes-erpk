@@ -3184,7 +3184,7 @@ function createRegionEditor(node) {
             if (!res.ok || json.error) {
                 state.scanError = json.error || `Scan failed (${res.status})`;
             } else {
-                applySectionResults(json.objects, frame);
+                applySectionResults(json.objects, frame, host);
             }
         } catch (err) {
             if (err.name !== "AbortError") {
@@ -3198,8 +3198,10 @@ function createRegionEditor(node) {
         }
     }
 
-    // Maps crop-space scan objects back into frame space and appends them.
-    function applySectionResults(objects, frame) {
+    // Maps crop-space scan objects back into frame space and REPLACES the
+    // host region with them at its depth slot — the host was the rough
+    // draft, the detections are its refinement.
+    function applySectionResults(objects, frame, host) {
         const sorted = (Array.isArray(objects) ? objects.slice() : [])
             .sort((a, b) => (Number(a?.depth_rank) || 0) - (Number(b?.depth_rank) || 0));
         const added = [];
@@ -3229,7 +3231,9 @@ function createRegionEditor(node) {
             state.scanError = "Scan found no objects in the region";
             return;
         }
-        state.boxes.push(...added);
+        const slot = state.boxes.indexOf(host);
+        if (slot >= 0) state.boxes.splice(slot, 1, ...added);
+        else state.boxes.push(...added);
         clearSelection();
         syncWidget();
     }
