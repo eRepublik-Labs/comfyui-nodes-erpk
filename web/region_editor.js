@@ -1392,12 +1392,16 @@ function createRegionEditor(node) {
     // Front-to-back pick that lets clicks pass through the empty part of a
     // scanned region's mask: a maskless region keeps plain rectangle
     // semantics, a masked one claims the point only where its object is.
+    // A SELECTED region keeps its whole rectangle, so grabbing near a corner
+    // handle manipulates it instead of falling through and starting a new box.
     function maskAwareHit(p) {
         if (state.hideBoxes) return -1;
         const hits = boxesAt(p);
         if (!hits.length) return -1;
         for (const box of hits) {
-            if (maskPixelHit(box, p) !== false) return state.boxes.indexOf(box);
+            if (state.selection.has(box) || maskPixelHit(box, p) !== false) {
+                return state.boxes.indexOf(box);
+            }
         }
         return state.boxes.indexOf(hits[0]);
     }
