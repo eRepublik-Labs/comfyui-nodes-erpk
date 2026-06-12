@@ -3347,19 +3347,39 @@ function createRegionEditor(node) {
             state.scanError = "Scan found no objects in the region";
             return;
         }
-        // The host stays and becomes the group parent; the detections nest
-        // under it as children, directly in front of it in z-order.
         const slot = state.boxes.indexOf(host);
-        if (slot >= 0) {
+        if (added.length === 1 && slot >= 0) {
+            // A lone detection is the host, refined — merging in place keeps
+            // the host's identity (id, parent, wired sockets) instead of
+            // wrapping one region in a pointless group.
+            const r = added[0];
+            for (const key of ["_erpkMaskImg", "_erpkMaskData",
+                               "_erpkCutout", "_erpkGhostChecker"]) {
+                delete host[key];
+            }
+            host.x = r.x; host.y = r.y; host.w = r.w; host.h = r.h;
+            host.kind = "object";
+            host.desc = r.desc;
+            host.group = r.group || host.group;
+            if (r.mask) host.mask = r.mask; else delete host.mask;
+            host.src = r.src;
+            select(host);
+        } else if (slot >= 0) {
+            // The host stays and becomes the group parent; the detections
+            // nest under it as children, directly in front in z-order. An
+            // unnamed host borrows its largest child's name.
+            if (!host.group) {
+                const biggest = added.reduce(
+                    (a, b) => (b.w * b.h > a.w * a.h ? b : a));
+                host.group = biggest.group ? biggest.group + " group" : "group";
+            }
             for (const region of added) region.parent = regionId(host);
             state.boxes.splice(slot + 1, 0, ...added);
+            select(added[0]);
         } else {
             state.boxes.push(...added);
+            select(added[0]);
         }
-        // Hand the open detail view the refinement: selecting the first
-        // detection rebinds the panel's fields, thumb, and rows when the
-        // post-scan render runs.
-        select(added[0]);
         syncWidget();
     }
 
