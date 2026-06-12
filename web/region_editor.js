@@ -3236,7 +3236,10 @@ function createRegionEditor(node) {
         const slot = state.boxes.indexOf(host);
         if (slot >= 0) state.boxes.splice(slot, 1, ...added);
         else state.boxes.push(...added);
-        clearSelection();
+        // Hand the open detail view the refinement: selecting the first
+        // detection rebinds the panel's fields, thumb, and rows when the
+        // post-scan render runs.
+        select(added[0]);
         syncWidget();
     }
 
