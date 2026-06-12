@@ -3616,19 +3616,19 @@ function createRegionEditor(node) {
             panelTextInput.dataset.tip =
                 "Literal text the model should render inside this region";
             styleInput(panelTextInput);
-            panelTextInput.style.width = "";
-            panelTextInput.style.flex = "1 1 auto";
-            panelTextInput.style.minWidth = "0";
             panelTextInput.style.fontSize = "10px";
+            panelTextInput.style.padding = "2px 6px";
             panelTextInput.addEventListener("input",
                 () => applyPanelText(panelTextInput));
+            // Sits directly under the prompt as its own row; the kind
+            // selector follows on its own line.
+            detail.insertBefore(panelTextInput, panelDescInput.nextSibling);
 
             const kindRow = document.createElement("div");
             kindRow.style.display = "flex";
             kindRow.style.alignItems = "center";
             kindRow.style.gap = "4px";
             kindRow.appendChild(panelKindSelect);
-            kindRow.appendChild(panelTextInput);
             detail.appendChild(kindRow);
 
             const actions = document.createElement("div");
