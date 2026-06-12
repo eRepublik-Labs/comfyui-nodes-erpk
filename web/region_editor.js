@@ -271,6 +271,10 @@ function parseRegions(text) {
         // backward compatible.
         if (typeof entry.mask === "string" && entry.mask) region.mask = entry.mask;
         if (typeof entry.group === "string" && entry.group) region.group = entry.group;
+        // Layer-group links: stable id plus optional parent id. Dangling
+        // parents are pruned after the full list is known.
+        if (typeof entry.id === "string" && entry.id) region.id = entry.id;
+        if (typeof entry.parent === "string" && entry.parent) region.parent = entry.parent;
         // View-only flag: a hidden region skips drawing and hit-testing but
         // still feeds the prompt, bbox, and mask outputs.
         if (entry.hidden === true) region.hidden = true;
@@ -294,6 +298,10 @@ function parseRegions(text) {
         }
         regions.push(region);
     }
+    const ids = new Set(regions.map((r) => r.id).filter(Boolean));
+    for (const r of regions) {
+        if (r.parent && !ids.has(r.parent)) delete r.parent;
+    }
     return regions;
 }
 
@@ -313,6 +321,8 @@ function serializeRegions(boxes) {
         if (b.mask) out.mask = b.mask;
         if (b.group) out.group = b.group;
         if (b.hidden) out.hidden = true;
+        if (b.id) out.id = b.id;
+        if (b.parent) out.parent = b.parent;
         if (b.src) {
             out.src = { x: round4(b.src.x), y: round4(b.src.y),
                         w: round4(b.src.w), h: round4(b.src.h) };
@@ -812,7 +822,7 @@ function createRegionEditor(node) {
     }
 
     function drawBox(box, index) {
-        if (box.hidden) return;
+        if (effectiveHidden(box)) return;
         const x = box.x * state.cssW;
         const y = box.y * state.cssH;
         const w = box.w * state.cssW;
@@ -1348,7 +1358,7 @@ function createRegionEditor(node) {
         const hits = [];
         for (let i = state.boxes.length - 1; i >= 0; i--) {
             const b = state.boxes[i];
-            if (b.hidden) continue;
+            if (effectiveHidden(b)) continue;
             if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
                 hits.push(b);
             }
@@ -1473,6 +1483,65 @@ function createRegionEditor(node) {
         ctx.closePath();
         ctx.fill();
         ctx.restore();
+    }
+
+    // --- Layer groups: stable ids, parent links, tree walks -----------
+    function regionId(box) {
+        if (!box.id) box.id = Math.random().toString(36).slice(2, 8);
+        return box.id;
+    }
+
+    function parentRegionOf(box) {
+        if (!box?.parent) return null;
+        return state.boxes.find((b) => b.id === box.parent) || null;
+    }
+
+    function childrenOf(box) {
+        if (!box?.id) return [];
+        return state.boxes.filter((b) => b.parent === box.id);
+    }
+
+    function descendantsOf(box, out = []) {
+        for (const child of childrenOf(box)) {
+            out.push(child);
+            descendantsOf(child, out);
+        }
+        return out;
+    }
+
+    function isDescendantOf(box, ancestor) {
+        let cur = parentRegionOf(box);
+        while (cur) {
+            if (cur === ancestor) return true;
+            cur = parentRegionOf(cur);
+        }
+        return false;
+    }
+
+    // Hidden inherits down the tree, like every layers palette.
+    function effectiveHidden(box) {
+        let cur = box;
+        while (cur) {
+            if (cur.hidden) return true;
+            cur = parentRegionOf(cur);
+        }
+        return false;
+    }
+
+    // Rebuilds the z-array so each parent is immediately followed by its
+    // descendants (group contiguity), preserving relative order throughout.
+    function normalizeGroups(order) {
+        const out = [];
+        const visit = (box) => {
+            out.push(box);
+            for (const child of order.filter((c) => parentRegionOf(c) === box)) {
+                visit(child);
+            }
+        };
+        for (const box of order) {
+            if (!parentRegionOf(box)) visit(box);
+        }
+        return out.length === order.length ? out : order;
     }
 
     // True when the region's geometry has left its scan origin box.
@@ -1633,6 +1702,15 @@ function createRegionEditor(node) {
 
     function deleteSelected() {
         if (!state.selection.size) return;
+        for (const box of state.selection) {
+            for (const child of childrenOf(box)) {
+                if (state.selection.has(child)) continue;
+                let p = parentRegionOf(box);
+                while (p && state.selection.has(p)) p = parentRegionOf(p);
+                if (p) child.parent = regionId(p);
+                else delete child.parent;
+            }
+        }
         state.boxes = state.boxes.filter((b) => !state.selection.has(b));
         clearSelection();
         syncWidget();
@@ -1643,11 +1721,15 @@ function createRegionEditor(node) {
     // copies read as distinct from their sources, and selects them.
     function pasteRegions(source) {
         if (!source.length) return;
-        const pasted = source.map((b) => ({
-            ...b,
-            x: clamp(b.x + 0.02, 0, 1 - b.w),
-            y: clamp(b.y + 0.02, 0, 1 - b.h),
-        }));
+        const pasted = source.map((b) => {
+            const copy = {
+                ...b,
+                x: clamp(b.x + 0.02, 0, 1 - b.w),
+                y: clamp(b.y + 0.02, 0, 1 - b.h),
+            };
+            delete copy.id;  // clones must not share the source's identity
+            return copy;
+        });
         state.boxes.push(...pasted);
         state.selection = new Set(pasted);
         state.primary = pasted[pasted.length - 1];
@@ -1898,6 +1980,10 @@ function createRegionEditor(node) {
                 } else {
                     select(box);
                 }
+                const moving = new Set(state.selection);
+                for (const sel of state.selection) {
+                    for (const d of descendantsOf(sel)) moving.add(d);
+                }
                 state.drag = {
                     mode: "move",
                     grabDX: p.x - box.x,
@@ -1905,7 +1991,7 @@ function createRegionEditor(node) {
                     startX: box.x,
                     startY: box.y,
                     starts: new Map(
-                        [...state.selection].map((b) => [b, { x: b.x, y: b.y }]),
+                        [...moving].map((b) => [b, { x: b.x, y: b.y }]),
                     ),
                     moved: false,
                     // A plain click (no movement) inside a multi-selection
@@ -2525,6 +2611,7 @@ function createRegionEditor(node) {
             ["Shift+click", "add or remove from selection"],
             ["Shift+drag", "marquee select"],
             ["Shift while resizing", "keep the aspect ratio"],
+            ["Alt+drop a list row", "group under that region (again to ungroup)"],
             ["drag a region", "move selection"],
             ["Alt+click", "cycle overlapping regions"],
             ["double-click", "edit description in the inspector"],
@@ -2946,6 +3033,10 @@ function createRegionEditor(node) {
     function deleteRegion(box) {
         const index = state.boxes.indexOf(box);
         if (index < 0) return;
+        for (const child of childrenOf(box)) {
+            if (box.parent) child.parent = box.parent;
+            else delete child.parent;
+        }
         state.boxes.splice(index, 1);
         state.selection.delete(box);
         if (state.primary === box) state.primary = lastSelected();
@@ -2963,12 +3054,24 @@ function createRegionEditor(node) {
             .filter((el) => el._erpkBox)
             .map((el) => el._erpkBox)
             .reverse();
+        // Collapsed descendants have no rows; reinsert each after its parent
+        // so the full z-array survives a reorder around folded groups.
+        const missing = state.boxes.filter((b) => !order.includes(b));
+        for (const m of missing) {
+            const p = parentRegionOf(m);
+            let idx = p ? order.indexOf(p) : -1;
+            if (idx === -1) { order.push(m); continue; }
+            while (idx + 1 < order.length && isDescendantOf(order[idx + 1], p)) {
+                idx++;
+            }
+            order.splice(idx + 1, 0, m);
+        }
         // A keyboard mutation mid-drag invalidates the row snapshot; refuse a
         // reorder that would add or drop regions and just rebuild the list.
         const valid = order.length === state.boxes.length
             && order.every((box) => state.boxes.includes(box));
         if (valid) {
-            state.boxes = order;
+            state.boxes = normalizeGroups(order);
             syncWidget();
         }
         render();
@@ -3024,7 +3127,7 @@ function createRegionEditor(node) {
             });
         }
 
-        function onRowUp() {
+        function onRowUp(ev) {
             window.removeEventListener("pointermove", onRowMove, true);
             window.removeEventListener("pointerup", onRowUp, true);
             window.removeEventListener("pointercancel", onRowUp, true);
@@ -3037,6 +3140,22 @@ function createRegionEditor(node) {
             row.style.position = "";
             row.style.zIndex = "";
             if (dragging) {
+                // Alt-drop nests the dragged region under the row it lands
+                // on; Alt-dropping onto its current parent ungroups it.
+                const dropBox = rows[targetIndex]?._erpkBox;
+                const dragBox = row._erpkBox;
+                if (ev?.altKey && dropBox && dropBox !== dragBox) {
+                    if (parentRegionOf(dragBox) === dropBox) {
+                        delete dragBox.parent;
+                    } else if (!isDescendantOf(dropBox, dragBox)) {
+                        dragBox.parent = regionId(dropBox);
+                    }
+                    state.boxes = normalizeGroups(state.boxes);
+                    syncWidget();
+                    render();
+                    renderPanelRows();
+                    return;
+                }
                 if (panelList && targetIndex !== startIndex) {
                     const ref = rows[targetIndex];
                     if (targetIndex > startIndex) {
@@ -3233,9 +3352,15 @@ function createRegionEditor(node) {
             state.scanError = "Scan found no objects in the region";
             return;
         }
+        // The host stays and becomes the group parent; the detections nest
+        // under it as children, directly in front of it in z-order.
         const slot = state.boxes.indexOf(host);
-        if (slot >= 0) state.boxes.splice(slot, 1, ...added);
-        else state.boxes.push(...added);
+        if (slot >= 0) {
+            for (const region of added) region.parent = regionId(host);
+            state.boxes.splice(slot + 1, 0, ...added);
+        } else {
+            state.boxes.push(...added);
+        }
         // Hand the open detail view the refinement: selecting the first
         // detection rebinds the panel's fields, thumb, and rows when the
         // post-scan render runs.
@@ -3334,8 +3459,8 @@ function createRegionEditor(node) {
         drawPanelThumb(box);
     }
 
-    function buildPanelRow(index) {
-        const box = state.boxes[index];
+    function buildPanelRow(box, depth = 0) {
+        const index = state.boxes.indexOf(box);
         const row = document.createElement("div");
         row._erpkBox = box;
         row.className = "erpk-region-row";
@@ -3343,6 +3468,7 @@ function createRegionEditor(node) {
         row.style.alignItems = "center";
         row.style.gap = "5px";
         row.style.padding = "2px 5px";
+        row.style.paddingLeft = (5 + depth * 14) + "px";
         row.style.borderRadius = "3px";
         row.style.cursor = "grab";
         row.style.border = "1px solid "
@@ -3396,7 +3522,8 @@ function createRegionEditor(node) {
         if (box.hidden) label.style.color = "rgba(255, 255, 255, 0.35)";
 
         const eyeBtn = makeStripButton("");
-        setEyeIcon(eyeBtn, !!box.hidden);
+        setEyeIcon(eyeBtn, effectiveHidden(box));
+        if (effectiveHidden(box) && !box.hidden) eyeBtn.style.opacity = "0.55";
         eyeBtn.dataset.tip = box.hidden ? "Show region" : "Hide region";
         eyeBtn.style.fontSize = "10px";
         eyeBtn.style.padding = "0 4px";
@@ -3413,6 +3540,29 @@ function createRegionEditor(node) {
         delBtn.style.color = DANGER_RED_DIM;
         delBtn.style.borderColor = DANGER_RED_BORDER;
 
+        const kids = childrenOf(box);
+        if (kids.length) {
+            const fold = document.createElement("span");
+            fold.textContent = box._erpkCollapsed ? "\u25b8" : "\u25be";
+            fold.dataset.tip = box._erpkCollapsed
+                ? "Expand group" : "Collapse group";
+            fold.style.cursor = "pointer";
+            fold.style.color = "rgba(255, 255, 255, 0.55)";
+            fold.style.flex = "0 0 auto";
+            fold.style.width = "10px";
+            fold.addEventListener("pointerdown", (e) => e.stopPropagation());
+            fold.addEventListener("click", (e) => {
+                e.stopPropagation();
+                box._erpkCollapsed = !box._erpkCollapsed;
+                renderPanelRows();
+            });
+            row.appendChild(fold);
+        } else if (depth > 0 || state.boxes.some((b) => childrenOf(b).length)) {
+            const pad = document.createElement("span");
+            pad.style.flex = "0 0 auto";
+            pad.style.width = "10px";
+            row.appendChild(pad);
+        }
         row.appendChild(eyeBtn);
         row.appendChild(swatch);
         row.appendChild(num);
@@ -3447,9 +3597,14 @@ function createRegionEditor(node) {
     function renderPanelRows() {
         if (!panelList) return;
         panelList.textContent = "";
-        for (let i = state.boxes.length - 1; i >= 0; i--) {
-            panelList.appendChild(buildPanelRow(i));
-        }
+        const emit = (box, depth) => {
+            panelList.appendChild(buildPanelRow(box, depth));
+            if (box._erpkCollapsed) return;
+            const kids = childrenOf(box);
+            for (let i = kids.length - 1; i >= 0; i--) emit(kids[i], depth + 1);
+        };
+        const roots = state.boxes.filter((b) => !parentRegionOf(b));
+        for (let i = roots.length - 1; i >= 0; i--) emit(roots[i], 0);
     }
 
     function openPanel(e) {
