@@ -72,6 +72,11 @@ hoverStyles.textContent = `
     border-top-color: #fff;
     animation: erpk-spin 0.7s linear infinite;
 }
+@keyframes erpk-pulse { 50% { opacity: 0.45; } }
+.erpk-scan-text {
+    color: ${ACTIVE_GREEN};
+    animation: erpk-pulse 1.2s ease-in-out infinite;
+}
 .erpk-stage-btn { opacity: 0.6; }
 .erpk-stage-btn:hover:not(:disabled),
 .erpk-stage-btn[data-busy="1"],
@@ -245,6 +250,11 @@ function parseRegions(text) {
                     region.src = { x: sx, y: sy, w: sw, h: sh };
                 }
             }
+        }
+        // Regions scanned before origins existed: an unmoved region's current
+        // geometry IS its origin, so backfill and the move preview lights up.
+        if (region.mask && !region.src) {
+            region.src = { x, y, w, h };
         }
         regions.push(region);
     }
@@ -1023,7 +1033,7 @@ function createRegionEditor(node) {
         const countSpan = document.createElement("span");
         if (state.scanning) {
             countSpan.textContent = "Scanning image for objects…";
-            countSpan.style.color = "rgba(255, 255, 255, 0.85)";
+            countSpan.classList.add("erpk-scan-text");
         } else {
             countSpan.textContent = count === 0
                 ? "No regions yet"
@@ -1109,6 +1119,30 @@ function createRegionEditor(node) {
         syncInspector();
     }
 
+    // A light band sweeps the frame top to bottom while the scan runs, over a
+    // slight dim so the image reads as "being processed".
+    function drawScanSweep() {
+        const t = (performance.now() % 1600) / 1600;
+        const y = t * (state.cssH + 160) - 80;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+        ctx.fillRect(0, 0, state.cssW, state.cssH);
+        const grad = ctx.createLinearGradient(0, y - 70, 0, y + 70);
+        grad.addColorStop(0, "rgba(82, 201, 125, 0)");
+        grad.addColorStop(0.5, "rgba(82, 201, 125, 0.22)");
+        grad.addColorStop(1, "rgba(82, 201, 125, 0)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, y - 70, state.cssW, 140);
+        ctx.fillStyle = "rgba(177, 255, 207, 0.55)";
+        ctx.fillRect(0, y - 1, state.cssW, 2);
+    }
+
+    // Drives render at animation rate only while a scan is in flight; the
+    // loop ends itself on the final post-scan render.
+    function scanFxLoop() {
+        render();
+        if (state.scanning) requestAnimationFrame(scanFxLoop);
+    }
+
     function render() {
         if (!state.cssW || !state.cssH) return;
         const dpr = window.devicePixelRatio || 1;
@@ -1124,6 +1158,7 @@ function createRegionEditor(node) {
             state.boxes.forEach((box, i) => drawBox(box, i));
         }
         if (state.drag?.mode === "create" || state.drag?.mode === "marquee") drawPending();
+        if (state.scanning) drawScanSweep();
         renderStatus();
         // Keyboard mutations (delete, paste, duplicate, depth) reach the open
         // panel through the shared render path; a row drag in flight owns the
@@ -2073,7 +2108,7 @@ function createRegionEditor(node) {
         state.scanError = null;
         state.scanning = true;
         state.scanAbort = new AbortController();
-        render();
+        scanFxLoop();
         try {
             const res = await fetch("/erpk/scan", {
                 method: "POST",
