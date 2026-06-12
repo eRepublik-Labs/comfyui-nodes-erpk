@@ -65,12 +65,18 @@ hoverStyles.textContent = `
 @keyframes erpk-spin { to { transform: rotate(360deg); } }
 .erpk-spinner {
     display: inline-block;
-    width: 16px;
-    height: 16px;
+    width: 13px;
+    height: 13px;
     border-radius: 50%;
-    border: 3px solid rgba(255, 255, 255, 0.2);
+    border: 2.5px solid rgba(255, 255, 255, 0.2);
     border-top-color: #fff;
     animation: erpk-spin 0.7s linear infinite;
+}
+.erpk-stage-btn { opacity: 0.6; }
+.erpk-stage-btn:hover:not(:disabled),
+.erpk-stage-btn[data-busy="1"],
+.erpk-stage-btn.erpk-btn-active {
+    opacity: 1 !important;
 }
 `;
 document.head.appendChild(hoverStyles);
@@ -391,22 +397,22 @@ function createRegionEditor(node) {
     // Square buttons floating over the stage corners share the strip buttons'
     // visual language; the canvas backdrop needs the slight fill for contrast.
     function floatOnStage(btn, side) {
+        btn.classList.add("erpk-stage-btn");
         btn.style.position = "absolute";
-        btn.style[side] = "8px";
-        btn.style.top = "8px";
+        btn.style[side] = "6px";
+        btn.style.top = "6px";
         btn.style.zIndex = "10";
-        btn.style.width = "30px";
-        btn.style.height = "30px";
+        btn.style.width = "24px";
+        btn.style.height = "24px";
         btn.style.padding = "0";
         btn.style.display = "flex";
         btn.style.alignItems = "center";
         btn.style.justifyContent = "center";
-        btn.style.fontSize = "16px";
+        btn.style.fontSize = "13px";
         btn.style.color = "rgba(255, 255, 255, 0.9)";
-        btn.style.background = "rgba(15, 15, 15, 0.9)";
-        btn.style.border = "1px solid rgba(255, 255, 255, 0.35)";
-        btn.style.borderRadius = "6px";
-        btn.style.boxShadow = "0 1px 6px rgba(0, 0, 0, 0.5)";
+        btn.style.background = "rgba(15, 15, 15, 0.8)";
+        btn.style.border = "1px solid rgba(255, 255, 255, 0.3)";
+        btn.style.borderRadius = "5px";
         stage.appendChild(btn);
     }
 
@@ -977,12 +983,17 @@ function createRegionEditor(node) {
         statusLeft.textContent = "";
         const count = state.boxes.length;
         const countSpan = document.createElement("span");
-        countSpan.textContent = count === 0
-            ? "No regions yet"
-            : `${count} region${count === 1 ? "" : "s"}`;
-        countSpan.style.color = count === 0
-            ? "rgba(255, 255, 255, 0.4)"
-            : "rgba(255, 255, 255, 0.65)";
+        if (state.scanning) {
+            countSpan.textContent = "Scanning image for objects…";
+            countSpan.style.color = "rgba(255, 255, 255, 0.85)";
+        } else {
+            countSpan.textContent = count === 0
+                ? "No regions yet"
+                : `${count} region${count === 1 ? "" : "s"}`;
+            countSpan.style.color = count === 0
+                ? "rgba(255, 255, 255, 0.4)"
+                : "rgba(255, 255, 255, 0.65)";
+        }
         statusLeft.appendChild(countSpan);
         const index = primaryIndex();
         const box = index >= 0 ? state.boxes[index] : null;
