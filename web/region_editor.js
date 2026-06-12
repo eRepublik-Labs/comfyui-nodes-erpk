@@ -3605,6 +3605,7 @@ function createRegionEditor(node) {
             panelKindSelect.dataset.tip =
                 "Region kind: an object in the scene, or literal text to render";
             styleInput(panelKindSelect);
+            panelKindSelect.style.width = "";
             panelKindSelect.style.fontSize = "10px";
             panelKindSelect.style.flex = "0 0 auto";
             panelKindSelect.addEventListener("change", onPanelKindChange);
@@ -3615,6 +3616,7 @@ function createRegionEditor(node) {
             panelTextInput.dataset.tip =
                 "Literal text the model should render inside this region";
             styleInput(panelTextInput);
+            panelTextInput.style.width = "";
             panelTextInput.style.flex = "1 1 auto";
             panelTextInput.style.minWidth = "0";
             panelTextInput.style.fontSize = "10px";
