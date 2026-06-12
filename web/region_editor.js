@@ -102,9 +102,24 @@ const HAIRLINE = "rgba(255, 255, 255, 0.10)";
 const HAIRLINE_STRONG = "rgba(255, 255, 255, 0.25)";
 const INK_ON_TAPE = "#0b0b0e";
 
-// Visibility toggle glyphs: filled disc reads as shown, crossed disc as hidden.
-const EYE_SHOWN = "◉";
-const EYE_HIDDEN = "⊘";
+// Visibility toggles render a real eye: open when shown, struck when hidden.
+const EYE_SVG =
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" '
+    + 'stroke="currentColor" stroke-width="2.4" stroke-linecap="round" '
+    + 'stroke-linejoin="round" style="display:block">'
+    + '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>'
+    + '<circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF_SVG =
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" '
+    + 'stroke="currentColor" stroke-width="2.4" stroke-linecap="round" '
+    + 'stroke-linejoin="round" style="display:block">'
+    + '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>'
+    + '<circle cx="12" cy="12" r="3"/>'
+    + '<line x1="4" y1="20" x2="20" y2="4"/></svg>';
+
+function setEyeIcon(btn, hidden) {
+    btn.innerHTML = hidden ? EYE_OFF_SVG : EYE_SVG;
+}
 
 // Regions cycle through gaffer-tape hues so each keeps a stable identity on
 // the stage; kind is marked by the T badge and rendered text, not by color.
@@ -509,6 +524,10 @@ function createRegionEditor(node) {
     // actually carries a scanned mask.
     const maskBtn = makeStripButton("◐");
     maskBtn.dataset.tip = "Show segmentation masks";
+    // Global overlay visibility, the strip twin of the H shortcut.
+    const hideBtn = makeStripButton("");
+    setEyeIcon(hideBtn, false);
+    hideBtn.dataset.tip = "Hide all region overlays (H)";
     // Scans the connected image for objects. Floats in the stage's upper-left
     // rather than the strip, and only shows when an image is connected.
     const scanBtn = makeStripButton("✦");
@@ -529,6 +548,7 @@ function createRegionEditor(node) {
     status.appendChild(statusRight);
     status.appendChild(matchBtn);
     status.appendChild(maskBtn);
+    status.appendChild(hideBtn);
     status.appendChild(gridBtn);
     status.appendChild(gridSizeInput);
     status.appendChild(gridColorInput);
@@ -903,14 +923,17 @@ function createRegionEditor(node) {
             ctx.fillText("▣", labelX + 4.5, y + 9.5);
             labelX += chipW + 1;
         }
-        if (box.desc) {
+        // The tag carries only the short layer name; the full prompt lives in
+        // the hover tooltip and the right-click detail view.
+        const tagText = box.group || box.desc;
+        if (tagText) {
             ctx.font = LABEL_FONT;
             // The label wraps inside the region: rows break at the box's
             // right edge and ellipsize only when its height runs out of
             // 13px bands.
             const labelMax = Math.max(w - (labelX - x) - 6, 12);
             const maxRows = Math.max(1, Math.floor(h / 13));
-            wrapLabel(box.desc, labelMax, maxRows).forEach((line, row) => {
+            wrapLabel(tagText, labelMax, maxRows).forEach((line, row) => {
                 const lineWidth = ctx.measureText(line).width;
                 ctx.fillStyle = "rgba(8, 8, 10, 0.72)";
                 ctx.fillRect(labelX, y + row * 13, lineWidth + 10, 13);
@@ -1116,8 +1139,8 @@ function createRegionEditor(node) {
         if (box) {
             const sel = document.createElement("span");
             const name = box.kind === "text"
-                ? (box.text || box.desc || "text")
-                : (box.desc || "unnamed");
+                ? (box.text || box.group || box.desc || "text")
+                : (box.group || box.desc || "unnamed");
             sel.textContent = ` · #${index + 1} ${name}`;
             sel.style.color = colorForRegion(box, index);
             statusLeft.appendChild(sel);
@@ -1179,6 +1202,12 @@ function createRegionEditor(node) {
         maskBtn.classList.toggle("erpk-btn-active", masksOn);
         maskBtn.style.color = masksOn ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
         maskBtn.style.borderColor = masksOn ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
+        if (hideBtn._erpkHidden !== state.hideBoxes) {
+            hideBtn._erpkHidden = state.hideBoxes;
+            setEyeIcon(hideBtn, state.hideBoxes);
+            hideBtn.dataset.tip = state.hideBoxes
+                ? "Show all region overlays (H)" : "Hide all region overlays (H)";
+        }
         clearBtn.disabled = !count;
         clearBtn.style.opacity = count ? "1" : "0.45";
         clearBtn.style.cursor = count ? "pointer" : "default";
@@ -2219,6 +2248,11 @@ function createRegionEditor(node) {
         }
     }
 
+    function onHideToggle() {
+        state.hideBoxes = !state.hideBoxes;
+        render();
+    }
+
     function onMaskToggle() {
         if (!state.boxes.some((b) => b.mask)) return;
         state.showMasks = !state.showMasks;
@@ -2579,8 +2613,11 @@ function createRegionEditor(node) {
 
     function regionTipText(box) {
         const index = state.boxes.indexOf(box);
-        const name = box.desc || (box.kind === "text" ? box.text : "") || "unnamed";
+        const name = box.group || box.desc
+            || (box.kind === "text" ? box.text : "") || "unnamed";
         const lines = [`#${index + 1} · ${name}`];
+        // The canvas tag shows only the name; the full prompt surfaces here.
+        if (box.desc && box.desc !== name) lines.push(box.desc);
         if (box.kind === "text") lines.push(`renders: "${box.text}"`);
         if (descWiredFor(box)) lines.push(`⌁ description wired from desc_${index + 1}`);
         if (refWiredFor(box)) lines.push(`▣ reference image from ref_${index + 1}`);
@@ -2924,7 +2961,7 @@ function createRegionEditor(node) {
         }
         if (panelEyeBtn) {
             const hidden = !!(box && box.hidden);
-            panelEyeBtn.textContent = hidden ? EYE_HIDDEN : EYE_SHOWN;
+            setEyeIcon(panelEyeBtn, hidden);
             panelEyeBtn.dataset.tip = hidden ? "Show region" : "Hide region";
         }
         drawPanelThumb(box);
@@ -2991,7 +3028,8 @@ function createRegionEditor(node) {
         // A hidden region reads as dimmed in the list.
         if (box.hidden) label.style.color = "rgba(255, 255, 255, 0.35)";
 
-        const eyeBtn = makeStripButton(box.hidden ? EYE_HIDDEN : EYE_SHOWN);
+        const eyeBtn = makeStripButton("");
+        setEyeIcon(eyeBtn, !!box.hidden);
         eyeBtn.dataset.tip = box.hidden ? "Show region" : "Hide region";
         eyeBtn.style.fontSize = "10px";
         eyeBtn.style.padding = "0 4px";
@@ -3008,12 +3046,12 @@ function createRegionEditor(node) {
         delBtn.style.color = DANGER_RED_DIM;
         delBtn.style.borderColor = DANGER_RED_BORDER;
 
+        row.appendChild(eyeBtn);
         row.appendChild(swatch);
         row.appendChild(num);
         row.appendChild(plug);
         row.appendChild(refMark);
         row.appendChild(label);
-        row.appendChild(eyeBtn);
         row.appendChild(dupBtn);
         row.appendChild(delBtn);
 
@@ -3095,24 +3133,7 @@ function createRegionEditor(node) {
         headerLabel.style.overflow = "hidden";
         headerLabel.style.textOverflow = "ellipsis";
 
-        const hideAllBtn = makeStripButton(state.hideBoxes ? EYE_HIDDEN : EYE_SHOWN);
-        hideAllBtn.dataset.tip = state.hideBoxes
-            ? "Show all region overlays (H)" : "Hide all region overlays (H)";
-        hideAllBtn.style.flex = "0 0 auto";
-        hideAllBtn.style.fontSize = "10px";
-        hideAllBtn.style.padding = "0 5px";
-        hideAllBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
-        hideAllBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            state.hideBoxes = !state.hideBoxes;
-            hideAllBtn.textContent = state.hideBoxes ? EYE_HIDDEN : EYE_SHOWN;
-            hideAllBtn.dataset.tip = state.hideBoxes
-                ? "Show all region overlays (H)" : "Hide all region overlays (H)";
-            render();
-        });
-
         header.appendChild(headerLabel);
-        header.appendChild(hideAllBtn);
         panel.appendChild(header);
 
         // Right-clicking a region shows its detail above the list: a mask
@@ -3197,7 +3218,8 @@ function createRegionEditor(node) {
             actions.style.justifyContent = "flex-end";
             actions.style.gap = "5px";
 
-            panelEyeBtn = makeStripButton(EYE_SHOWN);
+            panelEyeBtn = makeStripButton("");
+            setEyeIcon(panelEyeBtn, false);
             panelEyeBtn.style.fontSize = "11px";
             panelEyeBtn.style.padding = "0 6px";
             panelEyeBtn.addEventListener("click", (e) => {
@@ -3391,6 +3413,7 @@ function createRegionEditor(node) {
     snapBtn.addEventListener("click", onSnapToggle);
     scanBtn.addEventListener("click", onScanClick);
     maskBtn.addEventListener("click", onMaskToggle);
+    hideBtn.addEventListener("click", onHideToggle);
 
     const observer = new ResizeObserver(() => layout());
     observer.observe(stage);
