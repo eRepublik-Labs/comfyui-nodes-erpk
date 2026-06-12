@@ -126,6 +126,15 @@ function setEyeIcon(btn, hidden) {
     btn.innerHTML = hidden ? EYE_OFF_SVG : EYE_SVG;
 }
 
+// Picture glyph for the reference-image socket toggle.
+const IMAGE_SVG =
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" '
+    + 'stroke="currentColor" stroke-width="2.4" stroke-linecap="round" '
+    + 'stroke-linejoin="round" style="display:block">'
+    + '<rect x="3" y="3" width="18" height="18" rx="2"/>'
+    + '<circle cx="8.5" cy="8.5" r="1.6"/>'
+    + '<path d="M21 15l-5-5L5 21"/></svg>';
+
 // Regions cycle through gaffer-tape hues so each keeps a stable identity on
 // the stage; kind is marked by the T badge and rendered text, not by color.
 const TAPE_COLORS = ["#4cc9f0", "#f9a826", "#f15bb5", "#9ef01a", "#9b5de5", "#ff6d5a"];
@@ -3607,8 +3616,8 @@ function createRegionEditor(node) {
                 refreshPanelDetail();
             });
 
-            panelRefBtn = makeStripButton("▣");
-            panelRefBtn.style.fontSize = "11px";
+            panelRefBtn = makeStripButton("");
+            panelRefBtn.innerHTML = IMAGE_SVG;
             panelRefBtn.style.padding = "0 6px";
             panelRefBtn.addEventListener("click", (e) => {
                 e.stopPropagation();
