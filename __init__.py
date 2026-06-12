@@ -246,6 +246,15 @@ try:
 except Exception as e:
     print(f"[ERPK] Warning: Could not register shared workflows routes: {e}")
 
+# Register the editor scan route (vision-based region detection)
+try:
+    from server import PromptServer
+    from . import scan_route
+    scan_route.register(PromptServer.instance)
+    print("[ERPK] Registered scan route")
+except Exception as e:
+    print(f"[ERPK] Warning: Could not register scan route: {e}")
+
 # --- Monkey-patches (independent of V1/V3 node registration) ---
 
 try:

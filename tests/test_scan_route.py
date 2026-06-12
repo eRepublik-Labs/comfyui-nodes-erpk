@@ -1,0 +1,190 @@
+# ABOUTME: Tests for the /erpk/scan aiohttp route handler and its pure request helpers.
+# ABOUTME: Covers data-URL decode, max_objects clamping, response/error shapes, and registration.
+
+"""
+Validates utils.scan_route: the torch-free helpers (clamp_max_objects,
+decode_data_url) and the async handle_scan handler driven by a fake request and
+an injected fake engine. PIL decode is exercised with a real generated PNG; the
+Gemini engine is never invoked (dispatch is monkeypatched), keeping the suite
+network- and key-free.
+"""
+
+import asyncio
+import base64
+import io
+import json
+
+import pytest
+
+from utils import scan_engine, scan_route
+from utils.scan_route import clamp_max_objects, decode_data_url, handle_scan, register
+
+
+def _png_data_url():
+    """A tiny real PNG as a base64 data URL, so PIL.Image.open succeeds."""
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (4, 4), (10, 20, 30)).save(buf, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+class FakeRequest:
+    """Minimal stand-in exposing the async json() handle_scan reads."""
+
+    def __init__(self, payload, raise_json=False, content_length=None):
+        self._payload = payload
+        self._raise_json = raise_json
+        self.content_length = content_length
+
+    async def json(self):
+        if self._raise_json:
+            raise ValueError("bad json")
+        return self._payload
+
+
+def _body(response):
+    return json.loads(response.body.decode())
+
+
+class TestClampMaxObjects:
+    def test_default_for_missing(self):
+        assert clamp_max_objects(None) == scan_engine.DEFAULT_MAX_OBJECTS
+
+    def test_passthrough_in_range(self):
+        assert clamp_max_objects(12) == 12
+
+    def test_clamps_low(self):
+        assert clamp_max_objects(0) == 1
+        assert clamp_max_objects(-5) == 1
+
+    def test_clamps_high(self):
+        assert clamp_max_objects(9999) == scan_engine.MAX_OBJECTS_CEILING
+
+    def test_default_for_non_int(self):
+        assert clamp_max_objects("abc") == scan_engine.DEFAULT_MAX_OBJECTS
+
+
+class TestDecodeDataUrl:
+    def test_decodes_data_url(self):
+        raw = decode_data_url("data:image/png;base64,QUJD")
+        assert raw == b"ABC"
+
+    def test_decodes_raw_base64(self):
+        assert decode_data_url("QUJD") == b"ABC"
+
+    def test_missing_raises(self):
+        with pytest.raises(ValueError):
+            decode_data_url(None)
+        with pytest.raises(ValueError):
+            decode_data_url("")
+
+    def test_malformed_raises(self):
+        with pytest.raises(ValueError):
+            decode_data_url("data:image/png;base64")
+        with pytest.raises(ValueError):
+            decode_data_url("@@@not base64@@@")
+
+
+class TestHandleScan:
+    def test_oversized_body_rejected(self):
+        req = FakeRequest({}, content_length=scan_route.SCAN_MAX_BODY_BYTES + 1)
+        resp = asyncio.run(handle_scan(req))
+        assert resp.status == 413
+        assert "error" in _body(resp)
+
+    def test_success_returns_objects(self, monkeypatch):
+        async def fake_scan(image, max_objects, model):
+            return [{"name": "car", "box": {"x": 0, "y": 0, "w": 0.5, "h": 0.5},
+                     "mask": None, "group": "car", "depth_rank": 0}]
+
+        monkeypatch.setattr(scan_engine, "scan", fake_scan)
+        req = FakeRequest({"image": _png_data_url(), "max_objects": 5})
+        resp = asyncio.run(handle_scan(req))
+        assert resp.status == 200
+        assert _body(resp)["objects"][0]["name"] == "car"
+
+    def test_max_objects_clamped_before_engine(self, monkeypatch):
+        seen = {}
+
+        async def fake_scan(image, max_objects, model):
+            seen["max_objects"] = max_objects
+            seen["model"] = model
+            return []
+
+        monkeypatch.setattr(scan_engine, "scan", fake_scan)
+        req = FakeRequest({"image": _png_data_url(), "max_objects": 9999})
+        asyncio.run(handle_scan(req))
+        assert seen["max_objects"] == scan_engine.MAX_OBJECTS_CEILING
+        assert seen["model"] is None
+
+    def test_blank_model_becomes_none(self, monkeypatch):
+        seen = {}
+
+        async def fake_scan(image, max_objects, model):
+            seen["model"] = model
+            return []
+
+        monkeypatch.setattr(scan_engine, "scan", fake_scan)
+        req = FakeRequest({"image": _png_data_url(), "model": "  "})
+        asyncio.run(handle_scan(req))
+        assert seen["model"] is None
+
+    def test_explicit_model_forwarded(self, monkeypatch):
+        seen = {}
+
+        async def fake_scan(image, max_objects, model):
+            seen["model"] = model
+            return []
+
+        monkeypatch.setattr(scan_engine, "scan", fake_scan)
+        req = FakeRequest({"image": _png_data_url(), "model": "gemini-2.5-flash"})
+        asyncio.run(handle_scan(req))
+        assert seen["model"] == "gemini-2.5-flash"
+
+    def test_missing_image_is_400(self):
+        resp = asyncio.run(handle_scan(FakeRequest({})))
+        assert resp.status == 400
+        assert "image" in _body(resp)["error"].lower()
+
+    def test_malformed_image_is_400(self):
+        resp = asyncio.run(handle_scan(FakeRequest({"image": "data:image/png;base64,@@@"})))
+        assert resp.status == 400
+
+    def test_undecodable_image_is_400(self):
+        # Valid base64, but not an image PIL can open.
+        bogus = base64.b64encode(b"not an image").decode()
+        resp = asyncio.run(handle_scan(FakeRequest({"image": bogus})))
+        assert resp.status == 400
+
+    def test_invalid_json_body_is_400(self):
+        resp = asyncio.run(handle_scan(FakeRequest(None, raise_json=True)))
+        assert resp.status == 400
+
+    def test_engine_failure_is_502(self, monkeypatch):
+        async def boom(image, max_objects, model):
+            raise RuntimeError("Gemini blocked")
+
+        monkeypatch.setattr(scan_engine, "scan", boom)
+        resp = asyncio.run(handle_scan(FakeRequest({"image": _png_data_url()})))
+        assert resp.status == 502
+        assert "Gemini blocked" in _body(resp)["error"]
+
+
+class TestRegister:
+    def test_register_adds_post_route(self):
+        from aiohttp import web
+
+        routes = web.RouteTableDef()
+
+        class FakeServer:
+            pass
+
+        server = FakeServer()
+        server.routes = routes
+        register(server)
+        registered = list(routes)
+        assert any(
+            getattr(r, "path", None) == "/erpk/scan" and r.method == "POST"
+            for r in registered
+        )
