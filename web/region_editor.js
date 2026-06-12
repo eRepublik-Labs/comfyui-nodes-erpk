@@ -2143,13 +2143,6 @@ function createRegionEditor(node) {
             moveSelectedRegion(e.key === "]" ? 1 : -1);
             return;
         }
-        if (mod && key === "z") {
-            e.preventDefault();
-            e.stopPropagation();
-            if (e.shiftKey) redoRegions();
-            else undoRegions();
-            return;
-        }
         if (mod && key === "c" && state.selection.size) {
             e.preventDefault();
             e.stopPropagation();
@@ -3973,6 +3966,24 @@ function createRegionEditor(node) {
         el.style.transform = z !== 1 ? `scale(${z})` : "";
     }
 
+    // ComfyUI's undo keybinding listens in the capture phase at the
+    // document, ahead of any editor handler — letting it through both
+    // double-undoes (workflow + regions) and re-configures the node, which
+    // flashes the widget and tears down fullscreen. Window capture runs
+    // first, so the editor can own Ctrl/Cmd+Z for events born inside it.
+    function onGlobalUndoKey(e) {
+        if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return;
+        const target = e.target;
+        if (!(target instanceof Node) || !root.contains(target)) return;
+        const editable = target.tagName === "INPUT"
+            || target.tagName === "TEXTAREA" || target.isContentEditable;
+        e.stopPropagation();
+        if (editable) return;  // native text-field undo, ComfyUI kept out
+        e.preventDefault();
+        if (e.shiftKey) redoRegions();
+        else undoRegions();
+    }
+
     function onFsDocKeyDown(e) {
         if (e.key !== "Escape" || !root._erpkExpanded) return;
         if (e._erpkEscapeClosedPopover || helpPanel || panel) return;
@@ -4053,6 +4064,7 @@ function createRegionEditor(node) {
     canvas.addEventListener("pointercancel", onPointerUp);
     canvas.addEventListener("dblclick", onDblClick);
     canvas.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onGlobalUndoKey, true);
     canvas.addEventListener("contextmenu", onContextMenu);
     helpBtn.addEventListener("click", onHelpToggle);
     gearBtn.addEventListener("click", onOptionsToggle);
@@ -4130,6 +4142,7 @@ function createRegionEditor(node) {
         root.removeEventListener("pointerout", onTipOut);
         root.removeEventListener("pointerdown", hideTip, true);
         canvas.removeEventListener("pointerleave", onCanvasTipLeave);
+        window.removeEventListener("keydown", onGlobalUndoKey, true);
         hideTip();
         closePanel();
         closeHelp();
