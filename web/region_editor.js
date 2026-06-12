@@ -72,10 +72,15 @@ hoverStyles.textContent = `
     border-top-color: #fff;
     animation: erpk-spin 0.7s linear infinite;
 }
-@keyframes erpk-pulse { 50% { opacity: 0.45; } }
+@keyframes erpk-gemini-shimmer { to { background-position: -200% center; } }
 .erpk-scan-text {
-    color: ${ACTIVE_GREEN};
-    animation: erpk-pulse 1.2s ease-in-out infinite;
+    background: linear-gradient(90deg,
+        #4285f4, #9b72cb, #d96570, #9b72cb, #4285f4);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: erpk-gemini-shimmer 2.4s linear infinite;
 }
 .erpk-stage-btn { opacity: 0.6; }
 .erpk-stage-btn:hover:not(:disabled),
@@ -812,19 +817,20 @@ function createRegionEditor(node) {
         const color = colorForRegion(box, index);
         const isSelected = state.selection.has(box);
 
-        // A moved scanned region previews its relocation: the masked cut-out
-        // from the origin follows the box; the origin shows an erase-preview
-        // (the silhouette dimmed and hatched — "this gets removed"), and an
-        // arrow ties origin to destination. Clicking the ghost snaps back.
+        // A moved scanned region previews its relocation: the origin shows an
+        // erase-preview (a checkerboard silhouette — "already cut out") and
+        // the masked cut-out follows the box ABOVE it, so a small nudge reads
+        // as the object sliding off its own hole. Clicking the ghost snaps
+        // back; an arrow ties origin to destination.
         if (box.mask && regionMoved(box)) {
-            const cutout = cutoutFor(box);
-            if (cutout) ctx.drawImage(cutout, x, y, w, h);
             const gx = box.src.x * state.cssW;
             const gy = box.src.y * state.cssH;
             const gw = box.src.w * state.cssW;
             const gh = box.src.h * state.cssH;
             const ghost = ghostCheckerFor(box, gw, gh);
             if (ghost) ctx.drawImage(ghost, gx, gy, gw, gh);
+            const cutout = cutoutFor(box);
+            if (cutout) ctx.drawImage(cutout, x, y, w, h);
             ctx.save();
             ctx.setLineDash([4, 4]);
             ctx.strokeStyle = color + "66";
@@ -1221,21 +1227,34 @@ function createRegionEditor(node) {
         syncInspector();
     }
 
-    // A light band sweeps the frame top to bottom while the scan runs, over a
-    // slight dim so the image reads as "being processed".
+    // Gemini-gradient sweep while the scan runs: an eased ping-pong band in
+    // the Gemini brand colors glides over a softly dimmed frame, additively
+    // blended so it glows instead of veiling.
     function drawScanSweep() {
-        const t = (performance.now() % 1600) / 1600;
-        const y = t * (state.cssH + 160) - 80;
-        ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+        const phase = (performance.now() % 2400) / 2400;
+        // Cosine ping-pong: glides to the bottom and back with soft turns.
+        const t = (1 - Math.cos(phase * 2 * Math.PI)) / 2;
+        const y = t * (state.cssH + 120) - 60;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
         ctx.fillRect(0, 0, state.cssW, state.cssH);
-        const grad = ctx.createLinearGradient(0, y - 70, 0, y + 70);
-        grad.addColorStop(0, "rgba(82, 201, 125, 0)");
-        grad.addColorStop(0.5, "rgba(82, 201, 125, 0.22)");
-        grad.addColorStop(1, "rgba(82, 201, 125, 0)");
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, y - 70, state.cssW, 140);
-        ctx.fillStyle = "rgba(177, 255, 207, 0.55)";
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+        const band = ctx.createLinearGradient(0, y - 80, 0, y + 80);
+        band.addColorStop(0, "rgba(66, 133, 244, 0)");
+        band.addColorStop(0.35, "rgba(66, 133, 244, 0.16)");
+        band.addColorStop(0.5, "rgba(155, 114, 203, 0.22)");
+        band.addColorStop(0.65, "rgba(217, 101, 112, 0.16)");
+        band.addColorStop(1, "rgba(217, 101, 112, 0)");
+        ctx.fillStyle = band;
+        ctx.fillRect(0, y - 80, state.cssW, 160);
+        // Leading edge: a thin line running the Gemini gradient horizontally.
+        const edge = ctx.createLinearGradient(0, 0, state.cssW, 0);
+        edge.addColorStop(0, "rgba(66, 133, 244, 0.75)");
+        edge.addColorStop(0.5, "rgba(155, 114, 203, 0.85)");
+        edge.addColorStop(1, "rgba(217, 101, 112, 0.75)");
+        ctx.fillStyle = edge;
         ctx.fillRect(0, y - 1, state.cssW, 2);
+        ctx.restore();
     }
 
     // Drives render at animation rate only while a scan is in flight; the
