@@ -379,6 +379,11 @@ function createRegionEditor(node) {
     snapBtn.dataset.tip = "Snap drawing, moving, and resizing to the grid";
     const helpBtn = makeStripButton("?");
     helpBtn.dataset.tip = "Keyboard and mouse shortcuts";
+    const matchBtn = makeStripButton("⚠ match");
+    matchBtn.style.font = "bold 9px 'Segoe UI', sans-serif";
+    matchBtn.style.color = "rgba(249, 168, 38, 0.85)";
+    matchBtn.style.borderColor = "rgba(249, 168, 38, 0.45)";
+    matchBtn.style.display = "none";
     const clearBtn = makeStripButton("Clear all");
     clearBtn.classList.add("erpk-btn-danger");
     clearBtn.dataset.tip = "Remove every region (click twice to confirm)";
@@ -391,6 +396,7 @@ function createRegionEditor(node) {
     clearBtn.style.borderColor = DANGER_RED_BORDER;
     status.appendChild(statusLeft);
     status.appendChild(statusRight);
+    status.appendChild(matchBtn);
     status.appendChild(gridBtn);
     status.appendChild(gridSizeInput);
     status.appendChild(gridColorInput);
@@ -843,6 +849,16 @@ function createRegionEditor(node) {
         return `${Math.round(w / d)}:${Math.round(h / d)}`;
     }
 
+    // Frame dimensions matching an image's aspect, scaled into the widget
+    // range and snapped to the widgets' step of 8.
+    function fitFrameToImage(iw, ih) {
+        const down = Math.min(8192 / iw, 8192 / ih, 1);
+        const up = Math.max(64 / (iw * down), 64 / (ih * down), 1);
+        const w = Math.round((iw * down * up) / 8) * 8;
+        const h = Math.round((ih * down * up) / 8) * 8;
+        return { w: clamp(w, 64, 8192), h: clamp(h, 64, 8192) };
+    }
+
     function renderStatus() {
         statusLeft.textContent = "";
         const count = state.boxes.length;
@@ -868,6 +884,24 @@ function createRegionEditor(node) {
         const w = Number(findWidget(node, "width")?.value) || 1024;
         const h = Number(findWidget(node, "height")?.value) || 1024;
         statusRight.textContent = `${w}×${h} · ${ratioString(w, h)}`;
+        // An edit output follows the source image's canvas, so a frame whose
+        // aspect differs from the connected reference composes for a shape
+        // that will not exist; the chip offers a one-click match.
+        const refImg = upstreamImage("image");
+        let matchDims = null;
+        if (refImg?.naturalWidth && refImg?.naturalHeight) {
+            const imgAspect = refImg.naturalWidth / refImg.naturalHeight;
+            if (Math.abs(imgAspect / (w / h) - 1) > 0.01) {
+                matchDims = fitFrameToImage(refImg.naturalWidth, refImg.naturalHeight);
+            }
+        }
+        matchBtn.style.display = matchDims ? "" : "none";
+        if (matchDims) {
+            matchBtn._erpkDims = matchDims;
+            matchBtn.dataset.tip = `Frame ${w}×${h} doesn't match the `
+                + `connected image ${refImg.naturalWidth}×${refImg.naturalHeight}`
+                + ` — click to set ${matchDims.w}×${matchDims.h}`;
+        }
         clearBtn.disabled = !count;
         clearBtn.style.opacity = count ? "1" : "0.45";
         clearBtn.style.cursor = count ? "pointer" : "default";
@@ -1661,6 +1695,19 @@ function createRegionEditor(node) {
         moveSelectedRegion(-1);
     }
 
+    // The dimension widgets' value setters relay into applyAspectChange, so
+    // assigning here relayouts the canvas like a manual edit would.
+    function onMatchClick() {
+        const dims = matchBtn._erpkDims;
+        if (!dims) return;
+        const widthWidget = findWidget(node, "width");
+        const heightWidget = findWidget(node, "height");
+        if (widthWidget) widthWidget.value = dims.w;
+        if (heightWidget) heightWidget.value = dims.h;
+        node.setDirtyCanvas?.(true, true);
+        render();
+    }
+
     function onBringForward() {
         moveSelectedRegion(1);
     }
@@ -2350,6 +2397,7 @@ function createRegionEditor(node) {
     kindSelect.addEventListener("change", onKindChange);
     textInput.addEventListener("input", onTextInput);
     clearBtn.addEventListener("click", onClearClick);
+    matchBtn.addEventListener("click", onMatchClick);
     backBtn.addEventListener("click", onSendBack);
     frontBtn.addEventListener("click", onBringForward);
     plugBtn.addEventListener("click", onPlugToggle);
@@ -2391,6 +2439,7 @@ function createRegionEditor(node) {
         kindSelect.removeEventListener("change", onKindChange);
         textInput.removeEventListener("input", onTextInput);
         clearBtn.removeEventListener("click", onClearClick);
+        matchBtn.removeEventListener("click", onMatchClick);
         backBtn.removeEventListener("click", onSendBack);
         frontBtn.removeEventListener("click", onBringForward);
         plugBtn.removeEventListener("click", onPlugToggle);
