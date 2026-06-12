@@ -65,7 +65,7 @@ Each found object becomes a real, editable canvas region: its **prompt** is the 
 
 Hovering the canvas glows the mask of the object under the cursor, and clicking selects by mask: a click in the empty part of a scanned region's box passes through to whatever is actually under the pointer, so overlapping objects stay individually selectable. Hand-drawn regions keep plain rectangle behavior, and Alt-click still cycles the stack explicitly. The Region Mask node picks one region's mask out of the `masks` batch by canvas number for inpainting chains.
 
-Scanned objects can be repositioned: drag or scale a scanned region and its masked cut-out follows, with a dashed ghost marking the origin. The prompt then tells the model to move the object there and reconstruct the vacated background — the canvas previews the intent, and the edit model performs the actual move at generation time. Moving a region back to its origin restores the plain placement line.
+Scanned objects can be repositioned: drag or scale a scanned region and its masked cut-out follows, with a dashed ghost marking the origin. The prompt then leads with the move instructions (from-box to to-box, reconstruct the vacated background) while scanned regions you did not touch are summarized as "every other element stays exactly where it is" — re-describing them line by line invites the model to re-render the scene instead of editing it. The canvas previews the intent; the edit model performs the actual move at generation time. Moving a region back to its origin returns it to the silent stay-put group.
 
 ## Notes
 

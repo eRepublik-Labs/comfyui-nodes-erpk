@@ -33,12 +33,15 @@ REFS_HEADER = (
     "adapting it to the scene's lighting and perspective. Keep everything "
     "else in image 1 unchanged."
 )
-MOVED_HEADER = (
-    "Some elements are being repositioned: their lines give the element's "
-    "current location and the placement area to move it to. Move each one, "
-    "scaling it to fit its new area, and reconstruct the background it "
-    "leaves behind."
+# Edits lead the prompt: buried inside a long placement list that mostly
+# matches the existing image, move instructions lose to "reproduce the input".
+REPOSITION_HEADER = (
+    "Reposition these elements in the image: move each one from its current "
+    'area to its destination area (areas are "box_2d = [ymin, xmin, ymax, '
+    'xmax]" on a 0-1000 grid with top-left origin), scaling it to fit, and '
+    "reconstruct the background it leaves behind."
 )
+ANCHORS_LINE = "Every other element in the image stays exactly where it is."
 LAYOUT_FOOTER = (
     "Every element must stay fully inside its placement area and fill most of it. "
     "Do not add other prominent subjects. The placement areas are invisible "
@@ -181,12 +184,36 @@ def _element_line(region):
             else f"The item shown in image {ref}, reproduced exactly"
         )
         return f"{subject}: {geometry}"
-    if region_moved(region):
-        src = region["src"]
-        origin = box_2d(src["x"], src["y"], src["w"], src["h"])
-        subject = region["desc"] or "An element"
-        return f"{subject}, currently at box_2d = {origin} — move it to: {geometry}"
     return f'{region["desc"] or "An element"}: {geometry}'
+
+
+def _move_line(region):
+    src = region["src"]
+    origin = box_2d(src["x"], src["y"], src["w"], src["h"])
+    target = box_2d(region["x"], region["y"], region["w"], region["h"])
+    subject = region["desc"] or "The element"
+    return f"{subject}: from box_2d = {origin} to box_2d = {target}"
+
+
+def _classify_regions(regions):
+    """Split regions into moves, anchors, and additions for the prompt.
+
+    A scanned region (one with an origin box) that has not moved describes
+    pixels already in the image — giving it a placement line invites the
+    model to re-render the scene instead of editing it, so it becomes a
+    silent anchor. Reference-image and text regions always render as
+    additions regardless of origin.
+    """
+    moves, anchors, additions = [], [], []
+    for region in regions:
+        plain = region["kind"] != "text" and not region.get("ref_image")
+        if plain and region_moved(region):
+            moves.append(region)
+        elif plain and isinstance(region.get("src"), dict):
+            anchors.append(region)
+        else:
+            additions.append(region)
+    return moves, anchors, additions
 
 
 def build_prompt(prompt, width, height, regions):
@@ -198,16 +225,25 @@ def build_prompt(prompt, width, height, regions):
         lines.append("")
     ratio = aspect_ratio_string(width, height)
     lines.append(f"Compose for a {width}x{height} frame (aspect ratio {ratio}).")
-    if regions:
+    moves, anchors, additions = _classify_regions(regions)
+    if moves:
+        lines.append("")
+        lines.append(REPOSITION_HEADER)
+        for index, region in enumerate(moves, start=1):
+            lines.append(f"{index}. {_move_line(region)}")
+        if anchors:
+            lines.append(ANCHORS_LINE)
+    if additions:
         lines.append("")
         header = LAYOUT_HEADER
-        if any(region.get("ref_image") for region in regions):
+        if any(region.get("ref_image") for region in additions):
             header += " " + REFS_HEADER
-        if any(region_moved(r) and not r.get("ref_image") for r in regions):
-            header += " " + MOVED_HEADER
         lines.append(header)
-        for index, region in enumerate(regions, start=1):
+        for index, region in enumerate(additions, start=1):
             lines.append(f"{index}. {_element_line(region)}")
+        if anchors and not moves:
+            lines.append(ANCHORS_LINE)
+    if moves or additions:
         lines.append(LAYOUT_FOOTER)
     return "\n".join(lines)
 

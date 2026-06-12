@@ -776,30 +776,51 @@ class TestMovedRegions:
             {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
              "kind": "object", "desc": "", "text": ""})
 
-    def test_moved_line_relocates_from_origin(self):
+    @staticmethod
+    def _anchor_region(desc="a sleeping otter"):
+        # Scanned and unmoved: the object already sits where its box says.
+        return {"x": 0.1, "y": 0.7, "w": 0.2, "h": 0.2, "kind": "object",
+                "desc": desc, "text": "",
+                "src": {"x": 0.1, "y": 0.7, "w": 0.2, "h": 0.2}}
+
+    def test_move_block_gives_from_and_to(self):
         prompt = build_prompt("", 1000, 1000, [self._moved_region()])
-        assert "a hippo, currently at box_2d = [100, 100, 300, 300]" in prompt
-        assert "move it to:" in prompt
-        assert "box_2d = [600, 600, 800, 800]" in prompt
+        assert "Reposition" in prompt
+        assert "a hippo: from box_2d = [100, 100, 300, 300]" in prompt
+        assert "to box_2d = [600, 600, 800, 800]" in prompt
+        assert "reconstruct" in prompt.lower()
 
-    def test_moved_header_present_only_with_moved_regions(self):
-        moved = build_prompt("", 1000, 1000, [self._moved_region()])
-        assert "reconstruct the background" in moved.lower()
-        still = self._moved_region()
-        still["src"] = dict(x=still["x"], y=still["y"], w=still["w"], h=still["h"])
-        unmoved = build_prompt("", 1000, 1000, [still])
-        assert "reconstruct the background" not in unmoved.lower()
+    def test_moves_lead_the_layout_section(self):
+        hand_drawn = {"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2, "kind": "object",
+                      "desc": "a brass lantern", "text": ""}
+        prompt = build_prompt("", 1000, 1000,
+                              [hand_drawn, self._moved_region()])
+        assert prompt.index("Reposition") < prompt.index("Layout:")
+        assert "a brass lantern" in prompt
 
-    def test_unmoved_scanned_region_keeps_plain_line(self):
-        still = self._moved_region()
-        still["src"] = dict(x=still["x"], y=still["y"], w=still["w"], h=still["h"])
-        prompt = build_prompt("", 1000, 1000, [still])
-        assert "move it to" not in prompt
-        assert "a hippo: " in prompt
+    def test_anchor_regions_emit_no_element_line(self):
+        # An unmoved scanned region describes existing pixels - re-stating it
+        # invites the model to re-render instead of edit.
+        prompt = build_prompt("", 1000, 1000,
+                              [self._anchor_region(), self._moved_region()])
+        assert "a sleeping otter" not in prompt
+        assert "stays exactly where it is" in prompt
+
+    def test_anchors_only_yields_no_layout_section(self):
+        prompt = build_prompt("a zoo scene", 1000, 1000,
+                              [self._anchor_region()])
+        assert "Layout:" not in prompt
+        assert "Reposition" not in prompt
+        assert "a sleeping otter" not in prompt
+        assert "a zoo scene" in prompt
+
+    def test_no_anchor_sentence_without_anchors(self):
+        prompt = build_prompt("", 1000, 1000, [self._moved_region()])
+        assert "stays exactly where it is" not in prompt
 
     def test_ref_image_wins_over_move_phrasing(self):
         region = self._moved_region()
         region["ref_image"] = 2
         prompt = build_prompt("", 1000, 1000, [region])
         assert "taken from image 2" in prompt
-        assert "move it to" not in prompt
+        assert "Reposition" not in prompt
