@@ -2874,7 +2874,8 @@ function createRegionEditor(node) {
     let panelDescInput = null;    // prompt (region.desc) textarea
     let panelEyeBtn = null;       // per-region hide/show toggle in the detail
     let panelThumb = null;        // mask thumbnail canvas
-    let panelKindSelect = null;   // object/text selector in the detail
+    let panelKindBtns = null;     // object/text segmented control in the detail
+    let panelTextLabel = null;    // micro-label above the literal-text field
     let panelTextInput = null;    // literal text field (text regions only)
     let panelPlugBtn = null;      // desc_N socket toggle in the detail
     let panelRefBtn = null;       // ref_N socket toggle in the detail
@@ -2903,7 +2904,8 @@ function createRegionEditor(node) {
         panelDescInput = null;
         panelEyeBtn = null;
         panelThumb = null;
-        panelKindSelect = null;
+        panelKindBtns = null;
+        panelTextLabel = null;
         panelTextInput = null;
         panelPlugBtn = null;
         panelRefBtn = null;
@@ -3122,10 +3124,10 @@ function createRegionEditor(node) {
         render();
     }
 
-    function onPanelKindChange() {
+    function onPanelKindChange(kind) {
         const box = state.primary;
-        if (!box || !panelKindSelect) return;
-        box.kind = panelKindSelect.value === "text" ? "text" : "object";
+        if (!box) return;
+        box.kind = kind === "text" ? "text" : "object";
         syncWidget();
         render();
         refreshPanelDetail();
@@ -3296,12 +3298,25 @@ function createRegionEditor(node) {
             setEyeIcon(panelEyeBtn, hidden);
             panelEyeBtn.dataset.tip = hidden ? "Show region" : "Hide region";
         }
-        if (panelKindSelect && document.activeElement !== panelKindSelect) {
-            panelKindSelect.value = box?.kind === "text" ? "text" : "object";
+        if (panelKindBtns) {
+            const kind = box?.kind === "text" ? "text" : "object";
+            for (const [value, btn] of Object.entries(panelKindBtns)) {
+                const on = value === kind;
+                btn.classList.toggle("erpk-btn-active", on);
+                btn.style.color = on ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
+                btn.style.borderColor = on
+                    ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
+            }
         }
         if (panelTextInput) {
             const showText = box?.kind === "text";
+            const appearing = showText && panelTextInput.style.display === "none";
             panelTextInput.style.display = showText ? "" : "none";
+            if (panelTextLabel) panelTextLabel.style.display = showText ? "" : "none";
+            if (appearing) {
+                panelTextInput.style.opacity = "0";
+                requestAnimationFrame(() => { panelTextInput.style.opacity = "1"; });
+            }
             if (showText && document.activeElement !== panelTextInput) {
                 panelTextInput.value = box.text || "";
             }
@@ -3524,22 +3539,36 @@ function createRegionEditor(node) {
             const detail = document.createElement("div");
             detail.style.display = "flex";
             detail.style.flexDirection = "column";
-            detail.style.gap = "4px";
+            detail.style.gap = "5px";
             detail.style.padding = "2px 5px 5px";
             detail.style.marginBottom = "3px";
             detail.style.borderBottom = "1px solid " + HAIRLINE;
 
+            // One control metric across the detail: 10px type, 2px/6px pads.
+            const microLabel = (text) => {
+                const el = document.createElement("span");
+                el.textContent = text;
+                el.style.font = "8px 'Segoe UI', sans-serif";
+                el.style.letterSpacing = "0.6px";
+                el.style.textTransform = "uppercase";
+                el.style.color = "rgba(255, 255, 255, 0.45)";
+                el.style.marginBottom = "-3px";
+                return el;
+            };
+
+            // Identity line: what the region IS — swatch-scale thumb, name,
+            // and the kind segmented control (cause above its effect).
             const topRow = document.createElement("div");
             topRow.style.display = "flex";
             topRow.style.alignItems = "center";
             topRow.style.gap = "6px";
 
             panelThumb = document.createElement("canvas");
-            panelThumb.width = 40;
-            panelThumb.height = 40;
+            panelThumb.width = 24;
+            panelThumb.height = 24;
             panelThumb.style.flex = "0 0 auto";
-            panelThumb.style.width = "40px";
-            panelThumb.style.height = "40px";
+            panelThumb.style.width = "24px";
+            panelThumb.style.height = "24px";
             panelThumb.style.borderRadius = "3px";
             panelThumb.style.border = "1px solid " + HAIRLINE;
             panelThumb.style.background = PANEL_INPUT_BG;
@@ -3549,13 +3578,36 @@ function createRegionEditor(node) {
             panelNameInput.placeholder = "name";
             panelNameInput.dataset.tip = "Layer name — same-named regions share a color";
             styleInput(panelNameInput);
+            panelNameInput.style.width = "";
             panelNameInput.style.flex = "1 1 auto";
+            panelNameInput.style.minWidth = "0";
             panelNameInput.style.fontSize = "10px";
             panelNameInput.style.padding = "2px 6px";
             panelNameInput.addEventListener("input", () => applyPanelName(panelNameInput));
 
+            panelKindBtns = {};
+            const kindGroup = document.createElement("div");
+            kindGroup.style.display = "flex";
+            kindGroup.style.flex = "0 0 auto";
+            kindGroup.style.gap = "2px";
+            for (const kind of ["object", "text"]) {
+                const btn = makeStripButton(kind);
+                btn.dataset.tip = kind === "text"
+                    ? "Render literal text in this region"
+                    : "An object in the scene";
+                btn.style.fontSize = "9px";
+                btn.style.padding = "2px 5px";
+                btn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    onPanelKindChange(kind);
+                });
+                panelKindBtns[kind] = btn;
+                kindGroup.appendChild(btn);
+            }
+
             topRow.appendChild(panelThumb);
             topRow.appendChild(panelNameInput);
+            topRow.appendChild(kindGroup);
             detail.appendChild(topRow);
 
             const dimRow = document.createElement("div");
@@ -3575,8 +3627,8 @@ function createRegionEditor(node) {
                 input.style.width = "38px";
                 input.style.flex = "1 1 0";
                 input.style.minWidth = "0";
-                input.style.padding = "1px 3px";
-                input.style.fontSize = "9px";
+                input.style.padding = "2px 4px";
+                input.style.fontSize = "10px";
                 input.addEventListener("input", () => applyPanelDim(key, input));
                 panelDimFields[key] = input;
                 dimRow.appendChild(label);
@@ -3584,9 +3636,10 @@ function createRegionEditor(node) {
             }
             detail.appendChild(dimRow);
 
+            detail.appendChild(microLabel("prompt"));
             panelDescInput = document.createElement("textarea");
             panelDescInput.rows = 2;
-            panelDescInput.placeholder = "prompt";
+            panelDescInput.placeholder = "what should appear in this region";
             panelDescInput.dataset.tip = "Region prompt — feeds generation for this layer";
             styleInput(panelDescInput);
             panelDescInput.style.fontSize = "10px";
@@ -3595,45 +3648,26 @@ function createRegionEditor(node) {
             panelDescInput.addEventListener("input", () => applyPanelDesc(panelDescInput));
             detail.appendChild(panelDescInput);
 
-            panelKindSelect = document.createElement("select");
-            for (const kind of ["object", "text"]) {
-                const option = document.createElement("option");
-                option.value = kind;
-                option.textContent = kind;
-                panelKindSelect.appendChild(option);
-            }
-            panelKindSelect.dataset.tip =
-                "Region kind: an object in the scene, or literal text to render";
-            styleInput(panelKindSelect);
-            panelKindSelect.style.width = "";
-            panelKindSelect.style.fontSize = "10px";
-            panelKindSelect.style.flex = "0 0 auto";
-            panelKindSelect.addEventListener("change", onPanelKindChange);
-
+            panelTextLabel = microLabel("renders");
+            detail.appendChild(panelTextLabel);
             panelTextInput = document.createElement("input");
             panelTextInput.type = "text";
-            panelTextInput.placeholder = "text to render";
+            panelTextInput.placeholder = "literal text to draw";
             panelTextInput.dataset.tip =
                 "Literal text the model should render inside this region";
             styleInput(panelTextInput);
             panelTextInput.style.fontSize = "10px";
             panelTextInput.style.padding = "2px 6px";
+            panelTextInput.style.transition = "opacity 0.12s ease-out";
             panelTextInput.addEventListener("input",
                 () => applyPanelText(panelTextInput));
-            // Sits directly under the prompt as its own row; the kind
-            // selector follows on its own line.
-            detail.insertBefore(panelTextInput, panelDescInput.nextSibling);
+            detail.appendChild(panelTextInput);
 
-            const kindRow = document.createElement("div");
-            kindRow.style.display = "flex";
-            kindRow.style.alignItems = "center";
-            kindRow.style.gap = "4px";
-            kindRow.appendChild(panelKindSelect);
-            detail.appendChild(kindRow);
-
+            // Footer: augmenting verbs on the left, state and the destructive
+            // action isolated on the right — far from the dismissal corner.
             const actions = document.createElement("div");
             actions.style.display = "flex";
-            actions.style.justifyContent = "space-between";
+            actions.style.alignItems = "center";
             actions.style.gap = "5px";
 
             panelScanBtn = makeStripButton("✦");
@@ -3664,6 +3698,9 @@ function createRegionEditor(node) {
                 refreshPanelDetail();
             });
 
+            const spacer = document.createElement("span");
+            spacer.style.flex = "1 1 auto";
+
             panelEyeBtn = makeStripButton("");
             setEyeIcon(panelEyeBtn, false);
             panelEyeBtn.style.fontSize = "11px";
@@ -3688,10 +3725,10 @@ function createRegionEditor(node) {
             actions.appendChild(panelScanBtn);
             actions.appendChild(panelPlugBtn);
             actions.appendChild(panelRefBtn);
+            actions.appendChild(spacer);
             actions.appendChild(panelEyeBtn);
             actions.appendChild(detDelBtn);
-            // Actions lead the detail view, above the name row.
-            detail.insertBefore(actions, detail.firstChild);
+            detail.appendChild(actions);
 
             // Keep presses and typing inside the detail from starting a row
             // drag or reaching the canvas and ComfyUI's global hotkeys.
