@@ -188,3 +188,26 @@ class TestRegister:
             getattr(r, "path", None) == "/erpk/scan" and r.method == "POST"
             for r in registered
         )
+
+
+class TestRegistrationWiring:
+    """The root package wires the route from its real location."""
+
+    def test_root_init_imports_scan_route_from_utils(self):
+        import ast
+        import os
+        root_init = os.path.join(os.path.dirname(__file__), "..", "__init__.py")
+        with open(root_init) as f:
+            tree = ast.parse(f.read())
+        imports = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom)
+            and any(alias.name == "scan_route" for alias in node.names)
+        ]
+        assert imports, "root __init__.py no longer imports scan_route"
+        for node in imports:
+            assert node.level == 1 and node.module == "utils", (
+                "scan_route lives in utils/; importing it from the package "
+                "root raises ModuleNotFoundError at ComfyUI startup and the "
+                "route silently never registers (POST /erpk/scan -> 405)"
+            )

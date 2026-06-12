@@ -249,7 +249,7 @@ except Exception as e:
 # Register the editor scan route (vision-based region detection)
 try:
     from server import PromptServer
-    from . import scan_route
+    from .utils import scan_route
     scan_route.register(PromptServer.instance)
     print("[ERPK] Registered scan route")
 except Exception as e:
