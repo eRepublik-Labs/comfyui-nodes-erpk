@@ -842,6 +842,7 @@ function createRegionEditor(node) {
         if (box.cutout) {
             const cx = box.x * state.cssW, cy = box.y * state.cssH;
             const cw = box.w * state.cssW, ch = box.h * state.cssH;
+            ensureMaskImg(box);  // decode the mask so the silhouette survives reload
             const ghost = ghostCheckerFor(box, cw, ch);
             if (ghost) {
                 ctx.drawImage(ghost, cx, cy, cw, ch);
@@ -866,6 +867,7 @@ function createRegionEditor(node) {
         // as the object sliding off its own hole. Clicking the ghost snaps
         // back; an arrow ties origin to destination.
         if (box.mask && regionMoved(box)) {
+            ensureMaskImg(box);  // decode the mask so the ghost survives reload
             const gx = box.src.x * state.cssW;
             const gy = box.src.y * state.cssH;
             const gw = box.src.w * state.cssW;
@@ -1434,6 +1436,22 @@ function createRegionEditor(node) {
         ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
         ctx.fillText(text, px, py);
         ctx.restore();
+    }
+
+    // Lazily decode a region's stored mask into the _erpkMaskImg cache, which is
+    // runtime-only and so empty after a reload. Re-renders once it loads, so the
+    // mask silhouette (cut-out checker, move ghost) appears instead of falling
+    // back to the whole box. Returns the image (possibly not yet complete).
+    function ensureMaskImg(box) {
+        if (!box || !box.mask) return null;
+        let img = box._erpkMaskImg;
+        if (!img) {
+            img = new Image();
+            img.addEventListener("load", () => render(), { once: true });
+            img.src = "data:image/png;base64," + box.mask;
+            box._erpkMaskImg = img;
+        }
+        return img;
     }
 
     // SAM masks are opaque grayscale PNGs: brightness encodes the shape but
