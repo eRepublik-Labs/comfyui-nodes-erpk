@@ -278,6 +278,9 @@ function parseRegions(text) {
         // View-only flag: a hidden region skips drawing and hit-testing but
         // still feeds the prompt, bbox, and mask outputs.
         if (entry.hidden === true) region.hidden = true;
+        // Cut-out: removed from the scene and erased to transparent in the
+        // image output; rendered as the transparency checker, not a box.
+        if (entry.cutout === true) region.cutout = true;
         if (entry.src && typeof entry.src === "object") {
             const sn = [entry.src.x, entry.src.y, entry.src.w, entry.src.h]
                 .map((v) => Number(v ?? NaN));
@@ -321,6 +324,7 @@ function serializeRegions(boxes) {
         if (b.mask) out.mask = b.mask;
         if (b.group) out.group = b.group;
         if (b.hidden) out.hidden = true;
+        if (b.cutout) out.cutout = true;
         if (b.id) out.id = b.id;
         if (b.parent) out.parent = b.parent;
         if (b.src) {
@@ -832,6 +836,23 @@ function createRegionEditor(node) {
 
     function drawBox(box, index) {
         if (effectiveHidden(box)) return;
+        // A cut-out region renders only as the transparency checker behind its
+        // mask (or its whole box when maskless) — no box, label, or handles. It
+        // reads as "already removed", matching the transparent image output.
+        if (box.cutout) {
+            const cx = box.x * state.cssW, cy = box.y * state.cssH;
+            const cw = box.w * state.cssW, ch = box.h * state.cssH;
+            const ghost = ghostCheckerFor(box, cw, ch);
+            if (ghost) {
+                ctx.drawImage(ghost, cx, cy, cw, ch);
+            } else {
+                ctx.save();
+                ctx.fillStyle = checkerPattern(ctx);
+                ctx.fillRect(cx, cy, cw, ch);
+                ctx.restore();
+            }
+            return;
+        }
         const x = box.x * state.cssW;
         const y = box.y * state.cssH;
         const w = box.w * state.cssW;
@@ -1385,7 +1406,7 @@ function createRegionEditor(node) {
         const hits = [];
         for (let i = state.boxes.length - 1; i >= 0; i--) {
             const b = state.boxes[i];
-            if (effectiveHidden(b)) continue;
+            if (effectiveHidden(b) || b.cutout) continue;
             if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
                 hits.push(b);
             }
@@ -1739,6 +1760,18 @@ function createRegionEditor(node) {
             }
         }
         state.boxes = state.boxes.filter((b) => !state.selection.has(b));
+        clearSelection();
+        syncWidget();
+        render();
+    }
+
+    // Shift+Delete: mark the selection as cut out — removed from the scene and
+    // erased to transparent in the image output, shown on the canvas as the
+    // transparency checker behind the mask. The box/label/list entry disappear;
+    // undoable like any region change (Ctrl/Cmd+Z restores it).
+    function cutoutSelected() {
+        if (!state.selection.size) return;
+        for (const box of state.selection) box.cutout = true;
         clearSelection();
         syncWidget();
         render();
@@ -2161,7 +2194,8 @@ function createRegionEditor(node) {
         ) {
             e.preventDefault();
             e.stopPropagation();
-            deleteSelected();
+            if (e.shiftKey) cutoutSelected();
+            else deleteSelected();
             return;
         }
         if ((e.key === "[" || e.key === "]") && state.primary) {
@@ -2707,6 +2741,7 @@ function createRegionEditor(node) {
             ["double-click", "edit description in the inspector"],
             ["right-click", "region details, list, and depth order"],
             ["Del / Backspace", "delete selected"],
+            ["Shift+Del", "cut out — remove & make transparent"],
             ["arrow keys", "nudge 1px, Shift for 10px"],
             ["Alt+arrows", "resize 1px, Shift for 10px"],
             ["Ctrl/Cmd+C V D", "copy, paste, duplicate"],
@@ -2982,9 +3017,8 @@ function createRegionEditor(node) {
         }
     }
 
-    function makeTipEl(text) {
+    function makeTipEl(text, controls) {
         const el = document.createElement("div");
-        el.textContent = text;
         el.style.position = "absolute";
         el.style.zIndex = "30";
         el.style.maxWidth = "240px";
@@ -2996,8 +3030,26 @@ function createRegionEditor(node) {
         el.style.font = "9px 'Segoe UI', sans-serif";
         el.style.lineHeight = "1.5";
         el.style.color = "rgba(255, 255, 255, 0.85)";
-        el.style.whiteSpace = "pre-line";
         el.style.pointerEvents = "none";
+
+        const body = document.createElement("div");
+        body.textContent = text;
+        body.style.whiteSpace = "pre-line";
+        el.appendChild(body);
+
+        // Controls sit below a hairline separator in a dimmer color, so they
+        // read as metadata rather than part of the region's prompt.
+        if (controls) {
+            const ctl = document.createElement("div");
+            ctl.textContent = controls;
+            ctl.style.whiteSpace = "pre-line";
+            ctl.style.marginTop = "4px";
+            ctl.style.paddingTop = "4px";
+            ctl.style.borderTop = "1px solid " + HAIRLINE;
+            ctl.style.color = "rgba(255, 255, 255, 0.42)";
+            el.appendChild(ctl);
+        }
+
         root.appendChild(el);
         return el;
     }
@@ -3027,7 +3079,9 @@ function createRegionEditor(node) {
     // Regions live on the canvas, not in the DOM, so their tips anchor to
     // the pointer and are driven by the canvas hover tracking below.
     function showRegionTip(text, clientX, clientY) {
-        tipEl = makeTipEl(text);
+        // The controls line — chiefly so the buttonless ⇧+Del is discoverable.
+        tipEl = makeTipEl(text,
+            "drag move · Del delete · ⇧+Del cut out · right-click details");
         const rootRect = root.getBoundingClientRect();
         if (!rootRect.width) {
             hideTip();
@@ -3774,6 +3828,7 @@ function createRegionEditor(node) {
         if (!panelList) return;
         panelList.textContent = "";
         const emit = (box, depth) => {
+            if (box.cutout) return;  // cut-out regions are removed from the list
             panelList.appendChild(buildPanelRow(box, depth));
             if (box._erpkCollapsed) return;
             const kids = childrenOf(box);

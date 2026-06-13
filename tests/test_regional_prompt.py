@@ -9,6 +9,8 @@ import pytest
 
 from utils.regional_prompt import (
     RegionalPromptBuilder,
+    _cutout_mask,
+    apply_cutouts,
     aspect_ratio_string,
     box_2d,
     build_prompt,
@@ -434,6 +436,111 @@ def _png_base64(array):
     Image.fromarray(np.asarray(array, dtype="uint8"), mode="L").save(
         buffer, format="PNG")
     return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+class TestCutouts:
+    """A cut-out region is removed from prompt/bboxes/masks and erased to
+    transparent in the image output (Shift+Delete in the editor)."""
+
+    def _cut(self, **over):
+        region = {"x": 0.5, "y": 0.5, "w": 0.3, "h": 0.3, "kind": "object",
+                  "desc": "a dog", "text": "", "cutout": True}
+        region.update(over)
+        return region
+
+    def test_parse_preserves_cutout(self):
+        data = json.dumps([{"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3,
+                            "kind": "object", "cutout": True}])
+        assert parse_regions(data)[0]["cutout"] is True
+
+    def test_parse_omits_cutout_when_absent_or_false(self):
+        assert "cutout" not in parse_regions(
+            json.dumps([{"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3}]))[0]
+        assert "cutout" not in parse_regions(
+            json.dumps([{"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3,
+                         "cutout": False}]))[0]
+
+    def test_cutout_excluded_from_prompt(self):
+        keep = {"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3, "kind": "object",
+                "desc": "a cat", "text": ""}
+        out = build_prompt("scene", 1000, 1000, [keep, self._cut()])
+        assert "a cat" in out and "a dog" not in out
+
+    def test_cutout_adds_removal_directive_without_naming_it(self):
+        from utils.regional_prompt import REMOVAL_HEADER
+        keep = {"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3, "kind": "object",
+                "desc": "a cat", "text": ""}
+        out = build_prompt("scene", 1000, 1000, [keep, self._cut()])
+        assert REMOVAL_HEADER in out
+        # A box_2d for the removed area follows the header...
+        assert "box_2d" in out.split(REMOVAL_HEADER, 1)[1]
+        # ...but the removed object is never named (naming it invites re-adding).
+        assert "a dog" not in out
+
+    def test_cutout_excluded_from_bboxes(self):
+        keep = {"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3, "kind": "object",
+                "desc": "a", "text": ""}
+        boxes = regions_to_pixel_bboxes([keep, self._cut()], 1000, 1000)
+        assert len(boxes[0]) == 1
+
+    def test_cutout_excluded_from_masks(self):
+        pytest.importorskip("torch")
+        keep = {"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3}
+        masks = build_region_masks([keep, self._cut()], 50, 50)
+        assert masks.shape[0] == 1
+
+    def test_all_cutouts_yield_one_zero_mask(self):
+        pytest.importorskip("torch")
+        masks = build_region_masks([self._cut()], 40, 40)
+        assert masks.shape == (1, 40, 40)
+        assert float(masks.sum()) == 0.0
+
+    def test_apply_cutouts_no_cutouts_returns_input_unchanged(self):
+        torch = pytest.importorskip("torch")
+        img = torch.rand((1, 8, 8, 3))
+        keep = {"x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5, "kind": "object"}
+        assert apply_cutouts(img, [keep]) is img
+
+    def test_cutout_mask_marks_the_box(self):
+        np = pytest.importorskip("numpy")
+        region = {"x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5, "kind": "object",
+                  "cutout": True}
+        mask = _cutout_mask([region], 20, 20)
+        assert mask.shape == (20, 20) and mask.dtype == np.uint8
+        assert mask[2, 2] == 255    # inside the cut box -> fill
+        assert mask[18, 18] == 0    # outside -> keep
+
+    def test_cutout_mask_follows_silhouette(self):
+        np = pytest.importorskip("numpy")
+        glyph = np.zeros((10, 10), dtype="uint8")
+        glyph[:, :5] = 255          # left half opaque
+        region = {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0, "kind": "object",
+                  "cutout": True, "mask": _png_base64(glyph)}
+        mask = _cutout_mask([region], 20, 20)
+        assert mask[10, 3] == 255    # masked (left) -> fill
+        assert mask[10, 17] == 0     # unmasked (right) -> keep
+
+    def test_cutout_mask_empty_without_cutouts(self):
+        pytest.importorskip("numpy")
+        keep = {"x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5, "kind": "object"}
+        assert _cutout_mask([keep], 16, 16).max() == 0
+
+    def test_apply_cutouts_fills_masked_area(self):
+        pytest.importorskip("numpy")
+        torch = pytest.importorskip("torch")
+        pytest.importorskip("cv2")
+        # A red field with a blue patch in the cut box; inpaint fills the patch
+        # from the surrounding red, so it goes red and the output stays RGB.
+        img = torch.zeros((1, 20, 20, 3))
+        img[..., 0] = 1.0                       # all red
+        img[0, 5:15, 5:15, 0] = 0.0             # blue patch where the cut box is
+        img[0, 5:15, 5:15, 2] = 1.0
+        region = {"x": 0.25, "y": 0.25, "w": 0.5, "h": 0.5, "kind": "object",
+                  "cutout": True}
+        out = apply_cutouts(img, [region])
+        assert out.shape == (1, 20, 20, 3)      # stays RGB, no alpha
+        assert float(out[0, 10, 10, 0]) > float(out[0, 10, 10, 2])  # filled red
+        assert float(out[0, 0, 0, 0]) == 1.0    # outside untouched
 
 
 class TestBuildRegionMasks:

@@ -48,6 +48,17 @@ ANCHORS_LINE = (
     "Every other element in the image stays exactly where it is — do not "
     "remove, add, or alter anything else."
 )
+# Cut-out regions are already content-aware-filled in the image the model
+# receives (apply_cutouts), but an edit model repaints freely, so the prompt
+# must tell it to keep those areas as plain background — without naming what was
+# there, which would invite re-adding it.
+REMOVAL_HEADER = (
+    "Remove the contents of these areas: rebuild each as natural background that "
+    "continues the surrounding scene (same surfaces, texture, lighting, and "
+    "perspective). Do not place any object, subject, animal, plant, sign, or "
+    'text in them (areas are "box_2d = [ymin, xmin, ymax, xmax]" on a 0-1000 '
+    "grid with top-left origin):"
+)
 LAYOUT_FOOTER = (
     "Every element must stay fully inside its placement area and fill most of it. "
     "Do not add other prominent subjects. The placement areas are invisible "
@@ -117,6 +128,10 @@ def parse_regions(regions_json):
         src = _parse_src_box(entry.get("src"))
         if src is not None:
             region["src"] = src
+        # A cut-out region: removed from prompt/bboxes/masks, and its masked
+        # pixels are erased to transparent in the image output (Shift+Delete).
+        if entry.get("cutout"):
+            region["cutout"] = True
         regions.append(region)
     return regions
 
@@ -258,6 +273,9 @@ def _classify_regions(regions):
     """
     moves, anchors, additions = [], [], []
     for region in regions:
+        # Cut-out regions are removed from the scene; they never get a line.
+        if region.get("cutout"):
+            continue
         plain = region["kind"] != "text" and not region.get("ref_image")
         if plain and region_moved(region):
             moves.append(region)
@@ -295,6 +313,14 @@ def build_prompt(prompt, width, height, regions):
             lines.append(f"{index}. {_element_line(region)}")
         if anchors and not moves:
             lines.append(ANCHORS_LINE)
+    removals = [r for r in regions
+                if r.get("cutout") and r.get("kind") != "text"]
+    if removals:
+        lines.append("")
+        lines.append(REMOVAL_HEADER)
+        for index, region in enumerate(removals, start=1):
+            box = box_2d(region["x"], region["y"], region["w"], region["h"])
+            lines.append(f"{index}. box_2d = {box}")
     if moves or additions:
         lines.append(LAYOUT_FOOTER)
     return "\n".join(lines)
@@ -302,6 +328,7 @@ def build_prompt(prompt, width, height, regions):
 
 def regions_to_pixel_bboxes(regions, width, height):
     """Convert normalized regions into one frame of integer pixel boxes: [[box, ...]] or []."""
+    regions = [r for r in regions if not r.get("cutout")]
     if not regions:
         return []
     boxes = [{"x": round(region["x"] * width),
@@ -339,7 +366,7 @@ def composite_moved_regions(image, regions):
     """
     moved = [r for r in regions
              if region_moved(r) and r["kind"] != "text"
-             and not r.get("ref_image")]
+             and not r.get("ref_image") and not r.get("cutout")]
     if image is None or not moved:
         return image
     # Imported lazily, mirroring build_region_masks: the only torch touch.
@@ -375,6 +402,70 @@ def composite_moved_regions(image, regions):
     return result
 
 
+def _cutout_mask(regions, width, height):
+    """uint8 [height, width] mask, 255 where cut-out regions are to be filled.
+
+    Each cut-out region contributes its stored segmentation silhouette, or its
+    whole box when it has no mask; the union is returned. All-zero when there are
+    no cut-outs. numpy/PIL only, so the fill geometry is unit-testable without cv2.
+    """
+    import base64
+    from io import BytesIO
+
+    import numpy as np
+    from PIL import Image
+
+    mask = np.zeros((height, width), dtype=np.uint8)
+    for region in regions:
+        if not region.get("cutout") or region.get("kind") == "text":
+            continue
+        x0, y0, x1, y1 = mask_pixel_box(region, width, height)
+        bw, bh = x1 - x0, y1 - y0
+        patch = np.full((bh, bw), 255, dtype=np.uint8)
+        if region_has_stored_mask(region):
+            try:
+                glyph = Image.open(BytesIO(base64.b64decode(region["mask"])))
+                glyph = glyph.convert("L").resize((bw, bh))
+                patch = ((np.asarray(glyph) > 127).astype(np.uint8)) * 255
+            except Exception:
+                pass
+        mask[y0:y1, x0:x1] = np.maximum(mask[y0:y1, x0:x1], patch)
+    return mask
+
+
+def apply_cutouts(image, regions):
+    """Remove each cut-out region by inpainting its masked area from the scene.
+
+    A cut-out region (Shift+Delete in the editor) is erased: its masked
+    silhouette — or its whole box when it has no stored mask — is filled in from
+    the surrounding pixels with OpenCV inpainting, so the object is seamlessly
+    gone while the output stays RGB. Returns the input unchanged when there are
+    no cut-outs; never mutates it. OpenCV is a ComfyUI core dependency; if it is
+    somehow missing the image is returned unchanged and the reason is logged.
+    """
+    cuts = [r for r in regions if r.get("cutout") and r["kind"] != "text"]
+    if image is None or not cuts:
+        return image
+    import numpy as np
+    import torch
+
+    height, width = int(image.shape[1]), int(image.shape[2])
+    mask = _cutout_mask(regions, width, height)
+    if not mask.any():
+        return image
+    try:
+        import cv2
+    except ImportError:
+        print("[ERPK] Warning: OpenCV unavailable; cut-out regions left unfilled")
+        return image
+    result = image.clone()
+    for frame in range(int(result.shape[0])):
+        rgb = (result[frame, :, :, :3].cpu().numpy() * 255.0).clip(0, 255).astype(np.uint8)
+        filled = cv2.inpaint(rgb, mask, 4, cv2.INPAINT_TELEA)
+        result[frame, :, :, :3] = torch.from_numpy(filled.astype(np.float32) / 255.0)
+    return result
+
+
 def build_region_masks(regions, width, height):
     """Render one [height, width] mask per region into an [N, height, width] tensor.
 
@@ -392,6 +483,9 @@ def build_region_masks(regions, width, height):
     import torch
     from PIL import Image
 
+    # Cut-out regions are removed entirely (they erase to transparent in the
+    # image output instead of contributing a mask slot).
+    regions = [r for r in regions if not r.get("cutout")]
     if not regions:
         return torch.zeros((1, height, width))
     frames = []
@@ -537,6 +631,7 @@ class RegionalPromptBuilder(IO.ComfyNode):
         if not regions and not prompt.strip():
             raise ValueError("Describe the scene or add at least one region")
         image = composite_moved_regions(image, regions)
+        image = apply_cutouts(image, regions)
         masks = build_region_masks(regions, width, height)
         assembled = build_prompt(prompt, width, height, regions)
         bboxes = regions_to_pixel_bboxes(regions, width, height)
