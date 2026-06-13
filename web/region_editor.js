@@ -2592,6 +2592,8 @@ function createRegionEditor(node) {
         try {
             const body = { image: dataUrl, max_objects: SCAN_MAX_OBJECTS, engine: "gemini" };
             if (model) body.model = model;
+            const segmenter = node.properties?.erpkSegmenter;
+            if (segmenter) body.segmenter = segmenter;
             const res = await fetch("/erpk/scan", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -2754,6 +2756,8 @@ function createRegionEditor(node) {
     let optionsPanel = null;
     let scanModels = null;        // {models:[...], default:"..."} cached after a good fetch
     let scanModelSelect = null;
+    let scanSegmenters = null;    // {segmenters:[...], default:"..."} cached after a good fetch
+    let scanSegmenterSelect = null;
 
     function syncOptionsButton() {
         const open = !!optionsPanel;
@@ -2769,6 +2773,7 @@ function createRegionEditor(node) {
         document.removeEventListener("keydown", onOptionsDocKeyDown, true);
         optionsPanel.remove();
         optionsPanel = null;
+        scanSegmenterSelect = null;
         scanModelSelect = null;
         syncOptionsButton();
     }
@@ -2826,6 +2831,43 @@ function createRegionEditor(node) {
         populateScanModels();
     }
 
+    function populateScanSegmenters() {
+        if (!scanSegmenterSelect) return;
+        scanSegmenterSelect.textContent = "";
+        const list = scanSegmenters && scanSegmenters.segmenters;
+        if (!list || !list.length) {
+            // No server-side segmenter list (transformers absent or fetch failed):
+            // a value-less default so the scan omits "segmenter" and vit-base runs.
+            const opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = "default (SAM ViT-Base)";
+            opt.selected = true;
+            scanSegmenterSelect.appendChild(opt);
+            return;
+        }
+        const chosen = node.properties?.erpkSegmenter || scanSegmenters.default || list[0].id;
+        for (const s of list) {
+            const opt = document.createElement("option");
+            opt.value = s.id;
+            // A trailing ↓ marks weights that download on first use.
+            opt.textContent = s.label + (s.downloaded ? "" : " ↓");
+            if (s.id === chosen) opt.selected = true;
+            scanSegmenterSelect.appendChild(opt);
+        }
+    }
+
+    async function loadScanSegmenters() {
+        if (scanSegmenters) { populateScanSegmenters(); return; }
+        let data = null;
+        try {
+            const res = await fetch("/erpk/scan/segmenters");
+            const json = await res.json();
+            if (json && Array.isArray(json.segmenters)) data = json;
+        } catch (_) { /* fall through to the default-only list */ }
+        if (data) scanSegmenters = data;
+        populateScanSegmenters();
+    }
+
     function openOptions() {
         closePanel();
         closeHelp();
@@ -2870,8 +2912,29 @@ function createRegionEditor(node) {
         });
         optionsPanel.appendChild(scanModelSelect);
 
+        const segLabel = document.createElement("div");
+        segLabel.textContent = "Segmenter (masks)";
+        segLabel.style.font = "9px 'Segoe UI', sans-serif";
+        segLabel.style.color = "rgba(255, 255, 255, 0.7)";
+        segLabel.style.padding = "7px 4px 3px";
+        optionsPanel.appendChild(segLabel);
+
+        scanSegmenterSelect = document.createElement("select");
+        styleInput(scanSegmenterSelect);
+        scanSegmenterSelect.style.fontSize = "11px";
+        scanSegmenterSelect.addEventListener("change", () => {
+            if (!node.properties) node.properties = {};
+            if (scanSegmenterSelect.value) {
+                node.properties.erpkSegmenter = scanSegmenterSelect.value;
+            } else {
+                delete node.properties.erpkSegmenter;
+            }
+        });
+        optionsPanel.appendChild(scanSegmenterSelect);
+
         const hint = document.createElement("div");
-        hint.textContent = "Gemini detects the regions; SAM builds the masks.";
+        hint.textContent = "Gemini detects the regions; the segmenter builds the "
+            + "masks (ViT-Base is fastest). ↓ downloads on first use.";
         hint.style.font = "8px 'Segoe UI', sans-serif";
         hint.style.color = "rgba(255, 255, 255, 0.4)";
         hint.style.padding = "5px 4px 1px";
@@ -2884,6 +2947,7 @@ function createRegionEditor(node) {
         optionsPanel.style.bottom = (root.offsetHeight - status.offsetTop + 4) + "px";
 
         loadScanModels();
+        loadScanSegmenters();
 
         document.addEventListener("pointerdown", onOptionsDocPointerDown, true);
         document.addEventListener("keydown", onOptionsDocKeyDown, true);
@@ -3384,6 +3448,8 @@ function createRegionEditor(node) {
             const model = node.properties?.erpkScanModel;
             const body = { image: dataUrl, max_objects: SCAN_MAX_OBJECTS, engine: "gemini" };
             if (model) body.model = model;
+            const segmenter = node.properties?.erpkSegmenter;
+            if (segmenter) body.segmenter = segmenter;
             const res = await fetch("/erpk/scan", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

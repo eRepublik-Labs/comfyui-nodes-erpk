@@ -109,7 +109,7 @@ class TestHandleScan:
         assert "error" in _body(resp)
 
     def test_success_returns_objects_and_cost(self, monkeypatch):
-        async def fake_scan(image, max_objects, model, engine=None):
+        async def fake_scan(image, max_objects, model, engine=None, segmenter=None):
             return {
                 "objects": [{"name": "car", "box": {"x": 0, "y": 0, "w": 0.5, "h": 0.5},
                              "mask": None, "group": "car", "depth_rank": 0}],
@@ -127,7 +127,7 @@ class TestHandleScan:
         assert body["cost"]["input_tokens"] == 2300
 
     def test_local_cost_is_null(self, monkeypatch):
-        async def fake_scan(image, max_objects, model, engine=None):
+        async def fake_scan(image, max_objects, model, engine=None, segmenter=None):
             return {"objects": [], "cost": None}
 
         monkeypatch.setattr(scan_engine, "scan", fake_scan)
@@ -138,7 +138,7 @@ class TestHandleScan:
     def test_max_objects_clamped_before_engine(self, monkeypatch):
         seen = {}
 
-        async def fake_scan(image, max_objects, model, engine=None):
+        async def fake_scan(image, max_objects, model, engine=None, segmenter=None):
             seen["max_objects"] = max_objects
             seen["model"] = model
             return {"objects": [], "cost": None}
@@ -152,7 +152,7 @@ class TestHandleScan:
     def test_blank_model_becomes_none(self, monkeypatch):
         seen = {}
 
-        async def fake_scan(image, max_objects, model, engine=None):
+        async def fake_scan(image, max_objects, model, engine=None, segmenter=None):
             seen["model"] = model
             return {"objects": [], "cost": None}
 
@@ -164,7 +164,7 @@ class TestHandleScan:
     def test_explicit_model_forwarded(self, monkeypatch):
         seen = {}
 
-        async def fake_scan(image, max_objects, model, engine=None):
+        async def fake_scan(image, max_objects, model, engine=None, segmenter=None):
             seen["model"] = model
             return {"objects": [], "cost": None}
 
@@ -172,6 +172,30 @@ class TestHandleScan:
         req = FakeRequest({"image": _png_data_url(), "model": "gemini-2.5-flash"})
         asyncio.run(handle_scan(req))
         assert seen["model"] == "gemini-2.5-flash"
+
+    def test_segmenter_forwarded(self, monkeypatch):
+        seen = {}
+
+        async def fake_scan(image, max_objects, model, engine=None, segmenter=None):
+            seen["segmenter"] = segmenter
+            return {"objects": [], "cost": None}
+
+        monkeypatch.setattr(scan_engine, "scan", fake_scan)
+        req = FakeRequest({"image": _png_data_url(),
+                           "segmenter": "facebook/sam-vit-large"})
+        asyncio.run(handle_scan(req))
+        assert seen["segmenter"] == "facebook/sam-vit-large"
+
+    def test_blank_segmenter_becomes_none(self, monkeypatch):
+        seen = {}
+
+        async def fake_scan(image, max_objects, model, engine=None, segmenter=None):
+            seen["segmenter"] = segmenter
+            return {"objects": [], "cost": None}
+
+        monkeypatch.setattr(scan_engine, "scan", fake_scan)
+        asyncio.run(handle_scan(FakeRequest({"image": _png_data_url(), "segmenter": "  "})))
+        assert seen["segmenter"] is None
 
     def test_missing_image_is_400(self):
         resp = asyncio.run(handle_scan(FakeRequest({})))
@@ -193,7 +217,7 @@ class TestHandleScan:
         assert resp.status == 400
 
     def test_engine_failure_is_502(self, monkeypatch):
-        async def boom(image, max_objects, model, engine=None):
+        async def boom(image, max_objects, model, engine=None, segmenter=None):
             raise RuntimeError("Gemini blocked")
 
         monkeypatch.setattr(scan_engine, "scan", boom)
@@ -208,7 +232,7 @@ class TestEngineSelector:
     def _capture_engine(self, monkeypatch):
         seen = {}
 
-        async def fake_scan(image, max_objects, model, engine=None):
+        async def fake_scan(image, max_objects, model, engine=None, segmenter=None):
             seen["engine"] = engine
             return {"objects": [], "cost": None}
 
@@ -275,6 +299,31 @@ class TestScanModels:
         assert body["default"] in body["models"]
 
 
+class TestScanSegmenters:
+    """GET /erpk/scan/segmenters reports the runnable backbones and the default."""
+
+    def test_returns_default_and_list_shape(self):
+        # Works with or without transformers: the list is empty when transformers
+        # is absent (graceful degradation), populated when it is present.
+        from utils.scan_route import handle_scan_segmenters
+
+        resp = asyncio.run(handle_scan_segmenters(FakeRequest({})))
+        assert resp.status == 200
+        body = _body(resp)
+        assert body["default"] == scan_engine.DEFAULT_SEGMENTER
+        assert isinstance(body["segmenters"], list)
+        for s in body["segmenters"]:
+            assert {"id", "label", "family", "downloaded"} <= set(s)
+
+    def test_lists_backbones_when_transformers_present(self):
+        pytest.importorskip("transformers")
+        from utils.scan_route import handle_scan_segmenters
+
+        body = _body(asyncio.run(handle_scan_segmenters(FakeRequest({}))))
+        ids = [s["id"] for s in body["segmenters"]]
+        assert scan_engine.DEFAULT_SEGMENTER in ids
+
+
 class TestRegister:
     def test_register_adds_post_route(self):
         from aiohttp import web
@@ -307,6 +356,23 @@ class TestRegister:
         registered = list(routes)
         assert any(
             getattr(r, "path", None) == "/erpk/scan/models" and r.method == "GET"
+            for r in registered
+        )
+
+    def test_register_adds_segmenters_get_route(self):
+        from aiohttp import web
+
+        routes = web.RouteTableDef()
+
+        class FakeServer:
+            pass
+
+        server = FakeServer()
+        server.routes = routes
+        register(server)
+        registered = list(routes)
+        assert any(
+            getattr(r, "path", None) == "/erpk/scan/segmenters" and r.method == "GET"
             for r in registered
         )
 

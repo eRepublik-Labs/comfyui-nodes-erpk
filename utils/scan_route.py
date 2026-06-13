@@ -74,6 +74,12 @@ async def handle_scan(request):
         if not isinstance(model, str) or not model.strip():
             model = None
 
+        # Segmenter (SAM backbone) is validated in the engine via
+        # resolve_segmenter, which falls back to the default for unknown ids.
+        segmenter = body.get("segmenter")
+        if not isinstance(segmenter, str) or not segmenter.strip():
+            segmenter = None
+
         from io import BytesIO
         from PIL import Image
         try:
@@ -83,7 +89,8 @@ async def handle_scan(request):
 
         engine = getattr(scan_engine, SCAN_ENGINES[engine_name])
         try:
-            result = await scan_engine.scan(image, max_objects, model, engine=engine)
+            result = await scan_engine.scan(image, max_objects, model, engine=engine,
+                                            segmenter=segmenter)
         except Exception as e:
             return web.json_response({"error": str(e)}, status=502)
 
@@ -111,7 +118,22 @@ async def handle_scan_models(request):
     })
 
 
+async def handle_scan_segmenters(request):
+    """Return the segmentation backbones this install can run, and the default.
+
+    The editor populates its segmenter picker from this; entries are filtered to
+    families whose transformers classes import, each flagged downloaded/not.
+    """
+    from aiohttp import web
+
+    return web.json_response({
+        "segmenters": scan_engine.available_segmenters(),
+        "default": scan_engine.DEFAULT_SEGMENTER,
+    })
+
+
 def register(server):
     """Attach the scan routes to the PromptServer's aiohttp route table."""
     server.routes.post("/erpk/scan")(handle_scan)
     server.routes.get("/erpk/scan/models")(handle_scan_models)
+    server.routes.get("/erpk/scan/segmenters")(handle_scan_segmenters)

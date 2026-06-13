@@ -263,7 +263,7 @@ class TestScanDispatch:
     """scan() routes to the injected engine (the Moondream plug-in point)."""
 
     def test_engine_argument_is_called(self):
-        async def fake_engine(image, max_objects, model):
+        async def fake_engine(image, max_objects, model, segmenter=None):
             return [{"name": "stub", "max_objects": max_objects, "model": model}]
 
         result = asyncio.run(scan("IMG", max_objects=7, model="m", engine=fake_engine))
@@ -272,13 +272,23 @@ class TestScanDispatch:
         assert result[0]["model"] == "m"
 
     def test_default_engine_used_when_unset(self, monkeypatch):
-        async def fake_default(image, max_objects, model):
+        async def fake_default(image, max_objects, model, segmenter=None):
             return [{"name": "default", "max_objects": max_objects}]
 
         monkeypatch.setattr("utils.scan_engine.DEFAULT_ENGINE", fake_default)
         result = asyncio.run(scan("IMG"))
         assert result[0]["name"] == "default"
         assert result[0]["max_objects"] == 20
+
+    def test_segmenter_is_forwarded_to_engine(self):
+        seen = {}
+
+        async def fake_engine(image, max_objects, model, segmenter=None):
+            seen["segmenter"] = segmenter
+            return []
+
+        asyncio.run(scan("IMG", engine=fake_engine, segmenter="facebook/sam-vit-large"))
+        assert seen["segmenter"] == "facebook/sam-vit-large"
 
 
 class TestFlorenceToObjects:
@@ -559,6 +569,90 @@ class TestCleanMask:
         mask[5:15, 5:15] = 1
         out = scan_engine.clean_mask(mask, feather_sigma=1.0)
         assert out.max() == 255 and out.min() == 0
+
+
+class TestSegmenterRegistry:
+    """The SEGMENTERS registry lists selectable backbones; vit-base is default."""
+
+    def test_default_is_vit_base(self):
+        from utils.scan_engine import DEFAULT_SEGMENTER
+        assert DEFAULT_SEGMENTER == "facebook/sam-vit-base"
+
+    def test_default_is_first_entry(self):
+        from utils.scan_engine import SEGMENTERS, DEFAULT_SEGMENTER
+        assert SEGMENTERS[0]["id"] == DEFAULT_SEGMENTER
+
+    def test_registry_covers_three_families(self):
+        from utils.scan_engine import SEGMENTERS
+        assert {s["family"] for s in SEGMENTERS} == {"sam1", "samhq", "sam2"}
+
+    def test_entries_have_required_fields(self):
+        from utils.scan_engine import SEGMENTERS
+        for spec in SEGMENTERS:
+            assert {"id", "label", "family"} <= set(spec)
+            assert spec["family"] in ("sam1", "samhq", "sam2")
+
+
+class TestResolveSegmenter:
+    """resolve_segmenter falls back to the default for unknown/blank ids."""
+
+    def test_known_passes_through(self):
+        from utils.scan_engine import resolve_segmenter
+        assert resolve_segmenter("facebook/sam-vit-large") == "facebook/sam-vit-large"
+
+    def test_unknown_falls_back(self):
+        from utils.scan_engine import resolve_segmenter, DEFAULT_SEGMENTER
+        assert resolve_segmenter("bogus/model") == DEFAULT_SEGMENTER
+
+    def test_none_and_blank_fall_back(self):
+        from utils.scan_engine import resolve_segmenter, DEFAULT_SEGMENTER
+        assert resolve_segmenter(None) == DEFAULT_SEGMENTER
+        assert resolve_segmenter("  ") == DEFAULT_SEGMENTER
+
+
+class TestAvailableSegmenters:
+    """available_segmenters keeps only families whose transformers classes import."""
+
+    def _fake_tf(self, names):
+        import types as _t
+        ns = _t.SimpleNamespace()
+        for n in names:
+            setattr(ns, n, object)
+        return ns
+
+    def test_sam1_only_when_only_sam_classes(self):
+        from utils.scan_engine import available_segmenters
+        tf = self._fake_tf(["SamModel", "SamProcessor"])
+        fams = {s["family"] for s in available_segmenters(tf=tf)}
+        assert fams == {"sam1"}
+
+    def test_all_families_when_all_classes_present(self):
+        from utils.scan_engine import available_segmenters
+        tf = self._fake_tf([
+            "SamModel", "SamProcessor", "SamHQModel", "SamHQProcessor",
+            "Sam2Model", "Sam2Processor",
+        ])
+        fams = {s["family"] for s in available_segmenters(tf=tf)}
+        assert fams == {"sam1", "samhq", "sam2"}
+
+    def test_entries_flag_downloaded(self):
+        from utils.scan_engine import available_segmenters
+        tf = self._fake_tf(["SamModel", "SamProcessor"])
+        for s in available_segmenters(tf=tf):
+            assert "downloaded" in s and isinstance(s["downloaded"], bool)
+
+    def test_no_transformers_yields_empty(self, monkeypatch):
+        from utils import scan_engine
+        import builtins
+        real_import = builtins.__import__
+
+        def fake_import(name, *a, **k):
+            if name == "transformers":
+                raise ImportError("no transformers")
+            return real_import(name, *a, **k)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        assert scan_engine.available_segmenters() == []
 
 
 class TestFlorenceMalformedLabels:

@@ -188,8 +188,90 @@ def depth_prompt(labels):
     )
 
 
-SEGMENTER_MODEL_ID = "facebook/sam-vit-base"
+# Selectable segmentation backbones. vit-base is the default — clean, tight masks
+# at low CPU cost; the rest are opt-in via the editor's options window. Each family
+# needs a different call, handled per-family in segment_objects.
+DEFAULT_SEGMENTER = "facebook/sam-vit-base"
+SEGMENTERS = [
+    {"id": "facebook/sam-vit-base", "label": "SAM ViT-Base (default, fast)", "family": "sam1"},
+    {"id": "facebook/sam-vit-large", "label": "SAM ViT-Large", "family": "sam1"},
+    {"id": "facebook/sam-vit-huge", "label": "SAM ViT-Huge", "family": "sam1"},
+    {"id": "syscv-community/sam-hq-vit-base", "label": "SAM-HQ ViT-Base (fine edges)", "family": "samhq"},
+    {"id": "syscv-community/sam-hq-vit-large", "label": "SAM-HQ ViT-Large", "family": "samhq"},
+    {"id": "facebook/sam2.1-hiera-small", "label": "SAM 2.1 Hiera-Small", "family": "sam2"},
+    {"id": "facebook/sam2.1-hiera-base-plus", "label": "SAM 2.1 Hiera-Base+", "family": "sam2"},
+    {"id": "facebook/sam2.1-hiera-large", "label": "SAM 2.1 Hiera-Large", "family": "sam2"},
+]
+
+# transformers classes each family needs — used to detect what this install runs.
+SEGMENTER_FAMILY_CLASSES = {
+    "sam1": ("SamModel", "SamProcessor"),
+    "samhq": ("SamHQModel", "SamHQProcessor"),
+    "sam2": ("Sam2Model", "Sam2Processor"),
+}
+
+# Back-compat alias for the default; segment_objects resolves the per-scan choice.
+SEGMENTER_MODEL_ID = DEFAULT_SEGMENTER
+
+# Loaded segmenters cached per model id: {id: {processor, model, device, family}}.
 _segmenter = {}
+
+
+def resolve_segmenter(model_id):
+    """Return the requested segmenter when it is a known id, else the default.
+
+    The editor forwards a browser-supplied string; anything outside the registry
+    (or blank/None) falls back to vit-base rather than trying to load a bogus id.
+    """
+    if isinstance(model_id, str) and model_id.strip():
+        for spec in SEGMENTERS:
+            if spec["id"] == model_id:
+                return model_id
+    return DEFAULT_SEGMENTER
+
+
+def _segmenter_family(model_id):
+    """Family key for a segmenter id (defaults to sam1 for unknown ids)."""
+    for spec in SEGMENTERS:
+        if spec["id"] == model_id:
+            return spec["family"]
+    return "sam1"
+
+
+def _is_cached(model_id):
+    """True when a model's weights are already in the local HF hub cache.
+
+    Best-effort UI hint — a False only means "first use downloads". Honors
+    HF_HUB_CACHE / HF_HOME, defaulting to ~/.cache/huggingface/hub.
+    """
+    import os
+    cache = os.environ.get("HF_HUB_CACHE")
+    if not cache:
+        home = os.environ.get(
+            "HF_HOME", os.path.join(os.path.expanduser("~"), ".cache", "huggingface"))
+        cache = os.path.join(home, "hub")
+    folder = "models--" + model_id.replace("/", "--")
+    return os.path.isdir(os.path.join(cache, folder))
+
+
+def available_segmenters(tf=None):
+    """Registry entries whose transformers classes import on this install.
+
+    Each kept entry is annotated with `downloaded`. tf is injectable for tests; in
+    production it lazily imports transformers — if transformers is missing it
+    returns [] so the editor simply shows no picker rather than erroring.
+    """
+    if tf is None:
+        try:
+            import transformers as tf
+        except ImportError:
+            return []
+    result = []
+    for spec in SEGMENTERS:
+        classes = SEGMENTER_FAMILY_CLASSES.get(spec["family"], ())
+        if classes and all(hasattr(tf, name) for name in classes):
+            result.append({**spec, "downloaded": _is_cached(spec["id"])})
+    return result
 
 # A box whose larger normalized side is below this is "small": at the frame's
 # fixed encoder resolution it gets few mask pixels and inherently rough edges,
@@ -271,19 +353,44 @@ def pixel_box_prompts(objects, width, height):
     return prompts
 
 
-def segment_objects(image, objects):
+def _load_segmenter(model_id, family, torch):
+    """Load a segmenter's processor+model for its family, onto CPU/CUDA.
+
+    CPU on purpose: the SAM pipeline materializes float64 tensors that MPS
+    rejects; these models are small enough that CPU stays interactive. Each
+    family has its own transformers classes (imported lazily here).
+    """
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    if family == "samhq":
+        from transformers import SamHQModel, SamHQProcessor
+        processor = SamHQProcessor.from_pretrained(model_id)
+        model = SamHQModel.from_pretrained(model_id).to(device)
+    elif family == "sam2":
+        from transformers import Sam2Model, Sam2Processor
+        processor = Sam2Processor.from_pretrained(model_id)
+        model = Sam2Model.from_pretrained(model_id).to(device)
+    else:
+        from transformers import SamModel, SamProcessor
+        processor = SamProcessor.from_pretrained(model_id)
+        model = SamModel.from_pretrained(model_id).to(device)
+    return {"processor": processor, "model": model, "device": device, "family": family}
+
+
+def segment_objects(image, objects, segmenter=None):
     """Fill each object's mask with a locally-computed segmentation.
 
     The detector (Florence-2 locally, Gemini in the cloud) supplies boxes and
-    labels; masks always come from this box-prompted segmentation model because
+    labels; masks always come from a box-prompted segmentation model because
     vision-LLM mask output is too unreliable to ship (omitted fields, truncated
-    multi-object responses). One shared image embedding masks every box at once,
-    and SAM's several hypotheses per box are reduced to the highest predicted-IoU
-    one. Small objects are re-encoded from a padded crop so they get the encoder's
-    full resolution instead of a few pixels. Each mask is tidied (largest blob,
-    holes filled, edge feathered) and stored as a box-relative base64 PNG per the
-    regions contract. Any failure leaves masks None — the scan survives,
-    downstream falls back to rectangles, and the log says why.
+    multi-object responses). The backbone is the resolved `segmenter` (defaults
+    to vit-base); each SAM family is invoked correctly by segment_masks (SAM1:
+    multimask + best-IoU; SAM-HQ: single HQ mask; SAM 2.1: its own processor).
+    One shared image embedding masks every box at once; small objects are
+    re-encoded from a padded crop so they get the encoder's full resolution
+    instead of a few pixels. Each mask is tidied (largest blob, holes filled,
+    edge feathered) and stored as a box-relative base64 PNG per the regions
+    contract. Any failure leaves masks None — the scan survives, downstream falls
+    back to rectangles, and the log says why.
     """
     try:
         import base64
@@ -292,20 +399,15 @@ def segment_objects(image, objects):
         import numpy as np
         import torch
         from PIL import Image
-        from transformers import SamModel, SamProcessor
 
-        if not _segmenter:
-            # CPU on purpose: the segmentation pipeline materializes float64
-            # tensors, which MPS rejects; the model is small enough that CPU
-            # stays interactive.
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            _segmenter["processor"] = SamProcessor.from_pretrained(SEGMENTER_MODEL_ID)
-            _segmenter["model"] = SamModel.from_pretrained(SEGMENTER_MODEL_ID).to(device)
-            _segmenter["device"] = device
-            print(f"[ERPK scan] segmenter loaded on {device}")
-        processor = _segmenter["processor"]
-        model = _segmenter["model"]
-        device = _segmenter["device"]
+        model_id = resolve_segmenter(segmenter)
+        family = _segmenter_family(model_id)
+        if model_id not in _segmenter:
+            _segmenter[model_id] = _load_segmenter(model_id, family, torch)
+            print(f"[ERPK scan] segmenter '{model_id}' ({family}) loaded on "
+                  f"{_segmenter[model_id]['device']}")
+        entry = _segmenter[model_id]
+        processor, model, device = entry["processor"], entry["model"], entry["device"]
 
         rgb = image.convert("RGB")
 
@@ -315,19 +417,46 @@ def segment_objects(image, objects):
             Image.fromarray(mask_array, mode="L").save(buf, format="PNG")
             return base64.b64encode(buf.getvalue()).decode()
 
-        def run_sam(pil_image, box_px):
-            """Best predicted-IoU mask (bool array sized to pil_image) for one box."""
-            sam_in = processor(pil_image, input_boxes=[[box_px]],
+        def segment_masks(pil, prompts):
+            """Best masks for a batch of boxes, each a full-frame bool array sized
+            to `pil`. SAM1 picks the highest predicted-IoU of its hypotheses;
+            SAM-HQ returns its single HQ mask; SAM 2.1 uses its own processor and
+            output layout. Shared by the whole-image pass and the small-crop pass.
+            """
+            if family in ("sam1", "samhq"):
+                inputs = processor(pil, input_boxes=[prompts],
+                                   return_tensors="pt").to(device)
+                kwargs = ({"multimask_output": True} if family == "sam1"
+                          else {"multimask_output": False, "hq_token_only": True})
+                with torch.no_grad():
+                    out = model(**inputs, **kwargs)
+                masks = processor.image_processor.post_process_masks(
+                    out.pred_masks.cpu(), inputs["original_sizes"].cpu(),
+                    inputs["reshaped_input_sizes"].cpu())[0]
+                result = []
+                for i in range(len(prompts)):
+                    idx = (best_mask_index(out.iou_scores[0, i].tolist())
+                           if family == "sam1" else 0)
+                    result.append(masks[i, idx].numpy().astype(bool))
+                return result
+            # SAM 2.1: separate processor; normalize the per-box output dims.
+            inputs = processor(images=pil, input_boxes=[prompts],
                                return_tensors="pt").to(device)
             with torch.no_grad():
-                sam_out = model(**sam_in, multimask_output=True)
-            sam_masks = processor.image_processor.post_process_masks(
-                sam_out.pred_masks.cpu(),
-                sam_in["original_sizes"].cpu(),
-                sam_in["reshaped_input_sizes"].cpu(),
-            )[0]
-            index = best_mask_index(sam_out.iou_scores[0, 0].tolist())
-            return sam_masks[0, index].numpy()
+                out = model(**inputs, multimask_output=True)
+            masks = processor.post_process_masks(
+                out.pred_masks.cpu(), inputs["original_sizes"])[0]
+            arr = np.asarray(masks.numpy() if hasattr(masks, "numpy") else masks)
+            scores = np.asarray(out.iou_scores.cpu().numpy()).reshape(len(prompts), -1)
+            result = []
+            for i in range(len(prompts)):
+                per_box = arr[i]
+                if per_box.ndim == 3:
+                    idx = int(np.argmax(scores[i])) if scores[i].size else 0
+                    result.append(per_box[idx].astype(bool))
+                else:
+                    result.append(np.squeeze(per_box).astype(bool))
+            return result
 
         def segment_small(box_px):
             """Re-encode a small object from a padded crop for full-resolution edges.
@@ -340,8 +469,8 @@ def segment_objects(image, objects):
             pad_y = int(round((y1 - y0) * CROP_PADDING_FRAC))
             cx0, cy0 = max(0, x0 - pad_x), max(0, y0 - pad_y)
             cx1, cy1 = min(rgb.width, x1 + pad_x), min(rgb.height, y1 + pad_y)
-            crop_mask = run_sam(rgb.crop((cx0, cy0, cx1, cy1)),
-                                [x0 - cx0, y0 - cy0, x1 - cx0, y1 - cy0])
+            crop_mask = segment_masks(rgb.crop((cx0, cy0, cx1, cy1)),
+                                      [[x0 - cx0, y0 - cy0, x1 - cx0, y1 - cy0]])[0]
             full = np.zeros((rgb.height, rgb.width), dtype=bool)
             full[cy0:cy1, cx0:cx1] = np.asarray(crop_mask) > 0
             return full
@@ -349,23 +478,11 @@ def segment_objects(image, objects):
         # One shared image embedding masks every box; small objects are then
         # refined with their own higher-resolution crop pass.
         prompts = pixel_box_prompts(objects, rgb.width, rgb.height)
-        shared_in = processor(rgb, input_boxes=[prompts], return_tensors="pt").to(device)
-        with torch.no_grad():
-            shared_out = model(**shared_in, multimask_output=True)
-        shared_masks = processor.image_processor.post_process_masks(
-            shared_out.pred_masks.cpu(),
-            shared_in["original_sizes"].cpu(),
-            shared_in["reshaped_input_sizes"].cpu(),
-        )[0]
-        shared_scores = shared_out.iou_scores[0]
+        shared = segment_masks(rgb, prompts)
 
         for index, (obj, prompt) in enumerate(zip(objects, prompts)):
             x0, y0, x1, y1 = prompt
-            if is_small_object(obj["box"]):
-                full = segment_small(prompt)
-            else:
-                best = best_mask_index(shared_scores[index].tolist())
-                full = shared_masks[index, best].numpy()
+            full = segment_small(prompt) if is_small_object(obj["box"]) else shared[index]
             obj["mask"] = encode_png(clean_mask(full[y0:y1, x0:x1]))
     except Exception as e:
         print(f"[ERPK scan] Warning: local segmentation unavailable ({e}); "
@@ -465,7 +582,7 @@ def build_cost(usages, model):
     }
 
 
-async def gemini_scan(image, max_objects, model):
+async def gemini_scan(image, max_objects, model, segmenter=None):
     """Gemini engine: one detection call, SAM masks, one depth-ranking call.
 
     Gemini supplies boxes, labels, and per-object captions; the SAM stage fills
@@ -504,7 +621,7 @@ async def gemini_scan(image, max_objects, model):
         print(f"[ERPK scan] 0 objects; raw response head: {raw_text[:400]!r}")
         return {"objects": [],
                 "cost": build_cost([detection.get("usage")], model_to_use)}
-    segment_objects(image, objects)
+    segment_objects(image, objects, segmenter)
     masked = sum(1 for obj in objects if obj.get("mask"))
     print(f"[ERPK scan] {len(objects)} objects, {masked} with masks")
 
@@ -665,7 +782,7 @@ def _mask_region_medians(objects, depth_map):
     return medians
 
 
-def _local_scan_sync(image, max_objects):
+def _local_scan_sync(image, max_objects, segmenter=None):
     """Blocking local pipeline: Florence detect -> SAM masks -> depth ordering."""
     try:
         detection = _detect_florence(image)
@@ -680,7 +797,7 @@ def _local_scan_sync(image, max_objects):
         print("[ERPK scan] 0 objects detected")
         return []
 
-    segment_objects(image, objects)
+    segment_objects(image, objects, segmenter)
     masked = sum(1 for obj in objects if obj.get("mask"))
     print(f"[ERPK scan] {len(objects)} objects, {masked} with masks")
 
@@ -693,7 +810,7 @@ def _local_scan_sync(image, max_objects):
     return depth_ranks(objects, medians)
 
 
-async def local_scan(image, max_objects, model):
+async def local_scan(image, max_objects, model, segmenter=None):
     """Local engine: Florence-2 detection, SAM masks, Depth-Anything ordering.
 
     The model param is ignored: model selection is a cloud-provider concept
@@ -705,7 +822,7 @@ async def local_scan(image, max_objects, model):
     Returns {"objects": [...], "cost": None}: the local pipeline makes no API
     calls, so there is no cost to report (None reads as "not applicable").
     """
-    objects = await asyncio.to_thread(_local_scan_sync, image, max_objects)
+    objects = await asyncio.to_thread(_local_scan_sync, image, max_objects, segmenter)
     return {"objects": objects, "cost": None}
 
 
@@ -716,6 +833,7 @@ async def local_scan(image, max_objects, model):
 DEFAULT_ENGINE = gemini_scan
 
 
-async def scan(image, max_objects=DEFAULT_MAX_OBJECTS, model=None, engine=None):
+async def scan(image, max_objects=DEFAULT_MAX_OBJECTS, model=None, engine=None,
+               segmenter=None):
     """Run the active scan engine over the image, returning ranked scan objects."""
-    return await (engine or DEFAULT_ENGINE)(image, max_objects, model)
+    return await (engine or DEFAULT_ENGINE)(image, max_objects, model, segmenter)
