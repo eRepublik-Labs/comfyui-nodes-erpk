@@ -191,6 +191,71 @@ def depth_prompt(labels):
 SEGMENTER_MODEL_ID = "facebook/sam-vit-base"
 _segmenter = {}
 
+# A box whose larger normalized side is below this is "small": at the frame's
+# fixed encoder resolution it gets few mask pixels and inherently rough edges,
+# so it earns a crop re-encode (an extra image embedding) for full resolution.
+# Larger objects keep the single shared whole-image embedding.
+SMALL_OBJECT_MAX_EXTENT = 0.15
+
+# Padding around a small object's box when cropping it for the re-encode, as a
+# fraction of the box size, so the segmenter sees a little context on each side.
+CROP_PADDING_FRAC = 0.25
+
+
+def best_mask_index(scores):
+    """Index of the highest predicted-IoU mask among SAM's hypotheses.
+
+    SAM with multimask_output=True returns several mask candidates plus a
+    predicted IoU per candidate; the best-scoring one is usually the cleanest for
+    an ambiguous box. Empty scores fall back to 0 (the only/first mask).
+    """
+    if scores is None or len(scores) == 0:
+        return 0
+    best = 0
+    for index in range(1, len(scores)):
+        if scores[index] > scores[best]:
+            best = index
+    return best
+
+
+def is_small_object(box, threshold=SMALL_OBJECT_MAX_EXTENT):
+    """True when both of the box's sides are below threshold (normalized 0-1).
+
+    Uses the larger side: an object is small only when it is small in both
+    dimensions, so a long thin region (a wide horizon, a tall pole) is not
+    re-encoded just for being narrow on one axis.
+    """
+    return max(float(box.get("w", 0.0)), float(box.get("h", 0.0))) < threshold
+
+
+def clean_mask(mask, feather_sigma=1.0):
+    """Tidy a raw segmentation mask, returning a 2D uint8 array (0..255).
+
+    Keeps the largest connected blob (drops stray islands), fills interior holes,
+    and lightly feathers the edge so cut-outs composite without a hard stair-step.
+    numpy/scipy are imported lazily; if scipy is unavailable the mask degrades to
+    a clean binary one rather than raising, so the scan survives on a bare host.
+    """
+    import numpy as np
+
+    binary = np.asarray(mask) > 0
+    if not binary.any():
+        return binary.astype(np.uint8) * 255
+    try:
+        from scipy import ndimage
+
+        labels, count = ndimage.label(binary)
+        if count > 1:
+            sizes = ndimage.sum(binary, labels, range(1, count + 1))
+            binary = labels == (1 + int(np.argmax(sizes)))
+        binary = ndimage.binary_fill_holes(binary)
+        if feather_sigma and feather_sigma > 0:
+            alpha = ndimage.gaussian_filter(binary.astype(np.float32), feather_sigma)
+            return np.clip(alpha * 255.0, 0, 255).astype(np.uint8)
+    except ImportError:
+        pass
+    return binary.astype(np.uint8) * 255
+
 
 def pixel_box_prompts(objects, width, height):
     """Convert normalized scan boxes into integer [x0, y0, x1, y1] pixel
@@ -210,12 +275,15 @@ def segment_objects(image, objects):
     """Fill each object's mask with a locally-computed segmentation.
 
     The detector (Florence-2 locally, Gemini in the cloud) supplies boxes and
-    labels; masks always come from this box-prompted segmentation model (one
-    image embedding, one prompt per box) because vision-LLM mask output is too
-    unreliable to ship (omitted fields, truncated multi-object responses).
-    Masks are stored box-relative base64 PNGs per the regions contract. Any
-    failure leaves masks None — the scan survives, downstream falls back to
-    rectangles, and the log says why.
+    labels; masks always come from this box-prompted segmentation model because
+    vision-LLM mask output is too unreliable to ship (omitted fields, truncated
+    multi-object responses). One shared image embedding masks every box at once,
+    and SAM's several hypotheses per box are reduced to the highest predicted-IoU
+    one. Small objects are re-encoded from a padded crop so they get the encoder's
+    full resolution instead of a few pixels. Each mask is tidied (largest blob,
+    holes filled, edge feathered) and stored as a box-relative base64 PNG per the
+    regions contract. Any failure leaves masks None — the scan survives,
+    downstream falls back to rectangles, and the log says why.
     """
     try:
         import base64
@@ -240,21 +308,65 @@ def segment_objects(image, objects):
         device = _segmenter["device"]
 
         rgb = image.convert("RGB")
-        prompts = pixel_box_prompts(objects, rgb.width, rgb.height)
-        inputs = processor(rgb, input_boxes=[prompts], return_tensors="pt").to(device)
-        with torch.no_grad():
-            outputs = model(**inputs, multimask_output=False)
-        masks = processor.image_processor.post_process_masks(
-            outputs.pred_masks.cpu(),
-            inputs["original_sizes"].cpu(),
-            inputs["reshaped_input_sizes"].cpu(),
-        )[0]
-        for obj, prompt, mask in zip(objects, prompts, masks):
-            x0, y0, x1, y1 = prompt
-            crop = mask[0, y0:y1, x0:x1].numpy().astype(np.uint8) * 255
+
+        def encode_png(mask_array):
+            """Box-relative uint8 mask -> base64 PNG, per the regions contract."""
             buf = BytesIO()
-            Image.fromarray(crop, mode="L").save(buf, format="PNG")
-            obj["mask"] = base64.b64encode(buf.getvalue()).decode()
+            Image.fromarray(mask_array, mode="L").save(buf, format="PNG")
+            return base64.b64encode(buf.getvalue()).decode()
+
+        def run_sam(pil_image, box_px):
+            """Best predicted-IoU mask (bool array sized to pil_image) for one box."""
+            sam_in = processor(pil_image, input_boxes=[[box_px]],
+                               return_tensors="pt").to(device)
+            with torch.no_grad():
+                sam_out = model(**sam_in, multimask_output=True)
+            sam_masks = processor.image_processor.post_process_masks(
+                sam_out.pred_masks.cpu(),
+                sam_in["original_sizes"].cpu(),
+                sam_in["reshaped_input_sizes"].cpu(),
+            )[0]
+            index = best_mask_index(sam_out.iou_scores[0, 0].tolist())
+            return sam_masks[0, index].numpy()
+
+        def segment_small(box_px):
+            """Re-encode a small object from a padded crop for full-resolution edges.
+
+            Returns a full-frame mask with the crop's result pasted back, so the
+            caller crops it to the box just like a shared-pass mask.
+            """
+            x0, y0, x1, y1 = box_px
+            pad_x = int(round((x1 - x0) * CROP_PADDING_FRAC))
+            pad_y = int(round((y1 - y0) * CROP_PADDING_FRAC))
+            cx0, cy0 = max(0, x0 - pad_x), max(0, y0 - pad_y)
+            cx1, cy1 = min(rgb.width, x1 + pad_x), min(rgb.height, y1 + pad_y)
+            crop_mask = run_sam(rgb.crop((cx0, cy0, cx1, cy1)),
+                                [x0 - cx0, y0 - cy0, x1 - cx0, y1 - cy0])
+            full = np.zeros((rgb.height, rgb.width), dtype=bool)
+            full[cy0:cy1, cx0:cx1] = np.asarray(crop_mask) > 0
+            return full
+
+        # One shared image embedding masks every box; small objects are then
+        # refined with their own higher-resolution crop pass.
+        prompts = pixel_box_prompts(objects, rgb.width, rgb.height)
+        shared_in = processor(rgb, input_boxes=[prompts], return_tensors="pt").to(device)
+        with torch.no_grad():
+            shared_out = model(**shared_in, multimask_output=True)
+        shared_masks = processor.image_processor.post_process_masks(
+            shared_out.pred_masks.cpu(),
+            shared_in["original_sizes"].cpu(),
+            shared_in["reshaped_input_sizes"].cpu(),
+        )[0]
+        shared_scores = shared_out.iou_scores[0]
+
+        for index, (obj, prompt) in enumerate(zip(objects, prompts)):
+            x0, y0, x1, y1 = prompt
+            if is_small_object(obj["box"]):
+                full = segment_small(prompt)
+            else:
+                best = best_mask_index(shared_scores[index].tolist())
+                full = shared_masks[index, best].numpy()
+            obj["mask"] = encode_png(clean_mask(full[y0:y1, x0:x1]))
     except Exception as e:
         print(f"[ERPK scan] Warning: local segmentation unavailable ({e}); "
               "masks fall back to rectangles")

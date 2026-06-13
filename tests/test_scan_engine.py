@@ -430,6 +430,137 @@ class TestPixelBoxPrompts:
         assert x1 > x0 and y1 > y0
 
 
+class TestBuildCost:
+    """build_cost sums per-call token usage and prices it for the scan response."""
+
+    def test_sums_tokens_and_counts_calls(self):
+        from utils.scan_engine import build_cost
+        usages = [
+            {"input_tokens": 1200, "output_tokens": 1500, "total_tokens": 2700},
+            {"input_tokens": 1100, "output_tokens": 50, "total_tokens": 1150},
+        ]
+        cost = build_cost(usages, "gemini-2.5-flash")
+        assert cost["input_tokens"] == 2300
+        assert cost["output_tokens"] == 1550
+        assert cost["calls"] == 2
+        assert cost["model"] == "gemini-2.5-flash"
+        # 2300/1e6*0.30 + 1550/1e6*2.50
+        assert cost["usd"] == pytest.approx(2300 / 1e6 * 0.30 + 1550 / 1e6 * 2.5)
+
+    def test_none_usages_are_skipped(self):
+        from utils.scan_engine import build_cost
+        cost = build_cost([None, {"input_tokens": 100, "output_tokens": 0,
+                                  "total_tokens": 100}], "gemini-2.5-flash")
+        assert cost["input_tokens"] == 100
+        assert cost["calls"] == 1
+
+    def test_all_none_is_zero_tokens(self):
+        from utils.scan_engine import build_cost
+        cost = build_cost([None, None], "gemini-2.5-flash")
+        assert cost["input_tokens"] == 0 and cost["output_tokens"] == 0
+        assert cost["calls"] == 0
+        assert cost["usd"] == 0.0
+
+    def test_unknown_model_reports_tokens_but_no_usd(self):
+        from utils.scan_engine import build_cost
+        cost = build_cost([{"input_tokens": 500, "output_tokens": 500,
+                            "total_tokens": 1000}], "totally-bogus-model")
+        assert cost["usd"] is None
+        assert cost["input_tokens"] == 500 and cost["output_tokens"] == 500
+
+
+class TestBestMaskIndex:
+    """best_mask_index picks the highest predicted-IoU hypothesis."""
+
+    def test_picks_argmax(self):
+        from utils.scan_engine import best_mask_index
+        assert best_mask_index([0.1, 0.9, 0.5]) == 1
+
+    def test_first_on_tie(self):
+        from utils.scan_engine import best_mask_index
+        assert best_mask_index([0.5, 0.5, 0.5]) == 0
+
+    def test_empty_is_zero(self):
+        from utils.scan_engine import best_mask_index
+        assert best_mask_index([]) == 0
+
+
+class TestIsSmallObject:
+    """is_small_object flags boxes that benefit from a crop re-encode."""
+
+    def test_small_box_is_small(self):
+        from utils.scan_engine import is_small_object
+        assert is_small_object({"x": 0.1, "y": 0.1, "w": 0.05, "h": 0.05})
+
+    def test_large_box_is_not_small(self):
+        from utils.scan_engine import is_small_object
+        assert not is_small_object({"x": 0.0, "y": 0.0, "w": 0.5, "h": 0.4})
+
+    def test_threshold_is_strict(self):
+        from utils.scan_engine import is_small_object, SMALL_OBJECT_MAX_EXTENT
+        # A box whose larger side is exactly the threshold is not "small".
+        box = {"x": 0.0, "y": 0.0, "w": SMALL_OBJECT_MAX_EXTENT, "h": 0.01}
+        assert not is_small_object(box)
+
+    def test_tall_thin_object_is_small_by_max_extent(self):
+        from utils.scan_engine import is_small_object
+        # Both sides small -> small, even if aspect is extreme.
+        assert is_small_object({"x": 0.0, "y": 0.0, "w": 0.02, "h": 0.12})
+
+
+class TestCleanMask:
+    """clean_mask keeps the largest blob, fills holes, and softens edges."""
+
+    def test_keeps_largest_component_and_fills_holes(self):
+        np = pytest.importorskip("numpy")
+        pytest.importorskip("scipy")
+        from utils.scan_engine import clean_mask
+        mask = np.zeros((40, 40), dtype=np.uint8)
+        mask[5:35, 5:35] = 1      # the object blob
+        mask[18:22, 18:22] = 0    # a hole punched in it
+        mask[0:2, 0:2] = 1        # a stray speckle in the corner
+        out = clean_mask(mask, feather_sigma=0)
+        assert out.dtype == np.uint8
+        assert out[0, 0] == 0     # speckle dropped
+        assert out[20, 20] == 255  # hole filled
+        assert out[20, 6] == 255   # blob retained
+
+    def test_all_zero_stays_zero(self):
+        np = pytest.importorskip("numpy")
+        from utils.scan_engine import clean_mask
+        out = clean_mask(np.zeros((10, 10), dtype=np.uint8))
+        assert out.max() == 0
+
+    def test_feather_introduces_soft_edge_values(self):
+        np = pytest.importorskip("numpy")
+        pytest.importorskip("scipy")
+        from utils.scan_engine import clean_mask
+        mask = np.zeros((40, 40), dtype=np.uint8)
+        mask[10:30, 10:30] = 1
+        out = clean_mask(mask, feather_sigma=1.5)
+        # Feathering yields intermediate alpha, not a pure 0/255 mask.
+        assert ((out > 0) & (out < 255)).any()
+
+    def test_degrades_without_scipy(self, monkeypatch):
+        np = pytest.importorskip("numpy")
+        from utils import scan_engine
+        # Simulate scipy being absent: clean_mask must still return a binary
+        # mask rather than raise, so the scan survives on a bare-numpy host.
+        import builtins
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "scipy" or name.startswith("scipy."):
+                raise ImportError("no scipy")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        mask = np.zeros((20, 20), dtype=np.uint8)
+        mask[5:15, 5:15] = 1
+        out = scan_engine.clean_mask(mask, feather_sigma=1.0)
+        assert out.max() == 255 and out.min() == 0
+
+
 class TestFlorenceMalformedLabels:
     """A malformed labels array keeps the boxes, mirroring parse_segmentation."""
 
