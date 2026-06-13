@@ -433,30 +433,22 @@ def _cutout_mask(regions, width, height):
     return mask
 
 
-def apply_cutouts(image, regions):
-    """Remove each cut-out region by inpainting its masked area from the scene.
+def _inpaint_regions(image, mask):
+    """Inpaint an image tensor's masked pixels from their surroundings.
 
-    A cut-out region (Shift+Delete in the editor) is erased: its masked
-    silhouette — or its whole box when it has no stored mask — is filled in from
-    the surrounding pixels with OpenCV inpainting, so the object is seamlessly
-    gone while the output stays RGB. Returns the input unchanged when there are
-    no cut-outs; never mutates it. OpenCV is a ComfyUI core dependency; if it is
-    somehow missing the image is returned unchanged and the reason is logged.
+    image is float [B,H,W,3]; mask is uint8 [H,W] (255 = fill). Returns the input
+    unchanged when the mask is empty or OpenCV is missing (a ComfyUI core
+    dependency, so absence is logged, not fatal); never mutates the input.
     """
-    cuts = [r for r in regions if r.get("cutout") and r["kind"] != "text"]
-    if image is None or not cuts:
-        return image
     import numpy as np
     import torch
 
-    height, width = int(image.shape[1]), int(image.shape[2])
-    mask = _cutout_mask(regions, width, height)
-    if not mask.any():
+    if image is None or mask is None or not mask.any():
         return image
     try:
         import cv2
     except ImportError:
-        print("[ERPK] Warning: OpenCV unavailable; cut-out regions left unfilled")
+        print("[ERPK] Warning: OpenCV unavailable; removed/moved areas left unfilled")
         return image
     result = image.clone()
     for frame in range(int(result.shape[0])):
@@ -464,6 +456,77 @@ def apply_cutouts(image, regions):
         filled = cv2.inpaint(rgb, mask, 4, cv2.INPAINT_TELEA)
         result[frame, :, :, :3] = torch.from_numpy(filled.astype(np.float32) / 255.0)
     return result
+
+
+def apply_cutouts(image, regions):
+    """Remove each cut-out region by inpainting its masked area from the scene.
+
+    A cut-out region (Shift+Delete in the editor) is erased: its masked
+    silhouette — or its whole box when it has no stored mask — is filled in from
+    the surrounding pixels (OpenCV), so the object is seamlessly gone while the
+    output stays RGB. Returns the input unchanged when there are no cut-outs.
+    """
+    cuts = [r for r in regions if r.get("cutout") and r["kind"] != "text"]
+    if image is None or not cuts:
+        return image
+    height, width = int(image.shape[1]), int(image.shape[2])
+    return _inpaint_regions(image, _cutout_mask(regions, width, height))
+
+
+def _move_origin_mask(regions, width, height):
+    """uint8 [height, width] mask, 255 over each moved region's leftover origin.
+
+    For each moved region the origin is its source silhouette (or src box when
+    maskless) MINUS the destination box — so a move-in-place or scale that covers
+    its own origin erases only the part sticking out, never the fresh paste.
+    All-zero when nothing moved. numpy/PIL only (cv2-free, so unit-testable).
+    """
+    import base64
+    from io import BytesIO
+
+    import numpy as np
+    from PIL import Image
+
+    mask = np.zeros((height, width), dtype=np.uint8)
+    for region in regions:
+        if (not region_moved(region) or region.get("kind") == "text"
+                or region.get("ref_image") or region.get("cutout")):
+            continue
+        sx0, sy0, sx1, sy1 = mask_pixel_box(region["src"], width, height)
+        bw, bh = sx1 - sx0, sy1 - sy0
+        patch = np.full((bh, bw), 255, dtype=np.uint8)
+        if region_has_stored_mask(region):
+            try:
+                glyph = Image.open(BytesIO(base64.b64decode(region["mask"])))
+                glyph = glyph.convert("L").resize((bw, bh))
+                patch = ((np.asarray(glyph) > 127).astype(np.uint8)) * 255
+            except Exception:
+                pass
+        # Zero the part of this origin covered by the destination box so the
+        # freshly pasted copy is never erased.
+        dx0, dy0, dx1, dy1 = mask_pixel_box(region, width, height)
+        ix0, iy0 = max(sx0, dx0), max(sy0, dy0)
+        ix1, iy1 = min(sx1, dx1), min(sy1, dy1)
+        if ix1 > ix0 and iy1 > iy0:
+            patch[iy0 - sy0:iy1 - sy0, ix0 - sx0:ix1 - sx0] = 0
+        mask[sy0:sy1, sx0:sx1] = np.maximum(mask[sy0:sy1, sx0:sx1], patch)
+    return mask
+
+
+def apply_move_origin_cutouts(image, regions):
+    """Inpaint the leftover origin of each moved region so it does not appear twice.
+
+    composite_moved_regions pastes a moved object at its destination but leaves
+    the original behind; this erases that original (silhouette minus destination)
+    from the surrounding pixels, making the move's removal deterministic instead
+    of relying on the edit model. Returns the input unchanged when nothing moved.
+    """
+    moved = [r for r in regions if region_moved(r) and r.get("kind") != "text"
+             and not r.get("ref_image") and not r.get("cutout")]
+    if image is None or not moved:
+        return image
+    height, width = int(image.shape[1]), int(image.shape[2])
+    return _inpaint_regions(image, _move_origin_mask(regions, width, height))
 
 
 def build_region_masks(regions, width, height):
@@ -631,6 +694,7 @@ class RegionalPromptBuilder(IO.ComfyNode):
         if not regions and not prompt.strip():
             raise ValueError("Describe the scene or add at least one region")
         image = composite_moved_regions(image, regions)
+        image = apply_move_origin_cutouts(image, regions)
         image = apply_cutouts(image, regions)
         masks = build_region_masks(regions, width, height)
         assembled = build_prompt(prompt, width, height, regions)

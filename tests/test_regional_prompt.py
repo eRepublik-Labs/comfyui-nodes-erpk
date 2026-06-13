@@ -10,7 +10,9 @@ import pytest
 from utils.regional_prompt import (
     RegionalPromptBuilder,
     _cutout_mask,
+    _move_origin_mask,
     apply_cutouts,
+    apply_move_origin_cutouts,
     aspect_ratio_string,
     box_2d,
     build_prompt,
@@ -1012,6 +1014,65 @@ class TestCompositeMovedRegions:
         image = self._image(torch)
         composite_moved_regions(image, [self._moved()])
         assert float(image[0, 12, 12, 0]) == 0.0
+
+
+class TestMoveOriginCutouts:
+    """A moved region's origin is inpainted away (silhouette minus destination),
+    so the object does not appear at both its old and new positions."""
+
+    def test_disjoint_origin_is_marked(self):
+        np = pytest.importorskip("numpy")
+        moved = {"x": 0.5, "y": 0.5, "w": 0.25, "h": 0.25, "kind": "object",
+                 "desc": "x", "text": "", "src": {"x": 0.0, "y": 0.0,
+                                                   "w": 0.25, "h": 0.25}}
+        mask = _move_origin_mask([moved], 20, 20)
+        assert mask[2, 2] == 255      # the origin gets filled
+        assert mask[12, 12] == 0      # the destination is left alone
+        assert mask[8, 8] == 0        # untouched elsewhere
+
+    def test_overlap_excludes_the_destination(self):
+        np = pytest.importorskip("numpy")
+        # Destination sits inside the origin (scale/move-in-place).
+        moved = {"x": 0.2, "y": 0.2, "w": 0.2, "h": 0.2, "kind": "object",
+                 "desc": "x", "text": "", "src": {"x": 0.0, "y": 0.0,
+                                                  "w": 0.6, "h": 0.6}}
+        mask = _move_origin_mask([moved], 20, 20)
+        assert mask[1, 1] == 255       # origin, outside the destination -> fill
+        assert mask[6, 6] == 0         # inside the destination -> kept (fresh paste)
+
+    def test_unmoved_and_srcless_regions_are_ignored(self):
+        pytest.importorskip("numpy")
+        anchor = {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2, "kind": "object",
+                  "desc": "x", "text": "", "src": {"x": 0.1, "y": 0.1,
+                                                   "w": 0.2, "h": 0.2}}
+        hand_drawn = {"x": 0.5, "y": 0.5, "w": 0.2, "h": 0.2, "kind": "object",
+                      "desc": "x", "text": ""}
+        assert _move_origin_mask([anchor, hand_drawn], 20, 20).max() == 0
+
+    def test_apply_fills_the_origin(self):
+        pytest.importorskip("numpy")
+        torch = pytest.importorskip("torch")
+        pytest.importorskip("cv2")
+        # Red field with a blue patch where the origin is; after the move the
+        # origin is inpainted back to red, RGB preserved.
+        img = torch.zeros((1, 20, 20, 3))
+        img[..., 0] = 1.0
+        img[0, 0:5, 0:5, 0] = 0.0      # blue origin patch
+        img[0, 0:5, 0:5, 2] = 1.0
+        moved = {"x": 0.5, "y": 0.5, "w": 0.25, "h": 0.25, "kind": "object",
+                 "desc": "x", "text": "", "src": {"x": 0.0, "y": 0.0,
+                                                  "w": 0.25, "h": 0.25}}
+        out = apply_move_origin_cutouts(img, [moved])
+        assert out.shape == (1, 20, 20, 3)
+        assert float(out[0, 2, 2, 0]) > float(out[0, 2, 2, 2])  # origin -> red
+
+    def test_apply_no_move_returns_input(self):
+        torch = pytest.importorskip("torch")
+        img = torch.rand((1, 8, 8, 3))
+        anchor = {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2, "kind": "object",
+                  "desc": "x", "text": "", "src": {"x": 0.1, "y": 0.1,
+                                                   "w": 0.2, "h": 0.2}}
+        assert apply_move_origin_cutouts(img, [anchor]) is img
 
 
 class TestOverlappingMoves:

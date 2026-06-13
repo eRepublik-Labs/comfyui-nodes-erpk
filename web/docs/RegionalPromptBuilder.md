@@ -26,7 +26,7 @@ Draw regions on a canvas and emit a layout-aware prompt for any image generation
 | bboxes | BOUNDING_BOX | Pixel-space boxes for the drawn regions, compatible with core bbox nodes. |
 | width | INT | The frame width, passed through. |
 | height | INT | The frame height, passed through. |
-| image | IMAGE | The reference image, passed through. When scanned regions have been moved, their masked cut-outs are composited at the destinations first, so the edit model receives the move as fact. When a region is cut out (Shift+Delete), its masked area is inpainted from the surrounding pixels (OpenCV) so the object is removed and the gap filled; the output stays RGB. |
+| image | IMAGE | The reference image, passed through. When scanned regions have been moved, their masked cut-outs are composited at the destinations and their original locations are inpainted away (OpenCV), so a moved object does not appear twice. When a region is cut out (Shift+Delete), its masked area is likewise inpainted from the surrounding pixels so the object is removed and the gap filled. The output stays RGB. |
 | image_refs | ERPK_IMAGE_REFS | Wired region reference images in region order; connect to Gemini Image Edit's image_refs input. |
 | masks | MASK | A frame-sized mask batch, one per region in region order. Scanned regions use their stored segmentation; all other regions get filled rectangles. |
 
