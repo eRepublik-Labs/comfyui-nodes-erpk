@@ -168,6 +168,32 @@ class GeminiClient:
         if safety_settings:
             self.safety_settings = safety_settings
 
+    @staticmethod
+    def _normalize_usage(usage_metadata):
+        """Read the SDK's usage_metadata into {input_tokens, output_tokens, total_tokens}.
+
+        candidates_token_count already includes thinking tokens on the Gemini
+        Developer API, so it is the output total and thoughts_token_count is NOT
+        added (that would double-count). Returns None when no usage is reported.
+        Each field is coerced defensively so a missing or non-int count reads 0.
+        """
+        if usage_metadata is None:
+            return None
+
+        def _count(name):
+            value = getattr(usage_metadata, name, None)
+            return value if isinstance(value, int) else 0
+
+        input_tokens = _count("prompt_token_count")
+        output_tokens = _count("candidates_token_count")
+        total = getattr(usage_metadata, "total_token_count", None)
+        total_tokens = total if isinstance(total, int) else input_tokens + output_tokens
+        return {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
+        }
+
     def _generate_content_sync(
         self,
         prompt: str,
@@ -242,12 +268,14 @@ class GeminiClient:
         )
 
         # Extract text from response
+        usage = self._normalize_usage(getattr(response, "usage_metadata", None))
         try:
             text = response.text
             return {
                 "text": text,
                 "blocked": False,
-                "finish_reason": response.candidates[0].finish_reason if response.candidates else "STOP"
+                "finish_reason": response.candidates[0].finish_reason if response.candidates else "STOP",
+                "usage": usage
             }
         except Exception as e:
             # Response was blocked or error occurred
@@ -255,7 +283,8 @@ class GeminiClient:
                 "text": "",
                 "blocked": True,
                 "finish_reason": response.candidates[0].finish_reason if response.candidates else "ERROR",
-                "error": str(e)
+                "error": str(e),
+                "usage": usage
             }
 
     async def generate_content(

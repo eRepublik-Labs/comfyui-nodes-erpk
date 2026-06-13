@@ -1,0 +1,49 @@
+{
+  "_comment": "Gemini API pricing (USD per 1M tokens). Update from https://ai.google.dev/gemini-api/docs/pricing",
+  "_last_updated": "2026-06-13",
+  "_version": "1.0",
+  "_note": "Flash output prices include thinking tokens. Pro models are tiered by prompt size at 200k tokens; the <=200k rate is listed here because scans are small. Image inputs are billed as input tokens (Gemini 3.x: media_resolution-based, default ~1120 tokens/image).",
+
+  "models": {
+    "gemini-3.1-pro-preview": {
+      "name": "Gemini 3.1 Pro Preview",
+      "input_price_per_mtok": 2.0,
+      "output_price_per_mtok": 12.0
+    },
+    "gemini-3-pro-preview": {
+      "name": "Gemini 3 Pro Preview (deprecated ~2026-03-09, use 3.1 Pro)",
+      "input_price_per_mtok": 2.0,
+      "output_price_per_mtok": 12.0
+    },
+    "gemini-3.5-flash": {
+      "name": "Gemini 3.5 Flash",
+      "input_price_per_mtok": 1.5,
+      "output_price_per_mtok": 9.0
+    },
+    "gemini-3-flash-preview": {
+      "name": "Gemini 3 Flash Preview",
+      "input_price_per_mtok": 0.5,
+      "output_price_per_mtok": 3.0
+    },
+    "gemini-3.1-flash-lite-preview": {
+      "name": "Gemini 3.1 Flash-Lite Preview",
+      "input_price_per_mtok": 0.25,
+      "output_price_per_mtok": 1.5
+    },
+    "gemini-2.5-pro": {
+      "name": "Gemini 2.5 Pro",
+      "input_price_per_mtok": 1.25,
+      "output_price_per_mtok": 10.0
+    },
+    "gemini-2.5-flash": {
+      "name": "Gemini 2.5 Flash",
+      "input_price_per_mtok": 0.3,
+      "output_price_per_mtok": 2.5
+    },
+    "gemini-2.5-flash-lite": {
+      "name": "Gemini 2.5 Flash-Lite",
+      "input_price_per_mtok": 0.1,
+      "output_price_per_mtok": 0.4
+    }
+  }
+}

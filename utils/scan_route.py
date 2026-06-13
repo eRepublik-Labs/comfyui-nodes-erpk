@@ -83,11 +83,16 @@ async def handle_scan(request):
 
         engine = getattr(scan_engine, SCAN_ENGINES[engine_name])
         try:
-            objects = await scan_engine.scan(image, max_objects, model, engine=engine)
+            result = await scan_engine.scan(image, max_objects, model, engine=engine)
         except Exception as e:
             return web.json_response({"error": str(e)}, status=502)
 
-        return web.json_response({"objects": objects})
+        # Engines return {"objects": [...], "cost": {...}|None}; cost is the
+        # priced token usage for Gemini scans, None for the local pipeline.
+        return web.json_response({
+            "objects": result.get("objects", []),
+            "cost": result.get("cost"),
+        })
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 

@@ -5,6 +5,8 @@ import asyncio
 import json
 import math
 
+from . import scan_cost
+
 # Degenerate-box floor for detections, mirroring utils/regional_prompt's
 # MIN_REGION_EXTENT (the regions contract). It is duplicated rather than imported
 # to keep this module free of comfy_api/torch/genai so the pure helpers stay
@@ -331,6 +333,26 @@ def depth_ranks(objects, medians):
     return result
 
 
+def build_cost(usages, model):
+    """Assemble the scan's cost from each API call's token usage.
+
+    usages is one entry per Gemini call (None when a call reported no usage).
+    Returns {usd, input_tokens, output_tokens, calls, model}: tokens are summed
+    across calls and usd is the priced estimate, or None when the model has no
+    rate on file (the UI then shows "cost unavailable" rather than implying free).
+    """
+    input_tokens = sum(usage["input_tokens"] for usage in usages if usage)
+    output_tokens = sum(usage["output_tokens"] for usage in usages if usage)
+    calls = sum(1 for usage in usages if usage)
+    return {
+        "usd": scan_cost.price(model, input_tokens, output_tokens),
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "calls": calls,
+        "model": model,
+    }
+
+
 async def gemini_scan(image, max_objects, model):
     """Gemini engine: one detection call, SAM masks, one depth-ranking call.
 
@@ -339,6 +361,10 @@ async def gemini_scan(image, max_objects, model):
     imported lazily so this module stays genai-free at import time (the test
     harness never reaches this code). The key resolves through the standard
     3-tier chain via GeminiClient(api_key=None).
+
+    Returns {"objects": [...], "cost": {...}}: cost sums the token usage of both
+    billable calls (detection + depth) and prices it. The detection call is
+    billed even when it finds nothing, so a zero-object scan still reports cost.
     """
     from ..gemini.gemini_api.client import GeminiClient
 
@@ -364,7 +390,8 @@ async def gemini_scan(image, max_objects, model):
     objects = parse_detection(raw_text, max_objects)
     if not objects:
         print(f"[ERPK scan] 0 objects; raw response head: {raw_text[:400]!r}")
-        return []
+        return {"objects": [],
+                "cost": build_cost([detection.get("usage")], model_to_use)}
     segment_objects(image, objects)
     masked = sum(1 for obj in objects if obj.get("mask"))
     print(f"[ERPK scan] {len(objects)} objects, {masked} with masks")
@@ -391,7 +418,9 @@ async def gemini_scan(image, max_objects, model):
     # failing the whole scan.
     depth_text = "" if depth.get("blocked") else depth.get("text", "")
     rank_map = parse_depth_order(depth_text, labels)
-    return apply_depth_ranks(objects, rank_map)
+    ranked = apply_depth_ranks(objects, rank_map)
+    cost = build_cost([detection.get("usage"), depth.get("usage")], model_to_use)
+    return {"objects": ranked, "cost": cost}
 
 
 # Pinned revisions are the security mitigation for Florence-2's trust_remote_code
@@ -560,13 +589,18 @@ async def local_scan(image, max_objects, model):
     so there is nothing to choose. It stays in the signature for engine-contract
     parity. The blocking torch work runs in a thread so it never stalls the
     event loop when two scans share it.
+
+    Returns {"objects": [...], "cost": None}: the local pipeline makes no API
+    calls, so there is no cost to report (None reads as "not applicable").
     """
-    return await asyncio.to_thread(_local_scan_sync, image, max_objects)
+    objects = await asyncio.to_thread(_local_scan_sync, image, max_objects)
+    return {"objects": objects, "cost": None}
 
 
 # The single indirection point a future Moondream engine plugs into: any
-# coroutine (PIL.Image, max_objects:int, model:str|None) -> list[scan-object].
-# The scan button defaults to Gemini; the local pipeline stays opt-in per scan.
+# coroutine (PIL.Image, max_objects:int, model:str|None) -> {"objects": [...],
+# "cost": {...}|None}. The scan button defaults to Gemini; the local pipeline
+# stays opt-in per scan.
 DEFAULT_ENGINE = gemini_scan
 
 

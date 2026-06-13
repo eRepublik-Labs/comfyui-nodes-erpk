@@ -57,7 +57,7 @@ def ensure_local_engine(monkeypatch):
     """
     if not hasattr(scan_engine, "local_scan"):
         async def _stub(image, max_objects, model):
-            return []
+            return {"objects": [], "cost": None}
 
         monkeypatch.setattr(scan_engine, "local_scan", _stub, raising=False)
 
@@ -108,16 +108,32 @@ class TestHandleScan:
         assert resp.status == 413
         assert "error" in _body(resp)
 
-    def test_success_returns_objects(self, monkeypatch):
+    def test_success_returns_objects_and_cost(self, monkeypatch):
         async def fake_scan(image, max_objects, model, engine=None):
-            return [{"name": "car", "box": {"x": 0, "y": 0, "w": 0.5, "h": 0.5},
-                     "mask": None, "group": "car", "depth_rank": 0}]
+            return {
+                "objects": [{"name": "car", "box": {"x": 0, "y": 0, "w": 0.5, "h": 0.5},
+                             "mask": None, "group": "car", "depth_rank": 0}],
+                "cost": {"usd": 0.031, "input_tokens": 2300, "output_tokens": 1550,
+                         "calls": 2, "model": "gemini-2.5-flash"},
+            }
 
         monkeypatch.setattr(scan_engine, "scan", fake_scan)
         req = FakeRequest({"image": _png_data_url(), "max_objects": 5})
         resp = asyncio.run(handle_scan(req))
         assert resp.status == 200
-        assert _body(resp)["objects"][0]["name"] == "car"
+        body = _body(resp)
+        assert body["objects"][0]["name"] == "car"
+        assert body["cost"]["usd"] == 0.031
+        assert body["cost"]["input_tokens"] == 2300
+
+    def test_local_cost_is_null(self, monkeypatch):
+        async def fake_scan(image, max_objects, model, engine=None):
+            return {"objects": [], "cost": None}
+
+        monkeypatch.setattr(scan_engine, "scan", fake_scan)
+        resp = asyncio.run(handle_scan(FakeRequest({"image": _png_data_url()})))
+        assert resp.status == 200
+        assert _body(resp)["cost"] is None
 
     def test_max_objects_clamped_before_engine(self, monkeypatch):
         seen = {}
@@ -125,7 +141,7 @@ class TestHandleScan:
         async def fake_scan(image, max_objects, model, engine=None):
             seen["max_objects"] = max_objects
             seen["model"] = model
-            return []
+            return {"objects": [], "cost": None}
 
         monkeypatch.setattr(scan_engine, "scan", fake_scan)
         req = FakeRequest({"image": _png_data_url(), "max_objects": 9999})
@@ -138,7 +154,7 @@ class TestHandleScan:
 
         async def fake_scan(image, max_objects, model, engine=None):
             seen["model"] = model
-            return []
+            return {"objects": [], "cost": None}
 
         monkeypatch.setattr(scan_engine, "scan", fake_scan)
         req = FakeRequest({"image": _png_data_url(), "model": "  "})
@@ -150,7 +166,7 @@ class TestHandleScan:
 
         async def fake_scan(image, max_objects, model, engine=None):
             seen["model"] = model
-            return []
+            return {"objects": [], "cost": None}
 
         monkeypatch.setattr(scan_engine, "scan", fake_scan)
         req = FakeRequest({"image": _png_data_url(), "model": "gemini-2.5-flash"})
@@ -194,7 +210,7 @@ class TestEngineSelector:
 
         async def fake_scan(image, max_objects, model, engine=None):
             seen["engine"] = engine
-            return []
+            return {"objects": [], "cost": None}
 
         monkeypatch.setattr(scan_engine, "scan", fake_scan)
         return seen

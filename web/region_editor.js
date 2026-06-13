@@ -382,6 +382,8 @@ function createRegionEditor(node) {
         showMasks: false,      // overlay the scan's segmentation masks
         scanError: null,       // last scan failure, surfaced in the status strip
         scanAbort: null,       // AbortController for the in-flight scan
+        scanCost: null,        // last scan's {usd, input_tokens, output_tokens, calls, model}
+        scanSessionUsd: 0,     // running cost of priced scans since the editor opened
     };
 
     // --- DOM scaffold -------------------------------------------------
@@ -1183,6 +1185,24 @@ function createRegionEditor(node) {
             err.textContent = ` · ${state.scanError}`;
             err.style.color = DANGER_RED;
             statusLeft.appendChild(err);
+        }
+        // The last scan's cost, with the running session total once a second
+        // scan has added to it. Hidden mid-scan so a stale figure never shows.
+        if (state.scanCost && !state.scanning) {
+            const cost = document.createElement("span");
+            let text = ` · scan ${fmtUsd(state.scanCost.usd)}`;
+            if (state.scanSessionUsd > 0 &&
+                state.scanSessionUsd !== state.scanCost.usd) {
+                text += ` (session ${fmtUsd(state.scanSessionUsd)})`;
+            }
+            cost.textContent = text;
+            cost.style.color = "rgba(255, 255, 255, 0.45)";
+            const tokens = (state.scanCost.input_tokens || 0) +
+                (state.scanCost.output_tokens || 0);
+            cost.title = `${tokens.toLocaleString()} tokens over ` +
+                `${state.scanCost.calls || 0} call(s) · ${state.scanCost.model || "?"} ` +
+                `· paid-tier estimate (free tier bills nothing)`;
+            statusLeft.appendChild(cost);
         }
         const w = Number(findWidget(node, "width")?.value) || 1024;
         const h = Number(findWidget(node, "height")?.value) || 1024;
@@ -2424,6 +2444,72 @@ function createRegionEditor(node) {
     // depth_rank so array order stays z-order. Coordinates are re-clamped and
     // degenerate boxes dropped, mirroring the Python and route-side guards;
     // mask/caption/name ride along when present.
+    // --- Scan cost readout ------------------------------------------------
+    // The scan response carries {usd, input_tokens, output_tokens, ...}. usd is
+    // null when the model has no price on file (then we say "price n/a" rather
+    // than imply free). The figure is a paid-tier estimate; free-tier scans bill
+    // nothing, which the docs note.
+    function fmtUsd(usd) {
+        if (usd == null) return "n/a";
+        if (usd === 0) return "$0";
+        // A scan is a few cents; show enough precision to read sub-cent figures.
+        return usd < 0.1 ? `$${usd.toFixed(4)}` : `$${usd.toFixed(2)}`;
+    }
+
+    function costLine(cost) {
+        if (!cost) return "Scan cost unavailable";
+        const tokens = (cost.input_tokens || 0) + (cost.output_tokens || 0);
+        if (cost.usd == null) {
+            return `Scan: ${tokens.toLocaleString()} tokens · price n/a`;
+        }
+        return `Scan: ${fmtUsd(cost.usd)} · ${tokens.toLocaleString()} tokens`;
+    }
+
+    // A transient flash inside the editor root (which also is the fullscreen
+    // overlay, so the toast follows into expanded mode). Self-contained so it
+    // never depends on ComfyUI's cross-version toast service.
+    let costToast = null;
+    let costToastTimer = null;
+
+    function showCostToast(text) {
+        if (costToast) costToast.remove();
+        if (costToastTimer) clearTimeout(costToastTimer);
+        const toast = document.createElement("div");
+        toast.textContent = text;
+        toast.style.position = "absolute";
+        toast.style.top = "8px";
+        toast.style.left = "50%";
+        toast.style.transform = "translateX(-50%)";
+        toast.style.zIndex = "40";
+        toast.style.padding = "5px 11px";
+        toast.style.borderRadius = "7px";
+        toast.style.font = "11px ui-monospace, Menlo, monospace";
+        toast.style.color = "rgba(255, 255, 255, 0.92)";
+        toast.style.background = "rgba(18, 20, 26, 0.92)";
+        toast.style.border = "1px solid rgba(255, 255, 255, 0.16)";
+        toast.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.45)";
+        toast.style.pointerEvents = "none";
+        toast.style.opacity = "0";
+        toast.style.transition = "opacity 160ms ease";
+        root.appendChild(toast);
+        requestAnimationFrame(() => { toast.style.opacity = "1"; });
+        costToast = toast;
+        costToastTimer = setTimeout(() => {
+            toast.style.opacity = "0";
+            setTimeout(() => {
+                if (toast === costToast) { toast.remove(); costToast = null; }
+            }, 220);
+        }, 2600);
+    }
+
+    function recordScanCost(cost) {
+        state.scanCost = cost || null;
+        if (cost && typeof cost.usd === "number") {
+            state.scanSessionUsd += cost.usd;
+        }
+        showCostToast(costLine(cost));
+    }
+
     function applyScanResults(objects) {
         const sorted = (Array.isArray(objects) ? objects.slice() : [])
             .sort((a, b) => (Number(a?.depth_rank) || 0) - (Number(b?.depth_rank) || 0));
@@ -2517,6 +2603,7 @@ function createRegionEditor(node) {
                 state.scanError = json.error || `Scan failed (${res.status})`;
             } else {
                 applyScanResults(json.objects);
+                recordScanCost(json.cost);
             }
         } catch (err) {
             if (err.name === "AbortError") return;
@@ -3308,6 +3395,7 @@ function createRegionEditor(node) {
                 state.scanError = json.error || `Scan failed (${res.status})`;
             } else {
                 applySectionResults(json.objects, frame, host);
+                recordScanCost(json.cost);
             }
         } catch (err) {
             if (err.name !== "AbortError") {
