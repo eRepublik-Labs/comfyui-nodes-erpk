@@ -370,6 +370,21 @@ class TestBuildPrompt:
         prompt = build_prompt("", 1920, 1080, [])
         assert prompt == "Compose for a 1920x1080 frame (aspect ratio 16:9)."
 
+    def test_edit_mode_leads_with_preservation(self):
+        # An image is connected: the prompt edits the photo, it does not compose
+        # a fresh scene, so the model keeps the input instead of re-rendering it.
+        regions = [region(x=0.1, y=0.1, w=0.2, h=0.2, desc="a cat")]
+        prompt = build_prompt("a zoo", 1000, 1000, regions, edit_mode=True)
+        assert prompt.startswith("Edit the provided image")
+        assert "do not re-render" in prompt.lower()
+        assert "Compose for a" not in prompt
+
+    def test_generate_mode_composes_and_omits_edit_preamble(self):
+        regions = [region(x=0.1, y=0.1, w=0.2, h=0.2, desc="a cat")]
+        prompt = build_prompt("a zoo", 1000, 1000, regions, edit_mode=False)
+        assert "Compose for a 1000x1000 frame" in prompt
+        assert "Edit the provided image" not in prompt
+
     def test_object_region_without_desc_uses_an_element(self):
         regions = [region(x=0.4, y=0.4, w=0.2, h=0.2)]
         prompt = build_prompt("", 1000, 1000, regions)

@@ -184,6 +184,57 @@ try:
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
 
+    @PromptServer.instance.routes.get("/erpk/shared_workflows/trash")
+    async def erpk_list_trashed_workflows(request):
+        try:
+            try:
+                user_id = PromptServer.instance.user_manager.get_request_user_id(request)
+            except Exception:
+                user_id = None
+            return web.json_response(shared_workflows.list_trashed_workflows(user_id=user_id))
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    @PromptServer.instance.routes.post("/erpk/shared_workflows/trash/{trash_id}/restore")
+    async def erpk_restore_shared_workflow(request):
+        trash_id = request.match_info["trash_id"]
+        try:
+            try:
+                user_id = PromptServer.instance.user_manager.get_request_user_id(request)
+            except Exception:
+                user_id = None
+            restored = shared_workflows.restore_workflow(trash_id, user_id=user_id)
+            if not restored:
+                return web.json_response({"error": "Not found"}, status=404)
+            return web.json_response({"ok": True})
+        except ValueError as e:
+            return web.json_response({"error": str(e)}, status=400)
+        except PermissionError as e:
+            return web.json_response({"error": str(e)}, status=403)
+        except FileExistsError as e:
+            return web.json_response({"error": str(e)}, status=409)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    @PromptServer.instance.routes.delete("/erpk/shared_workflows/trash/{trash_id}")
+    async def erpk_purge_shared_workflow(request):
+        trash_id = request.match_info["trash_id"]
+        try:
+            try:
+                user_id = PromptServer.instance.user_manager.get_request_user_id(request)
+            except Exception:
+                user_id = None
+            purged = shared_workflows.purge_trashed_workflow(trash_id, user_id=user_id)
+            if not purged:
+                return web.json_response({"error": "Not found"}, status=404)
+            return web.json_response({"ok": True})
+        except ValueError as e:
+            return web.json_response({"error": str(e)}, status=400)
+        except PermissionError as e:
+            return web.json_response({"error": str(e)}, status=403)
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
     @PromptServer.instance.routes.get("/erpk/shared_workflows/{name}")
     async def erpk_get_shared_workflow(request):
         name = request.match_info["name"]
@@ -229,9 +280,14 @@ try:
         try:
             try:
                 user_id = PromptServer.instance.user_manager.get_request_user_id(request)
+                users = PromptServer.instance.user_manager.users
+                display_name = users.get(user_id, user_id)
             except Exception:
                 user_id = None
-            deleted = shared_workflows.delete_workflow(name, user_id=user_id)
+                display_name = None
+            deleted = shared_workflows.delete_workflow(
+                name, user_id=user_id, display_name=display_name
+            )
             if not deleted:
                 return web.json_response({"error": "Not found"}, status=404)
             return web.json_response({"ok": True})

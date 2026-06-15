@@ -37,6 +37,28 @@ async function deleteSharedWorkflow(name) {
     return resp.ok;
 }
 
+async function listTrashedWorkflows() {
+    const resp = await api.fetchApi("/erpk/shared_workflows/trash");
+    if (!resp.ok) return [];
+    return await resp.json();
+}
+
+async function restoreSharedWorkflow(trashId) {
+    const resp = await api.fetchApi(
+        `/erpk/shared_workflows/trash/${encodeURIComponent(trashId)}/restore`,
+        { method: "POST" }
+    );
+    return resp;
+}
+
+async function purgeSharedWorkflow(trashId) {
+    const resp = await api.fetchApi(
+        `/erpk/shared_workflows/trash/${encodeURIComponent(trashId)}`,
+        { method: "DELETE" }
+    );
+    return resp;
+}
+
 // ── Linked workflow state ─────────────────────────────────────────
 
 // Tracks the name of the shared workflow currently loaded on the canvas.
@@ -229,9 +251,15 @@ async function showBrowseDialog() {
     title.textContent = "Shared Workflows";
     title.style.cssText = "margin:0;color:#e8eaed;font-size:15px;font-weight:600;letter-spacing:0.01em;";
     header.appendChild(title);
-    header.appendChild(
+    const headerActions = document.createElement("div");
+    headerActions.style.cssText = "display:flex;gap:8px;align-items:center;";
+    headerActions.appendChild(
+        createButton("Trash", BUTTON_STYLE, () => showTrashDialog(refreshList))
+    );
+    headerActions.appendChild(
         createButton("Close", BUTTON_STYLE, () => overlay.remove())
     );
+    header.appendChild(headerActions);
     dialog.appendChild(header);
 
     // List container
@@ -297,12 +325,13 @@ async function showBrowseDialog() {
                 createButton("Delete", DANGER_BUTTON_STYLE, async () => {
                     if (
                         !confirm(
-                            `Delete shared workflow "${wf.name}"?`
+                            `Move shared workflow "${wf.name}" to Trash?`
                         )
                     )
                         return;
                     const deleted = await deleteSharedWorkflow(wf.name);
-                    if (deleted) showToast(`Deleted "${wf.name}"`);
+                    if (deleted) showToast(`Moved "${wf.name}" to Trash`);
+                    else showToast("Failed to move workflow to Trash", "error");
                     refreshList();
                 })
             );
@@ -313,6 +342,108 @@ async function showBrowseDialog() {
     }
 
     await refreshList();
+    document.body.appendChild(overlay);
+}
+
+// ── Trash Dialog ─────────────────────────────────────────────────
+
+async function showTrashDialog(onChange) {
+    const overlay = createOverlay(() => overlay.remove());
+    const dialog = createDialog();
+    overlay.appendChild(dialog);
+
+    const header = document.createElement("div");
+    header.style.cssText =
+        "display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;";
+    const title = document.createElement("h3");
+    title.textContent = "Shared Workflow Trash";
+    title.style.cssText = "margin:0;color:#e8eaed;font-size:15px;font-weight:600;letter-spacing:0.01em;";
+    header.appendChild(title);
+    header.appendChild(
+        createButton("Close", BUTTON_STYLE, () => overlay.remove())
+    );
+    dialog.appendChild(header);
+
+    const listContainer = document.createElement("div");
+    listContainer.style.cssText = "overflow-y:auto;flex:1;margin:0 -4px;";
+    dialog.appendChild(listContainer);
+
+    async function refreshTrash() {
+        clearChildren(listContainer);
+        const workflows = await listTrashedWorkflows();
+
+        if (workflows.length === 0) {
+            const empty = document.createElement("div");
+            empty.textContent = "Trash is empty.";
+            empty.style.cssText =
+                "color:#6b6f80;text-align:center;padding:32px 0;font-size:13px;font-style:italic;";
+            listContainer.appendChild(empty);
+            return;
+        }
+
+        for (const wf of workflows) {
+            const row = document.createElement("div");
+            row.className = "erpk-row";
+            row.style.cssText =
+                "display:flex;align-items:center;justify-content:space-between;padding:10px 12px;" +
+                "border-radius:6px;gap:12px;transition:background 0.15s ease;";
+
+            row.appendChild(createWorkflowIcon());
+
+            const info = document.createElement("div");
+            info.style.cssText = "flex:1;min-width:0;";
+            const nameEl = document.createElement("div");
+            nameEl.textContent = wf.name;
+            nameEl.style.cssText =
+                "font-size:13px;color:#e8eaed;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+            const meta = document.createElement("div");
+            const parts = [formatBytes(wf.size)];
+            if (wf.deleted_at) parts.push(`deleted ${formatDate(wf.deleted_at)}`);
+            if (wf.deleted_by) parts.push(`by ${wf.deleted_by}`);
+            if (wf.created_by) parts.push(`created by ${wf.created_by}`);
+            meta.textContent = parts.join("  \u00b7  ");
+            meta.style.cssText = "font-size:11px;color:#6b6f80;margin-top:3px;letter-spacing:0.01em;";
+            info.appendChild(nameEl);
+            info.appendChild(meta);
+            row.appendChild(info);
+
+            const actions = document.createElement("div");
+            actions.style.cssText = "display:flex;gap:6px;flex-shrink:0;";
+
+            actions.appendChild(
+                createButton("Restore", PRIMARY_BUTTON_STYLE, async () => {
+                    const resp = await restoreSharedWorkflow(wf.trash_id);
+                    if (resp.ok) {
+                        showToast(`Restored "${wf.name}"`);
+                        await refreshTrash();
+                        if (onChange) onChange();
+                    } else {
+                        const data = await resp.json().catch(() => null);
+                        showToast(data?.error || "Failed to restore workflow", "error");
+                    }
+                })
+            );
+
+            actions.appendChild(
+                createButton("Delete Forever", DANGER_BUTTON_STYLE, async () => {
+                    if (!confirm(`Permanently delete "${wf.name}"?`)) return;
+                    const resp = await purgeSharedWorkflow(wf.trash_id);
+                    if (resp.ok) {
+                        showToast(`Permanently deleted "${wf.name}"`);
+                        await refreshTrash();
+                    } else {
+                        const data = await resp.json().catch(() => null);
+                        showToast(data?.error || "Failed to delete workflow", "error");
+                    }
+                })
+            );
+
+            row.appendChild(actions);
+            listContainer.appendChild(row);
+        }
+    }
+
+    await refreshTrash();
     document.body.appendChild(overlay);
 }
 
@@ -466,12 +597,13 @@ function createSettingsWorkflowList() {
                 createButton("Delete", DANGER_BUTTON_STYLE, async () => {
                     if (
                         !confirm(
-                            `Delete shared workflow "${wf.name}"?`
+                            `Move shared workflow "${wf.name}" to Trash?`
                         )
                     )
                         return;
                     const deleted = await deleteSharedWorkflow(wf.name);
-                    if (deleted) showToast(`Deleted "${wf.name}"`);
+                    if (deleted) showToast(`Moved "${wf.name}" to Trash`);
+                    else showToast("Failed to move workflow to Trash", "error");
                     refreshList();
                 })
             );
@@ -481,11 +613,17 @@ function createSettingsWorkflowList() {
         }
     }
 
-    header.appendChild(
+    const headerActions = document.createElement("div");
+    headerActions.style.cssText = "display:flex;gap:8px;align-items:center;";
+    headerActions.appendChild(
+        createButton("Trash", BUTTON_STYLE, () => showTrashDialog(refreshList))
+    );
+    headerActions.appendChild(
         createButton("Share Current", PRIMARY_BUTTON_STYLE, () =>
             showSaveDialog(refreshList)
         )
     );
+    header.appendChild(headerActions);
     section.appendChild(header);
     section.appendChild(listContainer);
 
@@ -635,6 +773,10 @@ app.registerExtension({
                 {
                     content: "Browse Shared Workflows...",
                     callback: () => showBrowseDialog(),
+                },
+                {
+                    content: "Open Shared Workflow Trash...",
+                    callback: () => showTrashDialog(),
                 },
                 {
                     content: "Share Current Workflow...",

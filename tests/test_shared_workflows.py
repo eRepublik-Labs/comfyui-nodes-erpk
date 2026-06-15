@@ -13,9 +13,13 @@ from shared_workflows import (
     _resolve_storage_dir,
     delete_workflow,
     get_workflow,
+    list_trashed_workflows,
     list_workflows,
+    purge_trashed_workflow,
+    restore_workflow,
     save_workflow,
     validate_name,
+    validate_trash_id,
 )
 
 
@@ -235,10 +239,13 @@ class TestSaveWorkflow:
 
 class TestDeleteWorkflow:
     def test_delete_existing_legacy_file(self, storage_dir):
-        # Raw JSON with no envelope and no user_id is deletable by any authenticated user
+        # Raw JSON with no envelope and no user_id is trashable by any authenticated user
         (storage_dir / "doomed.json").write_text(json.dumps({}))
         assert delete_workflow("doomed", user_id="alice") is True
         assert not (storage_dir / "doomed.json").exists()
+        trashed = list_trashed_workflows(user_id="alice")
+        assert len(trashed) == 1
+        assert trashed[0]["name"] == "doomed"
 
     def test_delete_missing(self, storage_dir):
         assert delete_workflow("ghost", user_id="alice") is False
@@ -299,6 +306,7 @@ class TestDeleteWorkflowAuth:
         save_workflow("mine", {}, user_id="alice", display_name="Alice")
         assert delete_workflow("mine", user_id="alice") is True
         assert not (storage_dir / "mine.json").exists()
+        assert list_trashed_workflows(user_id="alice")[0]["name"] == "mine"
 
     def test_non_creator_delete_raises_permission_error(self, storage_dir):
         save_workflow("guarded", {}, user_id="alice", display_name="Alice")
@@ -324,3 +332,82 @@ class TestDeleteWorkflowAuth:
         }
         (storage_dir / "legacy.json").write_text(json.dumps(legacy))
         assert delete_workflow("legacy", user_id="alice") is True
+
+
+# ── Phase 4: Trash operations ─────────────────────────────────────
+
+
+class TestTrashWorkflow:
+    def test_validate_trash_id_rejects_path_traversal(self, storage_dir):
+        with pytest.raises(ValueError):
+            validate_trash_id("../escape")
+
+    def test_delete_moves_to_trash_and_preserves_payload(self, storage_dir):
+        data = {"nodes": [1]}
+        save_workflow("demo", data, user_id="alice", display_name="Alice")
+        assert delete_workflow("demo", user_id="alice", display_name="Alice") is True
+
+        assert get_workflow("demo") is None
+        trashed = list_trashed_workflows(user_id="alice")
+        assert len(trashed) == 1
+        assert trashed[0]["name"] == "demo"
+        assert trashed[0]["deleted_by"] == "Alice"
+        assert trashed[0]["deleted_at"] is not None
+
+        trash_file = storage_dir / ".trash" / f"{trashed[0]['trash_id']}.json"
+        saved = json.loads(trash_file.read_text())
+        assert saved["workflow"] == data
+        assert saved["meta"]["original_name"] == "demo"
+
+    def test_list_workflows_excludes_trash(self, storage_dir):
+        save_workflow("demo", {}, user_id="alice")
+        delete_workflow("demo", user_id="alice")
+        assert list_workflows() == []
+        assert len(list_trashed_workflows(user_id="alice")) == 1
+
+    def test_restore_round_trips_from_trash(self, storage_dir):
+        data = {"nodes": [1, 2, 3]}
+        save_workflow("demo", data, user_id="alice")
+        delete_workflow("demo", user_id="alice")
+        trash_id = list_trashed_workflows(user_id="alice")[0]["trash_id"]
+
+        assert restore_workflow(trash_id, user_id="alice") is True
+        assert get_workflow("demo") == data
+        assert list_trashed_workflows(user_id="alice") == []
+
+    def test_restore_missing_returns_false(self, storage_dir):
+        assert restore_workflow("missing", user_id="alice") is False
+
+    def test_restore_refuses_to_overwrite_active_workflow(self, storage_dir):
+        save_workflow("demo", {"v": 1}, user_id="alice")
+        delete_workflow("demo", user_id="alice")
+        trash_id = list_trashed_workflows(user_id="alice")[0]["trash_id"]
+        save_workflow("demo", {"v": 2}, user_id="alice")
+
+        with pytest.raises(FileExistsError):
+            restore_workflow(trash_id, user_id="alice")
+        assert get_workflow("demo") == {"v": 2}
+
+    def test_restore_by_non_owner_raises_permission_error(self, storage_dir):
+        save_workflow("demo", {}, user_id="alice")
+        delete_workflow("demo", user_id="alice")
+        trash_id = list_trashed_workflows(user_id="alice")[0]["trash_id"]
+
+        with pytest.raises(PermissionError):
+            restore_workflow(trash_id, user_id="bob")
+
+    def test_purge_deletes_trash_entry(self, storage_dir):
+        save_workflow("demo", {}, user_id="alice")
+        delete_workflow("demo", user_id="alice")
+        trash_id = list_trashed_workflows(user_id="alice")[0]["trash_id"]
+
+        assert purge_trashed_workflow(trash_id, user_id="alice") is True
+        assert list_trashed_workflows(user_id="alice") == []
+
+    def test_purge_by_non_owner_raises_permission_error(self, storage_dir):
+        save_workflow("demo", {}, user_id="alice")
+        delete_workflow("demo", user_id="alice")
+        trash_id = list_trashed_workflows(user_id="alice")[0]["trash_id"]
+
+        with pytest.raises(PermissionError):
+            purge_trashed_workflow(trash_id, user_id="bob")

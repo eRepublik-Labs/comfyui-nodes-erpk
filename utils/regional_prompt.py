@@ -223,6 +223,6 @@ class RegionalPromptBuilder(IO.ComfyNode):
         if image is not None:
             mask_height, mask_width = int(image.shape[1]), int(image.shape[2])
         masks = build_region_masks(regions, mask_width, mask_height)
-        assembled = build_prompt(prompt, width, height, regions)
+        assembled = build_prompt(prompt, width, height, regions, edit_mode=image is not None)
         bboxes = regions_to_pixel_bboxes(regions, width, height)
         return IO.NodeOutput(assembled, bboxes, width, height, image, image_refs, masks)

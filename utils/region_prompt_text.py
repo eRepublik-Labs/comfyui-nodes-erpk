@@ -56,6 +56,16 @@ LAYOUT_FOOTER = (
     "composition guides: never draw boxes, frames, outlines, coordinates, or any "
     "annotation overlays in the image."
 )
+# When an image is connected the node is editing a photo, not composing a scene.
+# Leading with a strong preservation instruction (and dropping the "compose a
+# frame" framing) keeps an edit model from re-rendering everything that is not an
+# explicit edit.
+EDIT_PREAMBLE = (
+    "Edit the provided image. Keep it faithful to the original — the same "
+    "subjects, textures, colors, lighting, framing, and composition — and apply "
+    "ONLY the changes described below. Do not re-render, restyle, or regenerate "
+    "any part of the image that is not an explicit edit."
+)
 
 
 def placement_phrase(x, y, w, h):
@@ -170,22 +180,32 @@ def _classify_regions(regions):
     return moves, anchors, additions
 
 
-def build_prompt(prompt, width, height, regions):
+def build_prompt(prompt, width, height, regions, edit_mode=False):
     """Assemble the hybrid scene + layout prompt for image generation.
 
+    edit_mode is set when an image is connected: the prompt then leads with a
+    preservation instruction and drops the "compose a frame" framing, so an edit
+    model edits the supplied photo instead of re-rendering the whole scene.
+
     Move origins and cut-outs are deterministically inpainted before the image
-    reaches the model, but an edit model regenerates the scene freely, so the
-    prompt always tells it to remove the leftover at the origin and rebuild those
-    areas as natural background. The OpenCV fill is only the floor for the
-    no-edit-model path; relying on it alone lets the model re-add what was there.
+    reaches the model, but an edit model regenerates freely, so the prompt always
+    tells it to remove the leftover at the origin and rebuild those areas as
+    natural background. The OpenCV fill is only the floor for the no-edit-model
+    path; relying on it alone lets the model re-add what was there.
     """
     lines = []
     scene = prompt.strip()
-    if scene:
-        lines.append(scene)
-        lines.append("")
-    ratio = aspect_ratio_string(width, height)
-    lines.append(f"Compose for a {width}x{height} frame (aspect ratio {ratio}).")
+    if edit_mode:
+        lines.append(EDIT_PREAMBLE)
+        if scene:
+            lines.append("")
+            lines.append(scene)
+    else:
+        if scene:
+            lines.append(scene)
+            lines.append("")
+        ratio = aspect_ratio_string(width, height)
+        lines.append(f"Compose for a {width}x{height} frame (aspect ratio {ratio}).")
     moves, anchors, additions = _classify_regions(regions)
     if moves:
         lines.append("")
