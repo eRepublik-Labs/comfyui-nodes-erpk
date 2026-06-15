@@ -9,10 +9,7 @@ import pytest
 
 from utils.region_contract import Box, Content, Region, Source, Mask, Ui
 from utils.regional_prompt import (
-    CLEARED_AREAS_HEADER,
-    PreprocessReport,
     REMOVAL_HEADER,
-    REPOSITION_CLEARED_HEADER,
     REPOSITION_HEADER,
     RegionalPromptBuilder,
     _cutout_mask,
@@ -521,7 +518,7 @@ class TestCutouts:
         torch = pytest.importorskip("torch")
         img = torch.rand((1, 8, 8, 3))
         keep = region(x=0.0, y=0.0, w=0.5, h=0.5)
-        out, _ = apply_cutouts(img, [keep])
+        out = apply_cutouts(img, [keep])
         assert out is img
 
     def test_cutout_mask_marks_the_box(self):
@@ -556,7 +553,7 @@ class TestCutouts:
         img[0, 5:15, 5:15, 0] = 0.0             # blue patch where the cut box is
         img[0, 5:15, 5:15, 2] = 1.0
         cut = region(x=0.25, y=0.25, w=0.5, h=0.5, cutout=True)
-        out, _ = apply_cutouts(img, [cut])
+        out = apply_cutouts(img, [cut])
         assert out.shape == (1, 20, 20, 3)      # stays RGB, no alpha
         assert float(out[0, 10, 10, 0]) > float(out[0, 10, 10, 2])  # filled red
         assert float(out[0, 0, 0, 0]) == 1.0    # outside untouched
@@ -872,6 +869,84 @@ class TestWiredRegions:
         assert len(out.args[1][0]) == 1
 
 
+def _v2_entry(rid, *, x=0.1, y=0.1, w=0.2, h=0.2, kind="object",
+              desc="", text="", bind_slot=None):
+    """A single v2 region entry the contract parses; bind_slot wires its slot."""
+    return {
+        "id": rid, "kind": kind,
+        "box": {"x": x, "y": y, "w": w, "h": h},
+        "content": {"desc": desc, "text": text},
+        "op": "normal",
+        "bind": {"slot": bind_slot} if bind_slot is not None else None,
+        "ui": {"parent": None, "hidden": False, "collapsed": False},
+    }
+
+
+def _v2_document(entries):
+    """A v2 regions document whose order[] is the entries' depth order."""
+    return json.dumps({
+        "version": 2,
+        "order": [entry["id"] for entry in entries],
+        "regions": entries,
+    })
+
+
+class TestBindSlotBinding:
+    """desc_N/ref_N bind by a region's stable bind_slot, so reordering the
+    canvas does not remap wires. Regions without a bind_slot fall back to their
+    depth position, preserving the legacy positional behavior."""
+
+    def test_desc_follows_bind_slot_not_position(self):
+        # Depth order is [alpha, beta] but their bind slots are reversed: alpha
+        # binds slot 2, beta binds slot 1.
+        doc = _v2_document([
+            _v2_entry("a", x=0.1, desc="alpha", bind_slot=2),
+            _v2_entry("b", x=0.5, desc="beta", bind_slot=1),
+        ])
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=doc, desc_1="one", desc_2="two",
+        )
+        prompt = out.args[0]
+        # alpha is element 1 (depth 0) but bound to slot 2 -> desc_2 = "two";
+        # beta is element 2 (depth 1) but bound to slot 1 -> desc_1 = "one".
+        assert "1. two:" in prompt
+        assert "2. one:" in prompt
+        assert "alpha" not in prompt
+        assert "beta" not in prompt
+
+    def test_desc_falls_back_to_position_without_bind_slot(self):
+        doc = _v2_document([
+            _v2_entry("a", x=0.1, desc="alpha"),
+            _v2_entry("b", x=0.5, desc="beta"),
+        ])
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=doc, desc_1="one", desc_2="two",
+        )
+        prompt = out.args[0]
+        # No bind_slot: desc_1 -> depth 0, desc_2 -> depth 1 (positional).
+        assert "1. one:" in prompt
+        assert "2. two:" in prompt
+
+    def test_ref_follows_bind_slot_keeping_region_order(self):
+        first, second = object(), object()
+        doc = _v2_document([
+            _v2_entry("a", x=0.1, desc="alpha", bind_slot=2),
+            _v2_entry("b", x=0.5, desc="beta", bind_slot=1),
+        ])
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=1000, prompt="",
+            regions_data=doc, ref_1=first, ref_2=second,
+        )
+        prompt, image_refs = out.args[0], out.args[5]
+        # image_refs stays in region (depth) order: alpha's ref_2 then beta's
+        # ref_1; the cited image numbers follow that list (offset by the base).
+        assert image_refs == [second, first]
+        assert "alpha, taken from image 2" in prompt
+        assert "beta, taken from image 3" in prompt
+
+
 class TestMovedRegions:
     """Scanned regions carry their origin box; moving one switches the prompt
     line to relocation language and raises the reposition header."""
@@ -978,10 +1053,12 @@ class TestMovedRegions:
         assert "Make these edits" not in prompt
 
 
-class TestConditionalRemovalWording:
-    """When OpenCV inpainted the move origins / cut-outs, those areas arrive as
-    natural background, so the prompt tells the model to keep them rather than to
-    remove a leftover the preprocessing already erased (and never names it)."""
+class TestRemovalWording:
+    """A move always tells the edit model to remove the leftover at the origin and
+    a cut-out always asks for removal. OpenCV deterministically fills both before
+    the image is handed off, but an edit model regenerates the scene, so relying
+    on the fill alone lets it re-add what was there; the prompt must still ask.
+    The removed object is never named (naming it invites re-adding)."""
 
     @staticmethod
     def _moved():
@@ -992,34 +1069,22 @@ class TestConditionalRemovalWording:
     def _cut():
         return region(x=0.5, y=0.5, w=0.3, h=0.3, desc="a dog", cutout=True)
 
-    def test_inpainted_origin_drops_remove_duplicate(self):
-        report = PreprocessReport(inpainted_origins=1, cv2_available=True)
-        prompt = build_prompt("", 1000, 1000, [self._moved()], report)
-        assert REPOSITION_CLEARED_HEADER in prompt
-        assert REPOSITION_HEADER not in prompt
-        assert "remove the duplicate" not in prompt
-        assert "blend the one" in prompt
-        assert "box_2d = [600, 600, 800, 800]" in prompt
-
-    def test_uninpainted_origin_keeps_remove_duplicate(self):
+    def test_move_asks_origin_removal(self):
         prompt = build_prompt("", 1000, 1000, [self._moved()])
         assert REPOSITION_HEADER in prompt
-        assert REPOSITION_CLEARED_HEADER not in prompt
         assert "remove the duplicate at box_2d = [100, 100, 300, 300]" in prompt
 
-    def test_inpainted_cutout_keeps_area_as_background(self):
-        report = PreprocessReport(inpainted_cutouts=1, cv2_available=True)
-        prompt = build_prompt("scene", 1000, 1000, [self._cut()], report)
-        assert CLEARED_AREAS_HEADER in prompt
-        assert REMOVAL_HEADER not in prompt
-        # The cleared area still carries its box_2d, and is never named.
-        assert "box_2d" in prompt.split(CLEARED_AREAS_HEADER, 1)[1]
-        assert "a dog" not in prompt
+    def test_move_origin_forbids_new_objects(self):
+        # The cleared origin must be rebuilt as plain background, not refilled
+        # with a new subject — over a large emptied area the edit model otherwise
+        # hallucinates one (a giant spider in the man's vacated center).
+        prompt = build_prompt("", 1000, 1000, [self._moved()])
+        assert "do not place any" in prompt.lower()
 
-    def test_uninpainted_cutout_asks_for_removal(self):
+    def test_cutout_asks_removal(self):
         prompt = build_prompt("scene", 1000, 1000, [self._cut()])
         assert REMOVAL_HEADER in prompt
-        assert CLEARED_AREAS_HEADER not in prompt
+        assert "a dog" not in prompt
 
 
 class TestCompositeMovedRegions:
@@ -1044,16 +1109,16 @@ class TestCompositeMovedRegions:
         torch = pytest.importorskip("torch")
         image = self._image(torch)
         anchor = self._moved(x=0.0, y=0.0)
-        out, _ = composite_moved_regions(image, [anchor])
+        out = composite_moved_regions(image, [anchor])
         assert out is image
 
     def test_none_image_passes_through(self):
-        out, _ = composite_moved_regions(None, [self._moved()])
+        out = composite_moved_regions(None, [self._moved()])
         assert out is None
 
     def test_maskless_move_pastes_the_source_rectangle(self):
         torch = pytest.importorskip("torch")
-        out, _ = composite_moved_regions(self._image(torch), [self._moved()])
+        out = composite_moved_regions(self._image(torch), [self._moved()])
         assert float(out[0, 12, 12, 0]) == 1.0   # pasted at destination
         assert float(out[0, 2, 2, 0]) == 1.0     # source pixels untouched
         assert float(out[0, 12, 2, 0]) == 0.0    # elsewhere unchanged
@@ -1061,7 +1126,7 @@ class TestCompositeMovedRegions:
     def test_move_scales_the_patch_to_the_destination(self):
         torch = pytest.importorskip("torch")
         big = self._moved(w=0.5, h=0.5, x=0.5, y=0.5)
-        out, _ = composite_moved_regions(self._image(torch), [big])
+        out = composite_moved_regions(self._image(torch), [big])
         assert float(out[0, 18, 18, 0]) == 1.0   # 5x5 grew to fill 10x10
 
     def test_mask_gates_the_paste(self):
@@ -1077,7 +1142,7 @@ class TestCompositeMovedRegions:
         buf = BytesIO()
         mask.save(buf, format="PNG")
         moved = self._moved(mask=base64.b64encode(buf.getvalue()).decode())
-        out, _ = composite_moved_regions(self._image(torch), [moved])
+        out = composite_moved_regions(self._image(torch), [moved])
         assert float(out[0, 12, 10, 0]) == 1.0   # inside the opaque half
         assert float(out[0, 12, 14, 0]) == 0.0   # masked-out half untouched
 
@@ -1093,15 +1158,10 @@ class TestCompositeMovedRegions:
         # or shape.
         torch = pytest.importorskip("torch")
         image = self._image(torch)
-        out, _ = composite_moved_regions(image, [self._moved()])
+        out = composite_moved_regions(image, [self._moved()])
         assert out.dtype == image.dtype
         assert out.shape == image.shape
         assert float(out[0, 12, 12, 0]) == 1.0   # patch landed at destination
-
-    def test_report_counts_the_paste(self):
-        torch = pytest.importorskip("torch")
-        _, report = composite_moved_regions(self._image(torch), [self._moved()])
-        assert report.pasted_moves == 1
 
 
 class TestMoveOriginCutouts:
@@ -1145,7 +1205,7 @@ class TestMoveOriginCutouts:
         img[0, 0:5, 0:5, 2] = 1.0
         moved = region(x=0.5, y=0.5, w=0.25, h=0.25, desc="x",
                        src={"x": 0.0, "y": 0.0, "w": 0.25, "h": 0.25})
-        out, _ = apply_move_origin_cutouts(img, [moved])
+        out = apply_move_origin_cutouts(img, [moved])
         assert out.shape == (1, 20, 20, 3)
         assert float(out[0, 2, 2, 0]) > float(out[0, 2, 2, 2])  # origin -> red
 
@@ -1154,7 +1214,7 @@ class TestMoveOriginCutouts:
         img = torch.rand((1, 8, 8, 3))
         anchor = region(x=0.1, y=0.1, w=0.2, h=0.2, desc="x",
                         src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2})
-        out, _ = apply_move_origin_cutouts(img, [anchor])
+        out = apply_move_origin_cutouts(img, [anchor])
         assert out is img
 
 

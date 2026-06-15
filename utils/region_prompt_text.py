@@ -31,15 +31,9 @@ REPOSITION_HEADER = (
     "Elements in this image were repositioned by pasting them at their new "
     "locations, so each still has a leftover duplicate at its old position. "
     'Make these edits (areas are "box_2d = [ymin, xmin, ymax, xmax]" on a '
-    "0-1000 grid with top-left origin):"
-)
-# When OpenCV inpainted the origins, the old positions are already natural
-# background in the image the model receives, so there is no duplicate to
-# remove — only the pasted copy needs blending.
-REPOSITION_CLEARED_HEADER = (
-    "Elements in this image were repositioned to their new locations and their "
-    "old positions cleared to background. Blend each into the scene (areas are "
-    '"box_2d = [ymin, xmin, ymax, xmax]" on a 0-1000 grid with top-left origin):'
+    "0-1000 grid with top-left origin). Where you remove a leftover, rebuild that "
+    "area as natural background that continues the surrounding scene; do not "
+    "place any object, subject, animal, plant, sign, or text there:"
 )
 ANCHORS_LINE = (
     "Every other element in the image stays exactly where it is — do not "
@@ -47,24 +41,14 @@ ANCHORS_LINE = (
 )
 # Cut-out regions are already content-aware-filled in the image the model
 # receives (apply_cutouts), but an edit model repaints freely, so the prompt
-# must tell it to keep those areas as plain background — without naming what was
-# there, which would invite re-adding it.
+# must tell it to rebuild those areas as plain background — without naming what
+# was there, which would invite re-adding it.
 REMOVAL_HEADER = (
     "Remove the contents of these areas: rebuild each as natural background that "
     "continues the surrounding scene (same surfaces, texture, lighting, and "
     "perspective). Do not place any object, subject, animal, plant, sign, or "
     'text in them (areas are "box_2d = [ymin, xmin, ymax, xmax]" on a 0-1000 '
     "grid with top-left origin):"
-)
-# When OpenCV already filled the cut-outs, those areas arrive as natural
-# background, so the model is told to keep them rather than to rebuild — still
-# without naming what was there, which would invite re-adding it.
-CLEARED_AREAS_HEADER = (
-    "These areas have been cleared to background. Keep each as natural "
-    "background that continues the surrounding scene (same surfaces, texture, "
-    "lighting, and perspective). Do not place any object, subject, animal, "
-    'plant, sign, or text in them (areas are "box_2d = [ymin, xmin, ymax, xmax]" '
-    "on a 0-1000 grid with top-left origin):"
 )
 LAYOUT_FOOTER = (
     "Every element must stay fully inside its placement area and fill most of it. "
@@ -124,7 +108,7 @@ def _boxes_overlap(a, b):
     return (ix * iy) / area if area > 0 else 0.0
 
 
-def _move_line(region, origin_cleared):
+def _move_line(region):
     # Hybrid phrasing, same doctrine as placement lines: the verbal
     # placement drives the model, the coordinates pin it.
     src = region.source.box
@@ -133,14 +117,6 @@ def _move_line(region, origin_cleared):
     target = box_2d(dest)
     placement = placement_phrase(dest.x, dest.y, dest.w, dest.h)
     subject = region.content.desc or "The element"
-    # When the origin was already inpainted to background, there is no leftover
-    # to remove: the model only blends the pasted copy into the scene.
-    if origin_cleared:
-        return (
-            f"{subject}: blend the one {placement} (box_2d = {target}) "
-            f"naturally into the scene — match lighting, shadows, and "
-            f"perspective."
-        )
     # When the destination covers the origin, the paste hides the old copy:
     # there is no duplicate to remove, and asking for one invites cutting a
     # hole through the pasted object.
@@ -194,16 +170,15 @@ def _classify_regions(regions):
     return moves, anchors, additions
 
 
-def build_prompt(prompt, width, height, regions, report=None):
+def build_prompt(prompt, width, height, regions):
     """Assemble the hybrid scene + layout prompt for image generation.
 
-    report carries what preprocessing already baked into the image: an inpainted
-    move origin or cut-out arrives as natural background, so the wording tells
-    the model to keep it rather than to remove a leftover that is gone. Without a
-    report, the prompt asks for the removals (the OpenCV-unavailable path).
+    Move origins and cut-outs are deterministically inpainted before the image
+    reaches the model, but an edit model regenerates the scene freely, so the
+    prompt always tells it to remove the leftover at the origin and rebuild those
+    areas as natural background. The OpenCV fill is only the floor for the
+    no-edit-model path; relying on it alone lets the model re-add what was there.
     """
-    origins_cleared = bool(report and report.inpainted_origins)
-    cutouts_cleared = bool(report and report.inpainted_cutouts)
     lines = []
     scene = prompt.strip()
     if scene:
@@ -214,9 +189,9 @@ def build_prompt(prompt, width, height, regions, report=None):
     moves, anchors, additions = _classify_regions(regions)
     if moves:
         lines.append("")
-        lines.append(REPOSITION_CLEARED_HEADER if origins_cleared else REPOSITION_HEADER)
+        lines.append(REPOSITION_HEADER)
         for index, region in enumerate(moves, start=1):
-            lines.append(f"{index}. {_move_line(region, origins_cleared)}")
+            lines.append(f"{index}. {_move_line(region)}")
         if anchors:
             lines.append(ANCHORS_LINE)
     if additions:
@@ -232,7 +207,7 @@ def build_prompt(prompt, width, height, regions, report=None):
     removals = [r for r in regions if r.op == "cutout" and r.kind != "text"]
     if removals:
         lines.append("")
-        lines.append(CLEARED_AREAS_HEADER if cutouts_cleared else REMOVAL_HEADER)
+        lines.append(REMOVAL_HEADER)
         for index, region in enumerate(removals, start=1):
             lines.append(f"{index}. box_2d = {box_2d(region.box)}")
     if moves or additions:
