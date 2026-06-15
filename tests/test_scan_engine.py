@@ -163,7 +163,7 @@ class TestParseDetection:
         parsed = parse_regions(json.dumps([region]))
         assert len(parsed) == 1
         for key in ("x", "y", "w", "h"):
-            assert parsed[0][key] == pytest.approx(obj["box"][key])
+            assert getattr(parsed[0].box, key) == pytest.approx(obj["box"][key])
 
     def test_min_region_extent_is_contract_value(self):
         assert ENGINE_MIN_REGION_EXTENT == MIN_REGION_EXTENT == 0.005
@@ -379,7 +379,7 @@ class TestFlorenceToObjects:
         parsed = parse_regions(json.dumps([region]))
         assert len(parsed) == 1
         for key in ("x", "y", "w", "h"):
-            assert parsed[0][key] == pytest.approx(obj["box"][key])
+            assert getattr(parsed[0].box, key) == pytest.approx(obj["box"][key])
 
 
 class TestDepthRanks:
@@ -439,6 +439,74 @@ class TestPixelBoxPrompts:
                     "box": {"x": 0.5, "y": 0.5, "w": 0.001, "h": 0.001}}]
         x0, y0, x1, y1 = pixel_box_prompts(objects, 100, 100)[0]
         assert x1 > x0 and y1 > y0
+
+
+class TestDownscaleMask:
+    """Box-relative masks are capped on their longer side before encoding, then
+    still decode and composite at the target box size."""
+
+    def test_large_mask_is_capped(self):
+        np = pytest.importorskip("numpy")
+        pytest.importorskip("PIL")
+        from utils.scan_engine import downscale_mask, MASK_ENCODE_MAX_SIDE
+        out = downscale_mask(np.full((1000, 800), 255, dtype=np.uint8))
+        assert max(out.shape) == MASK_ENCODE_MAX_SIDE  # longer side capped
+        assert out.shape[0] == MASK_ENCODE_MAX_SIDE
+        assert out.shape[1] < out.shape[0]             # aspect preserved
+
+    def test_small_mask_is_not_upscaled(self):
+        np = pytest.importorskip("numpy")
+        pytest.importorskip("PIL")
+        from utils.scan_engine import downscale_mask
+        out = downscale_mask(np.full((100, 50), 255, dtype=np.uint8))
+        assert out.shape == (100, 50)
+
+    def test_downscaled_mask_encodes_smaller(self):
+        np = pytest.importorskip("numpy")
+        Image = pytest.importorskip("PIL.Image")
+        import base64
+        import io
+        from utils.scan_engine import downscale_mask
+
+        def encode(arr):
+            buf = io.BytesIO()
+            Image.fromarray(np.asarray(arr, dtype=np.uint8), mode="L").save(
+                buf, format="PNG")
+            return base64.b64encode(buf.getvalue()).decode()
+
+        # A filled-disk silhouette, like a real segmentation: its encoded size
+        # scales with the boundary, so capping the long side shrinks the PNG.
+        yy, xx = np.ogrid[:1000, :1000]
+        mask = (((yy - 500) ** 2 + (xx - 500) ** 2) < 400 ** 2).astype(np.uint8) * 255
+        assert len(encode(downscale_mask(mask))) < len(encode(mask))
+
+    def test_downscaled_mask_decodes_and_composites_at_box_size(self):
+        np = pytest.importorskip("numpy")
+        Image = pytest.importorskip("PIL.Image")
+        pytest.importorskip("torch")
+        import base64
+        import io
+        from utils.scan_engine import downscale_mask, MASK_ENCODE_MAX_SIDE
+        from utils.region_contract import Box, Content, Mask, Region, Source
+        from utils.regional_prompt import build_region_masks
+
+        # A 900px silhouette, left half opaque. Capping shrinks it below 900px,
+        # but the decoder resizes it back to the 30px box and keeps the split.
+        glyph = np.zeros((900, 900), dtype=np.uint8)
+        glyph[:, :450] = 255
+        small = downscale_mask(glyph)
+        assert max(small.shape) <= MASK_ENCODE_MAX_SIDE
+        buf = io.BytesIO()
+        Image.fromarray(small, mode="L").save(buf, format="PNG")
+        data = base64.b64encode(buf.getvalue()).decode()
+        scanned = Region(id="r", kind="object", box=Box(0.0, 0.0, 1.0, 1.0),
+                         content=Content(),
+                         source=Source(box=Box(0.0, 0.0, 1.0, 1.0),
+                                       mask=Mask(data=data)))
+        masks = build_region_masks([scanned], 30, 30)
+        assert masks.shape == (1, 30, 30)
+        assert float(masks[0, 15, 5]) == 1.0    # left half -> set
+        assert float(masks[0, 15, 25]) == 0.0   # right half -> clear
 
 
 class TestBuildCost:

@@ -193,5 +193,5 @@ class TestContractRoundTrip:
         assert len(parsed) == len(produced)
         for emitted, accepted in zip(produced, parsed):
             for key in ("x", "y", "w", "h"):
-                assert emitted[key] == pytest.approx(accepted[key])
-            assert accepted["kind"] == "object"
+                assert emitted[key] == pytest.approx(getattr(accepted.box, key))
+            assert accepted.kind == "object"

@@ -7,7 +7,13 @@ import json
 
 import pytest
 
+from utils.region_contract import Box, Content, Region, Source, Mask, Ui
 from utils.regional_prompt import (
+    CLEARED_AREAS_HEADER,
+    PreprocessReport,
+    REMOVAL_HEADER,
+    REPOSITION_CLEARED_HEADER,
+    REPOSITION_HEADER,
     RegionalPromptBuilder,
     _cutout_mask,
     _move_origin_mask,
@@ -27,6 +33,33 @@ from utils.regional_prompt import (
 )
 
 
+def region(x=0.1, y=0.1, w=0.2, h=0.2, kind="object", desc="", text="",
+           src=None, mask=None, cutout=False, parent=None, hidden=False,
+           rid="", bind_slot=None, ref_image=None):
+    """Build a Region the way the canvas/scan would, for concise fixtures.
+
+    A src box or mask attaches a Source (scan origin); src defaults to the box
+    itself when only a mask is given (a scanned-in-place region). ref_image is
+    the runtime reference-image number execute() would assign.
+    """
+    source = None
+    if src is not None or mask is not None:
+        sbox = Box(src["x"], src["y"], src["w"], src["h"]) if src else Box(x, y, w, h)
+        source = Source(box=sbox, mask=Mask(data=mask) if mask else None, label="")
+    built = Region(
+        id=rid, kind=kind, box=Box(x, y, w, h),
+        content=Content(desc=desc, text=text),
+        source=source, op="cutout" if cutout else "normal",
+        bind_slot=bind_slot, ui=Ui(parent=parent, hidden=hidden),
+    )
+    if ref_image is not None:
+        built.ref_image = ref_image
+    return built
+
+
+# A v1 region document as the JS editor still emits it: a flat list of dicts.
+# Kept as JSON source for the parse/execute paths; the typed expectations below
+# describe what parse_regions yields.
 CANONICAL_REGIONS = [
     {"x": 0.04, "y": 0.62, "w": 0.30, "h": 0.25, "kind": "object",
      "desc": "a red vintage car", "text": ""},
@@ -171,7 +204,12 @@ class TestSchema:
 class TestParseRegions:
     def test_valid_regions_pass_through(self):
         regions = parse_regions(json.dumps(CANONICAL_REGIONS))
-        assert regions == CANONICAL_REGIONS
+        assert [(r.box, r.kind, r.content) for r in regions] == [
+            (Box(0.04, 0.62, 0.30, 0.25), "object",
+             Content("a red vintage car", "")),
+            (Box(0.30, 0.03, 0.40, 0.14), "text",
+             Content("glowing neon letters", "OPEN LATE")),
+        ]
 
     def test_invalid_json_yields_no_regions(self):
         assert parse_regions("not json {") == []
@@ -182,21 +220,24 @@ class TestParseRegions:
 
     def test_non_dict_entries_are_skipped(self):
         data = json.dumps([1, "box", CANONICAL_REGIONS[0], None])
-        assert parse_regions(data) == [CANONICAL_REGIONS[0]]
+        regions = parse_regions(data)
+        assert len(regions) == 1
+        assert regions[0].box == Box(0.04, 0.62, 0.30, 0.25)
+        assert regions[0].content.desc == "a red vintage car"
 
     def test_position_clamped_to_unit_square(self):
         data = json.dumps([{"x": -0.5, "y": 0.5, "w": 2.0, "h": 0.2}])
-        region = parse_regions(data)[0]
-        assert region["x"] == 0.0
-        assert region["y"] == 0.5
-        assert region["w"] == 1.0
-        assert region["h"] == 0.2
+        box = parse_regions(data)[0].box
+        assert box.x == 0.0
+        assert box.y == 0.5
+        assert box.w == 1.0
+        assert box.h == 0.2
 
     def test_size_clamped_to_remaining_extent(self):
         data = json.dumps([{"x": 0.8, "y": 0.7, "w": 0.5, "h": 0.6}])
-        region = parse_regions(data)[0]
-        assert region["w"] == pytest.approx(0.2)
-        assert region["h"] == pytest.approx(0.3)
+        box = parse_regions(data)[0].box
+        assert box.w == pytest.approx(0.2)
+        assert box.h == pytest.approx(0.3)
 
     def test_degenerate_regions_are_skipped(self):
         data = json.dumps([
@@ -212,13 +253,13 @@ class TestParseRegions:
             {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2, "kind": "banana"},
         ])
         regions = parse_regions(data)
-        assert [r["kind"] for r in regions] == ["object", "object"]
+        assert [r.kind for r in regions] == ["object", "object"]
 
     def test_missing_desc_and_text_default_to_empty(self):
         data = json.dumps([{"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}])
-        region = parse_regions(data)[0]
-        assert region["desc"] == ""
-        assert region["text"] == ""
+        content = parse_regions(data)[0].content
+        assert content.desc == ""
+        assert content.text == ""
 
     def test_non_numeric_coordinates_skip_the_entry(self):
         data = json.dumps([
@@ -233,7 +274,7 @@ class TestParseRegions:
             {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2, "kind": {}},
         ])
         regions = parse_regions(data)
-        assert [r["kind"] for r in regions] == ["object", "object"]
+        assert [r.kind for r in regions] == ["object", "object"]
 
     def test_non_finite_coordinates_skip_the_entry(self):
         data = '[{"x": 0.1, "y": 0.1, "w": NaN, "h": 0.5}, ' \
@@ -245,35 +286,32 @@ class TestParseRegions:
         data = json.dumps([{"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
                             "kind": "object", "desc": "car", "text": "",
                             "mask": "iVBORw0K", "group": "car"}])
-        region = parse_regions(data)[0]
-        assert region["mask"] == "iVBORw0K"
-        assert region["group"] == "car"
+        source = parse_regions(data)[0].source
+        assert source.mask.data == "iVBORw0K"
+        assert source.label == "car"
 
     def test_hand_drawn_regions_carry_no_mask_or_group(self):
         data = json.dumps([{"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}])
-        region = parse_regions(data)[0]
-        assert "mask" not in region
-        assert "group" not in region
+        assert parse_regions(data)[0].source is None
 
     def test_blank_or_non_string_mask_and_group_are_dropped(self):
         data = json.dumps([{"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
                             "mask": "", "group": 7},
                            {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
                             "mask": 123, "group": ["car"]}])
-        for region in parse_regions(data):
-            assert "mask" not in region
-            assert "group" not in region
+        for parsed in parse_regions(data):
+            assert parsed.source is None
 
 
 class TestBox2d:
     def test_canonical_first_region(self):
-        assert box_2d(0.04, 0.62, 0.30, 0.25) == [620, 40, 870, 340]
+        assert box_2d(Box(0.04, 0.62, 0.30, 0.25)) == [620, 40, 870, 340]
 
     def test_canonical_second_region(self):
-        assert box_2d(0.30, 0.03, 0.40, 0.14) == [30, 300, 170, 700]
+        assert box_2d(Box(0.30, 0.03, 0.40, 0.14)) == [30, 300, 170, 700]
 
     def test_values_clamped_to_grid(self):
-        assert box_2d(-0.5, -0.5, 2.0, 2.0) == [0, 0, 1000, 1000]
+        assert box_2d(Box(-0.5, -0.5, 2.0, 2.0)) == [0, 0, 1000, 1000]
 
 
 class TestPlacementPhrase:
@@ -336,40 +374,34 @@ class TestBuildPrompt:
         assert prompt == "Compose for a 1920x1080 frame (aspect ratio 16:9)."
 
     def test_object_region_without_desc_uses_an_element(self):
-        regions = [{"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2,
-                    "kind": "object", "desc": "", "text": ""}]
+        regions = [region(x=0.4, y=0.4, w=0.2, h=0.2)]
         prompt = build_prompt("", 1000, 1000, regions)
         assert ("1. An element: at the center, covering about 20% of the image "
                 "width and 20% of its height. box_2d = [400, 400, 600, 600]") in prompt
 
     def test_text_region_without_desc_omits_desc_clause(self):
-        regions = [{"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2,
-                    "kind": "text", "desc": "", "text": "SALE"}]
+        regions = [region(x=0.4, y=0.4, w=0.2, h=0.2, kind="text", text="SALE")]
         prompt = build_prompt("", 1000, 1000, regions)
         assert '1. The text "SALE": at the center, covering about 20%' in prompt
 
     def test_layout_forbids_drawing_annotations(self):
-        regions = [{"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
-                    "kind": "object", "desc": "a cat", "text": ""}]
+        regions = [region(x=0.1, y=0.1, w=0.2, h=0.2, desc="a cat")]
         prompt = build_prompt("", 1000, 1000, regions)
         assert "never draw boxes" in prompt
         assert "bounding box" not in prompt
 
     def test_layout_declares_back_to_front_depth_order(self):
-        regions = [{"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
-                    "kind": "object", "desc": "a cat", "text": ""}]
+        regions = [region(x=0.1, y=0.1, w=0.2, h=0.2, desc="a cat")]
         prompt = build_prompt("", 1000, 1000, regions)
         assert "listed from back to front" in prompt
         assert "appears in front of an earlier one" in prompt
 
-
     def test_unicode_and_long_desc_round_trip(self):
         long_desc = "ornate baroque detail, " * 200
         regions = [
-            {"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3,
-             "kind": "text", "desc": "霓虹灯 sign with sparkles", "text": "营业中 OPEN"},
-            {"x": 0.5, "y": 0.5, "w": 0.3, "h": 0.3,
-             "kind": "object", "desc": long_desc, "text": ""},
+            region(x=0.1, y=0.1, w=0.3, h=0.3, kind="text",
+                   desc="霓虹灯 sign with sparkles", text="营业中 OPEN"),
+            region(x=0.5, y=0.5, w=0.3, h=0.3, desc=long_desc),
         ]
         prompt = build_prompt("scene", 1024, 1024, regions)
         assert 'The text "营业中 OPEN", 霓虹灯 sign with sparkles:' in prompt
@@ -385,8 +417,7 @@ class TestRegionsToPixelBboxes:
         assert regions_to_pixel_bboxes([], 1024, 1024) == []
 
     def test_boxes_scale_with_frame_size(self):
-        regions = [{"x": 0.5, "y": 0.25, "w": 0.25, "h": 0.5,
-                    "kind": "object", "desc": "", "text": ""}]
+        regions = [region(x=0.5, y=0.25, w=0.25, h=0.5)]
         assert regions_to_pixel_bboxes(regions, 1920, 1080) == [[
             {"x": 960, "y": 270, "width": 480, "height": 540},
         ]]
@@ -394,37 +425,31 @@ class TestRegionsToPixelBboxes:
 
 class TestMaskPixelBox:
     def test_canonical_region_pixel_bounds(self):
-        region = {"x": 0.04, "y": 0.62, "w": 0.30, "h": 0.25}
-        assert mask_pixel_box(region, 1000, 1000) == (40, 620, 340, 870)
+        assert mask_pixel_box(Box(0.04, 0.62, 0.30, 0.25), 1000, 1000) == (40, 620, 340, 870)
 
     def test_bounds_scale_with_frame_size(self):
-        region = {"x": 0.5, "y": 0.25, "w": 0.25, "h": 0.5}
-        assert mask_pixel_box(region, 1920, 1080) == (960, 270, 1440, 810)
+        assert mask_pixel_box(Box(0.5, 0.25, 0.25, 0.5), 1920, 1080) == (960, 270, 1440, 810)
 
     def test_bounds_clamped_to_frame(self):
-        region = {"x": 0.95, "y": 0.95, "w": 0.2, "h": 0.2}
-        assert mask_pixel_box(region, 100, 100) == (95, 95, 100, 100)
+        assert mask_pixel_box(Box(0.95, 0.95, 0.2, 0.2), 100, 100) == (95, 95, 100, 100)
 
     def test_sub_pixel_region_still_encloses_a_pixel(self):
-        region = {"x": 0.0, "y": 0.0, "w": 0.006, "h": 0.006}
-        x0, y0, x1, y1 = mask_pixel_box(region, 64, 64)
+        x0, y0, x1, y1 = mask_pixel_box(Box(0.0, 0.0, 0.006, 0.006), 64, 64)
         assert x1 > x0
         assert y1 > y0
 
 
 class TestRegionHasStoredMask:
-    def test_non_empty_string_is_stored(self):
-        assert region_has_stored_mask({"mask": "iVBORw0K"}) is True
+    def test_region_with_stored_mask_is_true(self):
+        assert region_has_stored_mask(region(mask="iVBORw0K")) is True
 
-    @pytest.mark.parametrize("region", [
-        {},
-        {"mask": ""},
-        {"mask": None},
-        {"mask": 123},
-        {"mask": ["iVBORw0K"]},
-    ])
-    def test_missing_blank_or_non_string_is_not_stored(self, region):
-        assert region_has_stored_mask(region) is False
+    def test_region_without_source_is_not_stored(self):
+        assert region_has_stored_mask(region()) is False
+
+    def test_scanned_region_without_mask_is_not_stored(self):
+        # A scanned-in-place region carries a Source but no segmentation mask.
+        assert region_has_stored_mask(
+            region(src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2})) is False
 
 
 def _png_base64(array):
@@ -445,33 +470,29 @@ class TestCutouts:
     transparent in the image output (Shift+Delete in the editor)."""
 
     def _cut(self, **over):
-        region = {"x": 0.5, "y": 0.5, "w": 0.3, "h": 0.3, "kind": "object",
-                  "desc": "a dog", "text": "", "cutout": True}
-        region.update(over)
-        return region
+        params = dict(x=0.5, y=0.5, w=0.3, h=0.3, desc="a dog", cutout=True)
+        params.update(over)
+        return region(**params)
 
     def test_parse_preserves_cutout(self):
         data = json.dumps([{"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3,
                             "kind": "object", "cutout": True}])
-        assert parse_regions(data)[0]["cutout"] is True
+        assert parse_regions(data)[0].op == "cutout"
 
     def test_parse_omits_cutout_when_absent_or_false(self):
-        assert "cutout" not in parse_regions(
-            json.dumps([{"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3}]))[0]
-        assert "cutout" not in parse_regions(
+        assert parse_regions(
+            json.dumps([{"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3}]))[0].op == "normal"
+        assert parse_regions(
             json.dumps([{"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3,
-                         "cutout": False}]))[0]
+                         "cutout": False}]))[0].op == "normal"
 
     def test_cutout_excluded_from_prompt(self):
-        keep = {"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3, "kind": "object",
-                "desc": "a cat", "text": ""}
+        keep = region(x=0.1, y=0.1, w=0.3, h=0.3, desc="a cat")
         out = build_prompt("scene", 1000, 1000, [keep, self._cut()])
         assert "a cat" in out and "a dog" not in out
 
     def test_cutout_adds_removal_directive_without_naming_it(self):
-        from utils.regional_prompt import REMOVAL_HEADER
-        keep = {"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3, "kind": "object",
-                "desc": "a cat", "text": ""}
+        keep = region(x=0.1, y=0.1, w=0.3, h=0.3, desc="a cat")
         out = build_prompt("scene", 1000, 1000, [keep, self._cut()])
         assert REMOVAL_HEADER in out
         # A box_2d for the removed area follows the header...
@@ -480,14 +501,13 @@ class TestCutouts:
         assert "a dog" not in out
 
     def test_cutout_excluded_from_bboxes(self):
-        keep = {"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3, "kind": "object",
-                "desc": "a", "text": ""}
+        keep = region(x=0.1, y=0.1, w=0.3, h=0.3, desc="a")
         boxes = regions_to_pixel_bboxes([keep, self._cut()], 1000, 1000)
         assert len(boxes[0]) == 1
 
     def test_cutout_excluded_from_masks(self):
         pytest.importorskip("torch")
-        keep = {"x": 0.1, "y": 0.1, "w": 0.3, "h": 0.3}
+        keep = region(x=0.1, y=0.1, w=0.3, h=0.3)
         masks = build_region_masks([keep, self._cut()], 50, 50)
         assert masks.shape[0] == 1
 
@@ -500,14 +520,13 @@ class TestCutouts:
     def test_apply_cutouts_no_cutouts_returns_input_unchanged(self):
         torch = pytest.importorskip("torch")
         img = torch.rand((1, 8, 8, 3))
-        keep = {"x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5, "kind": "object"}
-        assert apply_cutouts(img, [keep]) is img
+        keep = region(x=0.0, y=0.0, w=0.5, h=0.5)
+        out, _ = apply_cutouts(img, [keep])
+        assert out is img
 
     def test_cutout_mask_marks_the_box(self):
         np = pytest.importorskip("numpy")
-        region = {"x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5, "kind": "object",
-                  "cutout": True}
-        mask = _cutout_mask([region], 20, 20)
+        mask = _cutout_mask([region(x=0.0, y=0.0, w=0.5, h=0.5, cutout=True)], 20, 20)
         assert mask.shape == (20, 20) and mask.dtype == np.uint8
         assert mask[2, 2] == 255    # inside the cut box -> fill
         assert mask[18, 18] == 0    # outside -> keep
@@ -516,15 +535,14 @@ class TestCutouts:
         np = pytest.importorskip("numpy")
         glyph = np.zeros((10, 10), dtype="uint8")
         glyph[:, :5] = 255          # left half opaque
-        region = {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0, "kind": "object",
-                  "cutout": True, "mask": _png_base64(glyph)}
-        mask = _cutout_mask([region], 20, 20)
+        cut = region(x=0.0, y=0.0, w=1.0, h=1.0, cutout=True, mask=_png_base64(glyph))
+        mask = _cutout_mask([cut], 20, 20)
         assert mask[10, 3] == 255    # masked (left) -> fill
         assert mask[10, 17] == 0     # unmasked (right) -> keep
 
     def test_cutout_mask_empty_without_cutouts(self):
         pytest.importorskip("numpy")
-        keep = {"x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5, "kind": "object"}
+        keep = region(x=0.0, y=0.0, w=0.5, h=0.5)
         assert _cutout_mask([keep], 16, 16).max() == 0
 
     def test_apply_cutouts_fills_masked_area(self):
@@ -537,9 +555,8 @@ class TestCutouts:
         img[..., 0] = 1.0                       # all red
         img[0, 5:15, 5:15, 0] = 0.0             # blue patch where the cut box is
         img[0, 5:15, 5:15, 2] = 1.0
-        region = {"x": 0.25, "y": 0.25, "w": 0.5, "h": 0.5, "kind": "object",
-                  "cutout": True}
-        out = apply_cutouts(img, [region])
+        cut = region(x=0.25, y=0.25, w=0.5, h=0.5, cutout=True)
+        out, _ = apply_cutouts(img, [cut])
         assert out.shape == (1, 20, 20, 3)      # stays RGB, no alpha
         assert float(out[0, 10, 10, 0]) > float(out[0, 10, 10, 2])  # filled red
         assert float(out[0, 0, 0, 0]) == 1.0    # outside untouched
@@ -554,8 +571,7 @@ class TestBuildRegionMasks:
 
     def test_maskless_region_fills_its_rectangle(self):
         pytest.importorskip("torch")
-        region = {"x": 0.25, "y": 0.25, "w": 0.5, "h": 0.5}
-        masks = build_region_masks([region], 100, 100)
+        masks = build_region_masks([region(x=0.25, y=0.25, w=0.5, h=0.5)], 100, 100)
         assert masks.shape == (1, 100, 100)
         assert float(masks[0, 50, 50]) == 1.0
         assert float(masks[0, 0, 0]) == 0.0
@@ -566,25 +582,23 @@ class TestBuildRegionMasks:
         pytest.importorskip("torch")
         glyph = np.zeros((10, 10), dtype="uint8")
         glyph[:, :5] = 255  # left half opaque, right half transparent
-        region = {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0,
-                  "mask": _png_base64(glyph)}
-        masks = build_region_masks([region], 20, 20)
+        masks = build_region_masks(
+            [region(x=0.0, y=0.0, w=1.0, h=1.0, mask=_png_base64(glyph))], 20, 20)
         assert float(masks[0, 10, 2]) == 1.0
         assert float(masks[0, 10, 18]) == 0.0
 
     def test_malformed_mask_falls_back_to_rectangle(self):
         pytest.importorskip("torch")
-        region = {"x": 0.25, "y": 0.25, "w": 0.5, "h": 0.5,
-                  "mask": "@@@not-a-png@@@"}
-        masks = build_region_masks([region], 100, 100)
+        masks = build_region_masks(
+            [region(x=0.25, y=0.25, w=0.5, h=0.5, mask="@@@not-a-png@@@")], 100, 100)
         assert float(masks[0, 50, 50]) == 1.0
         assert float(masks[0, 0, 0]) == 0.0
 
     def test_one_mask_per_region_in_order(self):
         pytest.importorskip("torch")
         regions = [
-            {"x": 0.0, "y": 0.0, "w": 0.3, "h": 0.3},
-            {"x": 0.5, "y": 0.5, "w": 0.4, "h": 0.4},
+            region(x=0.0, y=0.0, w=0.3, h=0.3),
+            region(x=0.5, y=0.5, w=0.4, h=0.4),
         ]
         masks = build_region_masks(regions, 100, 100)
         assert masks.shape == (2, 100, 100)
@@ -864,48 +878,48 @@ class TestMovedRegions:
 
     @staticmethod
     def _moved_region():
-        return {"x": 0.6, "y": 0.6, "w": 0.2, "h": 0.2, "kind": "object",
-                "desc": "a hippo", "text": "",
-                "src": {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}}
+        return region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a hippo",
+                      src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2})
 
     def test_parse_preserves_valid_src(self):
-        regions = parse_regions(json.dumps([self._moved_region()]))
-        assert regions[0]["src"] == {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}
+        regions = parse_regions(json.dumps([{
+            "x": 0.6, "y": 0.6, "w": 0.2, "h": 0.2, "kind": "object",
+            "desc": "a hippo", "text": "",
+            "src": {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}}]))
+        assert regions[0].source.box == Box(0.1, 0.1, 0.2, 0.2)
 
     def test_parse_clamps_src(self):
-        entry = self._moved_region()
-        entry["src"] = {"x": -0.5, "y": 0.0, "w": 2.0, "h": 0.5}
-        regions = parse_regions(json.dumps([entry]))
-        assert regions[0]["src"] == {"x": 0.0, "y": 0.0, "w": 1.0, "h": 0.5}
+        regions = parse_regions(json.dumps([{
+            "x": 0.6, "y": 0.6, "w": 0.2, "h": 0.2, "kind": "object",
+            "desc": "a hippo", "text": "",
+            "src": {"x": -0.5, "y": 0.0, "w": 2.0, "h": 0.5}}]))
+        assert regions[0].source.box == Box(0.0, 0.0, 1.0, 0.5)
 
     def test_parse_drops_malformed_src_keeps_region(self):
         for bad in ("nope", {"x": 0.1}, {"x": "a", "y": 0, "w": 1, "h": 1},
                     {"x": 0.1, "y": 0.1, "w": 0.001, "h": 0.001}):
-            entry = self._moved_region()
-            entry["src"] = bad
-            regions = parse_regions(json.dumps([entry]))
+            regions = parse_regions(json.dumps([{
+                "x": 0.6, "y": 0.6, "w": 0.2, "h": 0.2, "kind": "object",
+                "desc": "a hippo", "text": "", "src": bad}]))
             assert len(regions) == 1
-            assert "src" not in regions[0]
+            assert regions[0].source is None
 
     def test_region_moved_true_when_geometry_differs(self):
         assert region_moved(self._moved_region())
 
     def test_region_moved_false_in_place(self):
-        region = self._moved_region()
-        region["src"] = {"x": 0.6, "y": 0.6, "w": 0.2, "h": 0.2}
-        assert not region_moved(region)
+        in_place = region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a hippo",
+                          src={"x": 0.6, "y": 0.6, "w": 0.2, "h": 0.2})
+        assert not region_moved(in_place)
 
     def test_region_moved_false_without_src(self):
-        assert not region_moved(
-            {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2,
-             "kind": "object", "desc": "", "text": ""})
+        assert not region_moved(region(x=0.1, y=0.1, w=0.2, h=0.2))
 
     @staticmethod
     def _anchor_region(desc="a sleeping otter"):
         # Scanned and unmoved: the object already sits where its box says.
-        return {"x": 0.1, "y": 0.7, "w": 0.2, "h": 0.2, "kind": "object",
-                "desc": desc, "text": "",
-                "src": {"x": 0.1, "y": 0.7, "w": 0.2, "h": 0.2}}
+        return region(x=0.1, y=0.7, w=0.2, h=0.2, desc=desc,
+                      src={"x": 0.1, "y": 0.7, "w": 0.2, "h": 0.2})
 
     def test_move_block_asks_for_duplicate_removal(self):
         # The move is already composited into the image; the model only cleans up.
@@ -930,8 +944,7 @@ class TestMovedRegions:
         assert "do not remove" in prompt.lower()
 
     def test_moves_lead_the_layout_section(self):
-        hand_drawn = {"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2, "kind": "object",
-                      "desc": "a brass lantern", "text": ""}
+        hand_drawn = region(x=0.4, y=0.4, w=0.2, h=0.2, desc="a brass lantern")
         prompt = build_prompt("", 1000, 1000,
                               [hand_drawn, self._moved_region()])
         assert prompt.index("Make these edits") < prompt.index("Layout:")
@@ -958,11 +971,55 @@ class TestMovedRegions:
         assert "stays exactly where it is" not in prompt
 
     def test_ref_image_wins_over_move_phrasing(self):
-        region = self._moved_region()
-        region["ref_image"] = 2
-        prompt = build_prompt("", 1000, 1000, [region])
+        moved = self._moved_region()
+        moved.ref_image = 2
+        prompt = build_prompt("", 1000, 1000, [moved])
         assert "taken from image 2" in prompt
         assert "Make these edits" not in prompt
+
+
+class TestConditionalRemovalWording:
+    """When OpenCV inpainted the move origins / cut-outs, those areas arrive as
+    natural background, so the prompt tells the model to keep them rather than to
+    remove a leftover the preprocessing already erased (and never names it)."""
+
+    @staticmethod
+    def _moved():
+        return region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a hippo",
+                      src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2})
+
+    @staticmethod
+    def _cut():
+        return region(x=0.5, y=0.5, w=0.3, h=0.3, desc="a dog", cutout=True)
+
+    def test_inpainted_origin_drops_remove_duplicate(self):
+        report = PreprocessReport(inpainted_origins=1, cv2_available=True)
+        prompt = build_prompt("", 1000, 1000, [self._moved()], report)
+        assert REPOSITION_CLEARED_HEADER in prompt
+        assert REPOSITION_HEADER not in prompt
+        assert "remove the duplicate" not in prompt
+        assert "blend the one" in prompt
+        assert "box_2d = [600, 600, 800, 800]" in prompt
+
+    def test_uninpainted_origin_keeps_remove_duplicate(self):
+        prompt = build_prompt("", 1000, 1000, [self._moved()])
+        assert REPOSITION_HEADER in prompt
+        assert REPOSITION_CLEARED_HEADER not in prompt
+        assert "remove the duplicate at box_2d = [100, 100, 300, 300]" in prompt
+
+    def test_inpainted_cutout_keeps_area_as_background(self):
+        report = PreprocessReport(inpainted_cutouts=1, cv2_available=True)
+        prompt = build_prompt("scene", 1000, 1000, [self._cut()], report)
+        assert CLEARED_AREAS_HEADER in prompt
+        assert REMOVAL_HEADER not in prompt
+        # The cleared area still carries its box_2d, and is never named.
+        assert "box_2d" in prompt.split(CLEARED_AREAS_HEADER, 1)[1]
+        assert "a dog" not in prompt
+
+    def test_uninpainted_cutout_asks_for_removal(self):
+        prompt = build_prompt("scene", 1000, 1000, [self._cut()])
+        assert REMOVAL_HEADER in prompt
+        assert CLEARED_AREAS_HEADER not in prompt
 
 
 class TestCompositeMovedRegions:
@@ -977,33 +1034,34 @@ class TestCompositeMovedRegions:
         return image
 
     @staticmethod
-    def _moved(extra=None):
-        region = {"x": 0.5, "y": 0.5, "w": 0.25, "h": 0.25, "kind": "object",
-                  "desc": "patch", "text": "",
-                  "src": {"x": 0.0, "y": 0.0, "w": 0.25, "h": 0.25}}
-        region.update(extra or {})
-        return region
+    def _moved(**over):
+        params = dict(x=0.5, y=0.5, w=0.25, h=0.25, desc="patch",
+                      src={"x": 0.0, "y": 0.0, "w": 0.25, "h": 0.25})
+        params.update(over)
+        return region(**params)
 
     def test_identity_without_moves(self):
         torch = pytest.importorskip("torch")
         image = self._image(torch)
-        anchor = self._moved({"x": 0.0, "y": 0.0})
-        assert composite_moved_regions(image, [anchor]) is image
+        anchor = self._moved(x=0.0, y=0.0)
+        out, _ = composite_moved_regions(image, [anchor])
+        assert out is image
 
     def test_none_image_passes_through(self):
-        assert composite_moved_regions(None, [self._moved()]) is None
+        out, _ = composite_moved_regions(None, [self._moved()])
+        assert out is None
 
     def test_maskless_move_pastes_the_source_rectangle(self):
         torch = pytest.importorskip("torch")
-        out = composite_moved_regions(self._image(torch), [self._moved()])
+        out, _ = composite_moved_regions(self._image(torch), [self._moved()])
         assert float(out[0, 12, 12, 0]) == 1.0   # pasted at destination
         assert float(out[0, 2, 2, 0]) == 1.0     # source pixels untouched
         assert float(out[0, 12, 2, 0]) == 0.0    # elsewhere unchanged
 
     def test_move_scales_the_patch_to_the_destination(self):
         torch = pytest.importorskip("torch")
-        big = self._moved({"w": 0.5, "h": 0.5, "x": 0.5, "y": 0.5})
-        out = composite_moved_regions(self._image(torch), [big])
+        big = self._moved(w=0.5, h=0.5, x=0.5, y=0.5)
+        out, _ = composite_moved_regions(self._image(torch), [big])
         assert float(out[0, 18, 18, 0]) == 1.0   # 5x5 grew to fill 10x10
 
     def test_mask_gates_the_paste(self):
@@ -1018,8 +1076,8 @@ class TestCompositeMovedRegions:
                 mask.putpixel((xx, yy), 255)
         buf = BytesIO()
         mask.save(buf, format="PNG")
-        region = self._moved({"mask": base64.b64encode(buf.getvalue()).decode()})
-        out = composite_moved_regions(self._image(torch), [region])
+        moved = self._moved(mask=base64.b64encode(buf.getvalue()).decode())
+        out, _ = composite_moved_regions(self._image(torch), [moved])
         assert float(out[0, 12, 10, 0]) == 1.0   # inside the opaque half
         assert float(out[0, 12, 14, 0]) == 0.0   # masked-out half untouched
 
@@ -1035,10 +1093,15 @@ class TestCompositeMovedRegions:
         # or shape.
         torch = pytest.importorskip("torch")
         image = self._image(torch)
-        out = composite_moved_regions(image, [self._moved()])
+        out, _ = composite_moved_regions(image, [self._moved()])
         assert out.dtype == image.dtype
         assert out.shape == image.shape
         assert float(out[0, 12, 12, 0]) == 1.0   # patch landed at destination
+
+    def test_report_counts_the_paste(self):
+        torch = pytest.importorskip("torch")
+        _, report = composite_moved_regions(self._image(torch), [self._moved()])
+        assert report.pasted_moves == 1
 
 
 class TestMoveOriginCutouts:
@@ -1046,32 +1109,28 @@ class TestMoveOriginCutouts:
     so the object does not appear at both its old and new positions."""
 
     def test_disjoint_origin_is_marked(self):
-        np = pytest.importorskip("numpy")
-        moved = {"x": 0.5, "y": 0.5, "w": 0.25, "h": 0.25, "kind": "object",
-                 "desc": "x", "text": "", "src": {"x": 0.0, "y": 0.0,
-                                                   "w": 0.25, "h": 0.25}}
+        pytest.importorskip("numpy")
+        moved = region(x=0.5, y=0.5, w=0.25, h=0.25, desc="x",
+                       src={"x": 0.0, "y": 0.0, "w": 0.25, "h": 0.25})
         mask = _move_origin_mask([moved], 20, 20)
         assert mask[2, 2] == 255      # the origin gets filled
         assert mask[12, 12] == 0      # the destination is left alone
         assert mask[8, 8] == 0        # untouched elsewhere
 
     def test_overlap_excludes_the_destination(self):
-        np = pytest.importorskip("numpy")
+        pytest.importorskip("numpy")
         # Destination sits inside the origin (scale/move-in-place).
-        moved = {"x": 0.2, "y": 0.2, "w": 0.2, "h": 0.2, "kind": "object",
-                 "desc": "x", "text": "", "src": {"x": 0.0, "y": 0.0,
-                                                  "w": 0.6, "h": 0.6}}
+        moved = region(x=0.2, y=0.2, w=0.2, h=0.2, desc="x",
+                       src={"x": 0.0, "y": 0.0, "w": 0.6, "h": 0.6})
         mask = _move_origin_mask([moved], 20, 20)
         assert mask[1, 1] == 255       # origin, outside the destination -> fill
         assert mask[6, 6] == 0         # inside the destination -> kept (fresh paste)
 
     def test_unmoved_and_srcless_regions_are_ignored(self):
         pytest.importorskip("numpy")
-        anchor = {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2, "kind": "object",
-                  "desc": "x", "text": "", "src": {"x": 0.1, "y": 0.1,
-                                                   "w": 0.2, "h": 0.2}}
-        hand_drawn = {"x": 0.5, "y": 0.5, "w": 0.2, "h": 0.2, "kind": "object",
-                      "desc": "x", "text": ""}
+        anchor = region(x=0.1, y=0.1, w=0.2, h=0.2, desc="x",
+                        src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2})
+        hand_drawn = region(x=0.5, y=0.5, w=0.2, h=0.2, desc="x")
         assert _move_origin_mask([anchor, hand_drawn], 20, 20).max() == 0
 
     def test_apply_fills_the_origin(self):
@@ -1084,20 +1143,19 @@ class TestMoveOriginCutouts:
         img[..., 0] = 1.0
         img[0, 0:5, 0:5, 0] = 0.0      # blue origin patch
         img[0, 0:5, 0:5, 2] = 1.0
-        moved = {"x": 0.5, "y": 0.5, "w": 0.25, "h": 0.25, "kind": "object",
-                 "desc": "x", "text": "", "src": {"x": 0.0, "y": 0.0,
-                                                  "w": 0.25, "h": 0.25}}
-        out = apply_move_origin_cutouts(img, [moved])
+        moved = region(x=0.5, y=0.5, w=0.25, h=0.25, desc="x",
+                       src={"x": 0.0, "y": 0.0, "w": 0.25, "h": 0.25})
+        out, _ = apply_move_origin_cutouts(img, [moved])
         assert out.shape == (1, 20, 20, 3)
         assert float(out[0, 2, 2, 0]) > float(out[0, 2, 2, 2])  # origin -> red
 
     def test_apply_no_move_returns_input(self):
         torch = pytest.importorskip("torch")
         img = torch.rand((1, 8, 8, 3))
-        anchor = {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2, "kind": "object",
-                  "desc": "x", "text": "", "src": {"x": 0.1, "y": 0.1,
-                                                   "w": 0.2, "h": 0.2}}
-        assert apply_move_origin_cutouts(img, [anchor]) is img
+        anchor = region(x=0.1, y=0.1, w=0.2, h=0.2, desc="x",
+                        src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2})
+        out, _ = apply_move_origin_cutouts(img, [anchor])
+        assert out is img
 
 
 class TestOverlappingMoves:
@@ -1107,9 +1165,8 @@ class TestOverlappingMoves:
     @staticmethod
     def _overlapping_move():
         # Destination sits inside the origin, like shrinking a subject in place.
-        return {"x": 0.35, "y": 0.35, "w": 0.2, "h": 0.2, "kind": "object",
-                "desc": "a safari guide", "text": "",
-                "src": {"x": 0.2, "y": 0.1, "w": 0.5, "h": 0.8}}
+        return region(x=0.35, y=0.35, w=0.2, h=0.2, desc="a safari guide",
+                      src={"x": 0.2, "y": 0.1, "w": 0.5, "h": 0.8})
 
     def test_overlapping_move_erases_outside_the_kept_copy(self):
         prompt = build_prompt("", 1000, 1000, [self._overlapping_move()])
@@ -1117,19 +1174,18 @@ class TestOverlappingMoves:
         assert "remove the duplicate at" not in prompt
 
     def test_disjoint_move_keeps_remove_duplicate_phrasing(self):
-        region = self._overlapping_move()
-        region["src"] = {"x": 0.0, "y": 0.0, "w": 0.2, "h": 0.2}
-        prompt = build_prompt("", 1000, 1000, [region])
+        moved = region(x=0.35, y=0.35, w=0.2, h=0.2, desc="a safari guide",
+                       src={"x": 0.0, "y": 0.0, "w": 0.2, "h": 0.2})
+        prompt = build_prompt("", 1000, 1000, [moved])
         assert "remove the duplicate at box_2d = [0, 0, 200, 200]" in prompt
         assert "erase every part" not in prompt
 
     def test_growing_in_place_asks_only_for_blending(self):
         # Destination covers the origin: the paste hides the old copy, so
         # there is no duplicate to remove.
-        region = {"x": 0.1, "y": 0.1, "w": 0.6, "h": 0.6, "kind": "object",
-                  "desc": "a safari guide", "text": "",
-                  "src": {"x": 0.3, "y": 0.3, "w": 0.2, "h": 0.2}}
-        prompt = build_prompt("", 1000, 1000, [region])
+        moved = region(x=0.1, y=0.1, w=0.6, h=0.6, desc="a safari guide",
+                       src={"x": 0.3, "y": 0.3, "w": 0.2, "h": 0.2})
+        prompt = build_prompt("", 1000, 1000, [moved])
         assert "blend" in prompt.lower()
         assert "remove the duplicate" not in prompt
         assert "erase every part" not in prompt
@@ -1146,25 +1202,25 @@ class TestRegionGroups:
              "parent": "abc123"},
         ])
         regions = parse_regions(data)
-        assert regions[0]["id"] == "abc123"
-        assert "parent" not in regions[0]
-        assert regions[1]["parent"] == "abc123"
+        assert regions[0].id == "abc123"
+        assert regions[0].ui.parent is None
+        assert regions[1].ui.parent == "abc123"
 
     def test_non_string_id_and_parent_dropped(self):
         data = json.dumps([
             {"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.5, "id": 7, "parent": []},
         ])
-        regions = parse_regions(data)
-        assert "id" not in regions[0]
-        assert "parent" not in regions[0]
+        # A non-string id is not kept; the contract assigns a stable one instead.
+        region_out = parse_regions(data)[0]
+        assert region_out.id != 7
+        assert region_out.ui.parent is None
 
     def test_groups_do_not_change_prompt_or_bboxes(self):
-        flat = [{"x": 0.1, "y": 0.1, "w": 0.5, "h": 0.5, "kind": "object",
-                 "desc": "a man", "text": ""}]
-        grouped = [dict(flat[0], id="a1"),
-                   {"x": 0.15, "y": 0.12, "w": 0.1, "h": 0.1,
-                    "kind": "object", "desc": "a hat", "text": "",
-                    "id": "b2", "parent": "a1"}]
+        grouped = [
+            region(x=0.1, y=0.1, w=0.5, h=0.5, desc="a man", rid="a1"),
+            region(x=0.15, y=0.12, w=0.1, h=0.1, desc="a hat",
+                   rid="b2", parent="a1"),
+        ]
         prompt = build_prompt("", 1000, 1000, grouped)
         assert "a man" in prompt and "a hat" in prompt
         assert len(regions_to_pixel_bboxes(grouped, 100, 100)[0]) == 2

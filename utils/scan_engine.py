@@ -343,6 +343,34 @@ def clean_mask(mask, feather_sigma=1.0):
     return binary.astype(np.uint8) * 255
 
 
+# Box-relative masks are decoded by resizing back to their target box, so the
+# encoded PNG can be capped to this longer side with no loss of placement
+# accuracy, keeping the serialized region document small.
+MASK_ENCODE_MAX_SIDE = 512
+
+
+def downscale_mask(mask, max_side=MASK_ENCODE_MAX_SIDE):
+    """Shrink a box-relative uint8 mask so its longer side is at most max_side.
+
+    Never upscales: a mask already within the cap is returned unchanged. numpy
+    and PIL are imported lazily so the helper stays usable on a bare host.
+    """
+    import numpy as np
+    from PIL import Image
+
+    arr = np.asarray(mask)
+    height, width = arr.shape[:2]
+    longest = max(height, width)
+    if longest <= max_side:
+        return arr
+    scale = max_side / float(longest)
+    new_width = max(1, int(round(width * scale)))
+    new_height = max(1, int(round(height * scale)))
+    resized = Image.fromarray(arr.astype(np.uint8), mode="L").resize(
+        (new_width, new_height))
+    return np.asarray(resized, dtype=np.uint8)
+
+
 def pixel_box_prompts(objects, width, height):
     """Convert normalized scan boxes into integer [x0, y0, x1, y1] pixel
     prompts, clamped to the frame with at least one pixel of extent."""
@@ -497,7 +525,7 @@ def segment_objects(image, objects, segmenter=None):
         for index, (obj, prompt) in enumerate(zip(objects, prompts)):
             x0, y0, x1, y1 = prompt
             full = segment_small(prompt) if is_small_object(obj["box"]) else shared[index]
-            obj["mask"] = encode_png(clean_mask(full[y0:y1, x0:x1]))
+            obj["mask"] = encode_png(downscale_mask(clean_mask(full[y0:y1, x0:x1])))
     except Exception as e:
         print(f"[ERPK scan] Warning: local segmentation unavailable ({e}); "
               "masks fall back to rectangles")
@@ -813,7 +841,12 @@ def _mask_region_medians(objects, depth_map):
         if mask_b64:
             try:
                 raw = base64.b64decode(mask_b64)
-                mask = np.array(Image.open(BytesIO(raw)).convert("L"))
+                glyph = Image.open(BytesIO(raw)).convert("L")
+                # The stored mask may be downscaled for compact serialization;
+                # resize it back to the object's pixel box before sampling depth.
+                if glyph.size != (region.shape[1], region.shape[0]):
+                    glyph = glyph.resize((region.shape[1], region.shape[0]))
+                mask = np.array(glyph)
                 if mask.shape == region.shape:
                     selected = region[mask > 127]
                     if selected.size:
