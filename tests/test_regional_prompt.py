@@ -647,7 +647,8 @@ class TestExecute:
         assert "Layout:" not in out.args[0]
 
     def test_reference_image_passes_through(self):
-        sentinel = object()
+        torch = pytest.importorskip("torch")
+        sentinel = torch.zeros((1, 8, 8, 3))
         out = RegionalPromptBuilder.execute(
             width=1024, height=1024,
             prompt="A quiet forest", regions_data="[]",
@@ -661,6 +662,19 @@ class TestExecute:
             prompt="A quiet forest", regions_data="[]",
         )
         assert out.args[4] is None
+
+    def test_masks_match_connected_image_resolution(self):
+        # The masks must overlay the passed-through image, so when an image is
+        # connected they follow its H x W, not the width/height widgets.
+        torch = pytest.importorskip("torch")
+        image = torch.zeros((1, 768, 512, 3))  # differs from the widgets
+        out = RegionalPromptBuilder.execute(
+            width=1024, height=1024, prompt="",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+            image=image,
+        )
+        masks = out.args[6]
+        assert masks.shape == (2, 768, 512)
 
     def test_desc_input_overrides_region_description(self):
         out = RegionalPromptBuilder.execute(
@@ -1014,6 +1028,17 @@ class TestCompositeMovedRegions:
         image = self._image(torch)
         composite_moved_regions(image, [self._moved()])
         assert float(image[0, 12, 12, 0]) == 0.0
+
+    def test_blend_preserves_dtype_and_shape(self):
+        # The blend tensors are built on the destination patch's device and
+        # dtype, so the moved patch lands without changing the output's dtype
+        # or shape.
+        torch = pytest.importorskip("torch")
+        image = self._image(torch)
+        out = composite_moved_regions(image, [self._moved()])
+        assert out.dtype == image.dtype
+        assert out.shape == image.shape
+        assert float(out[0, 12, 12, 0]) == 1.0   # patch landed at destination
 
 
 class TestMoveOriginCutouts:

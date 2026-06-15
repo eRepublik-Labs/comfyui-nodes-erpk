@@ -1,8 +1,10 @@
 # ABOUTME: aiohttp handler for POST /erpk/scan: validates the request, decodes the posted image,
 # ABOUTME: and runs the scan engine. PIL and aiohttp.web import lazily so the package imports outside ComfyUI.
 
+import asyncio
 import base64
 import binascii
+import json
 
 from . import scan_engine
 
@@ -48,11 +50,19 @@ async def handle_scan(request):
     from aiohttp import web
 
     try:
+        # Content-Length is a cheap early-out, but it is absent on chunked
+        # uploads, so the actual bytes read are capped too before parsing.
         length = getattr(request, "content_length", None)
         if length is not None and length > SCAN_MAX_BODY_BYTES:
             return web.json_response({"error": "Request body too large"}, status=413)
         try:
-            body = await request.json()
+            raw = await request.read()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON body"}, status=400)
+        if len(raw) > SCAN_MAX_BODY_BYTES:
+            return web.json_response({"error": "Request body too large"}, status=413)
+        try:
+            body = json.loads(raw)
         except Exception:
             return web.json_response({"error": "Invalid JSON body"}, status=400)
         if not isinstance(body, dict):
@@ -126,8 +136,11 @@ async def handle_scan_segmenters(request):
     """
     from aiohttp import web
 
+    # available_segmenters does a cold `import transformers`; offload it so the
+    # editor-open path never stalls the aiohttp event loop.
+    segmenters = await asyncio.to_thread(scan_engine.available_segmenters)
     return web.json_response({
-        "segmenters": scan_engine.available_segmenters(),
+        "segmenters": segmenters,
         "default": scan_engine.DEFAULT_SEGMENTER,
     })
 

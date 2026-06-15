@@ -30,17 +30,25 @@ def _png_data_url():
 
 
 class FakeRequest:
-    """Minimal stand-in exposing the async json() handle_scan reads."""
+    """Minimal stand-in exposing the async read() handle_scan consumes.
 
-    def __init__(self, payload, raise_json=False, content_length=None):
+    handle_scan reads the raw body to enforce a hard size cap, so the body is
+    json-encoded payload bytes by default; `raw` overrides them (oversize cases)
+    and `raise_json` returns undecodable bytes.
+    """
+
+    def __init__(self, payload, raise_json=False, content_length=None, raw=None):
         self._payload = payload
         self._raise_json = raise_json
         self.content_length = content_length
+        self._raw = raw
 
-    async def json(self):
+    async def read(self):
+        if self._raw is not None:
+            return self._raw
         if self._raise_json:
-            raise ValueError("bad json")
-        return self._payload
+            return b"{not valid json"
+        return json.dumps(self._payload).encode()
 
 
 def _body(response):
@@ -104,6 +112,15 @@ class TestDecodeDataUrl:
 class TestHandleScan:
     def test_oversized_body_rejected(self):
         req = FakeRequest({}, content_length=scan_route.SCAN_MAX_BODY_BYTES + 1)
+        resp = asyncio.run(handle_scan(req))
+        assert resp.status == 413
+        assert "error" in _body(resp)
+
+    def test_oversized_body_without_content_length_rejected(self):
+        # A chunked/absent Content-Length bypasses the header pre-check, so the
+        # actual bytes read must still be capped rather than parsed unbounded.
+        big = b"x" * (scan_route.SCAN_MAX_BODY_BYTES + 1)
+        req = FakeRequest({}, content_length=None, raw=big)
         resp = asyncio.run(handle_scan(req))
         assert resp.status == 413
         assert "error" in _body(resp)
@@ -322,6 +339,23 @@ class TestScanSegmenters:
         body = _body(asyncio.run(handle_scan_segmenters(FakeRequest({}))))
         ids = [s["id"] for s in body["segmenters"]]
         assert scan_engine.DEFAULT_SEGMENTER in ids
+
+    def test_available_segmenters_runs_on_worker_thread(self, monkeypatch):
+        # available_segmenters does a cold `import transformers`; it must run off
+        # the event-loop thread so opening the editor never stalls aiohttp.
+        import threading
+        from utils.scan_route import handle_scan_segmenters
+
+        recorded = {}
+
+        def fake_available():
+            recorded["on_main"] = (threading.current_thread()
+                                   is threading.main_thread())
+            return []
+
+        monkeypatch.setattr(scan_engine, "available_segmenters", fake_available)
+        asyncio.run(handle_scan_segmenters(FakeRequest({})))
+        assert recorded["on_main"] is False
 
 
 class TestRegister:

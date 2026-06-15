@@ -387,13 +387,14 @@ def composite_moved_regions(image, regions):
         patch = torch.nn.functional.interpolate(
             patch, size=(dh, dw), mode="bilinear", align_corners=False,
         ).permute(0, 2, 3, 1)
-        alpha = torch.ones((dh, dw))
+        alpha = torch.ones((dh, dw), device=result.device, dtype=result.dtype)
         if region_has_stored_mask(region):
             try:
                 glyph = Image.open(BytesIO(base64.b64decode(region["mask"])))
                 glyph = glyph.convert("L").resize((dw, dh))
                 probs = np.asarray(glyph, dtype=np.float32) / 255.0
-                alpha = torch.from_numpy((probs > 0.5).astype(np.float32))
+                alpha = torch.from_numpy((probs > 0.5).astype(np.float32)).to(
+                    device=result.device, dtype=result.dtype)
             except Exception:
                 pass
         blend = alpha.reshape(1, dh, dw, 1)
@@ -696,7 +697,12 @@ class RegionalPromptBuilder(IO.ComfyNode):
         image = composite_moved_regions(image, regions)
         image = apply_move_origin_cutouts(image, regions)
         image = apply_cutouts(image, regions)
-        masks = build_region_masks(regions, width, height)
+        # Masks overlay the passed-through image, so they render at the
+        # connected image's H x W; with no image they fall back to the widgets.
+        mask_width, mask_height = width, height
+        if image is not None:
+            mask_height, mask_width = int(image.shape[1]), int(image.shape[2])
+        masks = build_region_masks(regions, mask_width, mask_height)
         assembled = build_prompt(prompt, width, height, regions)
         bboxes = regions_to_pixel_bboxes(regions, width, height)
         return IO.NodeOutput(assembled, bboxes, width, height, image, image_refs, masks)

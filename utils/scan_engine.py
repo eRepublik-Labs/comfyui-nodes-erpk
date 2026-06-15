@@ -4,6 +4,7 @@
 import asyncio
 import json
 import math
+import threading
 
 from . import scan_cost
 
@@ -214,7 +215,10 @@ SEGMENTER_FAMILY_CLASSES = {
 SEGMENTER_MODEL_ID = DEFAULT_SEGMENTER
 
 # Loaded segmenters cached per model id: {id: {processor, model, device, family}}.
+# The lock guards the check-then-load so concurrent first scans (the to_thread
+# offload makes those possible) share one load instead of each loading a copy.
 _segmenter = {}
+_segmenter_lock = threading.Lock()
 
 
 def resolve_segmenter(model_id):
@@ -376,6 +380,20 @@ def _load_segmenter(model_id, family, torch):
     return {"processor": processor, "model": model, "device": device, "family": family}
 
 
+def _get_segmenter(model_id, family, torch):
+    """Cached segmenter for model_id, loaded exactly once under a lock.
+
+    The lock spans only the check-then-load; the per-box forward pass runs
+    outside it so concurrent scans stay parallel through the CPU no_grad inference.
+    """
+    with _segmenter_lock:
+        if model_id not in _segmenter:
+            _segmenter[model_id] = _load_segmenter(model_id, family, torch)
+            print(f"[ERPK scan] segmenter '{model_id}' ({family}) loaded on "
+                  f"{_segmenter[model_id]['device']}")
+        return _segmenter[model_id]
+
+
 def segment_objects(image, objects, segmenter=None):
     """Fill each object's mask with a locally-computed segmentation.
 
@@ -402,11 +420,7 @@ def segment_objects(image, objects, segmenter=None):
 
         model_id = resolve_segmenter(segmenter)
         family = _segmenter_family(model_id)
-        if model_id not in _segmenter:
-            _segmenter[model_id] = _load_segmenter(model_id, family, torch)
-            print(f"[ERPK scan] segmenter '{model_id}' ({family}) loaded on "
-                  f"{_segmenter[model_id]['device']}")
-        entry = _segmenter[model_id]
+        entry = _get_segmenter(model_id, family, torch)
         processor, model, device = entry["processor"], entry["model"], entry["device"]
 
         rgb = image.convert("RGB")
@@ -566,13 +580,17 @@ def build_cost(usages, model):
     """Assemble the scan's cost from each API call's token usage.
 
     usages is one entry per Gemini call (None when a call reported no usage).
-    Returns {usd, input_tokens, output_tokens, calls, model}: tokens are summed
-    across calls and usd is the priced estimate, or None when the model has no
-    rate on file (the UI then shows "cost unavailable" rather than implying free).
+    Returns None when any call's usage is unreported: a call happened but its
+    tokens are unknown, so the whole cost is unknown rather than an undercount
+    (the UI shows "cost unavailable"). Otherwise returns {usd, input_tokens,
+    output_tokens, calls, model}: tokens are summed across calls and usd is the
+    priced estimate, or None usd when the model has no rate on file.
     """
-    input_tokens = sum(usage["input_tokens"] for usage in usages if usage)
-    output_tokens = sum(usage["output_tokens"] for usage in usages if usage)
-    calls = sum(1 for usage in usages if usage)
+    if any(usage is None for usage in usages):
+        return None
+    input_tokens = sum(usage["input_tokens"] for usage in usages)
+    output_tokens = sum(usage["output_tokens"] for usage in usages)
+    calls = len(usages)
     return {
         "usd": scan_cost.price(model, input_tokens, output_tokens),
         "input_tokens": input_tokens,
@@ -621,7 +639,9 @@ async def gemini_scan(image, max_objects, model, segmenter=None):
         print(f"[ERPK scan] 0 objects; raw response head: {raw_text[:400]!r}")
         return {"objects": [],
                 "cost": build_cost([detection.get("usage")], model_to_use)}
-    segment_objects(image, objects, segmenter)
+    # segment_objects loads SAM and runs inference; offload it so the blocking
+    # work never stalls the aiohttp event loop. It mutates objects in place.
+    await asyncio.to_thread(segment_objects, image, objects, segmenter)
     masked = sum(1 for obj in objects if obj.get("mask"))
     print(f"[ERPK scan] {len(objects)} objects, {masked} with masks")
 
@@ -659,8 +679,34 @@ FLORENCE_MODEL_ID = "microsoft/Florence-2-large-ft"
 FLORENCE_REVISION = "4a12a2b54b7016a48a22037fbd62da90cd566f2a"
 DEPTH_MODEL_ID = "depth-anything/Depth-Anything-V2-Small-hf"
 DEPTH_REVISION = "5426e4f0f36572d16453bbda7a8389317b1bef99"
+# Each cache's lock guards its check-then-load so two scans sharing the event
+# loop (via to_thread) load the backbone once instead of racing two copies.
 _florence = {}
+_florence_lock = threading.Lock()
 _depth = {}
+_depth_lock = threading.Lock()
+
+
+def _load_florence():
+    """Load Florence-2's processor and model onto CPU (pinned revision, eager attn)."""
+    from transformers import AutoModelForCausalLM, AutoProcessor
+
+    device = "cpu"
+    processor = AutoProcessor.from_pretrained(
+        FLORENCE_MODEL_ID, revision=FLORENCE_REVISION, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        FLORENCE_MODEL_ID, revision=FLORENCE_REVISION, trust_remote_code=True,
+        attn_implementation="eager").to(device)
+    return {"processor": processor, "model": model, "device": device}
+
+
+def _florence_models():
+    """Cached Florence processor/model/device, loaded exactly once under a lock."""
+    with _florence_lock:
+        if not _florence:
+            _florence.update(_load_florence())
+            print(f"[ERPK scan] Florence-2 loaded on {_florence['device']}")
+        return _florence
 
 
 def _detect_florence(image):
@@ -672,22 +718,11 @@ def _detect_florence(image):
     attn_implementation='eager' is also mandatory or the model fails to load.
     """
     import torch
-    from transformers import AutoModelForCausalLM, AutoProcessor
 
-    if not _florence:
-        device = "cpu"
-        processor = AutoProcessor.from_pretrained(
-            FLORENCE_MODEL_ID, revision=FLORENCE_REVISION, trust_remote_code=True)
-        model = AutoModelForCausalLM.from_pretrained(
-            FLORENCE_MODEL_ID, revision=FLORENCE_REVISION, trust_remote_code=True,
-            attn_implementation="eager").to(device)
-        _florence["processor"] = processor
-        _florence["model"] = model
-        _florence["device"] = device
-        print(f"[ERPK scan] Florence-2 loaded on {device}")
-    processor = _florence["processor"]
-    model = _florence["model"]
-    device = _florence["device"]
+    entry = _florence_models()
+    processor = entry["processor"]
+    model = entry["model"]
+    device = entry["device"]
 
     rgb = image.convert("RGB")
     inputs = processor(text=FLORENCE_DETECTION_TASK, images=rgb, return_tensors="pt")
@@ -707,6 +742,27 @@ def _detect_florence(image):
         text, task=FLORENCE_DETECTION_TASK, image_size=(rgb.width, rgb.height))
 
 
+def _load_depth():
+    """Load Depth-Anything-V2's image processor and model onto CPU (pinned revision)."""
+    from transformers import AutoImageProcessor, AutoModelForDepthEstimation
+
+    device = "cpu"
+    processor = AutoImageProcessor.from_pretrained(
+        DEPTH_MODEL_ID, revision=DEPTH_REVISION)
+    model = AutoModelForDepthEstimation.from_pretrained(
+        DEPTH_MODEL_ID, revision=DEPTH_REVISION).to(device)
+    return {"processor": processor, "model": model, "device": device}
+
+
+def _depth_models():
+    """Cached Depth-Anything processor/model/device, loaded exactly once under a lock."""
+    with _depth_lock:
+        if not _depth:
+            _depth.update(_load_depth())
+            print(f"[ERPK scan] Depth-Anything loaded on {_depth['device']}")
+        return _depth
+
+
 def _depth_map(image):
     """Return an (H, W) numpy disparity map (larger = nearer) for the image.
 
@@ -714,23 +770,12 @@ def _depth_map(image):
     not match (H, W); it is interpolated back to the original size before the
     SAM masks sample it, or the coordinates would not line up.
     """
-    import numpy as np
     import torch
-    from transformers import AutoImageProcessor, AutoModelForDepthEstimation
 
-    if not _depth:
-        device = "cpu"
-        processor = AutoImageProcessor.from_pretrained(
-            DEPTH_MODEL_ID, revision=DEPTH_REVISION)
-        model = AutoModelForDepthEstimation.from_pretrained(
-            DEPTH_MODEL_ID, revision=DEPTH_REVISION).to(device)
-        _depth["processor"] = processor
-        _depth["model"] = model
-        _depth["device"] = device
-        print(f"[ERPK scan] Depth-Anything loaded on {device}")
-    processor = _depth["processor"]
-    model = _depth["model"]
-    device = _depth["device"]
+    entry = _depth_models()
+    processor = entry["processor"]
+    model = entry["model"]
+    device = entry["device"]
 
     rgb = image.convert("RGB")
     inputs = processor(images=rgb, return_tensors="pt").to(device)

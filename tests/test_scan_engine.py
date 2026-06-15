@@ -32,6 +32,7 @@ from utils.scan_engine import (
     resolve_model,
     scan,
 )
+from utils import scan_engine
 from utils.regional_prompt import MIN_REGION_EXTENT
 
 
@@ -457,19 +458,22 @@ class TestBuildCost:
         # 2300/1e6*0.30 + 1550/1e6*2.50
         assert cost["usd"] == pytest.approx(2300 / 1e6 * 0.30 + 1550 / 1e6 * 2.5)
 
-    def test_none_usages_are_skipped(self):
+    def test_single_unreported_usage_is_unknown(self):
         from utils.scan_engine import build_cost
-        cost = build_cost([None, {"input_tokens": 100, "output_tokens": 0,
-                                  "total_tokens": 100}], "gemini-2.5-flash")
-        assert cost["input_tokens"] == 100
-        assert cost["calls"] == 1
+        # A call happened but reported no usage -> the total is unknown, so the
+        # whole cost is None rather than billing that call as zero tokens.
+        assert build_cost([None], "gemini-2.5-flash") is None
 
-    def test_all_none_is_zero_tokens(self):
+    def test_any_unreported_usage_is_unknown(self):
         from utils.scan_engine import build_cost
-        cost = build_cost([None, None], "gemini-2.5-flash")
-        assert cost["input_tokens"] == 0 and cost["output_tokens"] == 0
-        assert cost["calls"] == 0
-        assert cost["usd"] == 0.0
+        # One reported call plus one unreported call still reads as unknown: the
+        # reported tokens alone would undercount the scan.
+        assert build_cost([{"input_tokens": 100, "output_tokens": 0,
+                            "total_tokens": 100}, None], "gemini-2.5-flash") is None
+
+    def test_all_unreported_usage_is_unknown(self):
+        from utils.scan_engine import build_cost
+        assert build_cost([None, None], "gemini-2.5-flash") is None
 
     def test_unknown_model_reports_tokens_but_no_usd(self):
         from utils.scan_engine import build_cost
@@ -664,3 +668,127 @@ class TestFlorenceMalformedLabels:
         objects = florence_to_objects(od, 1000, 1000, 20)
         assert len(objects) == 2
         assert all(obj["name"] == "" for obj in objects)
+
+
+class TestGeminiScanOffloadsSegmentation:
+    """The SAM stage runs off the event-loop thread so it never stalls aiohttp.
+
+    gemini_scan does a relative `..gemini` import, so it is driven through the
+    synthetic `erpk` package (conftest) where that import resolves, mirroring how
+    the Gemini-touching modules are exercised elsewhere.
+    """
+
+    class _FakeClient:
+        MODELS = ["gemini-2.5-flash"]
+        DEFAULT_MODEL = "gemini-2.5-flash"
+
+        def __init__(self, api_key=None):
+            self._calls = 0
+
+        async def generate_content(self, prompt, images=None, **kwargs):
+            self._calls += 1
+            if self._calls == 1:
+                text = json.dumps([{"box_2d": [100, 200, 500, 600],
+                                    "label": "cat", "description": "a cat"}])
+            else:
+                text = json.dumps({"order": ["cat"]})
+            return {"text": text,
+                    "usage": {"input_tokens": 1, "output_tokens": 1,
+                              "total_tokens": 2}}
+
+    def test_segment_objects_runs_on_worker_thread(self, monkeypatch):
+        import threading
+        import erpk.gemini.gemini_api.client as gemini_client_module
+        from erpk.utils import scan_engine as erpk_scan_engine
+
+        monkeypatch.setattr(gemini_client_module, "GeminiClient", self._FakeClient)
+
+        recorded = {}
+
+        def fake_segment(image, objects, segmenter=None):
+            recorded["on_main"] = (threading.current_thread()
+                                   is threading.main_thread())
+
+        monkeypatch.setattr(erpk_scan_engine, "segment_objects", fake_segment)
+
+        asyncio.run(erpk_scan_engine.gemini_scan("IMG", 5, "gemini-2.5-flash"))
+        assert recorded["on_main"] is False
+
+
+class TestCacheInitLock:
+    """Concurrent first loads of a cache load the backbone exactly once.
+
+    Each loader is replaced with a counting stub that sleeps to widen the race
+    window; without the per-cache lock every thread would see the empty cache and
+    load, so a count of one proves the lock serializes the check-then-populate.
+    """
+
+    def _hammer(self, target):
+        import threading
+
+        barrier = threading.Barrier(8)
+
+        def run():
+            barrier.wait()
+            target()
+
+        threads = [threading.Thread(target=run) for _ in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+    def test_segmenter_loads_once(self, monkeypatch):
+        import time
+
+        scan_engine._segmenter.clear()
+        calls = []
+
+        def fake_load(model_id, family, torch):
+            calls.append(model_id)
+            time.sleep(0.02)
+            return {"processor": object(), "model": object(),
+                    "device": "cpu", "family": family}
+
+        monkeypatch.setattr(scan_engine, "_load_segmenter", fake_load)
+        try:
+            self._hammer(lambda: scan_engine._get_segmenter("id", "sam1", None))
+            assert len(calls) == 1
+        finally:
+            scan_engine._segmenter.clear()
+
+    def test_florence_loads_once(self, monkeypatch):
+        import time
+
+        scan_engine._florence.clear()
+        calls = []
+
+        def fake_load():
+            calls.append(1)
+            time.sleep(0.02)
+            return {"processor": object(), "model": object(), "device": "cpu"}
+
+        monkeypatch.setattr(scan_engine, "_load_florence", fake_load)
+        try:
+            self._hammer(scan_engine._florence_models)
+            assert len(calls) == 1
+        finally:
+            scan_engine._florence.clear()
+
+    def test_depth_loads_once(self, monkeypatch):
+        import time
+
+        scan_engine._depth.clear()
+        calls = []
+
+        def fake_load():
+            calls.append(1)
+            time.sleep(0.02)
+            return {"processor": object(), "model": object(), "device": "cpu"}
+
+        monkeypatch.setattr(scan_engine, "_load_depth", fake_load)
+        try:
+            self._hammer(scan_engine._depth_models)
+            assert len(calls) == 1
+        finally:
+            scan_engine._depth.clear()
