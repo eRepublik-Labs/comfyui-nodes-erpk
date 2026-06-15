@@ -1,5 +1,6 @@
 // ABOUTME: Pure helpers that read or size the litegraph node behind the region editor.
 // ABOUTME: Every function takes the node explicitly; no app, DOM, or shared editor state.
+// @ts-check
 
 import {
     MIN_NODE_WIDTH,

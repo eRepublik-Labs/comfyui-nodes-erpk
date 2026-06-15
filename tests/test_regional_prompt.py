@@ -9,6 +9,7 @@ import pytest
 
 from utils.region_contract import Box, Content, Region, Source, Mask, Ui
 from utils.regional_prompt import (
+    MODEL_REPOSITION_HEADER,
     REMOVAL_HEADER,
     REPOSITION_HEADER,
     RegionalPromptBuilder,
@@ -32,12 +33,13 @@ from utils.regional_prompt import (
 
 def region(x=0.1, y=0.1, w=0.2, h=0.2, kind="object", desc="", text="",
            src=None, mask=None, cutout=False, parent=None, hidden=False,
-           rid="", bind_slot=None, ref_image=None):
+           rid="", bind_slot=None, ref_image=None, edit_by="node"):
     """Build a Region the way the canvas/scan would, for concise fixtures.
 
     A src box or mask attaches a Source (scan origin); src defaults to the box
     itself when only a mask is given (a scanned-in-place region). ref_image is
-    the runtime reference-image number execute() would assign.
+    the runtime reference-image number execute() would assign. edit_by="model"
+    hands the region's move/cut-out to the prompt instead of the node.
     """
     source = None
     if src is not None or mask is not None:
@@ -47,7 +49,7 @@ def region(x=0.1, y=0.1, w=0.2, h=0.2, kind="object", desc="", text="",
         id=rid, kind=kind, box=Box(x, y, w, h),
         content=Content(desc=desc, text=text),
         source=source, op="cutout" if cutout else "normal",
-        bind_slot=bind_slot, ui=Ui(parent=parent, hidden=hidden),
+        bind_slot=bind_slot, edit_by=edit_by, ui=Ui(parent=parent, hidden=hidden),
     )
     if ref_image is not None:
         built.ref_image = ref_image
@@ -80,6 +82,8 @@ CANONICAL_PROMPT = (
     '2. The text "OPEN LATE", glowing neon letters: at the top-center, covering '
     "about 40% of the image width and 14% of its height. box_2d = [30, 300, 170, 700]\n"
     "Every element must stay fully inside its placement area and fill most of it. "
+    "Put each element exactly at its own box_2d and nowhere else, even if a "
+    "different, similar-looking spot in the image seems more natural. "
     "Do not add other prominent subjects. The placement areas are invisible "
     "composition guides: never draw boxes, frames, outlines, coordinates, or any "
     "annotation overlays in the image."
@@ -379,11 +383,27 @@ class TestBuildPrompt:
         assert "do not re-render" in prompt.lower()
         assert "Compose for a" not in prompt
 
+    def test_edit_mode_forbids_flipping(self):
+        # Heavy regeneration (model-applied moves) can mirror or rotate the whole
+        # frame; the preamble locks orientation against that.
+        regions = [region(x=0.1, y=0.1, w=0.2, h=0.2, desc="a cat")]
+        prompt = build_prompt("a zoo", 1000, 1000, regions, edit_mode=True)
+        assert "do not flip, mirror, rotate, or crop" in prompt.lower()
+
     def test_generate_mode_composes_and_omits_edit_preamble(self):
         regions = [region(x=0.1, y=0.1, w=0.2, h=0.2, desc="a cat")]
         prompt = build_prompt("a zoo", 1000, 1000, regions, edit_mode=False)
         assert "Compose for a 1000x1000 frame" in prompt
         assert "Edit the provided image" not in prompt
+
+    def test_edit_mode_states_image_pixel_dimensions(self):
+        # box_2d is normalized 0-1000, but stating the frame's actual pixel size
+        # removes ambiguity about the grid the coordinates map onto. The compose
+        # framing stays out — only the dimensions are stated, not a target frame.
+        regions = [region(x=0.4, y=0.3, w=0.1, h=0.16, desc="a red ball")]
+        prompt = build_prompt("a zoo", 1365, 768, regions, edit_mode=True)
+        assert "1365x768 pixels" in prompt
+        assert "Compose for a" not in prompt
 
     def test_object_region_without_desc_uses_an_element(self):
         regions = [region(x=0.4, y=0.4, w=0.2, h=0.2)]
@@ -407,6 +427,15 @@ class TestBuildPrompt:
         prompt = build_prompt("", 1000, 1000, regions)
         assert "listed from back to front" in prompt
         assert "appears in front of an earlier one" in prompt
+
+    def test_layout_anchors_each_element_to_its_box(self):
+        # Inserted objects otherwise drift to a "more natural" lookalike spot —
+        # a ball drawn over one hand gets rendered in the other. The footer pins
+        # each element to its own box and forbids the relocation.
+        regions = [region(x=0.1, y=0.1, w=0.2, h=0.2, desc="a red ball")]
+        prompt = build_prompt("", 1000, 1000, regions)
+        assert "nowhere else" in prompt
+        assert "similar-looking spot" in prompt
 
     def test_unicode_and_long_desc_round_trip(self):
         long_desc = "ornate baroque detail, " * 200
@@ -522,6 +551,27 @@ class TestCutouts:
         keep = region(x=0.1, y=0.1, w=0.3, h=0.3)
         masks = build_region_masks([keep, self._cut()], 50, 50)
         assert masks.shape[0] == 1
+
+    def test_cutout_mask_spares_kept_region(self):
+        # A kept region overlapping a cut-out is never erased — the cut-out clears
+        # only the background around it.
+        cut = region(x=0.1, y=0.1, w=0.4, h=0.4, cutout=True)
+        kept = region(x=0.3, y=0.3, w=0.4, h=0.4, desc="a man")
+        mask = _cutout_mask([cut, kept], 100, 100)
+        assert mask[15, 15] == 255   # cut-out only -> filled
+        assert mask[35, 35] == 0     # overlap with the kept region -> spared
+
+    def test_cutout_mask_spares_kept_region_regardless_of_order(self):
+        # Cut-outs sit at the lowest depth, so a kept region is spared even when
+        # it is listed before the cut-out in the regions array.
+        kept = region(x=0.3, y=0.3, w=0.4, h=0.4, desc="a man")
+        cut = region(x=0.1, y=0.1, w=0.4, h=0.4, cutout=True)
+        mask = _cutout_mask([kept, cut], 100, 100)
+        assert mask[35, 35] == 0
+
+    def test_removal_directive_keeps_overlapping_kept_element(self):
+        out = build_prompt("scene", 1000, 1000, [self._cut()])
+        assert "clear only around it" in out
 
     def test_all_cutouts_yield_one_zero_mask(self):
         pytest.importorskip("torch")
@@ -1021,6 +1071,15 @@ class TestMovedRegions:
         assert "box_2d = [600, 600, 800, 800]" in prompt
         assert "background" in prompt.lower()
 
+    def test_move_asks_for_relight_and_contact_shadow(self):
+        # A composited paste looks like a sticker until the model relights it and
+        # casts a shadow; the directive makes that an explicit edit, not optional.
+        prompt = build_prompt("", 1000, 1000, [self._moved_region()])
+        assert "relight it" in prompt
+        assert "contact shadow" in prompt
+        assert "does not look pasted" in prompt
+        assert "keep its shape, colors, and details unchanged" in prompt
+
     def test_move_destination_keeps_verbal_placement(self):
         # The hybrid doctrine: words drive the model, coordinates pin it.
         # No size phrasing — the composited paste already fixes the size.
@@ -1299,3 +1358,80 @@ class TestRegionGroups:
         prompt = build_prompt("", 1000, 1000, grouped)
         assert "a man" in prompt and "a hat" in prompt
         assert len(regions_to_pixel_bboxes(grouped, 100, 100)[0]) == 2
+
+
+class TestModelEditMoves:
+    """A moved region flagged edit_by='model' is NOT composited by the node, so
+    its prompt line tells the model to relocate it rather than to clean up an
+    already-pasted copy."""
+
+    @staticmethod
+    def _model_move():
+        return region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a hippo",
+                      src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2},
+                      edit_by="model")
+
+    @staticmethod
+    def _node_move():
+        return region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a hippo",
+                      src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2})
+
+    def test_model_move_uses_relocation_language(self):
+        prompt = build_prompt("", 1000, 1000, [self._model_move()])
+        assert MODEL_REPOSITION_HEADER in prompt
+        assert "currently at box_2d = [100, 100, 300, 300]" in prompt
+        assert "its new position is" in prompt
+        # No double preposition from the placement phrase ("at the ...").
+        assert "to at the" not in prompt
+
+    def test_model_move_omits_paste_cleanup_language(self):
+        # The node did not composite it, so there is no leftover duplicate.
+        prompt = build_prompt("", 1000, 1000, [self._model_move()])
+        assert "remove the duplicate" not in prompt
+        assert "repositioned by pasting" not in prompt
+
+    def test_model_move_states_target_size(self):
+        # Edit models size moved objects semantically, so the destination size is
+        # spelled out in percent and pixels with an explicit no-resize directive.
+        prompt = build_prompt("", 1000, 1000, [self._model_move()])
+        assert "about 20% of the image width and 20% of its height" in prompt
+        assert "(~200x200 px)" in prompt
+        assert "do not enlarge or shrink it" in prompt
+
+    def test_node_move_keeps_composite_language(self):
+        prompt = build_prompt("", 1000, 1000, [self._node_move()])
+        assert REPOSITION_HEADER in prompt
+        assert MODEL_REPOSITION_HEADER not in prompt
+
+    def test_mixed_moves_emit_both_blocks(self):
+        prompt = build_prompt("", 1000, 1000,
+                              [self._node_move(), self._model_move()])
+        assert REPOSITION_HEADER in prompt
+        assert MODEL_REPOSITION_HEADER in prompt
+
+
+class TestModelEditSkipsNodeFill:
+    """edit_by='model' leaves the pixels for the model: the node neither inpaints
+    a model-cut-out's area nor erases a model-move's origin."""
+
+    def test_model_cutout_not_filled_by_node(self):
+        cut = region(x=0.1, y=0.1, w=0.4, h=0.4, cutout=True, edit_by="model")
+        mask = _cutout_mask([cut], 100, 100)
+        assert mask[20, 20] == 0  # model removes it; node leaves the pixels
+
+    def test_node_cutout_still_filled(self):
+        cut = region(x=0.1, y=0.1, w=0.4, h=0.4, cutout=True)
+        mask = _cutout_mask([cut], 100, 100)
+        assert mask[20, 20] == 255
+
+    def test_model_move_origin_not_erased_by_node(self):
+        mv = region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a hippo",
+                    src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}, edit_by="model")
+        mask = _move_origin_mask([mv], 100, 100)
+        assert int(mask.sum()) == 0  # origin left intact; the model relocates it
+
+    def test_node_move_origin_still_erased(self):
+        mv = region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a hippo",
+                    src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2})
+        mask = _move_origin_mask([mv], 100, 100)
+        assert int(mask.sum()) > 0

@@ -21,7 +21,8 @@ def composite_moved_regions(image, regions):
     """
     moved = [r for r in regions
              if region_moved(r) and r.kind != "text"
-             and not region_ref_image(r) and r.op != "cutout"]
+             and not region_ref_image(r) and r.op != "cutout"
+             and r.edit_by != "model"]
     if image is None or not moved:
         return image
     # Imported lazily, mirroring build_region_masks: the only torch touch.
@@ -91,7 +92,8 @@ def apply_cutouts(image, regions):
     the surrounding pixels (OpenCV), so the object is seamlessly gone while the
     output stays RGB. Returns the input unchanged when there are no cut-outs.
     """
-    cuts = [r for r in regions if r.op == "cutout" and r.kind != "text"]
+    cuts = [r for r in regions if r.op == "cutout" and r.kind != "text"
+            and r.edit_by != "model"]
     if image is None or not cuts:
         return image
     height, width = int(image.shape[1]), int(image.shape[2])
@@ -107,7 +109,8 @@ def apply_move_origin_cutouts(image, regions):
     of relying on the edit model. Returns the input unchanged when nothing moved.
     """
     moved = [r for r in regions if region_moved(r) and r.kind != "text"
-             and not region_ref_image(r) and r.op != "cutout"]
+             and not region_ref_image(r) and r.op != "cutout"
+             and r.edit_by != "model"]
     if image is None or not moved:
         return image
     height, width = int(image.shape[1]), int(image.shape[2])

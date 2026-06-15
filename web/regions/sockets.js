@@ -1,5 +1,6 @@
 // ABOUTME: Manages the node's desc_N / ref_N input sockets that bind to regions by depth slot.
 // ABOUTME: Exposes, removes, labels, and styles the per-region description and reference-image inputs.
+// @ts-check
 
 import {
     REGION_DESC_INPUTS,

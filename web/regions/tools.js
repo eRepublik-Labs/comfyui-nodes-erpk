@@ -1,5 +1,6 @@
 // ABOUTME: Pointer, keyboard, and inspector-input interactions — select, draw, move, resize, marquee.
 // ABOUTME: Hit testing and snapping live here; mutations and rendering are reached through the injected E.
+// @ts-check
 
 import { clamp, rectFrom, enforceMinSize } from "./geometry.js";
 import { frameDims } from "./node_access.js";
@@ -129,6 +130,9 @@ export function installTools(E) {
         // moves while the regions are about to be replaced. The cursor shows the
         // busy state (updateCursor and the renderer set it to "wait").
         if (state.scanning) return;
+        // A canvas interaction acknowledges any lingering scan error, so a past
+        // failure clears instead of pinning in the status strip across edits.
+        if (state.scanError) state.scanError = null;
         canvas.focus();
         canvas.setPointerCapture(e.pointerId);
 
@@ -139,6 +143,23 @@ export function installTools(E) {
             E.clearSelection();
             const anchor = snapPoint(p);
             state.drag = { mode: "create", anchor, current: anchor };
+            E.render();
+            return;
+        }
+
+        // A corner handle of the selected region takes priority over Shift and
+        // Alt, so Shift+handle starts a proportional resize (constrained live in
+        // onPointerMove) instead of falling through to a marquee. hitHandle only
+        // fires when exactly one region is selected.
+        const handleId = hitHandle(pointerPx(e));
+        if (handleId) {
+            const box = state.primary;
+            state.drag = {
+                mode: "resize", box,
+                anchor: resizeAnchor(box, handleId),
+                // Aspect at grab time, for Shift-constrained resizing.
+                aspect: box.h > 0 ? box.w / box.h : 1,
+            };
             E.render();
             return;
         }
@@ -168,16 +189,9 @@ export function installTools(E) {
             }
         }
 
-        const handleId = hitHandle(pointerPx(e));
-        if (handleId) {
-            const box = state.primary;
-            state.drag = {
-                mode: "resize", box,
-                anchor: resizeAnchor(box, handleId),
-                // Aspect at grab time, for Shift-constrained resizing.
-                aspect: box.h > 0 ? box.w / box.h : 1,
-            };
-        } else {
+        // Handles and modifiers were resolved above; what remains is a plain
+        // press — select/move a region, cancel a move ghost, or start a new box.
+        {
             const hit = maskAwareHit(p);
             if (hit >= 0) {
                 const box = state.boxes[hit];
@@ -301,8 +315,12 @@ export function installTools(E) {
             }
         } else if (d.mode === "marquee") {
             const rect = rectFrom(d.anchor, d.current);
+            // Same visibility guard as boxesAt/drawBox: a marquee must not grab
+            // hidden or cut-out regions, or edits would bind to ones the user
+            // can't see on the canvas.
             const hits = state.boxes.filter((b) =>
-                b.x <= rect.x + rect.w && b.x + b.w >= rect.x
+                !E.effectiveHidden(b) && !b.cutout
+                && b.x <= rect.x + rect.w && b.x + b.w >= rect.x
                 && b.y <= rect.y + rect.h && b.y + b.h >= rect.y);
             state.selection = new Set(hits);
             state.primary = hits.length ? hits[hits.length - 1] : null;

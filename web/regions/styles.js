@@ -1,5 +1,6 @@
 // ABOUTME: DOM styling helpers for the region editor — button/input styling and the eye icon.
 // ABOUTME: Importing this injects the editor's hover/animation stylesheet once into the document head.
+// @ts-check
 
 import { DANGER_RED, PANEL_INPUT_BG, EYE_SVG, EYE_OFF_SVG } from "./constants.js";
 
@@ -8,7 +9,25 @@ import { DANGER_RED, PANEL_INPUT_BG, EYE_SVG, EYE_OFF_SVG } from "./constants.js
 // the generic button rule on the red controls.
 const hoverStyles = document.createElement("style");
 hoverStyles.textContent = `
-.erpk-region-row:hover { background: rgba(255, 255, 255, 0.07); }
+.erpk-region-row { transition: background 130ms cubic-bezier(0.16, 1, 0.3, 1); }
+.erpk-region-row:hover { background: rgba(255, 255, 255, 0.05); }
+.erpk-region-row-selected { background: rgba(82, 201, 125, 0.10); }
+.erpk-region-row-selected:hover { background: rgba(82, 201, 125, 0.14); }
+/* Per-row tools stay out of the way until the row is hovered or one is focused;
+   the eye (most-used) stays but dimmed. Keeps the list a quiet stack at rest. */
+.erpk-row-tool {
+    opacity: 0;
+    transition: opacity 130ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.erpk-region-row:hover .erpk-row-tool,
+.erpk-row-tool:focus-visible { opacity: 1; }
+.erpk-row-eye { opacity: 0.4; transition: opacity 130ms cubic-bezier(0.16, 1, 0.3, 1); }
+.erpk-region-row:hover .erpk-row-eye,
+.erpk-row-eye:focus-visible { opacity: 0.9; }
+@media (prefers-reduced-motion: reduce) {
+    .erpk-region-row, .erpk-row-tool, .erpk-row-eye { transition: none; }
+    .erpk-row-tool { opacity: 1; }
+}
 .erpk-strip-btn:hover:not(:disabled) {
     color: rgba(255, 255, 255, 0.95) !important;
     border-color: rgba(255, 255, 255, 0.45) !important;
@@ -76,6 +95,32 @@ export function makeStripButton(label) {
     btn.style.borderRadius = "3px";
     btn.style.padding = "1px 7px";
     btn.style.cursor = "pointer";
+    return btn;
+}
+
+// Give icon-only controls an accessible name for screen readers by mirroring
+// their tooltip text (data-tip) onto aria-label. The visible label is a glyph,
+// which announces as nothing useful, so without this the controls are unlabeled.
+// Run after a subtree's tips are set; it skips controls already named.
+export function labelControlsFromTips(scope) {
+    for (const el of scope.querySelectorAll("[data-tip]")) {
+        if (!el.getAttribute("aria-label") && el.dataset.tip) {
+            el.setAttribute("aria-label", el.dataset.tip);
+        }
+    }
+}
+
+// A fixed square icon button: one width/height for the whole toolbar so the
+// controls form an even row. The caller supplies the SVG via innerHTML.
+export function sizeIconButton(btn, px = 24) {
+    btn.style.width = px + "px";
+    btn.style.height = px + "px";
+    btn.style.minWidth = px + "px";
+    btn.style.padding = "0";
+    btn.style.boxSizing = "border-box";
+    btn.style.display = "inline-flex";
+    btn.style.alignItems = "center";
+    btn.style.justifyContent = "center";
     return btn;
 }
 

@@ -1,5 +1,6 @@
 // ABOUTME: Shared constants for the region editor — node id, sizes, colors, fonts, and SVG glyphs.
 // ABOUTME: Pure values only so any module (including the pure ones) can import without side effects.
+// @ts-check
 
 export const NODE_ID = "RegionalPromptBuilder";
 export const MIN_REGION_SIZE = 0.01;   // normalized floor; Python skips regions at or below 0.005
@@ -37,8 +38,8 @@ export const DANGER_RED_BORDER = "rgba(229, 72, 77, 0.40)";
 
 // Horizontal padding the editor root carries inside the DOM widget wrapper.
 export const ROOT_PADDING_H = 12;
-export const STATUS_STRIP_H = 22;
-export const INSPECTOR_H = 26;
+export const STATUS_STRIP_H = 28;
+export const INSPECTOR_H = 28;
 // Vertical chrome around the canvas inside the editor root: panel padding,
 // canvas border, the inspector row, the status strip, and the flex gaps.
 export const EDITOR_CHROME_V = 70;
@@ -75,3 +76,58 @@ export const IMAGE_SVG =
     + '<rect x="3" y="3" width="18" height="18" rx="2"/>'
     + '<circle cx="8.5" cy="8.5" r="1.6"/>'
     + '<path d="M21 15l-5-5L5 21"/></svg>';
+
+export const TRASH_SVG =
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" '
+    + 'stroke="currentColor" stroke-width="2.4" stroke-linecap="round" '
+    + 'stroke-linejoin="round" style="display:block">'
+    + '<path d="M3 6h18"/>'
+    + '<path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
+    + '<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>'
+    + '<path d="M10 11v6M14 11v6"/></svg>';
+
+// Lucide icons (MIT-licensed, lucide.dev) inlined as one coherent stroke set —
+// no build step or runtime dependency, and currentColor lets each icon inherit
+// its button's hover/active color. Same wrapper metric as the icons above so the
+// whole editor draws from a single family.
+function lucide(inner) {
+    return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" '
+        + 'stroke="currentColor" stroke-width="2.2" stroke-linecap="round" '
+        + 'stroke-linejoin="round" style="display:block">' + inner + "</svg>";
+}
+
+export const CONTRAST_SVG =
+    lucide('<circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12z"/>');
+export const GRID_SVG =
+    lucide('<rect width="18" height="18" x="3" y="3" rx="2"/>'
+        + '<path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>');
+export const CROSSHAIR_SVG =
+    lucide('<circle cx="12" cy="12" r="10"/>'
+        + '<path d="M22 12h-4M6 12H2M12 6V2M12 22v-4"/>');
+export const HELP_SVG =
+    lucide('<circle cx="12" cy="12" r="10"/>'
+        + '<path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>');
+export const SETTINGS_SVG =
+    lucide('<path d="M20 7h-9"/><path d="M14 17H5"/>'
+        + '<circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/>');
+// Lucide "sparkle" (singular) — one clean 4-point star, simpler than the full
+// "sparkles" at small sizes.
+export const SPARKLES_SVG =
+    lucide('<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0'
+        + '-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0'
+        + 'L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964'
+        + 'L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>');
+export const LINK_SVG =
+    lucide('<path d="M9 17H7A5 5 0 0 1 7 7h2"/>'
+        + '<path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/>');
+export const MAXIMIZE_SVG =
+    lucide('<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3'
+        + 'M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>');
+export const MINIMIZE_SVG =
+    lucide('<path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3'
+        + 'M3 16h3a2 2 0 0 1 2 2v3M16 21v-3a2 2 0 0 1 2-2h3"/>');
+export const CHEVRON_DOWN_SVG = lucide('<path d="m6 9 6 6 6-6"/>');
+export const CHEVRON_UP_SVG = lucide('<path d="m18 15-6-6-6 6"/>');
+export const COPY_SVG =
+    lucide('<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>'
+        + '<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>');

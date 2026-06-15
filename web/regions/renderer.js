@@ -1,5 +1,6 @@
 // ABOUTME: Canvas layout and all drawing for the region editor — boxes, masks, ghosts, grid, status.
 // ABOUTME: Owns render()/layout(); cross-module state and panels are reached through the injected E.
+// @ts-check
 
 import {
     colorForRegion,
@@ -60,7 +61,9 @@ export function installRenderer(E) {
         canvas.style.height = ch + "px";
         canvas.width = Math.max(1, Math.round(cw * dpr));
         canvas.height = Math.max(1, Math.round(ch * dpr));
-        render();
+        // Resizing the canvas blanks it; repaint synchronously so a resize never
+        // flashes empty for a frame.
+        paint();
     }
 
     function truncateLabel(text, maxWidth) {
@@ -108,6 +111,21 @@ export function installRenderer(E) {
         ];
     }
 
+    // A moved region's origin erase-preview (the checkerboard silhouette where
+    // it used to be) is a vacated/background area, so it draws backmost — the
+    // same lowest-depth rule as cut-outs — and a region moved over it paints on
+    // top instead of sliding under it.
+    function drawMoveGhost(box) {
+        if (box.cutout || !(box.mask && E.regionMoved(box))) return;
+        ensureMaskImg(box, render);
+        const gx = box.src.x * state.cssW;
+        const gy = box.src.y * state.cssH;
+        const gw = box.src.w * state.cssW;
+        const gh = box.src.h * state.cssH;
+        const ghost = ghostCheckerFor(box, gw, gh);
+        if (ghost) ctx.drawImage(ghost, gx, gy, gw, gh);
+    }
+
     function drawBox(box, index) {
         if (E.effectiveHidden(box)) return;
         // A cut-out region renders only as the transparency checker behind its
@@ -146,8 +164,8 @@ export function installRenderer(E) {
             const gy = box.src.y * state.cssH;
             const gw = box.src.w * state.cssW;
             const gh = box.src.h * state.cssH;
-            const ghost = ghostCheckerFor(box, gw, gh);
-            if (ghost) ctx.drawImage(ghost, gx, gy, gw, gh);
+            // The origin checkerboard itself is drawn backmost by drawMoveGhost;
+            // here only the relocated object, its origin outline, and the arrow.
             const cutout = cutoutFor(box, upstreamImage(node, "image"), render);
             if (cutout) ctx.drawImage(cutout, x, y, w, h);
             ctx.save();
@@ -251,6 +269,16 @@ export function installRenderer(E) {
             ctx.fillRect(labelX + 1, y, chipW, 13);
             ctx.fillStyle = ink;
             ctx.fillText("▣", labelX + 4.5, y + 9.5);
+            labelX += chipW + 1;
+        }
+        // A green chip flags a region whose move/cut-out the model applies, not
+        // the node — a distinct hue so it reads as a mode flag, not a wired input.
+        if (box.edit_by === "model") {
+            const chipW = Math.ceil(ctx.measureText("✦").width) + 7;
+            ctx.fillStyle = ACTIVE_GREEN;
+            ctx.fillRect(labelX + 1, y, chipW, 13);
+            ctx.fillStyle = "rgba(8, 8, 10, 0.9)";
+            ctx.fillText("✦", labelX + 4.5, y + 9.5);
             labelX += chipW + 1;
         }
         // The tag carries only the short layer name; the full prompt lives in
@@ -488,7 +516,9 @@ export function installRenderer(E) {
         // The scan button only shows once a loaded image is connected, and
         // swaps to a spinner glyph while a scan is in flight.
         const scanReady = !!(refImg?.naturalWidth && refImg?.naturalHeight);
-        scanBtn.style.display = scanReady ? "" : "none";
+        // Restore "flex" (not ""), or the SVG loses floatOnStage's centering —
+        // "" reverts the button to its non-flex default display.
+        scanBtn.style.display = scanReady ? "flex" : "none";
         scanBtn.disabled = state.scanning || !scanReady;
         // Swap content only on state edges: render() runs per frame, and
         // recreating the spinner each pass would restart its animation.
@@ -573,11 +603,25 @@ export function installRenderer(E) {
     // Drives render at animation rate only while a scan is in flight; the
     // loop ends itself on the final post-scan render.
     function scanFxLoop() {
-        render();
+        paint();
         if (state.scanning) requestAnimationFrame(scanFxLoop);
     }
 
+    // Coalesces the many render() calls a single interaction fires (every
+    // pointermove, plus the cascade of state mutations) into one paint per
+    // animation frame. layout() and scanFxLoop, which must repaint without a
+    // frame of latency, call paint() directly instead.
+    let framePending = false;
     function render() {
+        if (framePending) return;
+        framePending = true;
+        requestAnimationFrame(() => {
+            framePending = false;
+            paint();
+        });
+    }
+
+    function paint() {
         if (!state.cssW || !state.cssH) return;
         const dpr = window.devicePixelRatio || 1;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -589,7 +633,13 @@ export function installRenderer(E) {
         if (state.hideBoxes) {
             drawHiddenHint();
         } else {
-            state.boxes.forEach((box, i) => drawBox(box, i));
+            // Backmost first: cut-out checkerboards and moved-region origin
+            // ghosts are vacated/background areas, so every kept region paints on
+            // top of them (matching the output). Each box keeps its real index so
+            // colors and labels stay correct.
+            state.boxes.forEach((box, i) => { if (box.cutout) drawBox(box, i); });
+            state.boxes.forEach((box) => drawMoveGhost(box));
+            state.boxes.forEach((box, i) => { if (!box.cutout) drawBox(box, i); });
         }
         if (state.drag?.mode === "create" || state.drag?.mode === "marquee") drawPending();
         if (state.drag?.mode === "resize") drawResizeBadge(state.drag.box);

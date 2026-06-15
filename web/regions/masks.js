@@ -1,5 +1,6 @@
 // ABOUTME: Segmentation-mask decode and cache helpers for display — decode base64 PNGs into images.
 // ABOUTME: Pure of app and editor state; the render callback and source image are passed in.
+// @ts-check
 
 // Lazily decode a region's stored mask into the _erpkMaskImg cache, which is
 // runtime-only and so empty after a reload. Re-renders once it loads, so the

@@ -1,5 +1,6 @@
 // ABOUTME: Vision-scan network calls and cost formatting for the region editor.
 // ABOUTME: Pure of app and editor state — callers own state, the canvas, and result handling.
+// @ts-check
 
 // --- Scan cost readout ------------------------------------------------
 // The scan response carries {usd, input_tokens, output_tokens, ...}. usd is
@@ -33,6 +34,30 @@ export async function postScan(body, signal) {
     });
     const json = await res.json().catch(() => ({}));
     return { ok: res.ok, status: res.status, json };
+}
+
+// A scan can hang on a slow segmenter or a dropped connection; without a cap it
+// pins the busy state forever. Generous enough that a real CPU SAM pass finishes.
+export const SCAN_TIMEOUT_MS = 120000;
+
+// postScan with a client-side timeout. The caller owns the AbortController (kept
+// in state so destroy and a cancel re-click can abort the same request); this
+// arms a timer that aborts it. Returns the normal {ok,status,json} on completion,
+// or {timedOut:true} when the timer fired and {aborted:true} when the caller
+// aborted (cancel/destroy) — letting callers tell a timeout from a cancel.
+export async function postScanWithTimeout(body, controller, timeoutMs = SCAN_TIMEOUT_MS) {
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+    try {
+        return await postScan(body, controller.signal);
+    } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+            return timedOut ? { timedOut: true } : { aborted: true };
+        }
+        throw err;
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 // The scan model list, or null when the fetch fails or returns nothing usable;

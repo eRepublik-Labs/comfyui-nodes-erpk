@@ -51,7 +51,10 @@ def _cutout_mask(regions, width, height):
     """uint8 [height, width] mask, 255 where cut-out regions are to be filled.
 
     Each cut-out region contributes its stored segmentation silhouette, or its
-    whole box when it has no mask; the union is returned. All-zero when there are
+    whole box when it has no mask; the union is returned. Cut-outs sit at the
+    lowest depth, so the area covered by ANY kept (non-cut-out) region overlapping
+    a cut-out is spared — a cut-out clears the background behind it, never an
+    element kept on top of it, whatever the layer order. All-zero when there are
     no cut-outs. numpy/PIL only, so the fill geometry is unit-testable without cv2.
     """
     import base64
@@ -64,6 +67,8 @@ def _cutout_mask(regions, width, height):
     for region in regions:
         if region.op != "cutout" or region.kind == "text":
             continue
+        if region.edit_by == "model":
+            continue  # the edit model removes this one; leave the pixels
         x0, y0, x1, y1 = mask_pixel_box(region.box, width, height)
         bw, bh = x1 - x0, y1 - y0
         patch = np.full((bh, bw), 255, dtype=np.uint8)
@@ -74,6 +79,16 @@ def _cutout_mask(regions, width, height):
                 patch = ((np.asarray(glyph) > 127).astype(np.uint8)) * 255
             except Exception:
                 pass
+        # Zero the part of this cut-out covered by any kept region so an element
+        # kept on top is never erased (cut-outs are the lowest depth).
+        for other in regions:
+            if other.op == "cutout":
+                continue
+            fx0, fy0, fx1, fy1 = mask_pixel_box(other.box, width, height)
+            ix0, iy0 = max(x0, fx0), max(y0, fy0)
+            ix1, iy1 = min(x1, fx1), min(y1, fy1)
+            if ix1 > ix0 and iy1 > iy0:
+                patch[iy0 - y0:iy1 - y0, ix0 - x0:ix1 - x0] = 0
         mask[y0:y1, x0:x1] = np.maximum(mask[y0:y1, x0:x1], patch)
     return mask
 
@@ -97,7 +112,8 @@ def _move_origin_mask(regions, width, height):
     mask = np.zeros((height, width), dtype=np.uint8)
     for region in regions:
         if (not region_moved(region) or region.kind == "text"
-                or region_ref_image(region) or region.op == "cutout"):
+                or region_ref_image(region) or region.op == "cutout"
+                or region.edit_by == "model"):
             continue
         sx0, sy0, sx1, sy1 = mask_pixel_box(region.source.box, width, height)
         bw, bh = sx1 - sx0, sy1 - sy0

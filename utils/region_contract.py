@@ -101,6 +101,10 @@ class Region:
     source: Source | None = None
     op: str = "normal"
     bind_slot: int | None = None
+    # Who performs this region's geometric edit (move/cut-out): "node" composites
+    # and inpaints it deterministically; "model" leaves the pixels untouched and
+    # asks the edit model to do it from the prompt. Irrelevant for static regions.
+    edit_by: str = "node"
     ui: Ui = field(default_factory=Ui)
 
 
@@ -246,6 +250,7 @@ def _parse_v2_entry(entry):
         source=_parse_v2_source(entry.get("source"), box),
         op=op,
         bind_slot=_parse_bind(entry.get("bind")),
+        edit_by=_coerce_edit_by(entry.get("edit_by")),
         ui=_parse_v2_ui(entry.get("ui")),
     )
 
@@ -326,6 +331,10 @@ def _coerce_kind(value):
     return value if isinstance(value, str) and value in REGION_KINDS else "object"
 
 
+def _coerce_edit_by(value):
+    return "model" if value == "model" else "node"
+
+
 def _coerce_int(value):
     try:
         return int(value)
@@ -363,6 +372,9 @@ def _region_to_dict(region):
             "label": region.source.label,
         }
     out["op"] = region.op
+    # Default stays out of the document so node-applied regions serialize as before.
+    if region.edit_by != "node":
+        out["edit_by"] = region.edit_by
     out["bind"] = {"slot": region.bind_slot} if region.bind_slot is not None else None
     out["ui"] = {
         "parent": region.ui.parent,

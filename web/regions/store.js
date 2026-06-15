@@ -1,5 +1,6 @@
 // ABOUTME: Editor state, selection, undo/redo, layer-group normalization, and region mutations.
 // ABOUTME: Reads/writes the regions_data widget through schema.js; the render callback is injected via E.
+// @ts-check
 
 import { clamp } from "./geometry.js";
 import { findWidget } from "./node_access.js";
@@ -233,14 +234,27 @@ export function installStore(E) {
         E.render();
     }
 
-    // Shift+Delete: mark the selection as cut out — removed from the scene and
-    // erased to transparent in the image output, shown on the canvas as the
-    // transparency checker behind the mask. The box/label/list entry disappear;
-    // undoable like any region change (Ctrl/Cmd+Z restores it).
+    // Shift+Delete: toggle the selection's cut-out state. Cutting out removes a
+    // region from the scene and erases it to transparent in the image output,
+    // shown on the canvas as the transparency checker behind the mask; toggling
+    // it back restores a normal region. If the selection is mixed, cut all out.
+    // Undoable like any region change (Ctrl/Cmd+Z).
     function cutoutSelected() {
         if (!state.selection.size) return;
-        for (const box of state.selection) box.cutout = true;
+        const allCut = [...state.selection].every((box) => box.cutout);
+        for (const box of state.selection) box.cutout = !allCut;
         clearSelection();
+        syncWidget();
+        E.render();
+    }
+
+    // Set who applies a region's geometric edit: "model" (the edit model does the
+    // move/cut-out from the prompt) or "node" (the deterministic composite/inpaint,
+    // the default, stored as the field's absence).
+    function setRegionEditBy(box, mode) {
+        if (!box) return;
+        if (mode === "model") box.edit_by = "model";
+        else delete box.edit_by;
         syncWidget();
         E.render();
     }
@@ -249,6 +263,9 @@ export function installStore(E) {
     // copies read as distinct from their sources, and selects them.
     function pasteRegions(source) {
         if (!source.length) return;
+        // Map each source region to its clone so parent links rewire to the
+        // copies, not the originals.
+        const cloneByOldId = new Map();
         const pasted = source.map((b) => {
             const copy = {
                 ...b,
@@ -256,8 +273,18 @@ export function installStore(E) {
                 y: clamp(b.y + 0.02, 0, 1 - b.h),
             };
             delete copy.id;  // clones must not share the source's identity
+            if (b.id) cloneByOldId.set(b.id, copy);
             return copy;
         });
+        // Repoint each clone's parent at the pasted parent when it was copied
+        // too; otherwise drop it — a paste is self-contained and must not
+        // re-attach to the source group it was lifted from.
+        for (const copy of pasted) {
+            if (!copy.parent) continue;
+            const parentClone = cloneByOldId.get(copy.parent);
+            if (parentClone) copy.parent = regionId(parentClone);
+            else delete copy.parent;
+        }
         state.boxes.push(...pasted);
         state.selection = new Set(pasted);
         state.primary = pasted[pasted.length - 1];
@@ -328,6 +355,7 @@ export function installStore(E) {
         selectionInOrder,
         deleteSelected,
         cutoutSelected,
+        setRegionEditBy,
         pasteRegions,
         copySelection,
         clipboardSize,

@@ -35,6 +35,16 @@ REPOSITION_HEADER = (
     "area as natural background that continues the surrounding scene; do not "
     "place any object, subject, animal, plant, sign, or text there:"
 )
+# Model-applied moves are NOT composited into the image — the object still sits
+# only at its origin, with nothing pasted at the destination — so the prompt asks
+# the model to perform the relocation itself rather than to clean up a paste.
+MODEL_REPOSITION_HEADER = (
+    "Move the elements below to new positions. For each, erase it completely "
+    "from its current location and rebuild that area as natural background that "
+    "continues the surrounding scene, then render it at the target location, "
+    'blending naturally (areas are "box_2d = [ymin, xmin, ymax, xmax]" on a '
+    "0-1000 grid with top-left origin):"
+)
 ANCHORS_LINE = (
     "Every other element in the image stays exactly where it is — do not "
     "remove, add, or alter anything else."
@@ -47,11 +57,14 @@ REMOVAL_HEADER = (
     "Remove the contents of these areas: rebuild each as natural background that "
     "continues the surrounding scene (same surfaces, texture, lighting, and "
     "perspective). Do not place any object, subject, animal, plant, sign, or "
-    'text in them (areas are "box_2d = [ymin, xmin, ymax, xmax]" on a 0-1000 '
-    "grid with top-left origin):"
+    "text in them. Any element described above that falls within one of these "
+    "areas stays — clear only around it (areas are "
+    '"box_2d = [ymin, xmin, ymax, xmax]" on a 0-1000 grid with top-left origin):'
 )
 LAYOUT_FOOTER = (
     "Every element must stay fully inside its placement area and fill most of it. "
+    "Put each element exactly at its own box_2d and nowhere else, even if a "
+    "different, similar-looking spot in the image seems more natural. "
     "Do not add other prominent subjects. The placement areas are invisible "
     "composition guides: never draw boxes, frames, outlines, coordinates, or any "
     "annotation overlays in the image."
@@ -64,7 +77,9 @@ EDIT_PREAMBLE = (
     "Edit the provided image. Keep it faithful to the original — the same "
     "subjects, textures, colors, lighting, framing, and composition — and apply "
     "ONLY the changes described below. Do not re-render, restyle, or regenerate "
-    "any part of the image that is not an explicit edit."
+    "any part of the image that is not an explicit edit. Keep the original "
+    "orientation and framing exactly: do not flip, mirror, rotate, or crop the "
+    "image."
 )
 
 
@@ -118,6 +133,19 @@ def _boxes_overlap(a, b):
     return (ix * iy) / area if area > 0 else 0.0
 
 
+# A node-composited move is a hard-edged paste of original pixels — it reads as a
+# sticker until the model relights it and grounds it with a shadow. The edit
+# preamble tells the model to leave untouched regions alone, so the kept copy must
+# be named as an explicit harmonization target or it stays copy-paste. Identity is
+# pinned ("keep its shape, colors, and details") so harmonizing never re-renders it.
+BLEND_DIRECTIVE = (
+    "blending it naturally into the scene: relight it to match the scene's light "
+    "direction and color temperature, cast a contact shadow where it meets the "
+    "ground, and soften its edges so it does not look pasted — keep its shape, "
+    "colors, and details unchanged."
+)
+
+
 def _move_line(region):
     # Hybrid phrasing, same doctrine as placement lines: the verbal
     # placement drives the model, the coordinates pin it.
@@ -132,9 +160,8 @@ def _move_line(region):
     # hole through the pasted object.
     if _boxes_overlap(dest, src) > 0.9:
         return (
-            f"{subject}: blend the one {placement} (box_2d = {target}) "
-            f"naturally into the scene — match lighting, shadows, and "
-            f"perspective."
+            f"{subject}: keep the one {placement} (box_2d = {target}), "
+            f"{BLEND_DIRECTIVE}"
         )
     # When the destination overlaps the origin, "remove the duplicate at
     # [src]" would also remove the kept copy — the instruction is
@@ -145,14 +172,37 @@ def _move_line(region):
             f"{subject}: the old, larger copy overlaps the kept one — "
             f"erase every part of it outside box_2d = {target} and fill "
             f"those areas with the scene's background. Keep the copy "
-            f"{placement} (box_2d = {target}), blending it naturally into "
-            f"the scene — match lighting, shadows, and perspective."
+            f"{placement} (box_2d = {target}), {BLEND_DIRECTIVE}"
         )
     return (
         f"{subject}: remove the duplicate at box_2d = {origin} and fill "
         f"that area with the scene's background. Keep the one {placement} "
-        f"(box_2d = {target}), blending it naturally into the scene — "
-        f"match lighting, shadows, and perspective."
+        f"(box_2d = {target}), {BLEND_DIRECTIVE}"
+    )
+
+
+def _model_move_line(region, width, height):
+    # No composite happened, so the object is still at its origin. Lead with the
+    # destination (the action the model must perform) and name the origin second
+    # (the cleanup); models weight the first instruction, and one box per clause
+    # keeps the two coordinate sets from being conflated. Edit models size moved
+    # objects semantically, not by box_2d, so the target size is stated in
+    # concrete redundant terms (percent and pixels) with an explicit no-resize.
+    src = region.source.box
+    dest = region.box
+    placement = placement_phrase(dest.x, dest.y, dest.w, dest.h)
+    subject = region.content.desc or "The element"
+    size = (
+        f"about {round(dest.w * 100)}% of the image width and "
+        f"{round(dest.h * 100)}% of its height (~{round(dest.w * width)}x"
+        f"{round(dest.h * height)} px)"
+    )
+    return (
+        f"{subject}: its new position is {placement}, exactly filling box_2d = "
+        f"{box_2d(dest)} — {size}. Keep it at this size; do not enlarge or shrink "
+        f"it. It is currently at box_2d = {box_2d(src)}; erase it there and "
+        f"rebuild that area as natural background. Render it at the new position, "
+        f"matching lighting, shadows, and perspective."
     )
 
 
@@ -200,6 +250,11 @@ def build_prompt(prompt, width, height, regions, edit_mode=False):
         if scene:
             lines.append("")
             lines.append(scene)
+        # box_2d is normalized 0-1000, but the model maps that grid onto the
+        # frame's real extent; stating the pixel size pins the grid to the image
+        # it is editing. No "compose" framing — this only states dimensions.
+        lines.append("")
+        lines.append(f"The image is {width}x{height} pixels.")
     else:
         if scene:
             lines.append(scene)
@@ -207,13 +262,22 @@ def build_prompt(prompt, width, height, regions, edit_mode=False):
         ratio = aspect_ratio_string(width, height)
         lines.append(f"Compose for a {width}x{height} frame (aspect ratio {ratio}).")
     moves, anchors, additions = _classify_regions(regions)
-    if moves:
+    # Node-applied moves are already composited (clean up the paste); model-applied
+    # moves are untouched in the image (relocate them from the prompt).
+    node_moves = [region for region in moves if region.edit_by != "model"]
+    model_moves = [region for region in moves if region.edit_by == "model"]
+    if node_moves:
         lines.append("")
         lines.append(REPOSITION_HEADER)
-        for index, region in enumerate(moves, start=1):
+        for index, region in enumerate(node_moves, start=1):
             lines.append(f"{index}. {_move_line(region)}")
-        if anchors:
-            lines.append(ANCHORS_LINE)
+    if model_moves:
+        lines.append("")
+        lines.append(MODEL_REPOSITION_HEADER)
+        for index, region in enumerate(model_moves, start=1):
+            lines.append(f"{index}. {_model_move_line(region, width, height)}")
+    if moves and anchors:
+        lines.append(ANCHORS_LINE)
     if additions:
         lines.append("")
         header = LAYOUT_HEADER

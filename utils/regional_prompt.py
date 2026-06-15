@@ -23,6 +23,7 @@ from .region_prompt_text import (
     ANCHORS_LINE,
     LAYOUT_FOOTER,
     LAYOUT_HEADER,
+    MODEL_REPOSITION_HEADER,
     REFS_HEADER,
     REMOVAL_HEADER,
     REPOSITION_HEADER,
@@ -58,6 +59,7 @@ __all__ = [
     "REFS_HEADER",
     "REMOVAL_HEADER",
     "REPOSITION_HEADER",
+    "MODEL_REPOSITION_HEADER",
     "aspect_ratio_string",
     "build_prompt",
     "placement_phrase",
@@ -217,12 +219,15 @@ class RegionalPromptBuilder(IO.ComfyNode):
         image = composite_moved_regions(image, regions)
         image = apply_move_origin_cutouts(image, regions)
         image = apply_cutouts(image, regions)
-        # Masks overlay the passed-through image, so they render at the
-        # connected image's H x W; with no image they fall back to the widgets.
-        mask_width, mask_height = width, height
+        # The real frame is the connected image's H x W; with no image it falls
+        # back to the widgets. Both the masks (which overlay the image) and the
+        # edit-mode prompt's stated dimensions must use this, not the widgets —
+        # an edited photo is rarely the widget's default square.
+        frame_width, frame_height = width, height
         if image is not None:
-            mask_height, mask_width = int(image.shape[1]), int(image.shape[2])
-        masks = build_region_masks(regions, mask_width, mask_height)
-        assembled = build_prompt(prompt, width, height, regions, edit_mode=image is not None)
+            frame_height, frame_width = int(image.shape[1]), int(image.shape[2])
+        masks = build_region_masks(regions, frame_width, frame_height)
+        assembled = build_prompt(prompt, frame_width, frame_height, regions,
+                                 edit_mode=image is not None)
         bboxes = regions_to_pixel_bboxes(regions, width, height)
         return IO.NodeOutput(assembled, bboxes, width, height, image, image_refs, masks)

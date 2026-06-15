@@ -1,6 +1,9 @@
 // ABOUTME: ComfyUI extension entry for the RegionalPromptBuilder canvas region editor.
 // ABOUTME: Registers the node hooks and mounts the editor module tree (web/regions/) on each node.
+// @ts-check
 
+// app.js is resolved by ComfyUI at runtime; it is not present at type-check time.
+// @ts-ignore
 import { app } from "../../../scripts/app.js";
 
 import { createRegionEditor } from "./regions/editor.js";

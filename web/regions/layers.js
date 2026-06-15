@@ -1,14 +1,15 @@
 // ABOUTME: The right-click region list panel — rows front-to-back with select, duplicate, delete, drag-reorder.
 // ABOUTME: Hosts the detail section (built by properties) and groups; mutations flow through the injected E.
+// @ts-check
 
 import { clamp, regionColor } from "./geometry.js";
-import { makeStripButton, setEyeIcon } from "./styles.js";
+import { makeStripButton, setEyeIcon, labelControlsFromTips } from "./styles.js";
 import {
     HAIRLINE,
-    HAIRLINE_STRONG,
     PANEL_BG,
-    DANGER_RED_DIM,
-    DANGER_RED_BORDER,
+    ACTIVE_GREEN,
+    COPY_SVG,
+    TRASH_SVG,
 } from "./constants.js";
 
 export function installLayers(E) {
@@ -16,19 +17,9 @@ export function installLayers(E) {
 
     let panelList = null;
 
-    // Pointer position in the root's layout pixels; the bounding rect is
-    // scaled by the graph zoom, so divide it back out.
-    function panelPoint(e) {
-        const r = root.getBoundingClientRect();
-        if (!r.width || !r.height) return { x: 0, y: 0 };
-        return {
-            x: (e.clientX - r.left) * (root.offsetWidth / r.width),
-            y: (e.clientY - r.top) * (root.offsetHeight / r.height),
-        };
-    }
-
     function closePanel() {
         if (!E.panel) return;
+        E.hideTip();  // a tip hovering a panel control would otherwise orphan
         document.removeEventListener("pointerdown", onDocPointerDown, true);
         document.removeEventListener("keydown", onDocKeyDown, true);
         E.panel.remove();
@@ -45,6 +36,7 @@ export function installLayers(E) {
         E.panelPlugBtn = null;
         E.panelRefBtn = null;
         E.panelScanBtn = null;
+        E.panelEditByBtns = null;
     }
 
     function onDocPointerDown(e) {
@@ -230,30 +222,32 @@ export function installLayers(E) {
     function buildPanelRow(box, depth = 0) {
         const index = state.boxes.indexOf(box);
         const row = document.createElement("div");
-        row._erpkBox = box;
+        (/** @type {any} */ (row))._erpkBox = box;
         row.className = "erpk-region-row";
+        if (state.selection.has(box)) row.classList.add("erpk-region-row-selected");
         row.style.display = "flex";
         row.style.alignItems = "center";
-        row.style.gap = "5px";
-        row.style.padding = "2px 5px";
-        row.style.paddingLeft = (5 + depth * 14) + "px";
-        row.style.borderRadius = "3px";
+        row.style.gap = "7px";
+        row.style.padding = "4px 6px";
+        row.style.paddingLeft = (6 + depth * 14) + "px";
+        row.style.borderRadius = "4px";
         row.style.cursor = "grab";
-        row.style.border = "1px solid "
-            + (state.selection.has(box) ? HAIRLINE_STRONG : "transparent");
-        row.style.font = "8px 'Segoe UI', sans-serif";
-        row.style.color = "rgba(255, 255, 255, 0.8)";
+        row.style.border = "1px solid transparent";
+        row.style.font = "10px 'Segoe UI', sans-serif";
+        row.style.color = "rgba(255, 255, 255, 0.82)";
 
-        const swatch = document.createElement("span");
-        swatch.style.flex = "0 0 auto";
-        swatch.style.width = "9px";
-        swatch.style.height = "9px";
-        swatch.style.borderRadius = "2px";
-        swatch.style.background = regionColor(index);
+        // The region's hue as a vertical spine — the one element that ties each
+        // row to its box on the canvas. The list's only saturated color.
+        const rail = document.createElement("span");
+        rail.style.flex = "0 0 auto";
+        rail.style.width = "3px";
+        rail.style.height = "15px";
+        rail.style.borderRadius = "2px";
+        rail.style.background = regionColor(index);
 
         const num = document.createElement("span");
         num.style.flex = "0 0 auto";
-        num.style.color = "rgba(255, 255, 255, 0.5)";
+        num.style.color = "rgba(255, 255, 255, 0.4)";
         num.style.fontVariantNumeric = "tabular-nums";
         num.textContent = String(index + 1).padStart(2, "0");
 
@@ -270,6 +264,14 @@ export function installLayers(E) {
         refMark.dataset.tip = "Reference image wired from a ref input";
         refMark.textContent = "▣";
         refMark.style.display = E.refWiredFor(box) ? "" : "none";
+
+        // Flags a region whose move/cut-out is applied by the model, not the node.
+        const modelMark = document.createElement("span");
+        modelMark.style.flex = "0 0 auto";
+        modelMark.style.color = ACTIVE_GREEN;
+        modelMark.dataset.tip = "Move/cut-out applied by the edit model, not the node";
+        modelMark.textContent = "✦";
+        modelMark.style.display = box.edit_by === "model" ? "" : "none";
 
         const label = document.createElement("span");
         label.style.flex = "1 1 auto";
@@ -288,25 +290,41 @@ export function installLayers(E) {
         }
         // A hidden region reads as dimmed in the list.
         if (box.hidden) label.style.color = "rgba(255, 255, 255, 0.35)";
+        // A cut-out region reads struck through — it is out of the scene.
+        if (box.cutout) {
+            label.style.textDecoration = "line-through";
+            label.style.color = "rgba(255, 255, 255, 0.45)";
+            row.dataset.tip = "Cut out — select then ⇧Del to restore";
+        }
 
+        // The eye stays visible (visibility is the most-used row control) but
+        // dimmed at rest via .erpk-row-eye; no inline opacity, or it would beat
+        // the hover rule. Border dropped so it reads as a glyph, not a button.
         const eyeBtn = makeStripButton("");
         setEyeIcon(eyeBtn, E.effectiveHidden(box));
-        if (E.effectiveHidden(box) && !box.hidden) eyeBtn.style.opacity = "0.55";
+        eyeBtn.classList.add("erpk-row-eye");
+        eyeBtn.style.border = "none";
         eyeBtn.dataset.tip = box.hidden ? "Show region" : "Hide region";
-        eyeBtn.style.fontSize = "10px";
-        eyeBtn.style.padding = "0 4px";
+        eyeBtn.style.fontSize = "11px";
+        eyeBtn.style.padding = "0 2px";
 
-        const dupBtn = makeStripButton("⧉");
+        // Duplicate and delete only appear on row hover (.erpk-row-tool) and are
+        // borderless neutral glyphs; delete reddens only on its own hover, so the
+        // list is not a wall of red ✕.
+        const dupBtn = makeStripButton("");
+        dupBtn.innerHTML = COPY_SVG;
+        dupBtn.classList.add("erpk-row-tool");
         dupBtn.dataset.tip = "Duplicate region";
-        dupBtn.style.fontSize = "10px";
-        dupBtn.style.padding = "0 4px";
-        const delBtn = makeStripButton("✕");
-        delBtn.classList.add("erpk-btn-danger");
+        dupBtn.style.border = "none";
+        dupBtn.style.color = "rgba(255, 255, 255, 0.5)";
+        dupBtn.style.padding = "0 3px";
+        const delBtn = makeStripButton("");
+        delBtn.innerHTML = TRASH_SVG;
+        delBtn.classList.add("erpk-btn-danger", "erpk-row-tool");
         delBtn.dataset.tip = "Delete region";
-        delBtn.style.fontSize = "10px";
-        delBtn.style.padding = "0 4px";
-        delBtn.style.color = DANGER_RED_DIM;
-        delBtn.style.borderColor = DANGER_RED_BORDER;
+        delBtn.style.border = "none";
+        delBtn.style.color = "rgba(255, 255, 255, 0.5)";
+        delBtn.style.padding = "0 3px";
 
         const kids = E.childrenOf(box);
         if (kids.length) {
@@ -331,11 +349,12 @@ export function installLayers(E) {
             pad.style.width = "10px";
             row.appendChild(pad);
         }
+        row.appendChild(rail);
         row.appendChild(eyeBtn);
-        row.appendChild(swatch);
         row.appendChild(num);
         row.appendChild(plug);
         row.appendChild(refMark);
+        row.appendChild(modelMark);
         row.appendChild(label);
         row.appendChild(dupBtn);
         row.appendChild(delBtn);
@@ -361,12 +380,23 @@ export function installLayers(E) {
         return row;
     }
 
+    function cutoutDivider() {
+        const div = document.createElement("div");
+        div.textContent = "cut out · select then ⇧Del to restore · ✕ deletes";
+        div.style.font = "8px 'Segoe UI', sans-serif";
+        div.style.color = "rgba(255, 255, 255, 0.4)";
+        div.style.padding = "5px 5px 2px";
+        div.style.marginTop = "3px";
+        div.style.borderTop = "1px solid " + HAIRLINE;
+        return div;
+    }
+
     // Top row = frontmost region (the end of the array).
     function renderPanelRows() {
         if (!panelList) return;
         panelList.textContent = "";
         const emit = (box, depth) => {
-            if (box.cutout) return;  // cut-out regions are removed from the list
+            if (box.cutout) return;  // cut-outs are listed in their own section
             panelList.appendChild(buildPanelRow(box, depth));
             if (box._erpkCollapsed) return;
             const kids = E.childrenOf(box);
@@ -374,6 +404,18 @@ export function installLayers(E) {
         };
         const roots = state.boxes.filter((b) => !E.parentRegionOf(b));
         for (let i = roots.length - 1; i >= 0; i--) emit(roots[i], 0);
+
+        // Cut-out regions are pulled from the scene and the layer tree, but must
+        // stay reachable or a cut-out is a one-way trap — unselectable on the
+        // canvas (boxesAt skips it) and gone from the list. List them flat below.
+        const cutouts = state.boxes.filter((b) => b.cutout);
+        if (cutouts.length) {
+            panelList.appendChild(cutoutDivider());
+            for (let i = cutouts.length - 1; i >= 0; i--) {
+                panelList.appendChild(buildPanelRow(cutouts[i], 0));
+            }
+        }
+        labelControlsFromTips(panelList);
     }
 
     function openPanel(e) {
@@ -390,11 +432,17 @@ export function installLayers(E) {
         E.panel = panel;
         panel.className = "erpk-region-list";
         E.popoverZoom(panel);
-        panel.style.position = "absolute";
-        panel.style.zIndex = "20";
-        panel.style.minWidth = "170px";
-        panel.style.maxWidth = "280px";
-        panel.style.maxHeight = Math.round(root.clientHeight * 0.6) + "px";
+        // Portaled into document.body as a fixed-position popover so it can
+        // spill past the node box. ComfyUI's per-frame transform on the
+        // DOM-widget wrapper would otherwise be the containing block for a
+        // fixed descendant and re-trap it inside the node (see toolbar.js
+        // fullscreen note); body has no such transform, so fixed resolves
+        // against the viewport. zIndex sits above the fullscreen overlay (9999).
+        panel.style.position = "fixed";
+        panel.style.zIndex = "10000";
+        panel.style.minWidth = "210px";
+        panel.style.maxWidth = "320px";
+        panel.style.maxHeight = Math.round(window.innerHeight * 0.8 / E.popoverScale()) + "px";
         panel.style.overflowY = "auto";
         panel.style.overflowX = "hidden";
         panel.style.scrollbarWidth = "thin";
@@ -429,8 +477,9 @@ export function installLayers(E) {
         header.appendChild(headerLabel);
         panel.appendChild(header);
 
-        // The header doubles as a drag handle; clientX deltas are scaled
-        // back through the graph zoom like panelPoint does.
+        // The header doubles as a drag handle. The panel is fixed in the
+        // viewport, so pointer deltas map 1:1 to left/top — no graph-zoom
+        // compensation — and the drag is clamped to the window, not the node.
         header.style.cursor = "grab";
         header.addEventListener("pointerdown", (e) => {
             if (e.button !== 0) return;
@@ -440,15 +489,13 @@ export function installLayers(E) {
             const startTop = panel.offsetTop;
             const startX = e.clientX;
             const startY = e.clientY;
-            const r = root.getBoundingClientRect();
-            const scale = r.width ? root.offsetWidth / r.width : 1;
             const move = (ev) => {
                 if (!E.panel) return;
-                const nx = startLeft + (ev.clientX - startX) * scale;
-                const ny = startTop + (ev.clientY - startY) * scale;
+                const nx = startLeft + (ev.clientX - startX);
+                const ny = startTop + (ev.clientY - startY);
                 const pz = E.popoverScale();
-                const maxX = Math.max(root.clientWidth - panel.offsetWidth * pz - 4, 0);
-                const maxY = Math.max(root.clientHeight - panel.offsetHeight * pz - 4, 0);
+                const maxX = Math.max(window.innerWidth - panel.offsetWidth * pz - 4, 0);
+                const maxY = Math.max(window.innerHeight - panel.offsetHeight * pz - 4, 0);
                 panel.style.left = Math.round(Math.min(Math.max(nx, 4), maxX)) + "px";
                 panel.style.top = Math.round(Math.min(Math.max(ny, 4), maxY)) + "px";
             };
@@ -476,16 +523,21 @@ export function installLayers(E) {
 
         panel.addEventListener("pointerdown", onPanelPointerDown);
         panel.addEventListener("contextmenu", onPanelContextMenu);
+        // The panel is portaled out of root, so it needs its own tooltip
+        // handlers — root's pointerover never sees these controls.
+        panel.addEventListener("pointerover", E.onTipOver);
+        panel.addEventListener("pointerout", E.onTipOut);
 
-        // Append first so the measured size can clamp the position fully
-        // inside the root.
-        root.appendChild(panel);
-        const pt = panelPoint(e);
+        // Append to body first so the measured size can clamp the position
+        // inside the viewport; the cursor's clientX/Y are already viewport
+        // coordinates, so they anchor the fixed popover directly.
+        document.body.appendChild(panel);
+        labelControlsFromTips(panel);
         const pz = E.popoverScale();
-        const maxX = Math.max(root.clientWidth - panel.offsetWidth * pz - 4, 0);
-        const maxY = Math.max(root.clientHeight - panel.offsetHeight * pz - 4, 0);
-        panel.style.left = Math.round(Math.min(Math.max(pt.x, 4), maxX)) + "px";
-        panel.style.top = Math.round(Math.min(Math.max(pt.y, 4), maxY)) + "px";
+        const maxX = Math.max(window.innerWidth - panel.offsetWidth * pz - 4, 0);
+        const maxY = Math.max(window.innerHeight - panel.offsetHeight * pz - 4, 0);
+        panel.style.left = Math.round(Math.min(Math.max(e.clientX, 4), maxX)) + "px";
+        panel.style.top = Math.round(Math.min(Math.max(e.clientY, 4), maxY)) + "px";
 
         document.addEventListener("pointerdown", onDocPointerDown, true);
         document.addEventListener("keydown", onDocKeyDown, true);

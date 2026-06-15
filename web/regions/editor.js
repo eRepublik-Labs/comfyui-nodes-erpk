@@ -1,5 +1,6 @@
 // ABOUTME: Builds one region editor for a node — DOM scaffold, shared context, module wiring, lifecycle.
 // ABOUTME: createRegionEditor assembles store/sockets/renderer/tools/properties/layers/toolbar over one E context.
+// @ts-check
 
 import { createState, installStore } from "./store.js";
 import { installSockets } from "./sockets.js";
@@ -8,7 +9,9 @@ import { installTools } from "./tools.js";
 import { installProperties } from "./properties.js";
 import { installLayers } from "./layers.js";
 import { installToolbar } from "./toolbar.js";
-import { makeStripButton, styleInput, setEyeIcon } from "./styles.js";
+import {
+    makeStripButton, styleInput, setEyeIcon, labelControlsFromTips, sizeIconButton,
+} from "./styles.js";
 import { findWidget, setWidgetHidden } from "./node_access.js";
 import {
     STATUS_STRIP_H,
@@ -21,6 +24,15 @@ import {
     HAIRLINE,
     DANGER_RED_DIM,
     DANGER_RED_BORDER,
+    CONTRAST_SVG,
+    GRID_SVG,
+    CROSSHAIR_SVG,
+    HELP_SVG,
+    SETTINGS_SVG,
+    SPARKLES_SVG,
+    MAXIMIZE_SVG,
+    CHEVRON_DOWN_SVG,
+    CHEVRON_UP_SVG,
 } from "./constants.js";
 
 export function createRegionEditor(node) {
@@ -64,7 +76,7 @@ export function createRegionEditor(node) {
     // focused element whose `type` reads "textarea" (duck-typed input
     // check); this expando makes the focused canvas pass that guard so the
     // editor's own undo stack owns Ctrl/Cmd+Z, not the graph's.
-    canvas.type = "textarea";
+    (/** @type {any} */ (canvas)).type = "textarea";
     canvas.style.outline = "none";
     canvas.style.background = STAGE_BG;
     canvas.style.border = "1px solid " + HAIRLINE;
@@ -124,7 +136,8 @@ export function createRegionEditor(node) {
         stage.appendChild(btn);
     }
 
-    const gridBtn = makeStripButton("⊞");
+    const gridBtn = sizeIconButton(makeStripButton(""));
+    gridBtn.innerHTML = GRID_SVG;
     gridBtn.dataset.tip = "Show grid";
     const gridSizeInput = document.createElement("input");
     gridSizeInput.type = "number";
@@ -162,13 +175,17 @@ export function createRegionEditor(node) {
     gridAlphaInput.style.padding = "1px 4px";
     gridAlphaInput.style.fontSize = "10px";
     gridAlphaInput.style.display = "none";
-    const snapBtn = makeStripButton("⌖");
+    const snapBtn = sizeIconButton(makeStripButton(""));
+    snapBtn.innerHTML = CROSSHAIR_SVG;
     snapBtn.dataset.tip = "Snap drawing, moving, and resizing to the grid";
-    const helpBtn = makeStripButton("?");
+    const helpBtn = sizeIconButton(makeStripButton(""));
+    helpBtn.innerHTML = HELP_SVG;
     helpBtn.dataset.tip = "Keyboard and mouse shortcuts";
-    const gearBtn = makeStripButton("⚙");
+    const gearBtn = sizeIconButton(makeStripButton(""));
+    gearBtn.innerHTML = SETTINGS_SVG;
     gearBtn.dataset.tip = "Scan options";
-    const fsBtn = makeStripButton("⤢");
+    const fsBtn = makeStripButton("");
+    fsBtn.innerHTML = MAXIMIZE_SVG;
     fsBtn.dataset.tip = "Expand the editor to fill the window (F · Esc to exit)";
     floatOnStage(fsBtn, "right");
     const matchBtn = makeStripButton("⚠ match");
@@ -178,15 +195,17 @@ export function createRegionEditor(node) {
     matchBtn.style.display = "none";
     // Toggles the segmentation-mask overlay; enabled only when a region
     // actually carries a scanned mask.
-    const maskBtn = makeStripButton("◐");
+    const maskBtn = sizeIconButton(makeStripButton(""));
+    maskBtn.innerHTML = CONTRAST_SVG;
     maskBtn.dataset.tip = "Show segmentation masks";
     // Global overlay visibility, the strip twin of the H shortcut.
-    const hideBtn = makeStripButton("");
+    const hideBtn = sizeIconButton(makeStripButton(""));
     setEyeIcon(hideBtn, false);
     hideBtn.dataset.tip = "Hide all region overlays (H)";
     // Scans the connected image for objects. Floats in the stage's upper-left
     // rather than the strip, and only shows when an image is connected.
-    const scanBtn = makeStripButton("✦");
+    const scanBtn = makeStripButton("");
+    scanBtn.innerHTML = SPARKLES_SVG;
     scanBtn.dataset.tip = "Scan the connected image for objects";
     floatOnStage(scanBtn, "left");
     scanBtn.style.display = "none";
@@ -258,9 +277,11 @@ export function createRegionEditor(node) {
     textInput.style.flex = "1 1 0";
     textInput.style.minWidth = "0";
 
-    const backBtn = makeStripButton("▼");
+    const backBtn = sizeIconButton(makeStripButton(""));
+    backBtn.innerHTML = CHEVRON_DOWN_SVG;
     backBtn.dataset.tip = "Send back — one layer toward the background ( [ )";
-    const frontBtn = makeStripButton("▲");
+    const frontBtn = sizeIconButton(makeStripButton(""));
+    frontBtn.innerHTML = CHEVRON_UP_SVG;
     frontBtn.dataset.tip = "Bring forward — one layer toward the front ( ] )";
 
     inspector.appendChild(descInput);
@@ -324,6 +345,10 @@ export function createRegionEditor(node) {
     installProperties(E);
     installLayers(E);
     installToolbar(E);
+
+    // Name the now-assembled controls for screen readers (the icons announce as
+    // nothing); the right-click panel labels its own rows as it builds them.
+    labelControlsFromTips(root);
 
     // --- Widget plumbing ----------------------------------------------
     function hideRegionsWidget() {

@@ -1,5 +1,6 @@
 // ABOUTME: Pure geometry, color, and frame-math helpers for the region editor.
 // ABOUTME: No app, DOM, or shared editor state — every value comes in as an argument.
+// @ts-check
 
 import { MIN_REGION_SIZE } from "./constants.js";
 

@@ -330,3 +330,40 @@ class TestGeometry:
     def test_pixel_bounds_at_right_edge_stays_in_frame(self):
         x0, y0, x1, y1 = Box(0.99, 0.0, 0.006, 0.5).pixel_bounds(10, 10)
         assert x0 < x1 <= 10 and y0 < y1 <= 10
+
+
+class TestEditBy:
+    def base_v2(self, **over):
+        entry = {
+            "id": "r_a", "kind": "object",
+            "box": {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2},
+            "content": {"desc": "a cat", "text": ""},
+        }
+        entry.update(over)
+        return {"version": 2, "order": ["r_a"], "regions": [entry]}
+
+    def test_defaults_to_node_in_v1(self):
+        assert parse(V1_HAND_DRAWN)[0].edit_by == "node"
+
+    def test_defaults_to_node_in_v2_when_absent(self):
+        assert parse(self.base_v2())[0].edit_by == "node"
+
+    def test_model_value_parsed(self):
+        assert parse(self.base_v2(edit_by="model"))[0].edit_by == "model"
+
+    def test_unknown_value_falls_back_to_node(self):
+        assert parse(self.base_v2(edit_by="banana"))[0].edit_by == "node"
+
+    def test_node_region_omits_edit_by(self):
+        # Default stays out of the document so existing regions serialize byte-identically.
+        out = serialize([parse(self.base_v2())[0]])
+        assert "edit_by" not in out["regions"][0]
+
+    def test_model_region_serializes_edit_by(self):
+        out = serialize([parse(self.base_v2(edit_by="model"))[0]])
+        assert out["regions"][0]["edit_by"] == "model"
+
+    def test_model_round_trips(self):
+        once = parse(self.base_v2(edit_by="model"))
+        twice = parse(serialize(once))
+        assert twice[0].edit_by == "model"

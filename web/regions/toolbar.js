@@ -1,11 +1,12 @@
 // ABOUTME: Editor chrome around the canvas — status-strip controls, vision scan, popovers, tooltips, fullscreen.
 // ABOUTME: Owns grid/snap/clear/depth/match/hide/mask buttons; shared state and rendering reach in through E.
+// @ts-check
 
 import { clamp } from "./geometry.js";
 import { frameDims, findWidget, upstreamImage, pinRootWidth } from "./node_access.js";
 import {
     costLine,
-    postScan,
+    postScanWithTimeout,
     fetchScanModels,
     fetchScanSegmenters,
 } from "./scanClient.js";
@@ -22,6 +23,8 @@ import {
     GRID_MAX_CELL_PX,
     SCAN_MAX_EDGE_PX,
     SCAN_MAX_OBJECTS,
+    MAXIMIZE_SVG,
+    MINIMIZE_SVG,
 } from "./constants.js";
 
 export function installToolbar(E) {
@@ -289,17 +292,25 @@ export function installToolbar(E) {
             state.scanError = "Scan found no objects";
             return;
         }
-        // A scan replaces the canvas: clear every existing region, then drop in
-        // the scanned set with nothing selected so dragging one region doesn't
-        // drag them all. One syncWidget keeps the replace a single undo step.
-        state.boxes = added;
+        // A scan augments the canvas: existing regions (including hand-drawn
+        // ones) are kept and the scanned set is appended in front of them, so a
+        // scan fills in around manual work instead of discarding it. Selection
+        // is cleared so dragging a scanned region doesn't drag a previously
+        // selected one. One syncWidget keeps the merge a single undo step.
+        // Overlaps with existing regions are left for the user to resolve.
+        state.boxes = state.boxes.concat(added);
         state.selection = new Set();
         state.primary = null;
         E.syncWidget();
     }
 
     async function onScanClick() {
-        if (state.scanning) return;
+        // A click while a scan is in flight cancels it (the busy cursor is the
+        // affordance); the abort resolves as {aborted} below and exits quietly.
+        if (state.scanning) {
+            state.scanAbort?.abort();
+            return;
+        }
         const model = node.properties?.erpkScanModel;
         const img = upstreamImage(node, "image");
         if (!img || !img.complete || !img.naturalWidth) {
@@ -337,15 +348,17 @@ export function installToolbar(E) {
             if (model) body.model = model;
             const segmenter = node.properties?.erpkSegmenter;
             if (segmenter) body.segmenter = segmenter;
-            const { ok, status: code, json } = await postScan(body, state.scanAbort.signal);
-            if (!ok || json.error) {
-                state.scanError = json.error || `Scan failed (${code})`;
+            const res = await postScanWithTimeout(body, state.scanAbort);
+            if (res.aborted) return;  // user cancel or node teardown: stay silent
+            if (res.timedOut) {
+                state.scanError = "Scan timed out";
+            } else if (!res.ok || res.json.error) {
+                state.scanError = res.json.error || `Scan failed (${res.status})`;
             } else {
-                applyScanResults(json.objects);
-                recordScanCost(json.cost);
+                applyScanResults(res.json.objects);
+                recordScanCost(res.json.cost);
             }
         } catch (err) {
-            if (err.name === "AbortError") return;
             state.scanError = `Scan failed: ${err.message}`;
         } finally {
             state.scanning = false;
@@ -710,10 +723,13 @@ export function installToolbar(E) {
         }
     }
 
-    function makeTipEl(text, controls) {
+    // screen mode renders the tip in the viewport (fixed, on document.body) for
+    // the right-click panel, which is itself portaled out of root; otherwise the
+    // tip is a root child in the editor's own coordinate space.
+    function makeTipEl(text, controls, screen) {
         const el = document.createElement("div");
-        el.style.position = "absolute";
-        el.style.zIndex = "30";
+        el.style.position = screen ? "fixed" : "absolute";
+        el.style.zIndex = screen ? "10001" : "30";
         el.style.maxWidth = "240px";
         el.style.padding = "3px 7px";
         el.style.background = PANEL_BG;
@@ -743,13 +759,27 @@ export function installToolbar(E) {
             el.appendChild(ctl);
         }
 
-        root.appendChild(el);
+        (screen ? document.body : root).appendChild(el);
         return el;
     }
 
     function showTip(target) {
         const text = target.dataset.tip;
         if (!text) return;
+        // The right-click panel is portaled to document.body and fixed in the
+        // viewport, so its tips render in screen space, anchored to the target's
+        // viewport rect, instead of the editor's graph-transformed coordinates.
+        if (E.panel && E.panel.contains(target)) {
+            tipEl = makeTipEl(text, null, true);
+            const t = target.getBoundingClientRect();
+            const maxX = window.innerWidth - tipEl.offsetWidth - 4;
+            const left = t.left + t.width / 2 - tipEl.offsetWidth / 2;
+            tipEl.style.left = Math.round(clamp(left, 4, Math.max(maxX, 4))) + "px";
+            let top = t.top - tipEl.offsetHeight - 5;
+            if (top < 4) top = t.bottom + 5;
+            tipEl.style.top = Math.round(top) + "px";
+            return;
+        }
         tipEl = makeTipEl(text);
         // Rects come in screen px; the editor lays out in its own px with
         // the graph zoom in between, so rect deltas scale back to layout px.
@@ -860,7 +890,7 @@ export function installToolbar(E) {
         fsBtn.style.color = on ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.9)";
         fsBtn.style.borderColor = on
             ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.35)";
-        fsBtn.textContent = on ? "⤡" : "⤢";
+        fsBtn.innerHTML = on ? MINIMIZE_SVG : MAXIMIZE_SVG;
         fsBtn.dataset.tip = on
             ? "Restore the editor to the node (F · Esc to exit)"
             : "Expand the editor to fill the window (F · Esc to exit)";
@@ -890,7 +920,7 @@ export function installToolbar(E) {
     function onGlobalUndoKey(e) {
         if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return;
         const target = e.target;
-        if (!(target instanceof Node) || !root.contains(target)) return;
+        if (!(target instanceof HTMLElement) || !root.contains(target)) return;
         const editable = target.tagName === "INPUT"
             || target.tagName === "TEXTAREA" || target.isContentEditable;
         e.stopPropagation();
@@ -907,7 +937,7 @@ export function installToolbar(E) {
         if (e.key !== "Escape" || !root._erpkExpanded) return;
         if (e._erpkEscapeClosedPopover || helpPanel || E.panel) return;
         const field = document.activeElement;
-        if (field && root.contains(field)
+        if (field instanceof HTMLElement && root.contains(field)
             && (field.tagName === "INPUT" || field.tagName === "TEXTAREA")) {
             e.preventDefault();
             e.stopPropagation();

@@ -1,10 +1,11 @@
 // ABOUTME: The right-click region detail panel — thumbnail, name, geometry, prompt, kind, sockets, scan.
 // ABOUTME: Builds and refreshes the inspector for the primary region; mutations flow through the injected E.
+// @ts-check
 
 import { clamp, colorForRegion, hexToRgba } from "./geometry.js";
 import { frameDims, upstreamImage } from "./node_access.js";
 import { maskAlphaCanvas } from "./masks.js";
-import { postScan } from "./scanClient.js";
+import { postScanWithTimeout } from "./scanClient.js";
 import { makeStripButton, styleInput, setEyeIcon } from "./styles.js";
 import {
     MIN_REGION_SIZE,
@@ -14,7 +15,10 @@ import {
     ACTIVE_GREEN_BORDER,
     HAIRLINE,
     PANEL_INPUT_BG,
+    TRASH_SVG,
     IMAGE_SVG,
+    SPARKLES_SVG,
+    LINK_SVG,
     DANGER_RED_DIM,
     DANGER_RED_BORDER,
 } from "./constants.js";
@@ -99,7 +103,12 @@ export function installProperties(E) {
     // the results map back through the host box into frame space. Findings
     // append; the host region is left for the user to keep or delete.
     async function onSectionScan(host) {
-        if (!host || state.scanning) return;
+        // A re-trigger while a scan is in flight cancels it instead of stacking.
+        if (state.scanning) {
+            state.scanAbort?.abort();
+            return;
+        }
+        if (!host) return;
         const img = upstreamImage(node, "image");
         if (!img || !img.complete || !img.naturalWidth) {
             state.scanError = "No loaded image to scan";
@@ -140,17 +149,18 @@ export function installProperties(E) {
             if (model) body.model = model;
             const segmenter = node.properties?.erpkSegmenter;
             if (segmenter) body.segmenter = segmenter;
-            const { ok, status, json } = await postScan(body, state.scanAbort.signal);
-            if (!ok || json.error) {
-                state.scanError = json.error || `Scan failed (${status})`;
+            const res = await postScanWithTimeout(body, state.scanAbort);
+            if (res.aborted) return;  // user cancel or node teardown: stay silent
+            if (res.timedOut) {
+                state.scanError = "Scan timed out";
+            } else if (!res.ok || res.json.error) {
+                state.scanError = res.json.error || `Scan failed (${res.status})`;
             } else {
-                applySectionResults(json.objects, frame, host);
-                E.recordScanCost(json.cost);
+                applySectionResults(res.json.objects, frame, host);
+                E.recordScanCost(res.json.cost);
             }
         } catch (err) {
-            if (err.name !== "AbortError") {
-                state.scanError = `Scan failed: ${err.message}`;
-            }
+            state.scanError = `Scan failed: ${err.message}`;
         } finally {
             state.scanning = false;
             state.scanBounds = null;
@@ -307,6 +317,23 @@ export function installProperties(E) {
             E.panelScanBtn.disabled = !ready;
             E.panelScanBtn.style.opacity = ready ? "1" : "0.45";
         }
+        if (E.panelEditByBtns) {
+            const mode = box?.edit_by === "model" ? "model" : "node";
+            const applies = !!box && (box.cutout === true || E.regionMoved(box));
+            for (const [value, btn] of Object.entries(E.panelEditByBtns)) {
+                const on = value === mode;
+                btn.classList.toggle("erpk-btn-active", on);
+                btn.style.color = on ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
+                btn.style.borderColor = on
+                    ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
+                btn.style.opacity = applies ? "1" : "0.45";
+                btn.dataset.tip = value === "node"
+                    ? "Apply this move/cut-out in the node: deterministic, exact "
+                      + "size and position (best for precise placement)"
+                    : "Apply this move/cut-out with the edit model: it relocates "
+                      + "and relights, but size/position drift (less precise)";
+            }
+        }
         drawPanelThumb(box);
     }
 
@@ -315,13 +342,18 @@ export function installProperties(E) {
     // layer name, the X/Y/W/H pixel fields, the prompt, and hide / delete
     // actions. Empty-canvas right-clicks open just the list (no detail).
     function buildDetail(panel) {
+        // The detail is the inspector for the selected region: lift it one
+        // elevation step above the list (a faint tint + card border) so the
+        // "editing this one" surface reads as distinct from the layer stack.
         const detail = document.createElement("div");
         detail.style.display = "flex";
         detail.style.flexDirection = "column";
-        detail.style.gap = "5px";
-        detail.style.padding = "2px 5px 5px";
-        detail.style.marginBottom = "3px";
-        detail.style.borderBottom = "1px solid " + HAIRLINE;
+        detail.style.gap = "6px";
+        detail.style.padding = "8px";
+        detail.style.marginBottom = "7px";
+        detail.style.background = "rgba(255, 255, 255, 0.03)";
+        detail.style.border = "1px solid " + HAIRLINE;
+        detail.style.borderRadius = "6px";
 
         // One control metric across the detail: 10px type, 2px/6px pads.
         const microLabel = (text) => {
@@ -332,6 +364,45 @@ export function installProperties(E) {
             el.style.textTransform = "uppercase";
             el.style.color = "rgba(255, 255, 255, 0.45)";
             el.style.marginBottom = "-3px";
+            return el;
+        };
+
+        // Every chip in the card shares one metric — same height, padding, radius,
+        // and type — so the controls read as a single uniform set, not a jumble.
+        const chip = (btn) => {
+            btn.style.font = "10px 'Segoe UI', sans-serif";
+            btn.style.lineHeight = "1";
+            btn.style.height = "24px";
+            btn.style.boxSizing = "border-box";
+            btn.style.padding = "0 9px";
+            btn.style.borderRadius = "5px";
+            btn.style.display = "inline-flex";
+            btn.style.alignItems = "center";
+            btn.style.justifyContent = "center";
+            btn.style.gap = "4px";
+            return btn;
+        };
+
+        // A uniform chip with a leading Lucide icon and a text label, so the
+        // footer verbs match the toolbar's icon family instead of bare glyphs.
+        const iconChip = (svg, text) => {
+            const btn = chip(makeStripButton(""));
+            btn.innerHTML = svg;
+            const lbl = document.createElement("span");
+            lbl.textContent = text;
+            btn.appendChild(lbl);
+            return btn;
+        };
+
+        // A small uppercase inline tag that introduces a control group.
+        const groupTag = (text) => {
+            const el = document.createElement("span");
+            el.textContent = text;
+            el.style.font = "9px 'Segoe UI', sans-serif";
+            el.style.letterSpacing = "0.6px";
+            el.style.textTransform = "uppercase";
+            el.style.color = "rgba(255, 255, 255, 0.4)";
+            el.style.flex = "0 0 auto";
             return el;
         };
 
@@ -348,7 +419,8 @@ export function installProperties(E) {
         panelThumb.style.flex = "0 0 auto";
         panelThumb.style.width = "24px";
         panelThumb.style.height = "24px";
-        panelThumb.style.borderRadius = "3px";
+        panelThumb.style.boxSizing = "border-box";
+        panelThumb.style.borderRadius = "5px";
         panelThumb.style.border = "1px solid " + HAIRLINE;
         panelThumb.style.background = PANEL_INPUT_BG;
 
@@ -361,7 +433,9 @@ export function installProperties(E) {
         panelNameInput.style.flex = "1 1 auto";
         panelNameInput.style.minWidth = "0";
         panelNameInput.style.fontSize = "10px";
-        panelNameInput.style.padding = "2px 6px";
+        panelNameInput.style.height = "24px";
+        panelNameInput.style.padding = "0 8px";
+        panelNameInput.style.borderRadius = "5px";
         panelNameInput.addEventListener("input", () => applyPanelName(panelNameInput));
 
         const panelKindBtns = {};
@@ -370,12 +444,10 @@ export function installProperties(E) {
         kindGroup.style.flex = "0 0 auto";
         kindGroup.style.gap = "2px";
         for (const kind of ["object", "text"]) {
-            const btn = makeStripButton(kind);
+            const btn = chip(makeStripButton(kind === "object" ? "Object" : "Text"));
             btn.dataset.tip = kind === "text"
                 ? "Render literal text in this region"
                 : "An object in the scene";
-            btn.style.fontSize = "9px";
-            btn.style.padding = "2px 5px";
             btn.addEventListener("click", (e) => {
                 e.stopPropagation();
                 onPanelKindChange(kind);
@@ -384,10 +456,10 @@ export function installProperties(E) {
             kindGroup.appendChild(btn);
         }
 
-        const panelEyeBtn = makeStripButton("");
+        const panelEyeBtn = chip(makeStripButton(""));
         setEyeIcon(panelEyeBtn, false);
         panelEyeBtn.style.flex = "0 0 auto";
-        panelEyeBtn.style.padding = "0 5px";
+        panelEyeBtn.style.padding = "0 7px";
         panelEyeBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             E.toggleRegionHidden(state.primary);
@@ -452,35 +524,59 @@ export function installProperties(E) {
             () => applyPanelText(panelTextInput));
         detail.appendChild(panelTextInput);
 
-        // Footer: augmenting verbs on the left, state and the destructive
-        // action isolated on the right — far from the dismissal corner.
+        // "Applied by" group: who performs this region's move/cut-out. "Node" =
+        // deterministic composite/inpaint (default, exact size/position); "Model"
+        // = the edit model relocates and relights it. The group dims when the
+        // region has no geometric edit, where the choice has no effect.
+        const editByRow = document.createElement("div");
+        editByRow.style.display = "flex";
+        editByRow.style.alignItems = "center";
+        editByRow.style.gap = "7px";
+        editByRow.appendChild(groupTag("applied by"));
+        const panelEditByBtns = {};
+        const editByGroup = document.createElement("div");
+        editByGroup.style.display = "flex";
+        editByGroup.style.gap = "4px";
+        for (const mode of ["node", "model"]) {
+            const btn = chip(makeStripButton(mode === "node" ? "Node" : "Model"));
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                E.setRegionEditBy(state.primary, mode);
+                refreshPanelDetail();
+            });
+            panelEditByBtns[mode] = btn;
+            editByGroup.appendChild(btn);
+        }
+        editByRow.appendChild(editByGroup);
+        detail.appendChild(editByRow);
+
+        // Action row: labeled augment chips on the left, the destructive delete
+        // isolated on the right (far from the dismissal corner), neutral until
+        // its own hover. Text labels replace the cryptic icons.
         const actions = document.createElement("div");
         actions.style.display = "flex";
         actions.style.alignItems = "center";
-        actions.style.gap = "5px";
+        actions.style.gap = "6px";
+        // A hairline rule sets the action verbs apart from the applied-by group.
+        actions.style.borderTop = "1px solid " + HAIRLINE;
+        actions.style.paddingTop = "8px";
+        actions.style.marginTop = "1px";
 
-        const panelScanBtn = makeStripButton("✦");
-        panelScanBtn.dataset.tip =
-            "Detect objects inside this region only";
-        panelScanBtn.style.fontSize = "11px";
-        panelScanBtn.style.padding = "0 6px";
+        const panelScanBtn = iconChip(SPARKLES_SVG, "Scan");
+        panelScanBtn.dataset.tip = "Detect objects inside this region only";
         panelScanBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             onSectionScan(state.primary);
         });
 
-        const panelPlugBtn = makeStripButton("⌁");
-        panelPlugBtn.style.fontSize = "11px";
-        panelPlugBtn.style.padding = "0 6px";
+        const panelPlugBtn = iconChip(LINK_SVG, "Desc");
         panelPlugBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             E.onPlugToggle();
             refreshPanelDetail();
         });
 
-        const panelRefBtn = makeStripButton("");
-        panelRefBtn.innerHTML = IMAGE_SVG;
-        panelRefBtn.style.padding = "0 6px";
+        const panelRefBtn = iconChip(IMAGE_SVG, "Ref");
         panelRefBtn.addEventListener("click", (e) => {
             e.stopPropagation();
             E.onRefToggle();
@@ -490,11 +586,11 @@ export function installProperties(E) {
         const spacer = document.createElement("span");
         spacer.style.flex = "1 1 auto";
 
-        const detDelBtn = makeStripButton("✕");
+        // The one prominent delete (unlike the quiet per-row ones) stays red so
+        // it always reads as destructive; a trash icon names the action.
+        const detDelBtn = iconChip(TRASH_SVG, "Delete");
         detDelBtn.classList.add("erpk-btn-danger");
         detDelBtn.dataset.tip = "Delete region";
-        detDelBtn.style.fontSize = "11px";
-        detDelBtn.style.padding = "0 6px";
         detDelBtn.style.color = DANGER_RED_DIM;
         detDelBtn.style.borderColor = DANGER_RED_BORDER;
         detDelBtn.addEventListener("click", (e) => {
@@ -526,6 +622,7 @@ export function installProperties(E) {
         E.panelTextLabel = panelTextLabel;
         E.panelTextInput = panelTextInput;
         E.panelScanBtn = panelScanBtn;
+        E.panelEditByBtns = panelEditByBtns;
         E.panelPlugBtn = panelPlugBtn;
         E.panelRefBtn = panelRefBtn;
     }

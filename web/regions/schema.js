@@ -1,5 +1,6 @@
 // ABOUTME: Pure serializer/deserializer between the region editor's in-memory
 // ABOUTME: region array and the versioned regions_data document the prompt builder parses.
+// @ts-check
 
 // Mirrors utils/region_contract.py: deserializeRegions reads a v1 list or a v2
 // document into the editor's flat in-memory region shape, and serializeRegions
@@ -73,7 +74,7 @@ export function deserializeRegions(jsonString) {
     } else {
         return [];
     }
-    pruneDanglingParents(regions);
+    repairParentLinks(regions);
     return regions;
 }
 
@@ -165,6 +166,7 @@ function parseV2Entry(entry) {
     const id = coerceOptionalStr(entry.id);
     if (id) region.id = id;
     if (entry.op === "cutout") region.cutout = true;
+    if (entry.edit_by === "model") region.edit_by = "model";
     const bindSlot = coerceBindSlot(entry.bind);
     if (bindSlot !== null) region.bind_slot = bindSlot;
     if (isPlainObject(entry.ui)) {
@@ -191,10 +193,32 @@ function applyV2Source(region, source, box) {
     }
 }
 
-function pruneDanglingParents(regions) {
-    const ids = new Set(regions.map((r) => r.id).filter(Boolean));
+// Make every parent link valid and acyclic. Dangling links (target gone) are
+// dropped, and parent cycles are broken by cutting the back-edge that closes
+// them. The chain-walkers (descendantsOf, isDescendantOf, effectiveHidden) loop
+// on the parent pointers with no cycle guard, so a hand-edited or crafted
+// workflow with a loop (a -> b -> a) would hang the tab on load without this.
+function repairParentLinks(regions) {
+    const byId = new Map();
     for (const region of regions) {
-        if (region.parent && !ids.has(region.parent)) delete region.parent;
+        if (region.id) byId.set(region.id, region);
+    }
+    for (const region of regions) {
+        if (region.parent && !byId.has(region.parent)) delete region.parent;
+    }
+    for (const region of regions) {
+        const seen = new Set();
+        let cur = region;
+        while (cur && cur.parent) {
+            seen.add(cur);
+            const parent = byId.get(cur.parent);
+            if (!parent) break;
+            if (seen.has(parent)) {
+                delete cur.parent;  // back-edge into the chain: cut it
+                break;
+            }
+            cur = parent;
+        }
     }
 }
 
@@ -254,6 +278,8 @@ function regionToEntry(region, id) {
         };
     }
     entry.op = region.cutout ? "cutout" : "normal";
+    // Default ("node") stays out so node-applied regions serialize as before.
+    if (region.edit_by === "model") entry.edit_by = "model";
     entry.bind = (typeof region.bind_slot === "number" && Number.isFinite(region.bind_slot))
         ? { slot: Math.trunc(region.bind_slot) }
         : null;
