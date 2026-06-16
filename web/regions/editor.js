@@ -183,7 +183,7 @@ export function createRegionEditor(node) {
     helpBtn.dataset.tip = "Keyboard and mouse shortcuts";
     const gearBtn = sizeIconButton(makeStripButton(""));
     gearBtn.innerHTML = SETTINGS_SVG;
-    gearBtn.dataset.tip = "Scan options";
+    gearBtn.dataset.tip = "Options";
     const fsBtn = makeStripButton("");
     fsBtn.innerHTML = MAXIMIZE_SVG;
     fsBtn.dataset.tip = "Expand the editor to fill the window (F · Esc to exit)";
@@ -351,8 +351,8 @@ export function createRegionEditor(node) {
     labelControlsFromTips(root);
 
     // --- Widget plumbing ----------------------------------------------
-    function hideRegionsWidget() {
-        const widget = findWidget(node, "regions_data");
+    function hideManagedWidget(name) {
+        const widget = findWidget(node, name);
         if (!widget || widget._erpkHidden) return;
         widget._erpkHidden = true;
         setWidgetHidden(widget, true);
@@ -361,6 +361,14 @@ export function createRegionEditor(node) {
         // the renderer; hide whichever is present so no textarea peeks through.
         if (widget.inputEl) widget.inputEl.style.display = "none";
         if (widget.element) widget.element.style.display = "none";
+    }
+
+    // regions_data is the canvas's backing store; removal_fill/chroma_color are
+    // edited through the scan-options popover, so none of them belong in the body.
+    function hideRegionsWidget() {
+        hideManagedWidget("regions_data");
+        hideManagedWidget("removal_fill");
+        hideManagedWidget("chroma_color");
     }
 
     // A frame-aspect change can need more node height than the current size

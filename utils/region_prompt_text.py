@@ -230,18 +230,30 @@ def _classify_regions(regions):
     return moves, anchors, additions
 
 
-def build_prompt(prompt, width, height, regions, edit_mode=False):
+def _chroma_note(color):
+    # When cleared areas are chroma-filled instead of inpainted, name the key
+    # color so a downstream model treats those flat patches as empty to rebuild.
+    return (
+        f"Cleared areas — removed objects and the old positions of moved ones — "
+        f"are filled with a flat chroma key color ({color}). Treat any patch of "
+        f"that exact color as empty space and rebuild it as natural background "
+        f"that continues the scene; never leave the color visible."
+    )
+
+
+def build_prompt(prompt, width, height, regions, edit_mode=False, chroma=None):
     """Assemble the hybrid scene + layout prompt for image generation.
 
     edit_mode is set when an image is connected: the prompt then leads with a
     preservation instruction and drops the "compose a frame" framing, so an edit
     model edits the supplied photo instead of re-rendering the whole scene.
 
-    Move origins and cut-outs are deterministically inpainted before the image
-    reaches the model, but an edit model regenerates freely, so the prompt always
-    tells it to remove the leftover at the origin and rebuild those areas as
-    natural background. The OpenCV fill is only the floor for the no-edit-model
-    path; relying on it alone lets the model re-add what was there.
+    Move origins and cut-outs are deterministically filled before the image
+    reaches the model — inpainted, or (when chroma is a hex color) flat-keyed.
+    An edit model regenerates freely, so the prompt always tells it to rebuild
+    those areas as natural background, and when chroma is set it names the key
+    color so the model treats those patches as empty. The fill is only the floor
+    for the no-edit-model path; relying on it alone lets the model re-add content.
     """
     lines = []
     scene = prompt.strip()
@@ -266,6 +278,13 @@ def build_prompt(prompt, width, height, regions, edit_mode=False):
     # moves are untouched in the image (relocate them from the prompt).
     node_moves = [region for region in moves if region.edit_by != "model"]
     model_moves = [region for region in moves if region.edit_by == "model"]
+    # The chroma key fill only touches node-applied clears (node moves' origins +
+    # node cut-outs); name the key color once up front when any exist.
+    node_removals = [r for r in regions if r.op == "cutout" and r.kind != "text"
+                     and r.edit_by != "model"]
+    if chroma and (node_moves or node_removals):
+        lines.append("")
+        lines.append(_chroma_note(chroma))
     if node_moves:
         lines.append("")
         lines.append(REPOSITION_HEADER)

@@ -625,7 +625,7 @@ export function installToolbar(E) {
         optionsPanel.style.boxShadow = "0 4px 14px rgba(0, 0, 0, 0.45)";
 
         const header = document.createElement("div");
-        header.textContent = "Scan options";
+        header.textContent = "Options";
         header.style.font = "8px 'Segoe UI', sans-serif";
         header.style.color = "rgba(255, 255, 255, 0.45)";
         header.style.padding = "2px 4px 4px";
@@ -680,6 +680,72 @@ export function installToolbar(E) {
         hint.style.color = "rgba(255, 255, 255, 0.4)";
         hint.style.padding = "5px 4px 1px";
         optionsPanel.appendChild(hint);
+
+        // Removal fill: how cleared cut-out / move-origin areas are filled. These
+        // drive the hidden removal_fill / chroma_color node widgets that execute
+        // reads, so the setting lives here instead of cluttering the node body.
+        const fillWidget = findWidget(node, "removal_fill");
+        const colorWidget = findWidget(node, "chroma_color");
+
+        const fillLabel = document.createElement("div");
+        fillLabel.textContent = "Removal fill";
+        fillLabel.style.font = "9px 'Segoe UI', sans-serif";
+        fillLabel.style.color = "rgba(255, 255, 255, 0.7)";
+        fillLabel.style.padding = "9px 4px 3px";
+        fillLabel.style.borderTop = "1px solid " + HAIRLINE;
+        fillLabel.style.marginTop = "6px";
+        optionsPanel.appendChild(fillLabel);
+
+        const fillSelect = document.createElement("select");
+        styleInput(fillSelect);
+        fillSelect.style.fontSize = "11px";
+        for (const [val, text] of [["inpaint", "Inpaint (rebuild background)"],
+                                   ["chroma", "Chroma key (flat color)"]]) {
+            const opt = document.createElement("option");
+            opt.value = val;
+            opt.textContent = text;
+            fillSelect.appendChild(opt);
+        }
+        fillSelect.value = fillWidget?.value === "chroma" ? "chroma" : "inpaint";
+        optionsPanel.appendChild(fillSelect);
+
+        const colorRow = document.createElement("div");
+        colorRow.style.display = "flex";
+        colorRow.style.alignItems = "center";
+        colorRow.style.gap = "6px";
+        colorRow.style.padding = "6px 4px 1px";
+        const colorLabel = document.createElement("span");
+        colorLabel.textContent = "Chroma color";
+        colorLabel.style.font = "9px 'Segoe UI', sans-serif";
+        colorLabel.style.color = "rgba(255, 255, 255, 0.7)";
+        colorLabel.style.flex = "1 1 auto";
+        const colorInput = document.createElement("input");
+        colorInput.type = "color";
+        colorInput.value = /^#[0-9a-fA-F]{6}$/.test(colorWidget?.value)
+            ? colorWidget.value : "#00B140";
+        colorInput.style.flex = "0 0 auto";
+        colorInput.style.width = "30px";
+        colorInput.style.height = "20px";
+        colorInput.style.padding = "0";
+        colorInput.style.border = "1px solid " + HAIRLINE;
+        colorInput.style.borderRadius = "3px";
+        colorInput.style.background = "transparent";
+        colorInput.style.cursor = "pointer";
+        colorRow.appendChild(colorLabel);
+        colorRow.appendChild(colorInput);
+        optionsPanel.appendChild(colorRow);
+
+        const syncColorRow = () => {
+            colorRow.style.display = fillSelect.value === "chroma" ? "flex" : "none";
+        };
+        syncColorRow();
+        fillSelect.addEventListener("change", () => {
+            if (fillWidget) fillWidget.value = fillSelect.value;
+            syncColorRow();
+        });
+        colorInput.addEventListener("input", () => {
+            if (colorWidget) colorWidget.value = colorInput.value;
+        });
 
         optionsPanel.addEventListener("pointerdown", E.onPanelPointerDown);
 

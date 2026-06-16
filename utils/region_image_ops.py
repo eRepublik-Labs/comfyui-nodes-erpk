@@ -84,29 +84,73 @@ def _inpaint_regions(image, mask):
     return result
 
 
-def apply_cutouts(image, regions):
-    """Remove each cut-out region by inpainting its masked area from the scene.
+def _hex_to_rgb01(value):
+    """Parse "#rrggbb" into an (r, g, b) tuple of 0..1 floats.
+
+    Falls back to chroma green on anything unparseable, so a malformed widget
+    value never breaks the fill.
+    """
+    default = (0.0, 0.690, 0.251)  # chroma green #00B140
+    if not isinstance(value, str):
+        return default
+    text = value.lstrip("#")
+    if len(text) != 6:
+        return default
+    try:
+        return tuple(int(text[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+    except ValueError:
+        return default
+
+
+def _fill_regions(image, mask, color):
+    """Paint an image tensor's masked pixels a flat color (chroma key fill).
+
+    image is float [B,H,W,3]; mask is uint8 [H,W] (255 = fill); color is an
+    (r,g,b) 0..1 tuple. A flat fill is the clean alternative to inpaint for the
+    no-model path — a downstream chroma keyer can remove it. Never mutates input.
+    """
+    import numpy as np
+    import torch
+
+    if image is None or mask is None or not mask.any():
+        return image
+    result = image.clone()
+    sel = torch.from_numpy(np.asarray(mask) > 0).to(result.device)
+    for channel in range(3):
+        result[:, :, :, channel][:, sel] = float(color[channel])
+    return result
+
+
+def _clear_regions(image, mask, chroma):
+    """Clear masked pixels: flat chroma key when chroma is a hex color, else inpaint."""
+    if chroma:
+        return _fill_regions(image, mask, _hex_to_rgb01(chroma))
+    return _inpaint_regions(image, mask)
+
+
+def apply_cutouts(image, regions, chroma=None):
+    """Remove each cut-out region from the scene's masked area.
 
     A cut-out region (Shift+Delete in the editor) is erased: its masked
-    silhouette — or its whole box when it has no stored mask — is filled in from
-    the surrounding pixels (OpenCV), so the object is seamlessly gone while the
-    output stays RGB. Returns the input unchanged when there are no cut-outs.
+    silhouette — or its whole box when it has no stored mask — is filled from the
+    surrounding pixels (OpenCV inpaint), or flat-filled with a chroma key color
+    when chroma is a hex string. Returns the input unchanged with no cut-outs.
     """
     cuts = [r for r in regions if r.op == "cutout" and r.kind != "text"
             and r.edit_by != "model"]
     if image is None or not cuts:
         return image
     height, width = int(image.shape[1]), int(image.shape[2])
-    return _inpaint_regions(image, _cutout_mask(regions, width, height))
+    return _clear_regions(image, _cutout_mask(regions, width, height), chroma)
 
 
-def apply_move_origin_cutouts(image, regions):
-    """Inpaint the leftover origin of each moved region so it does not appear twice.
+def apply_move_origin_cutouts(image, regions, chroma=None):
+    """Clear the leftover origin of each moved region so it does not appear twice.
 
     composite_moved_regions pastes a moved object at its destination but leaves
     the original behind; this erases that original (silhouette minus destination)
-    from the surrounding pixels, making the move's removal deterministic instead
-    of relying on the edit model. Returns the input unchanged when nothing moved.
+    by inpaint, or a flat chroma key fill when chroma is set, making the move's
+    removal deterministic. Returns the input unchanged when nothing moved.
     """
     moved = [r for r in regions if region_moved(r) and r.kind != "text"
              and not region_ref_image(r) and r.op != "cutout"
@@ -114,4 +158,4 @@ def apply_move_origin_cutouts(image, regions):
     if image is None or not moved:
         return image
     height, width = int(image.shape[1]), int(image.shape[2])
-    return _inpaint_regions(image, _move_origin_mask(regions, width, height))
+    return _clear_regions(image, _move_origin_mask(regions, width, height), chroma)

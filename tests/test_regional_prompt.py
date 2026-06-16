@@ -105,7 +105,8 @@ class TestSchema:
     def test_input_ids_and_order(self):
         schema = RegionalPromptBuilder.define_schema()
         assert [i.id for i in schema.inputs] == [
-            "width", "height", "prompt", "regions_data", "image",
+            "width", "height", "prompt", "regions_data",
+            "removal_fill", "chroma_color", "image",
             *[f"desc_{n}" for n in range(1, 11)],
             *[f"ref_{n}" for n in range(1, 11)],
             "regions",
@@ -396,6 +397,19 @@ class TestBuildPrompt:
         assert "Compose for a 1000x1000 frame" in prompt
         assert "Edit the provided image" not in prompt
 
+    def test_chroma_note_describes_the_key_color_when_set(self):
+        # When cleared areas are chroma-filled (not inpainted), the prompt names
+        # the key color so a downstream model treats it as empty to rebuild.
+        regions = [region(x=0.1, y=0.1, w=0.2, h=0.2, cutout=True)]
+        prompt = build_prompt("a zoo", 1000, 1000, regions, chroma="#00B140")
+        assert "chroma" in prompt.lower()
+        assert "#00B140" in prompt
+
+    def test_no_chroma_note_without_chroma(self):
+        regions = [region(x=0.1, y=0.1, w=0.2, h=0.2, cutout=True)]
+        prompt = build_prompt("a zoo", 1000, 1000, regions)
+        assert "chroma" not in prompt.lower()
+
     def test_edit_mode_states_image_pixel_dimensions(self):
         # box_2d is normalized 0-1000, but stating the frame's actual pixel size
         # removes ambiguity about the grid the coordinates map onto. The compose
@@ -578,6 +592,19 @@ class TestCutouts:
         masks = build_region_masks([self._cut()], 40, 40)
         assert masks.shape == (1, 40, 40)
         assert float(masks.sum()) == 0.0
+
+    def test_hex_to_rgb01_parses_and_falls_back(self):
+        from utils.region_image_ops import _hex_to_rgb01
+        assert _hex_to_rgb01("#00FF00") == (0.0, 1.0, 0.0)
+        assert _hex_to_rgb01("nope") == (0.0, 0.690, 0.251)  # chroma-green default
+
+    def test_apply_cutouts_chroma_fills_flat_color(self):
+        torch = pytest.importorskip("torch")
+        img = torch.zeros((1, 20, 20, 3))
+        cut = region(x=0.25, y=0.25, w=0.5, h=0.5, cutout=True)
+        out = apply_cutouts(img, [cut], chroma="#00FF00")
+        px = out[0, 10, 10, :]  # center of the cut-out box -> pure green
+        assert float(px[0]) == 0.0 and float(px[1]) == 1.0 and float(px[2]) == 0.0
 
     def test_apply_cutouts_no_cutouts_returns_input_unchanged(self):
         torch = pytest.importorskip("torch")
@@ -1435,3 +1462,30 @@ class TestModelEditSkipsNodeFill:
                     src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2})
         mask = _move_origin_mask([mv], 100, 100)
         assert int(mask.sum()) > 0
+
+
+class TestMoveOriginSilhouette:
+    """A moved region's leftover origin is cleared everywhere the pasted copy
+    does NOT actually cover — subtracting the paste silhouette, not its box."""
+
+    @staticmethod
+    def _half_mask_b64():
+        np = pytest.importorskip("numpy")
+        pytest.importorskip("PIL")
+        import base64
+        from io import BytesIO
+        from PIL import Image
+        arr = np.zeros((20, 20), dtype=np.uint8)
+        arr[:, 10:] = 255  # white on the RIGHT half of the box
+        buf = BytesIO()
+        Image.fromarray(arr, "L").save(buf, "PNG")
+        return base64.b64encode(buf.getvalue()).decode()
+
+    def test_origin_filled_where_paste_silhouette_misses(self):
+        # Origin's right-half silhouette sits inside the dest BOX but outside the
+        # dest paste silhouette, so it must be filled (box subtraction zeroed it).
+        moved = region(x=0.25, y=0.0, w=0.5, h=0.5,
+                       src={"x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5},
+                       mask=self._half_mask_b64())
+        mask = _move_origin_mask([moved], 100, 100)
+        assert mask[25, 30] == 255

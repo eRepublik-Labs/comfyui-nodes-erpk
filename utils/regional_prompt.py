@@ -129,6 +129,24 @@ class RegionalPromptBuilder(IO.ComfyNode):
                     socketless=True,
                     tooltip="Managed by the canvas editor; JSON list of normalized regions.",
                 ),
+                IO.Combo.Input(
+                    "removal_fill",
+                    options=["inpaint", "chroma"],
+                    default="inpaint",
+                    optional=True,
+                    tooltip="How cleared areas (cut-outs and moved-region origins) "
+                            "are filled: 'inpaint' rebuilds the background (can "
+                            "smear on busy scenes); 'chroma' lays a flat key color "
+                            "to remove with a downstream chroma keyer.",
+                ),
+                IO.String.Input(
+                    "chroma_color",
+                    default="#00B140",
+                    optional=True,
+                    tooltip="Hex chroma key color used when removal_fill is 'chroma' "
+                            "(default chroma green; pick blue/magenta if the scene "
+                            "already contains the key color).",
+                ),
                 IO.Image.Input(
                     "image",
                     optional=True,
@@ -216,9 +234,12 @@ class RegionalPromptBuilder(IO.ComfyNode):
         regions += parse_regions(kwargs.get("regions"))
         if not regions and not prompt.strip():
             raise ValueError("Describe the scene or add at least one region")
+        # Chroma key fill for cleared areas when selected, else cv2 inpaint.
+        chroma = (kwargs.get("chroma_color", "#00B140")
+                  if kwargs.get("removal_fill") == "chroma" else None)
         image = composite_moved_regions(image, regions)
-        image = apply_move_origin_cutouts(image, regions)
-        image = apply_cutouts(image, regions)
+        image = apply_move_origin_cutouts(image, regions, chroma=chroma)
+        image = apply_cutouts(image, regions, chroma=chroma)
         # The real frame is the connected image's H x W; with no image it falls
         # back to the widgets. Both the masks (which overlay the image) and the
         # edit-mode prompt's stated dimensions must use this, not the widgets —
@@ -228,6 +249,6 @@ class RegionalPromptBuilder(IO.ComfyNode):
             frame_height, frame_width = int(image.shape[1]), int(image.shape[2])
         masks = build_region_masks(regions, frame_width, frame_height)
         assembled = build_prompt(prompt, frame_width, frame_height, regions,
-                                 edit_mode=image is not None)
+                                 edit_mode=image is not None, chroma=chroma)
         bboxes = regions_to_pixel_bboxes(regions, width, height)
         return IO.NodeOutput(assembled, bboxes, width, height, image, image_refs, masks)
