@@ -259,6 +259,16 @@ export function installStore(E) {
         E.render();
     }
 
+    // Toggle a region's placement marker. On is the default (stored as the
+    // field's absence); only the off state is recorded.
+    function setRegionMarkers(box, on) {
+        if (!box) return;
+        if (on) delete box.markers;
+        else box.markers = false;
+        syncWidget();
+        E.render();
+    }
+
     // Appends clones of the given regions on top (frontmost), nudged so the
     // copies read as distinct from their sources, and selects them.
     function pasteRegions(source) {
@@ -356,6 +366,7 @@ export function installStore(E) {
         deleteSelected,
         cutoutSelected,
         setRegionEditBy,
+        setRegionMarkers,
         pasteRegions,
         copySelection,
         clipboardSize,

@@ -98,14 +98,41 @@ def _cutout_mask(regions, width, height):
     return mask
 
 
+def _kept_pixels(regions, width, height):
+    """uint8 [height, width] mask of pixels that hold real content after the move
+    composite: static scanned objects at their box, and node moves at their
+    destination silhouette. Move-origin clearing subtracts this so it never paints
+    over a pasted move or a real object that overlaps a vacated origin. Model moves
+    and bare additions are excluded — nothing is composited at their box.
+    """
+    import numpy as np
+
+    from .region_geometry import region_ref_image
+
+    kept = np.zeros((height, width), dtype=np.uint8)
+    for region in regions:
+        if region.op == "cutout" or region.kind == "text":
+            continue
+        if region_moved(region):
+            if region.edit_by == "model" or region_ref_image(region):
+                continue   # nothing composited at the destination
+        elif region.source is None:
+            continue       # a hand-drawn addition holds no pixels at its box
+        kept = np.maximum(kept, _silhouette_at(region, region.box, width, height))
+    return kept
+
+
 def _move_origin_mask(regions, width, height):
     """uint8 [height, width] mask, 255 over each moved region's leftover origin.
 
-    For each moved region the origin is its source silhouette (or src box when
-    maskless) MINUS the destination silhouette — the area the pasted copy actually
-    covers, not its bounding box — so the whole original is cleared except where
-    the fresh paste truly lands (a box subtraction left ghost pixels behind on a
-    short move). All-zero when nothing moved. numpy/PIL only, unit-testable.
+    The union of every moved region's source silhouette (or src box when maskless)
+    MINUS the pixels that hold real content after compositing (_kept_pixels): the
+    paste that landed there, an overlapping static object, or another move's
+    destination. Subtracting the whole keep set — not just the region's own paste —
+    means clearing one origin never erases a pasted move or a real object that now
+    sits over it (a per-region subtraction left a neighbour's copy painted over).
+    A model move composites no paste, so its origin clears except where it overlaps
+    something real. All-zero when nothing moved. numpy/PIL only, unit-testable.
     """
     import numpy as np
 
@@ -114,10 +141,7 @@ def _move_origin_mask(regions, width, height):
     mask = np.zeros((height, width), dtype=np.uint8)
     for region in regions:
         if (not region_moved(region) or region.kind == "text"
-                or region_ref_image(region) or region.op == "cutout"
-                or region.edit_by == "model"):
+                or region_ref_image(region) or region.op == "cutout"):
             continue
-        origin = _silhouette_at(region, region.source.box, width, height)
-        paste = _silhouette_at(region, region.box, width, height)
-        mask = np.maximum(mask, origin & ~paste)
-    return mask
+        mask = np.maximum(mask, _silhouette_at(region, region.source.box, width, height))
+    return mask & ~_kept_pixels(regions, width, height)

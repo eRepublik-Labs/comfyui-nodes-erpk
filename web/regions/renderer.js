@@ -230,6 +230,33 @@ export function installRenderer(E) {
             }
         }
 
+        // A crosshair at the box center previews the placement dot drawn at
+        // execute time, for the elements the model places itself: additions and
+        // model-applied moves with their marker on. Node-composited moves and
+        // node-inserted refs already have their pixels, and an unmoved scanned
+        // region is an anchor — none get a dot, so none get a crosshair.
+        const moved = E.regionMoved(box);
+        const nodeRefInsert = E.refWiredFor(box) && box.edit_by !== "model";
+        const showCrosshair = box.markers !== false && !box.cutout && !nodeRefInsert
+            && (moved ? box.edit_by === "model" : box.src == null);
+        if (showCrosshair) {
+            const cx = x + w / 2;
+            const cy = y + h / 2;
+            const r = Math.max(3, Math.min(9, Math.min(w, h) * 0.18));
+            ctx.save();
+            ctx.lineCap = "round";
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = color;
+            ctx.globalAlpha = 0.55;
+            ctx.beginPath();
+            ctx.moveTo(cx - r, cy);
+            ctx.lineTo(cx + r, cy);
+            ctx.moveTo(cx, cy - r);
+            ctx.lineTo(cx, cy + r);
+            ctx.stroke();
+            ctx.restore();
+        }
+
         // Text regions preview their literal text like a signage mock.
         if (box.kind === "text" && box.text) {
             ctx.save();

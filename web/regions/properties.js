@@ -317,21 +317,46 @@ export function installProperties(E) {
             E.panelScanBtn.disabled = !ready;
             E.panelScanBtn.style.opacity = ready ? "1" : "0.45";
         }
+        // A control only shows for regions it actually affects; a row that would
+        // do nothing is hidden, not greyed. Applied by governs a move, a cut-out,
+        // or a ref-wired addition (Node composites it, Model places it). A marker
+        // is for an element the model places itself — an addition or a Model move.
+        const moved = !!box && E.regionMoved(box);
+        const refWired = !!box && E.refWiredFor(box);
+        const cutout = box?.cutout === true;
+        const editByApplies = !!box && (cutout || moved || refWired);
+        const nodeRefInsert = refWired && box?.edit_by !== "model";
+        const markerApplies = !!box && !cutout && !nodeRefInsert
+            && (moved ? box.edit_by === "model" : box.src == null);
+        if (E.panelEditByRow) E.panelEditByRow.style.display = editByApplies ? "flex" : "none";
+        if (E.panelMarkersRow) E.panelMarkersRow.style.display = markerApplies ? "flex" : "none";
         if (E.panelEditByBtns) {
             const mode = box?.edit_by === "model" ? "model" : "node";
-            const applies = !!box && (box.cutout === true || E.regionMoved(box));
             for (const [value, btn] of Object.entries(E.panelEditByBtns)) {
                 const on = value === mode;
                 btn.classList.toggle("erpk-btn-active", on);
                 btn.style.color = on ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
                 btn.style.borderColor = on
                     ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
-                btn.style.opacity = applies ? "1" : "0.45";
                 btn.dataset.tip = value === "node"
-                    ? "Apply this move/cut-out in the node: deterministic, exact "
-                      + "size and position (best for precise placement)"
-                    : "Apply this move/cut-out with the edit model: it relocates "
-                      + "and relights, but size/position drift (less precise)";
+                    ? "Apply this move/cut-out/insertion in the node: deterministic, "
+                      + "exact size and position (best for precise placement)"
+                    : "Apply it with the edit model: it places and relights, but "
+                      + "size/position drift (less precise)";
+            }
+        }
+        if (E.panelMarkersBtns) {
+            const on = box?.markers !== false;
+            for (const [value, btn] of Object.entries(E.panelMarkersBtns)) {
+                const active = (value === "on") === on;
+                btn.classList.toggle("erpk-btn-active", active);
+                btn.style.color = active ? ACTIVE_GREEN : "rgba(255, 255, 255, 0.65)";
+                btn.style.borderColor = active
+                    ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
+                btn.dataset.tip = value === "on"
+                    ? "Draw a colored placement dot for this element; the prompt "
+                      + "asks the model to center it there and paint the dot out"
+                    : "No placement dot for this element";
             }
         }
         drawPanelThumb(box);
@@ -394,7 +419,9 @@ export function installProperties(E) {
             return btn;
         };
 
-        // A small uppercase inline tag that introduces a control group.
+        // A small uppercase inline tag that introduces a control group. A fixed
+        // min-width keeps stacked rows' controls (Applied by, Marker) aligned on a
+        // common left edge regardless of label length.
         const groupTag = (text) => {
             const el = document.createElement("span");
             el.textContent = text;
@@ -403,6 +430,7 @@ export function installProperties(E) {
             el.style.textTransform = "uppercase";
             el.style.color = "rgba(255, 255, 255, 0.4)";
             el.style.flex = "0 0 auto";
+            el.style.minWidth = "64px";
             return el;
         };
 
@@ -550,6 +578,31 @@ export function installProperties(E) {
         editByRow.appendChild(editByGroup);
         detail.appendChild(editByRow);
 
+        // "Marker" group: draw a colored placement dot the edit model can target
+        // when it places this element itself (an addition or a Model move). On by
+        // default; node-composited regions ignore it since their pixels are placed.
+        const markersRow = document.createElement("div");
+        markersRow.style.display = "flex";
+        markersRow.style.alignItems = "center";
+        markersRow.style.gap = "7px";
+        markersRow.appendChild(groupTag("marker"));
+        const panelMarkersBtns = {};
+        const markersGroup = document.createElement("div");
+        markersGroup.style.display = "flex";
+        markersGroup.style.gap = "4px";
+        for (const value of ["on", "off"]) {
+            const btn = chip(makeStripButton(value === "on" ? "On" : "Off"));
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                E.setRegionMarkers(state.primary, value === "on");
+                refreshPanelDetail();
+            });
+            panelMarkersBtns[value] = btn;
+            markersGroup.appendChild(btn);
+        }
+        markersRow.appendChild(markersGroup);
+        detail.appendChild(markersRow);
+
         // Action row: labeled augment chips on the left, the destructive delete
         // isolated on the right (far from the dismissal corner), neutral until
         // its own hover. Text labels replace the cryptic icons.
@@ -622,7 +675,10 @@ export function installProperties(E) {
         E.panelTextLabel = panelTextLabel;
         E.panelTextInput = panelTextInput;
         E.panelScanBtn = panelScanBtn;
+        E.panelEditByRow = editByRow;
         E.panelEditByBtns = panelEditByBtns;
+        E.panelMarkersRow = markersRow;
+        E.panelMarkersBtns = panelMarkersBtns;
         E.panelPlugBtn = panelPlugBtn;
         E.panelRefBtn = panelRefBtn;
     }

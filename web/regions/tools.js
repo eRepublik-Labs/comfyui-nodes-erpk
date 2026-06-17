@@ -308,7 +308,11 @@ export function installTools(E) {
         if (d.mode === "create") {
             const rect = rectFrom(d.anchor, d.current);
             if (rect.w >= MIN_REGION_SIZE && rect.h >= MIN_REGION_SIZE) {
-                const box = { ...rect, kind: "object", desc: "", text: "" };
+                // Hand-drawn regions are additions the edit model places, so they
+                // default to Model. Scanned regions (which become moves, where a
+                // deterministic composite is the better default) keep Node.
+                const box = { ...rect, kind: "object", desc: "", text: "",
+                              edit_by: "model" };
                 state.boxes.push(box);
                 E.select(box);
                 E.syncWidget();

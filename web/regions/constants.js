@@ -44,6 +44,12 @@ export const INSPECTOR_H = 28;
 // canvas border, the inspector row, the status strip, and the flex gaps.
 export const EDITOR_CHROME_V = 70;
 
+// Fixed height for the multiline scene-prompt field. Capping it (instead of
+// letting it absorb the node's slack) keeps the node's minimum height small, so
+// it defaults compact, can be shrunk, and stays put on reload; the field scrolls
+// for longer text. ~4 rows plus the widget's own chrome.
+export const PROMPT_FIELD_H = 96;
+
 // The canvas is a stage for the image-to-be: dark like every ComfyUI content
 // preview, independent of the UI theme. Chrome around it follows the theme.
 export const STAGE_BG = "#101014";

@@ -33,6 +33,7 @@ import {
     MAXIMIZE_SVG,
     CHEVRON_DOWN_SVG,
     CHEVRON_UP_SVG,
+    PROMPT_FIELD_H,
 } from "./constants.js";
 
 export function createRegionEditor(node) {
@@ -371,6 +372,17 @@ export function createRegionEditor(node) {
         hideManagedWidget("chroma_color");
     }
 
+    // The multiline scene prompt otherwise absorbs the node's slack and reports a
+    // large layout minimum, ballooning the field and flooring the node tall (so it
+    // can't be shrunk and reloads big). Pin it to a fixed, scrollable height; the
+    // canvas is the pinned-aspect widget, and the node now sizes to its content.
+    function capPromptHeight() {
+        const widget = findWidget(node, "prompt");
+        if (!widget || widget._erpkCapped) return;
+        widget._erpkCapped = true;
+        widget.computeSize = (width) => [width ?? 0, PROMPT_FIELD_H];
+    }
+
     // A frame-aspect change can need more node height than the current size
     // provides; grow the node first so layout() sees the final stage size.
     function applyAspectChange() {
@@ -447,8 +459,20 @@ export function createRegionEditor(node) {
     const observer = new ResizeObserver(() => E.layout());
     observer.observe(stage);
 
+    // With the editor pinned and the prompt capped, nothing grows into extra node
+    // height, so any surplus is just empty space (and, on a workflow saved before
+    // the cap, the old ballooned height). Shrink the node to its content height.
+    function fitNodeHeight() {
+        const computed = node.computeSize?.();
+        if (computed && node.size[1] > computed[1] + 1) {
+            node.setSize([node.size[0], computed[1]]);
+        }
+    }
+
     function setup() {
         hideRegionsWidget();
+        capPromptHeight();
+        fitNodeHeight();
         hookDimensionWidget("width");
         hookDimensionWidget("height");
         E.restoreGridPrefs();

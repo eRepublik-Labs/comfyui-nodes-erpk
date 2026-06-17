@@ -9,6 +9,7 @@ import pytest
 
 from utils.region_contract import Box, Content, Region, Source, Mask, Ui
 from utils.regional_prompt import (
+    MARKER_HEADER,
     MODEL_REPOSITION_HEADER,
     REMOVAL_HEADER,
     REPOSITION_HEADER,
@@ -18,10 +19,15 @@ from utils.regional_prompt import (
     apply_cutouts,
     apply_move_origin_cutouts,
     aspect_ratio_string,
+    assign_markers,
     box_2d,
     build_prompt,
     composite_moved_regions,
+    composite_ref_at_box,
+    crop_region_subject,
     build_region_masks,
+    draw_placement_markers,
+    marker_regions,
     mask_pixel_box,
     parse_regions,
     placement_phrase,
@@ -33,7 +39,7 @@ from utils.regional_prompt import (
 
 def region(x=0.1, y=0.1, w=0.2, h=0.2, kind="object", desc="", text="",
            src=None, mask=None, cutout=False, parent=None, hidden=False,
-           rid="", bind_slot=None, ref_image=None, edit_by="node"):
+           rid="", bind_slot=None, ref_image=None, edit_by="node", markers=True):
     """Build a Region the way the canvas/scan would, for concise fixtures.
 
     A src box or mask attaches a Source (scan origin); src defaults to the box
@@ -49,7 +55,8 @@ def region(x=0.1, y=0.1, w=0.2, h=0.2, kind="object", desc="", text="",
         id=rid, kind=kind, box=Box(x, y, w, h),
         content=Content(desc=desc, text=text),
         source=source, op="cutout" if cutout else "normal",
-        bind_slot=bind_slot, edit_by=edit_by, ui=Ui(parent=parent, hidden=hidden),
+        bind_slot=bind_slot, edit_by=edit_by, markers=markers,
+        ui=Ui(parent=parent, hidden=hidden),
     )
     if ref_image is not None:
         built.ref_image = ref_image
@@ -77,10 +84,9 @@ CANONICAL_PROMPT = (
     "on a 0-1000 grid with top-left origin. Elements are listed from back to "
     "front: where placement areas overlap, a later element appears in front of "
     "an earlier one.\n"
-    "1. a red vintage car: at the bottom-left, covering about 30% of the image "
-    "width and 25% of its height. box_2d = [620, 40, 870, 340]\n"
-    '2. The text "OPEN LATE", glowing neon letters: at the top-center, covering '
-    "about 40% of the image width and 14% of its height. box_2d = [30, 300, 170, 700]\n"
+    "1. a red vintage car: at the bottom-left. box_2d = [620, 40, 870, 340]\n"
+    '2. The text "OPEN LATE", glowing neon letters: at the top-center. '
+    "box_2d = [30, 300, 170, 700]\n"
     "Every element must stay fully inside its placement area and fill most of it. "
     "Put each element exactly at its own box_2d and nowhere else, even if a "
     "different, similar-looking spot in the image seems more natural. "
@@ -410,6 +416,15 @@ class TestBuildPrompt:
         prompt = build_prompt("a zoo", 1000, 1000, regions)
         assert "chroma" not in prompt.lower()
 
+    def test_chroma_note_fires_for_model_move(self):
+        # A model move now clears its origin too, so a chroma fill there needs the
+        # key-color note even with no node move or cut-out present.
+        regions = [region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a hippo",
+                          src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2},
+                          edit_by="model")]
+        prompt = build_prompt("a zoo", 1000, 1000, regions, chroma="#00B140")
+        assert "#00B140" in prompt
+
     def test_edit_mode_states_image_pixel_dimensions(self):
         # box_2d is normalized 0-1000, but stating the frame's actual pixel size
         # removes ambiguity about the grid the coordinates map onto. The compose
@@ -419,16 +434,34 @@ class TestBuildPrompt:
         assert "1365x768 pixels" in prompt
         assert "Compose for a" not in prompt
 
+    def test_edit_mode_addition_gets_blend_directive(self):
+        # An added object dropped onto an existing photo needs relighting and a
+        # contact shadow or it reads as a sticker, the same as a move.
+        regions = [region(x=0.4, y=0.4, w=0.2, h=0.2, desc="a red hat")]
+        prompt = build_prompt("a zoo", 1000, 1000, regions, edit_mode=True)
+        assert "photographed in place" in prompt
+        assert "contact shadow" in prompt
+
+    def test_compose_mode_addition_omits_blend_directive(self):
+        # Compose renders the whole frame at once: there is nothing to blend into.
+        regions = [region(x=0.4, y=0.4, w=0.2, h=0.2, desc="a red hat")]
+        prompt = build_prompt("a zoo", 1000, 1000, regions, edit_mode=False)
+        assert "photographed in place" not in prompt
+
+    def test_edit_mode_text_addition_omits_blend_directive(self):
+        regions = [region(x=0.4, y=0.4, w=0.2, h=0.2, kind="text", text="SALE")]
+        prompt = build_prompt("a zoo", 1000, 1000, regions, edit_mode=True)
+        assert "photographed in place" not in prompt
+
     def test_object_region_without_desc_uses_an_element(self):
         regions = [region(x=0.4, y=0.4, w=0.2, h=0.2)]
         prompt = build_prompt("", 1000, 1000, regions)
-        assert ("1. An element: at the center, covering about 20% of the image "
-                "width and 20% of its height. box_2d = [400, 400, 600, 600]") in prompt
+        assert "1. An element: at the center. box_2d = [400, 400, 600, 600]" in prompt
 
     def test_text_region_without_desc_omits_desc_clause(self):
         regions = [region(x=0.4, y=0.4, w=0.2, h=0.2, kind="text", text="SALE")]
         prompt = build_prompt("", 1000, 1000, regions)
-        assert '1. The text "SALE": at the center, covering about 20%' in prompt
+        assert '1. The text "SALE": at the center. box_2d =' in prompt
 
     def test_layout_forbids_drawing_annotations(self):
         regions = [region(x=0.1, y=0.1, w=0.2, h=0.2, desc="a cat")]
@@ -779,6 +812,28 @@ class TestExecute:
         masks = out.args[6]
         assert masks.shape == (2, 768, 512)
 
+    def test_bboxes_and_dims_follow_connected_image_resolution(self):
+        # bboxes and the width/height outputs must match the connected image too,
+        # not the widgets — otherwise a 2K (or any non-widget-sized) image yields
+        # bboxes/dims that disagree with the masks and the passed-through image.
+        torch = pytest.importorskip("torch")
+        image = torch.zeros((1, 768, 512, 3))  # H x W differs from the widgets
+        out = RegionalPromptBuilder.execute(
+            width=1024, height=1024, prompt="",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+            image=image,
+        )
+        bboxes, width, height = out.args[1], out.args[2], out.args[3]
+        assert (width, height) == (512, 768)              # image size, not widgets
+        assert bboxes[0][0]["width"] == round(0.30 * 512)  # scaled to image width
+
+    def test_dims_fall_back_to_widgets_without_image(self):
+        out = RegionalPromptBuilder.execute(
+            width=1000, height=800, prompt="a forest",
+            regions_data=json.dumps(CANONICAL_REGIONS),
+        )
+        assert (out.args[2], out.args[3]) == (1000, 800)
+
     def test_desc_input_overrides_region_description(self):
         out = RegionalPromptBuilder.execute(
             width=1000, height=1000, prompt="",
@@ -1094,7 +1149,7 @@ class TestMovedRegions:
         assert "Make these edits" in prompt
         assert "a hippo: remove the duplicate at box_2d = [100, 100, 300, 300]" in prompt
         assert "Keep the one" in prompt
-        assert "blending it naturally" in prompt
+        assert "blending it into the scene" in prompt
         assert "box_2d = [600, 600, 800, 800]" in prompt
         assert "background" in prompt.lower()
 
@@ -1104,8 +1159,17 @@ class TestMovedRegions:
         prompt = build_prompt("", 1000, 1000, [self._moved_region()])
         assert "relight it" in prompt
         assert "contact shadow" in prompt
-        assert "does not look pasted" in prompt
-        assert "keep its shape, colors, and details unchanged" in prompt
+        assert "not pasted" in prompt
+        assert "keep its shape, pose, colors, and identifying details unchanged" in prompt
+
+    def test_move_blend_names_photographic_cues(self):
+        # "Looks fake/pasted" is the failure; the directive must name the cues a
+        # composite misses — depth of field, grain, and ambient color spill — so
+        # the model integrates the patch instead of leaving a sticker.
+        prompt = build_prompt("", 1000, 1000, [self._moved_region()])
+        assert "depth of field" in prompt
+        assert "film grain" in prompt
+        assert "photographed in place" in prompt
 
     def test_move_destination_keeps_verbal_placement(self):
         # The hybrid doctrine: words drive the model, coordinates pin it.
@@ -1152,6 +1216,108 @@ class TestMovedRegions:
         prompt = build_prompt("", 1000, 1000, [moved])
         assert "taken from image 2" in prompt
         assert "Make these edits" not in prompt
+
+
+class TestOcclusionPrompt:
+    """When a node-composited move lands behind a scanned region above it, the
+    move's line names the occluder and tells the model to keep the covered part
+    hidden — the pixels are already occluded, but the blend directive ('keep its
+    shape unchanged') would otherwise invite the model to redraw the whole object."""
+
+    @staticmethod
+    def _lemur():
+        # Moves from the top-left into the man's area below.
+        return region(x=0.5, y=0.5, w=0.25, h=0.25, desc="a lemur",
+                      src={"x": 0.0, "y": 0.0, "w": 0.25, "h": 0.25})
+
+    @staticmethod
+    def _man(mask=True, moved=False, edit_by="node"):
+        import numpy as np
+        solid = _png_base64(np.full((10, 10), 255, dtype="uint8")) if mask else None
+        # A moved occluder comes from elsewhere; a static one sits at its box.
+        src = ({"x": 0.2, "y": 0.15, "w": 0.2, "h": 0.3} if moved
+               else {"x": 0.55, "y": 0.5, "w": 0.2, "h": 0.3})
+        return region(x=0.55, y=0.5, w=0.2, h=0.3, desc="the man",
+                      src=src, mask=solid, edit_by=edit_by)
+
+    def test_occluded_move_frames_the_occluder_in_front(self):
+        pytest.importorskip("numpy")
+        prompt = build_prompt("", 1000, 1000, [self._lemur(), self._man()])
+        assert "With the man in front of it" in prompt
+        assert "a lemur is partly hidden" in prompt
+
+    def test_occluded_move_keeps_the_covered_part_hidden(self):
+        pytest.importorskip("numpy")
+        prompt = build_prompt("", 1000, 1000, [self._lemur(), self._man()])
+        assert "not covered by the man" in prompt
+        assert "do not redraw the covered part" in prompt
+
+    def test_node_moved_occluder_still_occludes(self):
+        # The occluder can itself be a node move — its paste lands on top in
+        # depth order — so it must still trigger the clause.
+        pytest.importorskip("numpy")
+        prompt = build_prompt("", 1000, 1000, [self._lemur(), self._man(moved=True)])
+        assert "With the man in front of it" in prompt
+
+    def test_model_moved_occluder_is_not_an_occluder(self):
+        # A model-move occluder is never composited, so it cannot occlude.
+        pytest.importorskip("numpy")
+        man = self._man(moved=True, edit_by="model")
+        prompt = build_prompt("", 1000, 1000, [self._lemur(), man])
+        assert "partly hidden" not in prompt
+
+    def test_occluder_below_the_move_adds_no_clause(self):
+        pytest.importorskip("numpy")
+        # Man first (behind), lemur second (in front): the lemur is on top.
+        prompt = build_prompt("", 1000, 1000, [self._man(), self._lemur()])
+        assert "partly hidden" not in prompt
+
+    def test_maskless_region_adds_no_clause(self):
+        # A hand-drawn box above the move is a layout guide, not an occluder.
+        prompt = build_prompt("", 1000, 1000, [self._lemur(), self._man(mask=False)])
+        assert "partly hidden" not in prompt
+
+
+class TestAdditionAnchors:
+    """Hand-drawn additions get the same landmark anchoring as model moves, so a
+    new element is placed relative to objects already in the scene rather than by
+    bare coordinates the edit model ignores."""
+
+    @staticmethod
+    def _man():
+        return region(x=0.6, y=0.4, w=0.2, h=0.4, desc="the man",
+                      src={"x": 0.6, "y": 0.4, "w": 0.2, "h": 0.4})
+
+    def test_object_addition_anchors_to_landmark(self):
+        hat = region(x=0.45, y=0.45, w=0.08, h=0.1, desc="a red hat")
+        prompt = build_prompt("", 1000, 1000, [self._man(), hat])
+        assert "to the left of the man" in prompt
+
+    def test_text_addition_gets_no_anchor(self):
+        sign = region(x=0.3, y=0.05, w=0.4, h=0.1, kind="text",
+                      text="OPEN", desc="neon letters")
+        prompt = build_prompt("", 1000, 1000, [self._man(), sign])
+        assert "Place it" not in prompt
+
+    def test_inserted_region_gets_blend_line_not_placement(self):
+        # A composited ref (region.inserted) is already at its box, so it gets a
+        # blend directive — never a "Place it" anchor or a Layout placement line.
+        hat = region(x=0.45, y=0.45, w=0.1, h=0.13, desc="a wizard hat")
+        hat.inserted = True
+        prompt = build_prompt("", 1000, 1000, [hat])
+        assert "a wizard hat: at the center" in prompt
+        assert "at at" not in prompt          # placement_phrase already says "at the …"
+        assert "blending it into the scene" in prompt
+        assert "Place it" not in prompt
+        assert "Layout:" not in prompt
+
+    def test_addition_does_not_anchor_to_another_addition(self):
+        # A second hand-drawn addition is not yet placed (no source), so it is not
+        # a valid landmark — only grounded (scanned/node-moved) objects are.
+        hat = region(x=0.45, y=0.45, w=0.08, h=0.1, desc="a red hat")
+        scarf = region(x=0.5, y=0.5, w=0.08, h=0.1, desc="a blue scarf")
+        prompt = build_prompt("", 1000, 1000, [hat, scarf])
+        assert "Place it" not in prompt
 
 
 class TestRemovalWording:
@@ -1265,6 +1431,196 @@ class TestCompositeMovedRegions:
         assert float(out[0, 12, 12, 0]) == 1.0   # patch landed at destination
 
 
+class TestCropRegionSubject:
+    """A model move's origin is cleared, so a crop of the original subject is
+    attached as a reference image the edit model can reproduce."""
+
+    def test_none_image_returns_none(self):
+        assert crop_region_subject(None, region()) is None
+
+    def test_crops_the_source_box(self):
+        torch = pytest.importorskip("torch")
+        image = torch.zeros((1, 20, 20, 3))
+        image[:, 0:5, 0:5, :] = 1.0
+        mv = region(x=0.5, y=0.5, w=0.25, h=0.25, desc="x",
+                    src={"x": 0.0, "y": 0.0, "w": 0.25, "h": 0.25}, edit_by="model")
+        crop = crop_region_subject(image, mv)
+        assert crop.shape == (1, 5, 5, 3)
+        assert float(crop[0, 2, 2, 0]) == 1.0    # source pixels carried over
+
+    def test_mask_isolates_subject_on_white(self):
+        torch = pytest.importorskip("torch")
+        Image = pytest.importorskip("PIL.Image")
+        import base64
+        from io import BytesIO
+        glyph = Image.new("L", (5, 5), 0)
+        for yy in range(5):
+            for xx in range(2):
+                glyph.putpixel((xx, yy), 255)   # left two columns opaque
+        buf = BytesIO()
+        glyph.save(buf, format="PNG")
+        image = torch.full((1, 20, 20, 3), 0.5)
+        mv = region(x=0.5, y=0.5, w=0.25, h=0.25, desc="x",
+                    src={"x": 0.0, "y": 0.0, "w": 0.25, "h": 0.25},
+                    mask=base64.b64encode(buf.getvalue()).decode(), edit_by="model")
+        crop = crop_region_subject(image, mv)
+        assert float(crop[0, 2, 0, 0]) == 0.5   # inside the silhouette: kept
+        assert float(crop[0, 2, 4, 0]) == 1.0   # outside it: white
+
+
+class TestCompositeRefAtBox:
+    """A wired reference image is composited into the scene at its region's box,
+    with its near-uniform background auto-keyed out, so an added object lands
+    pixel-exact where the box is drawn."""
+
+    def test_none_inputs_return_image(self):
+        assert composite_ref_at_box(None, "x", Box(0.1, 0.1, 0.2, 0.2)) is None
+
+    def test_keys_background_and_pastes_subject(self):
+        torch = pytest.importorskip("torch")
+        base = torch.zeros((1, 20, 20, 3))           # black scene
+        ref = torch.ones((1, 4, 4, 3))               # white background
+        ref[:, 1:3, 1:3, 2] = 1.0                     # blue subject (R,G=0, B=1)
+        ref[:, 1:3, 1:3, 0] = 0.0
+        ref[:, 1:3, 1:3, 1] = 0.0
+        out = composite_ref_at_box(base, ref, Box(0.4, 0.4, 0.2, 0.2))  # px 8..12
+        # The blue subject lands inside the box…
+        assert float(out[0, 10, 10, 2]) == 1.0
+        assert float(out[0, 10, 10, 0]) == 0.0
+        # …and the white border is keyed out, leaving the black scene.
+        assert float(out[0, 8, 8, 0]) == 0.0
+
+    def test_input_not_mutated(self):
+        torch = pytest.importorskip("torch")
+        base = torch.zeros((1, 20, 20, 3))
+        ref = torch.ones((1, 4, 4, 3))
+        ref[:, 1:3, 1:3, :] = 0.0
+        composite_ref_at_box(base, ref, Box(0.4, 0.4, 0.2, 0.2))
+        assert float(base[0, 10, 10, 0]) == 0.0
+
+
+class TestModelMoveReferenceCrop:
+    """execute() attaches the crop to image_refs and the prompt cites it."""
+
+    @staticmethod
+    def _doc():
+        return json.dumps({
+            "version": 2, "order": ["r0"],
+            "regions": [{
+                "id": "r0", "kind": "object",
+                "box": {"x": 0.5, "y": 0.5, "w": 0.25, "h": 0.25},
+                "content": {"desc": "a lemur", "text": ""},
+                "source": {"box": {"x": 0.0, "y": 0.0, "w": 0.25, "h": 0.25},
+                           "mask": None, "label": ""},
+                "op": "normal", "edit_by": "model", "bind": None,
+                "ui": {"parent": None, "hidden": False, "collapsed": False},
+            }],
+        })
+
+    def test_crop_appended_and_cited(self):
+        torch = pytest.importorskip("torch")
+        image = torch.zeros((1, 40, 40, 3))
+        image[:, 0:10, 0:10, :] = 1.0
+        out = RegionalPromptBuilder.execute(
+            width=40, height=40, prompt="",
+            regions_data=self._doc(), image=image,
+        )
+        prompt, image_refs = out.args[0], out.args[5]
+        assert len(image_refs) == 1
+        assert float(image_refs[0][0, 2, 2, 0]) == 1.0   # the source subject
+        assert "Reproduce it exactly from image 2" in prompt
+
+
+class TestNodeRefInsertion:
+    """A node-mode ref addition with an image connected is composited into the
+    scene at its box (not sent to the edit model), and the prompt blends it."""
+
+    def test_ref_addition_composited_not_sent(self):
+        torch = pytest.importorskip("torch")
+        base = torch.zeros((1, 40, 40, 3))            # black scene
+        ref = torch.ones((1, 8, 8, 3))                # white background
+        ref[:, 2:6, 2:6, 0] = 0.0                      # blue subject (R,G=0, B=1)
+        ref[:, 2:6, 2:6, 1] = 0.0
+        regions = [{"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2,
+                    "kind": "object", "desc": "a hat", "text": ""}]
+        out = RegionalPromptBuilder.execute(
+            width=40, height=40, prompt="",
+            regions_data=json.dumps(regions), image=base, ref_1=ref,
+        )
+        prompt, image, image_refs = out.args[0], out.args[4], out.args[5]
+        assert image_refs == []                        # composited, not sent
+        assert "blending it into the scene" in prompt  # insert blend line
+        assert "image 2" not in prompt                 # not "reproduce from image 2"
+        assert float(image[0, 20, 20, 2]) == 1.0       # subject landed at the box
+        assert float(image[0, 20, 20, 0]) == 0.0
+
+    def test_ref_addition_sent_to_model_without_image(self):
+        # No image to composite into → the ref still goes to the edit model.
+        sentinel = object()
+        out = RegionalPromptBuilder.execute(
+            width=40, height=40, prompt="",
+            regions_data=json.dumps([{"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2,
+                                      "kind": "object", "desc": "a hat", "text": ""}]),
+            ref_1=sentinel,
+        )
+        assert out.args[5] == [sentinel]
+
+
+class TestOcclusion:
+    """A moved region pasted under a scanned region that sits above it in the
+    depth order is partially hidden: the upper region's original pixels are
+    re-stamped on top, so the move can land behind an object in the photo."""
+
+    @staticmethod
+    def _scene(torch):
+        # 20x20 black frame. A white 5x5 patch top-left is the movable object;
+        # a green vertical band (cols 12..16, rows 8..18) is the standing object
+        # that other things can move behind.
+        image = torch.zeros((1, 20, 20, 3))
+        image[:, 0:5, 0:5, :] = 1.0          # white source patch (the lemur)
+        image[:, 8:18, 12:16, 1] = 0.5       # green band (the man), red stays 0
+        return image
+
+    @staticmethod
+    def _lemur(**over):
+        params = dict(x=0.5, y=0.5, w=0.25, h=0.25, desc="lemur",
+                      src={"x": 0.0, "y": 0.0, "w": 0.25, "h": 0.25})
+        params.update(over)
+        return region(**params)
+
+    @staticmethod
+    def _man():
+        import numpy as np
+        # A scanned region needs a stored mask to act as an occluder; a solid
+        # mask means its silhouette is its whole box (cols 12..16, rows 8..18).
+        solid = _png_base64(np.full((10, 4), 255, dtype="uint8"))
+        return region(x=0.6, y=0.4, w=0.2, h=0.5, desc="man", mask=solid)
+
+    def test_upper_region_re_covers_the_move(self):
+        torch = pytest.importorskip("torch")
+        pytest.importorskip("PIL.Image")
+        # Depth order back-to-front: lemur first (behind), man second (in front).
+        out = composite_moved_regions(self._scene(torch), [self._lemur(), self._man()])
+        assert float(out[0, 12, 11, 0]) == 1.0   # lemur shows where the man is absent
+        assert float(out[0, 12, 13, 0]) == 0.0   # under the man: lemur is hidden
+        assert float(out[0, 12, 13, 1]) == 0.5   # the man's own pixels show through
+
+    def test_lower_region_does_not_occlude(self):
+        torch = pytest.importorskip("torch")
+        pytest.importorskip("PIL.Image")
+        # Man first (behind), lemur second (in front): the move stays on top.
+        out = composite_moved_regions(self._scene(torch), [self._man(), self._lemur()])
+        assert float(out[0, 12, 13, 0]) == 1.0   # lemur covers the man, not vice versa
+
+    def test_maskless_region_does_not_occlude(self):
+        torch = pytest.importorskip("torch")
+        # A hand-drawn box (no scan, no mask) is a layout guide, not a physical
+        # object, so it never re-covers a move even when drawn above it.
+        guide = region(x=0.6, y=0.4, w=0.2, h=0.5, desc="area")
+        out = composite_moved_regions(self._scene(torch), [self._lemur(), guide])
+        assert float(out[0, 12, 13, 0]) == 1.0   # the lemur is not occluded
+
+
 class TestMoveOriginCutouts:
     """A moved region's origin is inpainted away (silhouette minus destination),
     so the object does not appear at both its old and new positions."""
@@ -1293,6 +1649,29 @@ class TestMoveOriginCutouts:
                         src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2})
         hand_drawn = region(x=0.5, y=0.5, w=0.2, h=0.2, desc="x")
         assert _move_origin_mask([anchor, hand_drawn], 20, 20).max() == 0
+
+    def test_origin_clear_spares_another_moves_destination(self):
+        pytest.importorskip("numpy")
+        # B's origin lands exactly on A's pasted destination; clearing B must not
+        # wipe A's fresh copy, and A's own origin still clears.
+        a = region(x=0.5, y=0.0, w=0.3, h=0.3, desc="A",
+                   src={"x": 0.0, "y": 0.0, "w": 0.3, "h": 0.3})   # moved right
+        b = region(x=0.0, y=0.5, w=0.3, h=0.3, desc="B",
+                   src={"x": 0.5, "y": 0.0, "w": 0.3, "h": 0.3})   # origin == A's dest
+        mask = _move_origin_mask([a, b], 100, 100)
+        assert mask[10, 65] == 0      # A's destination is spared
+        assert mask[10, 10] == 255    # A's own origin still cleared
+
+    def test_origin_clear_spares_static_object(self):
+        pytest.importorskip("numpy")
+        # A moved region's origin overlaps a static scanned object; clearing must
+        # not erase the static object that sits there.
+        static = region(x=0.4, y=0.4, w=0.3, h=0.3, desc="tree",
+                        src={"x": 0.4, "y": 0.4, "w": 0.3, "h": 0.3})  # unmoved
+        moved = region(x=0.0, y=0.0, w=0.5, h=0.5, desc="x",
+                       src={"x": 0.3, "y": 0.3, "w": 0.5, "h": 0.5})   # origin overlaps static
+        mask = _move_origin_mask([static, moved], 100, 100)
+        assert mask[50, 50] == 0      # the static object's area is spared
 
     def test_apply_fills_the_origin(self):
         pytest.importorskip("numpy")
@@ -1417,13 +1796,13 @@ class TestModelEditMoves:
         assert "remove the duplicate" not in prompt
         assert "repositioned by pasting" not in prompt
 
-    def test_model_move_states_target_size(self):
-        # Edit models size moved objects semantically, so the destination size is
-        # spelled out in percent and pixels with an explicit no-resize directive.
+    def test_model_move_pins_size_to_box(self):
+        # The box_2d carries the extent; the line states no percent/pixel size and
+        # leans on the box with an explicit no-resize directive instead.
         prompt = build_prompt("", 1000, 1000, [self._model_move()])
-        assert "about 20% of the image width and 20% of its height" in prompt
-        assert "(~200x200 px)" in prompt
-        assert "do not enlarge or shrink it" in prompt
+        assert "of the image width and" not in prompt
+        assert "px)" not in prompt
+        assert "Keep it at the size of that box; do not enlarge or shrink it" in prompt
 
     def test_node_move_keeps_composite_language(self):
         prompt = build_prompt("", 1000, 1000, [self._node_move()])
@@ -1436,10 +1815,121 @@ class TestModelEditMoves:
         assert REPOSITION_HEADER in prompt
         assert MODEL_REPOSITION_HEADER in prompt
 
+    @staticmethod
+    def _lemur(x=0.6, y=0.6, w=0.1, h=0.1):
+        return region(x=x, y=y, w=w, h=h, desc="a lemur",
+                      src={"x": 0.02, "y": 0.02, "w": w, "h": h}, edit_by="model")
+
+    def test_model_move_anchors_to_nearest_landmark(self):
+        # Edit models honor landmarks far better than coordinates, so the
+        # destination is described relative to the nearest stable named region.
+        man = region(x=0.75, y=0.55, w=0.15, h=0.3, desc="the man",
+                     src={"x": 0.75, "y": 0.55, "w": 0.15, "h": 0.3})
+        prompt = build_prompt("", 1000, 1000, [self._lemur(), man])
+        assert "to the left of the man" in prompt
+
+    def test_model_move_between_separated_flanking_landmarks(self):
+        # Two landmarks straddling the destination triangulate it far better than
+        # one fuzzy "next to": the placement becomes "between A and B".
+        lemur = self._lemur(x=0.45, y=0.45)            # center (0.5, 0.5)
+        cub = region(x=0.15, y=0.4, w=0.2, h=0.2, desc="a tiger cub",
+                     src={"x": 0.15, "y": 0.4, "w": 0.2, "h": 0.2})  # left
+        man = region(x=0.7, y=0.4, w=0.2, h=0.2, desc="the man",
+                     src={"x": 0.7, "y": 0.4, "w": 0.2, "h": 0.2})   # right
+        prompt = build_prompt("", 1000, 1000, [lemur, cub, man])
+        assert "between a tiger cub and the man" in prompt
+
+    def test_model_move_states_depth_in_front_when_overlapping(self):
+        # An overlapping landmark is described by depth, not direction, and the
+        # back-to-front order decides which: the later region is in front.
+        cub = region(x=0.4, y=0.4, w=0.3, h=0.3, desc="a tiger cub",
+                     src={"x": 0.4, "y": 0.4, "w": 0.3, "h": 0.3})
+        lemur = self._lemur(x=0.45, y=0.45, w=0.15, h=0.15)
+        prompt = build_prompt("", 1000, 1000, [cub, lemur])  # lemur drawn in front
+        assert "in front of a tiger cub" in prompt
+
+    def test_model_move_states_depth_behind_when_lower_layer(self):
+        cub = region(x=0.4, y=0.4, w=0.3, h=0.3, desc="a tiger cub",
+                     src={"x": 0.4, "y": 0.4, "w": 0.3, "h": 0.3})
+        lemur = self._lemur(x=0.45, y=0.45, w=0.15, h=0.15)
+        prompt = build_prompt("", 1000, 1000, [lemur, cub])  # lemur drawn behind
+        assert "behind a tiger cub" in prompt
+
+    def test_model_move_relates_to_two_overlapping_anchors_by_depth(self):
+        # The lemur's case: it overlaps both the man and the cub, so it is placed
+        # by depth against each — behind the man, in front of the cub.
+        lemur = self._lemur(x=0.42, y=0.42, w=0.16, h=0.16)   # center (0.5, 0.5)
+        man = region(x=0.3, y=0.1, w=0.4, h=0.45, desc="the man",
+                     src={"x": 0.3, "y": 0.1, "w": 0.4, "h": 0.45})   # overlaps from above
+        cub = region(x=0.35, y=0.5, w=0.3, h=0.4, desc="a tiger cub",
+                     src={"x": 0.35, "y": 0.5, "w": 0.3, "h": 0.4})   # overlaps from below
+        prompt = build_prompt("", 1000, 1000, [cub, lemur, man])  # cub back, lemur, man front
+        assert "behind the man and in front of a tiger cub" in prompt
+
+    def test_model_move_ignores_unstable_model_landmarks(self):
+        # Another model-move has no known final position, so it is not an anchor.
+        parrot = region(x=0.75, y=0.55, w=0.15, h=0.2, desc="a parrot",
+                        src={"x": 0.2, "y": 0.2, "w": 0.15, "h": 0.2},
+                        edit_by="model")
+        prompt = build_prompt("", 1000, 1000, [self._lemur(), parrot])
+        assert "Place it" not in prompt
+
+    def test_model_move_without_landmarks_has_no_anchor(self):
+        prompt = build_prompt("", 1000, 1000, [self._model_move()])
+        assert "Place it" not in prompt
+
+    def test_model_move_cites_reference_crop(self):
+        # The node clears the origin, so the model has no in-image reference; a
+        # crop is attached and the line tells the model to reproduce it from it.
+        lemur = self._lemur(x=0.5, y=0.5, w=0.1, h=0.1)
+        lemur.move_ref_image = 2
+        prompt = build_prompt("", 1000, 1000, [lemur])
+        assert "Reproduce it exactly from image 2" in prompt
+        assert "image 1 is the image being edited" in prompt  # legend present
+
+    def test_model_move_without_crop_omits_reference(self):
+        prompt = build_prompt("", 1000, 1000, [self._model_move()])
+        assert "Reproduce it exactly from image" not in prompt
+        assert "image 1 is the image being edited" not in prompt
+
+    def test_model_move_gets_best_effort_occlusion_clause(self):
+        # Model mode can't bake occlusion, but the prompt still asks for it when a
+        # masked object sits in front of and overlaps the move.
+        import numpy as np
+        solid = _png_base64(np.full((10, 10), 255, dtype="uint8"))
+        lemur = self._lemur(x=0.42, y=0.42, w=0.16, h=0.16)
+        man = region(x=0.3, y=0.3, w=0.4, h=0.4, desc="the man", mask=solid)
+        prompt = build_prompt("", 1000, 1000, [lemur, man])
+        assert "partly hidden" in prompt
+        assert "covered by the man" in prompt
+
+    def test_model_move_occlusion_grounds_the_occluder_box(self):
+        # Bounding-box grounding: with no pixels to lean on, the occluder's box_2d
+        # is stated next to the move's own box (Gemini honors coords for both).
+        import numpy as np
+        solid = _png_base64(np.full((10, 10), 255, dtype="uint8"))
+        lemur = self._lemur(x=0.42, y=0.42, w=0.16, h=0.16)
+        man = region(x=0.3, y=0.3, w=0.4, h=0.4, desc="the man", mask=solid)
+        prompt = build_prompt("", 1000, 1000, [lemur, man])
+        assert "the man (box_2d = [300, 300, 700, 700])" in prompt
+
+    def test_node_move_occlusion_clause_omits_box(self):
+        # Node moves bake occlusion into pixels, so the clause stays box-free —
+        # the coordinates would be redundant noise.
+        import numpy as np
+        solid = _png_base64(np.full((10, 10), 255, dtype="uint8"))
+        node_lemur = region(x=0.42, y=0.42, w=0.16, h=0.16, desc="a lemur",
+                            src={"x": 0.02, "y": 0.02, "w": 0.16, "h": 0.16})
+        man = region(x=0.3, y=0.3, w=0.4, h=0.4, desc="the man", mask=solid)
+        prompt = build_prompt("", 1000, 1000, [node_lemur, man])
+        assert "in front of it" in prompt
+        assert "the man (box_2d" not in prompt
+
 
 class TestModelEditSkipsNodeFill:
-    """edit_by='model' leaves the pixels for the model: the node neither inpaints
-    a model-cut-out's area nor erases a model-move's origin."""
+    """A model cut-out leaves its pixels for the model to remove. A model MOVE,
+    however, still has its origin cleared by the node: leaving the original in
+    place makes the edit model render a second copy at the destination."""
 
     def test_model_cutout_not_filled_by_node(self):
         cut = region(x=0.1, y=0.1, w=0.4, h=0.4, cutout=True, edit_by="model")
@@ -1451,11 +1941,23 @@ class TestModelEditSkipsNodeFill:
         mask = _cutout_mask([cut], 100, 100)
         assert mask[20, 20] == 255
 
-    def test_model_move_origin_not_erased_by_node(self):
+    def test_model_move_origin_is_cleared(self):
+        # Leaving the origin makes the model render a SECOND copy; the node clears
+        # it so only the destination render remains.
         mv = region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a hippo",
                     src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}, edit_by="model")
         mask = _move_origin_mask([mv], 100, 100)
-        assert int(mask.sum()) == 0  # origin left intact; the model relocates it
+        assert mask[15, 15] == 255   # origin (px 10-30) is cleared
+        assert int(mask.sum()) > 0
+
+    def test_model_move_clears_whole_origin_no_paste_to_spare(self):
+        # A node move spares where its paste lands; a model move composites no
+        # paste, so the entire origin silhouette is cleared even when the
+        # destination overlaps it.
+        mv = region(x=0.2, y=0.2, w=0.2, h=0.2, desc="a hippo",   # dest overlaps origin
+                    src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}, edit_by="model")
+        mask = _move_origin_mask([mv], 100, 100)
+        assert mask[25, 25] == 255   # inside the dest box, still cleared
 
     def test_node_move_origin_still_erased(self):
         mv = region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a hippo",
@@ -1489,3 +1991,153 @@ class TestMoveOriginSilhouette:
                        mask=self._half_mask_b64())
         mask = _move_origin_mask([moved], 100, 100)
         assert mask[25, 30] == 255
+
+
+class TestMarkerRegions:
+    """marker_regions selects only the elements the edit model places itself —
+    additions and model-applied moves — never node-composited or inserted ones."""
+
+    def test_addition_is_marked(self):
+        add = region(desc="a red hat")
+        assert marker_regions([add]) == [add]
+
+    def test_model_move_is_marked(self):
+        mv = region(x=0.6, y=0.6, desc="a lemur",
+                    src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}, edit_by="model")
+        assert marker_regions([mv]) == [mv]
+
+    def test_node_move_is_not_marked(self):
+        mv = region(x=0.6, y=0.6, desc="a lemur",
+                    src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2})
+        assert marker_regions([mv]) == []
+
+    def test_unmoved_scan_anchor_is_not_marked(self):
+        anchor = region(desc="a tree", src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2})
+        assert marker_regions([anchor]) == []
+
+    def test_cutout_is_not_marked(self):
+        cut = region(desc="a sign", cutout=True)
+        assert marker_regions([cut]) == []
+
+    def test_markers_off_opts_out(self):
+        add = region(desc="a red hat", markers=False)
+        assert marker_regions([add]) == []
+
+
+class TestAssignMarkers:
+    """Each placed region gets a distinct marker color and a sequential label
+    letter; the color skips any color word already in the description."""
+
+    def test_distinct_colors_and_labels(self):
+        a, b = region(desc="a hat"), region(desc="a ball")
+        assign_markers([a, b])
+        assert a.marker_color and b.marker_color
+        assert a.marker_color != b.marker_color
+        assert a.marker_label == "A" and b.marker_label == "B"
+
+    def test_avoids_color_named_in_description(self):
+        # The default first palette color is magenta; a magenta object must not
+        # get a magenta marker.
+        r = region(desc="a magenta balloon")
+        assign_markers([r])
+        assert "magenta" not in r.marker_color
+
+
+class TestMarkerPrompt:
+    """When a region carries a marker, the prompt explains the targets and cites
+    each element's marker by letter and color; without it, neither appears."""
+
+    def test_header_and_marker_cited(self):
+        add = region(desc="a red hat")
+        assign_markers([add])
+        out = build_prompt("", 686, 386, [add], edit_mode=True)
+        assert MARKER_HEADER in out
+        assert f"marker {add.marker_label}" in out
+        assert f"{add.marker_color} dot" in out
+
+    def test_no_marker_no_header(self):
+        add = region(desc="a red hat")
+        out = build_prompt("", 686, 386, [add], edit_mode=True)
+        assert MARKER_HEADER not in out
+        assert "Center it on marker" not in out
+
+
+class TestDrawPlacementMarkers:
+    """A colored reticle is stamped at each marked region's box center."""
+
+    def test_none_image_returns_none(self):
+        add = region(desc="a hat")
+        assign_markers([add])
+        assert draw_placement_markers(None, [add]) is None
+
+    def test_unmarked_region_leaves_image_untouched(self):
+        torch = pytest.importorskip("torch")
+        pytest.importorskip("PIL")
+        base = torch.zeros((1, 40, 40, 3))
+        out = draw_placement_markers(base, [region(desc="a hat")])  # no marker_color
+        assert float(out[0, 20, 20, 0]) == 0.0
+
+    def test_dot_fill_is_marker_color(self):
+        torch = pytest.importorskip("torch")
+        pytest.importorskip("PIL")
+        base = torch.zeros((1, 100, 100, 3))
+        add = region(x=0.4, y=0.4, w=0.2, h=0.2, desc="a hat")  # center px (50,50)
+        assign_markers([add])
+        from utils.region_image_ops import MARKER_COLORS
+        rgb = dict(MARKER_COLORS)[add.marker_color]
+        out = draw_placement_markers(base, [add])
+        # Sample the dot's left edge (inside the fill, off the centered glyph).
+        assert float(out[0, 50, 41, 0]) == rgb[0]
+        assert float(out[0, 50, 41, 1]) == rgb[1]
+        assert float(out[0, 50, 41, 2]) == rgb[2]
+        # A corner well outside the dot stays the original scene.
+        assert float(out[0, 5, 5, 0]) == 0.0
+
+    def test_input_not_mutated(self):
+        torch = pytest.importorskip("torch")
+        pytest.importorskip("PIL")
+        base = torch.zeros((1, 100, 100, 3))
+        add = region(x=0.4, y=0.4, w=0.2, h=0.2, desc="a hat")
+        assign_markers([add])
+        draw_placement_markers(base, [add])
+        assert float(base[0, 50, 50, 0]) == 0.0
+
+
+class TestExecuteMarkers:
+    """execute() draws a region's marker and explains it by default, and draws
+    nothing for a region that opts out with markers=false."""
+
+    @staticmethod
+    def _doc(markers=None):
+        region = {
+            "id": "r0", "kind": "object",
+            "box": {"x": 0.4, "y": 0.4, "w": 0.2, "h": 0.2},
+            "content": {"desc": "a red hat", "text": ""},
+            "op": "normal", "bind": None,
+            "ui": {"parent": None, "hidden": False, "collapsed": False},
+        }
+        if markers is not None:
+            region["markers"] = markers
+        return json.dumps({"version": 2, "order": ["r0"], "regions": [region]})
+
+    def test_marker_drawn_and_prompt_explains(self):
+        torch = pytest.importorskip("torch")
+        image = torch.zeros((1, 100, 100, 3))
+        out = RegionalPromptBuilder.execute(
+            width=100, height=100, prompt="",
+            regions_data=self._doc(), image=image,
+        )
+        prompt, image_out = out.args[0], out.args[4]
+        assert MARKER_HEADER in prompt
+        assert float(image_out.sum()) > 0   # a dot was stamped
+
+    def test_markers_off_draws_nothing(self):
+        torch = pytest.importorskip("torch")
+        image = torch.zeros((1, 100, 100, 3))
+        out = RegionalPromptBuilder.execute(
+            width=100, height=100, prompt="",
+            regions_data=self._doc(markers=False), image=image,
+        )
+        prompt, image_out = out.args[0], out.args[4]
+        assert MARKER_HEADER not in prompt
+        assert float(image_out.sum()) == 0.0

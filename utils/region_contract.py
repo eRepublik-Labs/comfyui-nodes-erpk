@@ -105,6 +105,10 @@ class Region:
     # and inpaints it deterministically; "model" leaves the pixels untouched and
     # asks the edit model to do it from the prompt. Irrelevant for static regions.
     edit_by: str = "node"
+    # Draw a visual placement dot the edit model can target when it places this
+    # element itself (an addition or a model move). On by default; node-composited
+    # regions ignore it since their pixels are already placed.
+    markers: bool = True
     ui: Ui = field(default_factory=Ui)
 
 
@@ -251,6 +255,7 @@ def _parse_v2_entry(entry):
         op=op,
         bind_slot=_parse_bind(entry.get("bind")),
         edit_by=_coerce_edit_by(entry.get("edit_by")),
+        markers=_coerce_markers(entry.get("markers")),
         ui=_parse_v2_ui(entry.get("ui")),
     )
 
@@ -335,6 +340,11 @@ def _coerce_edit_by(value):
     return "model" if value == "model" else "node"
 
 
+def _coerce_markers(value):
+    """Markers are on unless explicitly disabled, so an absent field reads on."""
+    return value is not False
+
+
 def _coerce_int(value):
     try:
         return int(value)
@@ -375,6 +385,9 @@ def _region_to_dict(region):
     # Default stays out of the document so node-applied regions serialize as before.
     if region.edit_by != "node":
         out["edit_by"] = region.edit_by
+    # Markers default on, so only the off state is written.
+    if not region.markers:
+        out["markers"] = False
     out["bind"] = {"slot": region.bind_slot} if region.bind_slot is not None else None
     out["ui"] = {
         "parent": region.ui.parent,

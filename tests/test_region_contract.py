@@ -363,6 +363,35 @@ class TestEditBy:
         out = serialize([parse(self.base_v2(edit_by="model"))[0]])
         assert out["regions"][0]["edit_by"] == "model"
 
+
+class TestMarkers:
+    def base_v2(self, **over):
+        entry = {
+            "id": "r_a", "kind": "object",
+            "box": {"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2},
+            "content": {"desc": "a cat", "text": ""},
+        }
+        entry.update(over)
+        return {"version": 2, "order": ["r_a"], "regions": [entry]}
+
+    def test_defaults_on_in_v1(self):
+        assert parse(V1_HAND_DRAWN)[0].markers is True
+
+    def test_defaults_on_in_v2_when_absent(self):
+        assert parse(self.base_v2())[0].markers is True
+
+    def test_false_value_parsed(self):
+        assert parse(self.base_v2(markers=False))[0].markers is False
+
+    def test_on_region_omits_markers(self):
+        # Default stays out so existing regions serialize byte-identically.
+        out = serialize([parse(self.base_v2())[0]])
+        assert "markers" not in out["regions"][0]
+
+    def test_off_region_serializes_markers(self):
+        out = serialize([parse(self.base_v2(markers=False))[0]])
+        assert out["regions"][0]["markers"] is False
+
     def test_model_round_trips(self):
         once = parse(self.base_v2(edit_by="model"))
         twice = parse(serialize(once))

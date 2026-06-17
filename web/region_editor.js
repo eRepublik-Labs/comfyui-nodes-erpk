@@ -36,8 +36,9 @@ app.registerExtension({
                 serialize: false,
                 hideOnZoom: false,
                 // Pinning min == max keeps the canvas aspect-true at the node's
-                // width and leaves the multiline scene field as the only widget
-                // that grows when the node is stretched taller.
+                // width. The scene-prompt field is capped to a fixed height
+                // (editor.js capPromptHeight), so the node sizes to its content
+                // rather than letting the prompt balloon to fill it.
                 getMinHeight: () => desiredEditorHeight(this),
                 getMaxHeight: () => desiredEditorHeight(this),
             });

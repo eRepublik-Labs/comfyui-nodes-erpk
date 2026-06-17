@@ -3,7 +3,12 @@
 
 import math
 
-from .region_geometry import box_2d, region_moved, region_ref_image
+from .region_geometry import (
+    box_2d,
+    region_has_stored_mask,
+    region_moved,
+    region_ref_image,
+)
 
 # "Bounding box" is detection-annotation vocabulary: models that know it from
 # vision training will happily RENDER yellow boxes around the elements. The
@@ -81,6 +86,29 @@ EDIT_PREAMBLE = (
     "orientation and framing exactly: do not flip, mirror, rotate, or crop the "
     "image."
 )
+# Inserted regions had their reference image composited into the scene at their
+# box already, so the model must not move or re-place them — only integrate them.
+INSERT_HEADER = (
+    "The elements below were already placed into the image at their exact "
+    "positions. Keep each exactly where it is — do not move, resize, or "
+    'duplicate it — only blend it into the scene (areas are "box_2d = [ymin, '
+    'xmin, ymax, xmax]" on a 0-1000 grid with top-left origin):'
+)
+# A small colored dot is drawn at each model-placed element's box center
+# (region_image_ops.draw_placement_markers). The model ignores box_2d numbers but
+# reads pixels, so the dot is a target it can actually see; it must be painted out
+# so it never survives into the result.
+MARKER_HEADER = (
+    "Solid colored dots have been drawn on the image to mark where each new "
+    "element goes — each is a filled dot in a unique color with a label letter "
+    "inside it, and each element below names its marker by letter and color. The "
+    "dots are guides, not part of the scene: place the named element centered on "
+    "its dot at the described size, then paint the dot out completely so none of "
+    "it remains. Each dot is the exact, required location for its element — put "
+    "the element on its dot even if a different spot in the scene looks more "
+    "natural or more typical for it; never move it off its dot to a more likely "
+    "place."
+)
 
 
 def placement_phrase(x, y, w, h):
@@ -103,10 +131,10 @@ def aspect_ratio_string(width, height):
 def _element_line(region):
     box = region.box
     placement = placement_phrase(box.x, box.y, box.w, box.h)
-    geometry = (
-        f"{placement}, covering about {round(box.w * 100)}% of the image "
-        f"width and {round(box.h * 100)}% of its height. box_2d = {box_2d(box)}"
-    )
+    # The box_2d carries the extent; a spelled-out percent size on top of it reads
+    # as a competing instruction and edit models place worse with it, so the line
+    # states only where the element goes.
+    geometry = f"{placement}. box_2d = {box_2d(box)}"
     # Referenced items use take-from-image phrasing: a trailing "as shown in"
     # aside is weak enough that models follow the words and drop the picture.
     ref = region_ref_image(region)
@@ -139,10 +167,12 @@ def _boxes_overlap(a, b):
 # be named as an explicit harmonization target or it stays copy-paste. Identity is
 # pinned ("keep its shape, colors, and details") so harmonizing never re-renders it.
 BLEND_DIRECTIVE = (
-    "blending it naturally into the scene: relight it to match the scene's light "
-    "direction and color temperature, cast a contact shadow where it meets the "
-    "ground, and soften its edges so it does not look pasted — keep its shape, "
-    "colors, and details unchanged."
+    "blending it into the scene so it looks photographed in place, not pasted: "
+    "relight it to match the scene's light direction, intensity, and color "
+    "temperature; ground it with a contact shadow and soft ambient occlusion "
+    "where it meets the surface; match the surrounding depth of field, focus, and "
+    "film grain; and let nearby colors and reflections spill onto it — keep its "
+    "shape, pose, colors, and identifying details unchanged."
 )
 
 
@@ -181,44 +211,226 @@ def _move_line(region):
     )
 
 
-def _model_move_line(region, width, height):
+def _join_names(names):
+    """Join names as prose: "a", "a and b", or "a, b, and c"."""
+    if len(names) == 1:
+        return names[0]
+    if len(names) == 2:
+        return f"{names[0]} and {names[1]}"
+    return ", ".join(names[:-1]) + f", and {names[-1]}"
+
+
+def _occluder_regions(region, regions):
+    """The scanned objects that sit in front of `region` and cover it.
+
+    An object later in `regions` and overlapping the move is in front of it
+    (back-to-front order). It occludes in pixels either because it is static and
+    re-stamped (region_image_ops._reapply_occluders) or because it is a node move
+    whose paste lands on top in that same order. A model-move occluder is never
+    composited, so it cannot occlude and is excluded; a hand-drawn box carries no
+    silhouette and is a layout guide. Returned in depth order, back-to-front.
+    """
+    index = next((i for i, other in enumerate(regions) if other is region), None)
+    if index is None:
+        return []
+    found = []
+    for other in regions[index + 1:]:
+        if (other.op == "cutout" or other.kind == "text"
+                or (region_moved(other) and other.edit_by == "model")
+                or not region_has_stored_mask(other)):
+            continue
+        if _boxes_overlap(other.box, region.box) > 0:
+            found.append(other)
+    return found
+
+
+def _occluder_names(region, regions):
+    """Descriptions of the occluders in front of `region`, in depth order."""
+    return [other.content.desc or "the object in front"
+            for other in _occluder_regions(region, regions)]
+
+
+def _occlusion_clause(subject, names):
+    """A trailing clause keeping a move's occluded part hidden.
+
+    Framed from the occluder's side ("X in front of it"), which edit models honor
+    better than a subject-side "it is behind X" — foreground-covers-background is
+    how they reason. For node moves the composited pixels already back this up; on
+    a model move it is the only signal and stays best-effort.
+    """
+    occ = _join_names(names)
+    return (
+        f" With {occ} in front of it, {subject} is partly hidden: render only "
+        f"the part of it not covered by {occ}, and do not redraw the covered part."
+    )
+
+
+def _grounded_occlusion_clause(subject, occluders):
+    """Occluder-framed occlusion clause carrying each occluder's box_2d.
+
+    For a model move there are no composited pixels to imply the layering, so the
+    occluder's coordinates are stated next to the move's own box — bounding-box
+    grounding for both objects is the strongest lever an edit model honors for
+    depth. Best-effort: it raises the odds, it does not guarantee occlusion.
+    """
+    refs = _join_names([
+        f"{other.content.desc or 'the object in front'} (box_2d = {box_2d(other.box)})"
+        for other in occluders
+    ])
+    plain = _join_names([other.content.desc or "the object in front"
+                         for other in occluders])
+    return (
+        f" With {refs} in front of it, {subject} is partly hidden: render only "
+        f"the visible part of it and do not redraw the part covered by {plain}."
+    )
+
+
+def _box_center(box):
+    return (box.x + box.w / 2, box.y + box.h / 2)
+
+
+_DIRECTIONS = ("to the left of", "to the right of", "above", "below")
+
+
+def _direction(dest, other_box):
+    """The directional placement of `dest` relative to a separated `other_box`."""
+    dcx, dcy = _box_center(dest)
+    ocx, ocy = _box_center(other_box)
+    if abs(ocx - dcx) >= abs(ocy - dcy):
+        return "to the left of" if ocx > dcx else "to the right of"
+    return "above" if ocy > dcy else "below"
+
+
+def _depth_relation(region, other, regions):
+    """"in front of" / "behind" from back-to-front order, or "" if unresolved.
+
+    Later in `regions` = nearer the camera, the same rule the occlusion composite
+    follows, so a model-move's stated depth matches what a node-move would paint.
+    """
+    ri = next((i for i, r in enumerate(regions) if r is region), None)
+    oi = next((i for i, r in enumerate(regions) if r is other), None)
+    if ri is None or oi is None or ri == oi:
+        return ""
+    return "in front of" if ri > oi else "behind"
+
+
+def _anchor_relation(region, other, regions):
+    """How `region`'s destination relates to a landmark: depth when they overlap
+    (front/behind is what's visible there), direction when they are separated."""
+    if _boxes_overlap(region.box, other.box) > 0:
+        depth = _depth_relation(region, other, regions)
+        if depth:
+            return depth
+    return _direction(region.box, other.box)
+
+
+def _flanked_between(dest, first, second):
+    """The "between A and B" phrase when two landmarks straddle `dest`, else "".
+
+    A straddle means the two landmark centers sit on opposite sides of the
+    destination on either axis; the names are ordered along that axis (top→bottom
+    or left→right) so the prose matches the layout.
+    """
+    dcx, dcy = _box_center(dest)
+    fx, fy = _box_center(first.box)
+    sx, sy = _box_center(second.box)
+    if (fy - dcy) * (sy - dcy) < 0:
+        top, bottom = (first, second) if fy < sy else (second, first)
+        return f"between {top.content.desc} and {bottom.content.desc}"
+    if (fx - dcx) * (sx - dcx) < 0:
+        left, right = (first, second) if fx < sx else (second, first)
+        return f"between {left.content.desc} and {right.content.desc}"
+    return ""
+
+
+def _placement_anchors(region, regions):
+    """Describe a placement's destination relative to nearby grounded landmarks.
+
+    Edit models place objects by landmarks far more reliably than by box_2d
+    coordinates, so the destination is pinned to the nearest named objects that
+    are actually in the image at a known position: a scanned region (has a
+    source) or a node move (composited at its box). A model move or a not-yet-
+    placed addition has no known position and is skipped, as are cut-outs, text,
+    hidden, and unnamed regions. Used for both model moves and hand-drawn
+    additions, neither of which the model places well from coordinates alone.
+
+    Two separated landmarks that straddle the spot read as "between A and B"
+    (the strongest triangulation); otherwise each landmark gets a relation that
+    is a depth cue when it overlaps the move and a direction when it does not.
+    Returns a trailing sentence (" Place it ...."), or "" when nothing anchors it.
+    """
+    dest = region.box
+    dcx, dcy = _box_center(dest)
+    landmarks = []
+    for other in regions:
+        if (other is region or other.op == "cutout" or other.kind != "object"
+                or other.ui.hidden or not other.content.desc
+                or other.source is None
+                or (region_moved(other) and other.edit_by == "model")):
+            continue
+        ocx, ocy = _box_center(other.box)
+        landmarks.append(((ocx - dcx) ** 2 + (ocy - dcy) ** 2, other))
+    if not landmarks:
+        return ""
+    landmarks.sort(key=lambda item: item[0])
+    first = landmarks[0][1]
+    rel_first = _anchor_relation(region, first, regions)
+    if len(landmarks) > 1:
+        second = landmarks[1][1]
+        rel_second = _anchor_relation(region, second, regions)
+        if rel_first in _DIRECTIONS and rel_second in _DIRECTIONS:
+            between = _flanked_between(dest, first, second)
+            if between:
+                return f" Place it {between}."
+        place = (f"{rel_first} {first.content.desc} and "
+                 f"{rel_second} {second.content.desc}")
+    else:
+        place = f"{rel_first} {first.content.desc}"
+    return f" Place it {place}."
+
+
+def _model_move_line(region, regions):
     # No composite happened, so the object is still at its origin. Lead with the
     # destination (the action the model must perform) and name the origin second
     # (the cleanup); models weight the first instruction, and one box per clause
-    # keeps the two coordinate sets from being conflated. Edit models size moved
-    # objects semantically, not by box_2d, so the target size is stated in
-    # concrete redundant terms (percent and pixels) with an explicit no-resize.
+    # keeps the two coordinate sets from being conflated. The box_2d pins the
+    # target extent; a spelled-out percent/pixel size on top of it competes with
+    # the box and places worse, so size rides on the box plus a no-resize cue.
     src = region.source.box
     dest = region.box
     placement = placement_phrase(dest.x, dest.y, dest.w, dest.h)
     subject = region.content.desc or "The element"
-    size = (
-        f"about {round(dest.w * 100)}% of the image width and "
-        f"{round(dest.h * 100)}% of its height (~{round(dest.w * width)}x"
-        f"{round(dest.h * height)} px)"
-    )
+    crop = getattr(region, "move_ref_image", None)
+    reference = (f" Reproduce it exactly from image {crop} — keep the same shape, "
+                 f"colors, and markings.") if crop else ""
     return (
         f"{subject}: its new position is {placement}, exactly filling box_2d = "
-        f"{box_2d(dest)} — {size}. Keep it at this size; do not enlarge or shrink "
-        f"it. It is currently at box_2d = {box_2d(src)}; erase it there and "
-        f"rebuild that area as natural background. Render it at the new position, "
-        f"matching lighting, shadows, and perspective."
+        f"{box_2d(dest)}. Keep it at the size of that box; do not enlarge or "
+        f"shrink it.{_placement_anchors(region, regions)} It is currently at "
+        f"box_2d = {box_2d(src)}; erase it there and rebuild that area as natural "
+        f"background. Render it at the new position, matching lighting, shadows, "
+        f"and perspective.{reference}"
     )
 
 
 def _classify_regions(regions):
-    """Split regions into moves, anchors, and additions for the prompt.
+    """Split regions into inserts, moves, anchors, and additions for the prompt.
 
-    A scanned region (one with an origin box) that has not moved describes
-    pixels already in the image — giving it a placement line invites the
-    model to re-render the scene instead of editing it, so it becomes a
-    silent anchor. Reference-image and text regions always render as
-    additions regardless of origin.
+    An inserted region is one whose reference image was composited into the scene
+    at its box (region.inserted) — it is already placed, so it only needs a blend
+    directive. A scanned region (one with an origin box) that has not moved
+    describes pixels already in the image — giving it a placement line invites the
+    model to re-render the scene instead of editing it, so it becomes a silent
+    anchor. Reference-image and text regions always render as additions regardless
+    of origin.
     """
-    moves, anchors, additions = [], [], []
+    inserts, moves, anchors, additions = [], [], [], []
     for region in regions:
         # Cut-out regions are removed from the scene; they never get a line.
         if region.op == "cutout":
+            continue
+        if getattr(region, "inserted", False):
+            inserts.append(region)
             continue
         plain = region.kind != "text" and not region_ref_image(region)
         if plain and region_moved(region):
@@ -227,7 +439,29 @@ def _classify_regions(regions):
             anchors.append(region)
         else:
             additions.append(region)
-    return moves, anchors, additions
+    return inserts, moves, anchors, additions
+
+
+def marker_regions(regions):
+    """The regions that get a visual placement marker: the ones the edit model
+    places itself — additions and model-applied moves — with markers left on.
+    Node-composited moves and inserted refs already have their pixels and never
+    do, and a region with markers off opts out.
+    """
+    _, moves, _, additions = _classify_regions(regions)
+    model_moves = [region for region in moves if region.edit_by == "model"]
+    return [region for region in model_moves + additions
+            if getattr(region, "markers", True)]
+
+
+def _marker_clause(region):
+    """A trailing clause pointing an element at its drawn marker, or "" if unmarked."""
+    color = getattr(region, "marker_color", None)
+    if not color:
+        return ""
+    label = getattr(region, "marker_label", None)
+    target = f"marker {label} (the {color} dot)" if label else f"the {color} dot"
+    return f" Center it on {target}."
 
 
 def _chroma_note(color):
@@ -273,38 +507,78 @@ def build_prompt(prompt, width, height, regions, edit_mode=False, chroma=None):
             lines.append("")
         ratio = aspect_ratio_string(width, height)
         lines.append(f"Compose for a {width}x{height} frame (aspect ratio {ratio}).")
-    moves, anchors, additions = _classify_regions(regions)
+    inserts, moves, anchors, additions = _classify_regions(regions)
     # Node-applied moves are already composited (clean up the paste); model-applied
     # moves are untouched in the image (relocate them from the prompt).
     node_moves = [region for region in moves if region.edit_by != "model"]
     model_moves = [region for region in moves if region.edit_by == "model"]
-    # The chroma key fill only touches node-applied clears (node moves' origins +
-    # node cut-outs); name the key color once up front when any exist.
+    # The chroma key fill touches every move's origin (node and model both clear
+    # it) plus node cut-outs; name the key color once up front when any exist.
     node_removals = [r for r in regions if r.op == "cutout" and r.kind != "text"
                      and r.edit_by != "model"]
-    if chroma and (node_moves or node_removals):
+    if chroma and (moves or node_removals):
         lines.append("")
         lines.append(_chroma_note(chroma))
+    # One legend for every numbered reference — wired ref images on additions and
+    # the crops attached to model moves alike — so each "image N" is explained.
+    if any(region_ref_image(r) or getattr(r, "move_ref_image", None)
+           for r in regions):
+        lines.append("")
+        lines.append(REFS_HEADER)
+    # The dots are drawn before any placement section so the model knows what the
+    # colors mean when it reaches each element's marker clause.
+    if any(getattr(r, "marker_color", None) for r in regions):
+        lines.append("")
+        lines.append(MARKER_HEADER)
     if node_moves:
         lines.append("")
         lines.append(REPOSITION_HEADER)
         for index, region in enumerate(node_moves, start=1):
-            lines.append(f"{index}. {_move_line(region)}")
+            line = _move_line(region)
+            occluders = _occluder_names(region, regions)
+            if occluders:
+                line += _occlusion_clause(region.content.desc or "the element",
+                                          occluders)
+            lines.append(f"{index}. {line}")
     if model_moves:
         lines.append("")
         lines.append(MODEL_REPOSITION_HEADER)
         for index, region in enumerate(model_moves, start=1):
-            lines.append(f"{index}. {_model_move_line(region, width, height)}")
+            line = _model_move_line(region, regions)
+            occluders = _occluder_regions(region, regions)
+            if occluders:
+                line += _grounded_occlusion_clause(
+                    region.content.desc or "the element", occluders)
+            line += _marker_clause(region)
+            lines.append(f"{index}. {line}")
     if moves and anchors:
         lines.append(ANCHORS_LINE)
+    if inserts:
+        lines.append("")
+        lines.append(INSERT_HEADER)
+        for index, region in enumerate(inserts, start=1):
+            subject = region.content.desc or "the element"
+            placement = placement_phrase(region.box.x, region.box.y,
+                                         region.box.w, region.box.h)
+            lines.append(f"{index}. {subject}: {placement} (box_2d = "
+                         f"{box_2d(region.box)}), {BLEND_DIRECTIVE}")
     if additions:
         lines.append("")
-        header = LAYOUT_HEADER
-        if any(region_ref_image(region) for region in additions):
-            header += " " + REFS_HEADER
-        lines.append(header)
+        lines.append(LAYOUT_HEADER)
         for index, region in enumerate(additions, start=1):
-            lines.append(f"{index}. {_element_line(region)}")
+            line = _element_line(region)
+            # Hand-drawn additions are placed by coordinates the model ignores;
+            # anchoring them to grounded objects nudges them to a plausible spot.
+            if region.kind != "text":
+                line += _placement_anchors(region, regions)
+            line += _marker_clause(region)
+            # When editing a photo, an added object is dropped onto an existing
+            # scene and reads as a sticker without relighting; ask for the same
+            # integration a move gets. Compose mode renders the whole frame at
+            # once, so there is nothing to blend into and the directive is skipped.
+            if edit_mode and region.kind != "text":
+                line += f" {BLEND_DIRECTIVE[0].upper()}{BLEND_DIRECTIVE[1:]}"
+            lines.append(f"{index}. {line}")
         if anchors and not moves:
             lines.append(ANCHORS_LINE)
     removals = [r for r in regions if r.op == "cutout" and r.kind != "text"]
@@ -313,6 +587,6 @@ def build_prompt(prompt, width, height, regions, edit_mode=False, chroma=None):
         lines.append(REMOVAL_HEADER)
         for index, region in enumerate(removals, start=1):
             lines.append(f"{index}. box_2d = {box_2d(region.box)}")
-    if moves or additions:
+    if moves or additions or inserts:
         lines.append(LAYOUT_FOOTER)
     return "\n".join(lines)

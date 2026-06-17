@@ -85,11 +85,18 @@ export function installSockets(E) {
     function toggleFamilySocket(prefix) {
         const index = E.primaryIndex();
         if (index < 0 || index >= SOCKET_FAMILIES[prefix].max) return;
-        if (socketWiredFor(prefix, state.primary)) return;
         const n = index + 1;
         const exposed = exposedSocketSet(prefix);
-        if (exposed.has(n)) exposed.delete(n);
-        else exposed.add(n);
+        if (socketWiredFor(prefix, state.primary)) {
+            // A wired toggle severs its link from the node face, so an input
+            // can be unset here without hunting for the wire in the graph.
+            node.disconnectInput?.(`${prefix}_${n}`);
+            exposed.delete(n);
+        } else if (exposed.has(n)) {
+            exposed.delete(n);
+        } else {
+            exposed.add(n);
+        }
         persistExposedSockets(prefix, exposed);
         syncFamilySockets(prefix);
         node.setDirtyCanvas?.(true, true);
@@ -128,7 +135,7 @@ export function installSockets(E) {
         const wireable = index >= 0 && index < cap;
         const plugged = wireable
             && (wired || exposedSocketSet(prefix).has(index + 1));
-        btn.disabled = !wireable || wired;
+        btn.disabled = !wireable;
         btn.style.opacity = wireable ? "1" : "0.45";
         btn.classList.toggle("erpk-btn-active", plugged);
         btn.style.color = plugged
@@ -136,7 +143,7 @@ export function installSockets(E) {
         btn.style.borderColor = plugged
             ? ACTIVE_GREEN_BORDER : "rgba(255, 255, 255, 0.14)";
         btn.dataset.tip = wired
-            ? `The ${noun} is wired — disconnect the input to unplug`
+            ? `Disconnect the wired ${noun} input`
             : plugged
                 ? `Hide this region's ${noun} input`
                 : wireable

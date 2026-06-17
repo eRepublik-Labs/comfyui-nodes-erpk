@@ -15,7 +15,11 @@ from .region_geometry import (
 from .region_image_ops import (
     apply_cutouts,
     apply_move_origin_cutouts,
+    assign_markers,
     composite_moved_regions,
+    composite_ref_at_box,
+    crop_region_subject,
+    draw_placement_markers,
 )
 from .region_masks import _cutout_mask, _move_origin_mask, build_region_masks
 from .region_outputs import regions_to_pixel_bboxes
@@ -23,12 +27,14 @@ from .region_prompt_text import (
     ANCHORS_LINE,
     LAYOUT_FOOTER,
     LAYOUT_HEADER,
+    MARKER_HEADER,
     MODEL_REPOSITION_HEADER,
     REFS_HEADER,
     REMOVAL_HEADER,
     REPOSITION_HEADER,
     aspect_ratio_string,
     build_prompt,
+    marker_regions,
     placement_phrase,
 )
 
@@ -48,7 +54,12 @@ __all__ = [
     "region_ref_image",
     "apply_cutouts",
     "apply_move_origin_cutouts",
+    "assign_markers",
     "composite_moved_regions",
+    "composite_ref_at_box",
+    "crop_region_subject",
+    "draw_placement_markers",
+    "marker_regions",
     "_cutout_mask",
     "_move_origin_mask",
     "build_region_masks",
@@ -56,6 +67,7 @@ __all__ = [
     "ANCHORS_LINE",
     "LAYOUT_FOOTER",
     "LAYOUT_HEADER",
+    "MARKER_HEADER",
     "REFS_HEADER",
     "REMOVAL_HEADER",
     "REPOSITION_HEADER",
@@ -168,10 +180,13 @@ class RegionalPromptBuilder(IO.ComfyNode):
                     IO.Image.Input(
                         f"ref_{n}",
                         optional=True,
-                        tooltip=f"Reference image for region {n}: forwarded on "
-                                "image_refs, and the region's prompt line cites "
-                                "its image number (regions numbered as on the "
-                                "canvas).",
+                        tooltip=f"Reference image for region {n}. With an image "
+                                "connected and the region set to Node, it is "
+                                "composited into the scene at the region's box "
+                                "(background auto-keyed), pixel-exact; otherwise "
+                                "it is forwarded on image_refs and the region's "
+                                "prompt line cites its image number (regions "
+                                "numbered as on the canvas).",
                     )
                     for n in range(1, REF_INPUT_COUNT + 1)
                 ],
@@ -221,12 +236,24 @@ class RegionalPromptBuilder(IO.ComfyNode):
         # in region order; each region cites its 1-based position in that list,
         # offset by the base image in slot 1.
         image_refs = []
+        # Node-mode ref additions are composited into the image at their box
+        # (deterministic placement); model-mode (or no image) refs are sent to the
+        # edit model to place. Collected here, composited after the move/cut-out
+        # passes so they layer on top.
+        inserts = []
         for index, region in enumerate(regions):
             slot = _binding_slot(index, region)
             if not 1 <= slot <= REF_INPUT_COUNT:
                 continue
             ref = kwargs.get(f"ref_{slot}")
-            if ref is not None:
+            if ref is None:
+                continue
+            if (image is not None and region.edit_by == "node"
+                    and not region_moved(region) and region.op != "cutout"
+                    and region.kind != "text"):
+                inserts.append((region, ref))
+                region.inserted = True
+            else:
                 image_refs.append(ref)
                 region.ref_image = len(image_refs) + 1
         # Appended after the override loops so desc_N/ref_N bind canvas regions
@@ -234,21 +261,45 @@ class RegionalPromptBuilder(IO.ComfyNode):
         regions += parse_regions(kwargs.get("regions"))
         if not regions and not prompt.strip():
             raise ValueError("Describe the scene or add at least one region")
+        # A model move's origin is cleared deterministically below, leaving the
+        # edit model no in-image copy to reproduce; attach a crop of the original
+        # subject (taken from the still-pristine image) as a reference it cites.
+        for region in regions:
+            if (region.edit_by == "model" and region_moved(region)
+                    and region.kind != "text" and region.op != "cutout"
+                    and not region_ref_image(region)):
+                crop = crop_region_subject(image, region)
+                if crop is not None:
+                    image_refs.append(crop)
+                    region.move_ref_image = len(image_refs) + 1
         # Chroma key fill for cleared areas when selected, else cv2 inpaint.
         chroma = (kwargs.get("chroma_color", "#00B140")
                   if kwargs.get("removal_fill") == "chroma" else None)
         image = composite_moved_regions(image, regions)
         image = apply_move_origin_cutouts(image, regions, chroma=chroma)
         image = apply_cutouts(image, regions, chroma=chroma)
+        for region, ref in inserts:
+            image = composite_ref_at_box(image, ref, region.box)
+        # Visual placement markers: a dot the edit model can see at each element
+        # it must place itself (per-region, on by default). Assigned before the
+        # prompt is built so each line can cite its color, drawn last (on the
+        # composited image) so the dots are not cleared by the move/cut-out fills
+        # or covered by inserts.
+        if image is not None:
+            assign_markers(marker_regions(regions))
+            image = draw_placement_markers(image, regions)
         # The real frame is the connected image's H x W; with no image it falls
-        # back to the widgets. Both the masks (which overlay the image) and the
-        # edit-mode prompt's stated dimensions must use this, not the widgets —
-        # an edited photo is rarely the widget's default square.
+        # back to the widgets. Everything sized to the frame — masks (which overlay
+        # the image), the edit-mode prompt's stated dimensions, the pixel bboxes,
+        # and the width/height outputs — must use this, not the widgets, so an
+        # edited photo of any resolution stays self-consistent (an edited photo is
+        # rarely the widget's default square).
         frame_width, frame_height = width, height
         if image is not None:
             frame_height, frame_width = int(image.shape[1]), int(image.shape[2])
         masks = build_region_masks(regions, frame_width, frame_height)
         assembled = build_prompt(prompt, frame_width, frame_height, regions,
                                  edit_mode=image is not None, chroma=chroma)
-        bboxes = regions_to_pixel_bboxes(regions, width, height)
-        return IO.NodeOutput(assembled, bboxes, width, height, image, image_refs, masks)
+        bboxes = regions_to_pixel_bboxes(regions, frame_width, frame_height)
+        return IO.NodeOutput(assembled, bboxes, frame_width, frame_height,
+                             image, image_refs, masks)

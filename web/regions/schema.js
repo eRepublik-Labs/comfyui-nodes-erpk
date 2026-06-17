@@ -167,6 +167,7 @@ function parseV2Entry(entry) {
     if (id) region.id = id;
     if (entry.op === "cutout") region.cutout = true;
     if (entry.edit_by === "model") region.edit_by = "model";
+    if (entry.markers === false) region.markers = false;
     const bindSlot = coerceBindSlot(entry.bind);
     if (bindSlot !== null) region.bind_slot = bindSlot;
     if (isPlainObject(entry.ui)) {
@@ -280,6 +281,8 @@ function regionToEntry(region, id) {
     entry.op = region.cutout ? "cutout" : "normal";
     // Default ("node") stays out so node-applied regions serialize as before.
     if (region.edit_by === "model") entry.edit_by = "model";
+    // Markers default on, so only the off state is written.
+    if (region.markers === false) entry.markers = false;
     entry.bind = (typeof region.bind_slot === "number" && Number.isFinite(region.bind_slot))
         ? { slot: Math.trunc(region.bind_slot) }
         : null;
