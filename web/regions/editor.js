@@ -456,7 +456,23 @@ export function createRegionEditor(node) {
     root.addEventListener("pointerdown", E.hideTip, true);
     canvas.addEventListener("pointerleave", E.onCanvasTipLeave);
 
-    const observer = new ResizeObserver(() => E.layout());
+    // The ResizeObserver fires once the DOM widget's real dimensions settle,
+    // which can land after setup()'s first fitNodeHeight() — at setup time the
+    // editor height is not always folded into computeSize() yet, so a node that
+    // was saved or created tall keeps a height surplus (the empty band below the
+    // editor). Re-fit here. The fit is deferred to an animation frame and
+    // guarded so the setSize it may trigger does not re-enter the observer
+    // synchronously (it converges in one corrective step).
+    let fitScheduled = false;
+    const observer = new ResizeObserver(() => {
+        E.layout();
+        if (fitScheduled) return;
+        fitScheduled = true;
+        requestAnimationFrame(() => {
+            fitScheduled = false;
+            fitNodeHeight();
+        });
+    });
     observer.observe(stage);
 
     // With the editor pinned and the prompt capped, nothing grows into extra node
