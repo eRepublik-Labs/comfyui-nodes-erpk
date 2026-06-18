@@ -5,6 +5,8 @@
 
 Preview any value in the graph: strings, URLs to media, ComfyUI IMAGE tensors, AUDIO dicts, or any Python value. A Download button saves the rendered content to your computer.
 
+The three settings below live in a collapsible **Options** panel on the node — click the Options bar to expand the styled controls. The Download / Copy buttons appear only once there is content to act on.
+
 ## Parameters
 
 | Parameter | Type | Default | Description |
@@ -12,6 +14,7 @@ Preview any value in the graph: strings, URLs to media, ComfyUI IMAGE tensors, A
 | value | * (any) | — | The value to preview. Connect any output. |
 | display_type | Combo | auto | `auto` detects from the input. Force with `text`, `markdown`, `image`, `gif`, `video`, `audio`. |
 | filename | String | preview | Base filename used when the Download button is clicked. |
+| strip_metadata | Boolean | false | Re-encode image URL inputs to strip EXIF / ICC / XMP (GPS, camera info, timestamps) before download. Images only; IMAGE tensor inputs are already metadata-free. |
 
 ## How detection works
 

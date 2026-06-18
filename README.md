@@ -292,7 +292,10 @@ String manipulation and general utility nodes.
 **Preview Anything features:**
 - Accepts any value via a wildcard input
 - Auto-detects type (image/video/audio by URL extension, markdown by syntax, IMAGE tensor, AUDIO dict)
-- Optional `display_type` dropdown to force a specific renderer
+- Dark, distraction-free preview surface
+- **Collapsible Options panel** tucks `display_type`, `filename`, and `strip_metadata` behind a single bar so the node stays clean; click to expand the styled controls
+- **Toolbar appears only when there is content** — the Download / Copy buttons and character counter stay hidden until a payload is rendered
+- `display_type` dropdown to force a specific renderer
 - Download button saves content as `.txt`, `.md`, or the original media format
 - **Copy button** in the toolbar: copies text/markdown to clipboard, or copies the current image (single-image and gallery-single views) as a PNG blob
 - **Character counter** appears in the toolbar for text and markdown output
