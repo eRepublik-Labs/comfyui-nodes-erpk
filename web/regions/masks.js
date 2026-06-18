@@ -12,6 +12,10 @@ export function ensureMaskImg(box, render) {
     if (!img) {
         img = new Image();
         img.addEventListener("load", () => render(), { once: true });
+        // A corrupt/empty base64 mask never fires `load`; flag it so callers fall
+        // back to a full-box crop (mirroring the Python composite's except-pass)
+        // instead of staying stuck showing the untouched source.
+        img.addEventListener("error", () => { box._erpkMaskFailed = true; render(); }, { once: true });
         img.src = "data:image/png;base64," + box.mask;
         box._erpkMaskImg = img;
     }
@@ -80,20 +84,25 @@ export function ghostCheckerFor(box, gw, gh) {
     return off;
 }
 
-// The masked object pixels cropped from the source image at the origin
-// box, for the drag preview of a moved region. Built once per region.
+// The object pixels cropped from the source image at the region's source box,
+// for the relocation preview of a moved region and the occluder re-stamp of a
+// static one. With a decodable mask the crop is clipped to the silhouette; a
+// maskless region (or one whose mask failed to decode) yields the FULL source
+// rectangle, mirroring the Python composite's alpha=ones fallback. Built once
+// per region (cached on the box). Returns null only while a present mask is
+// still decoding, or when the source image / source box is unavailable.
 export function cutoutFor(box, img, render) {
     if (box._erpkCutout) return box._erpkCutout;
-    if (!img || !img.complete || !img.naturalWidth) return null;
-    let maskImg = box._erpkMaskImg;
-    if (!maskImg) {
-        maskImg = new Image();
-        maskImg.src = "data:image/png;base64," + box.mask;
-        box._erpkMaskImg = maskImg;
-    }
-    if (!maskImg.complete || !maskImg.naturalWidth) {
-        maskImg.addEventListener("load", () => render(), { once: true });
-        return null;
+    if (!img || !img.complete || !img.naturalWidth || !box.src) return null;
+    let alpha = null;
+    if (box.mask && !box._erpkMaskFailed) {
+        const maskImg = ensureMaskImg(box, render);
+        if (!maskImg.complete || !maskImg.naturalWidth) {
+            // Still decoding (ensureMaskImg's load/error listeners re-render).
+            if (!box._erpkMaskFailed) return null;
+        } else {
+            alpha = maskAlphaCanvas(box);
+        }
     }
     const pw = Math.max(1, Math.round(box.src.w * img.naturalWidth));
     const ph = Math.max(1, Math.round(box.src.h * img.naturalHeight));
@@ -106,7 +115,6 @@ export function cutoutFor(box, img, render) {
         box.src.x * img.naturalWidth, box.src.y * img.naturalHeight,
         pw, ph, 0, 0, pw, ph,
     );
-    const alpha = maskAlphaCanvas(box);
     if (alpha) {
         offCtx.globalCompositeOperation = "destination-in";
         offCtx.drawImage(alpha, 0, 0, pw, ph);

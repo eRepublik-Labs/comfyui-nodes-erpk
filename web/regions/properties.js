@@ -276,6 +276,12 @@ export function installProperties(E) {
 
     function refreshPanelDetail() {
         const box = state.primary;
+        // The detail is the inspector for the selected region; with no selection
+        // (an empty-canvas right-click) the panel shows just the list. Selecting
+        // any row — including a cut-out, which has no clickable canvas face —
+        // reveals it. Built unconditionally on open, shown only when something is
+        // selected.
+        if (E.panelDetail) E.panelDetail.style.display = box ? "flex" : "none";
         if (E.panelNameInput && document.activeElement !== E.panelNameInput) {
             E.panelNameInput.value = box ? (box.group || "") : "";
         }
@@ -326,8 +332,10 @@ export function installProperties(E) {
         const cutout = box?.cutout === true;
         const editByApplies = !!box && (cutout || moved || refWired);
         const nodeRefInsert = refWired && box?.edit_by !== "model";
-        const markerApplies = !!box && !cutout && !nodeRefInsert
-            && (moved ? box.edit_by === "model" : box.src == null);
+        const modelCutout = cutout && box?.edit_by === "model";
+        const markerApplies = !!box && !nodeRefInsert && (
+            modelCutout
+            || (!cutout && (moved ? box.edit_by === "model" : box.src == null)));
         if (E.panelEditByRow) E.panelEditByRow.style.display = editByApplies ? "flex" : "none";
         if (E.panelMarkersRow) E.panelMarkersRow.style.display = markerApplies ? "flex" : "none";
         if (E.panelEditByBtns) {
@@ -666,6 +674,7 @@ export function installProperties(E) {
 
         // Publish the field references so refresh/redraw can reach them and
         // closePanel can drop them.
+        E.panelDetail = detail;
         E.panelThumb = panelThumb;
         E.panelNameInput = panelNameInput;
         E.panelKindBtns = panelKindBtns;

@@ -114,8 +114,14 @@ def _kept_pixels(regions, width, height):
         if region.op == "cutout" or region.kind == "text":
             continue
         if region_moved(region):
-            if region.edit_by == "model" or region_ref_image(region):
-                continue   # nothing composited at the destination
+            if region_ref_image(region):
+                continue   # ref-move: the model places it, nothing composited
+            if region.edit_by == "model":
+                # A model move keeps its object at the ORIGIN — the node no longer
+                # clears it — so spare that silhouette, not the empty destination.
+                kept = np.maximum(
+                    kept, _silhouette_at(region, region.source.box, width, height))
+                continue
         elif region.source is None:
             continue       # a hand-drawn addition holds no pixels at its box
         kept = np.maximum(kept, _silhouette_at(region, region.box, width, height))
@@ -131,8 +137,9 @@ def _move_origin_mask(regions, width, height):
     destination. Subtracting the whole keep set — not just the region's own paste —
     means clearing one origin never erases a pasted move or a real object that now
     sits over it (a per-region subtraction left a neighbour's copy painted over).
-    A model move composites no paste, so its origin clears except where it overlaps
-    something real. All-zero when nothing moved. numpy/PIL only, unit-testable.
+    A model move is excluded entirely — its object stays at the origin for the edit
+    model to relocate, so the node never clears it. All-zero when nothing moved.
+    numpy/PIL only, unit-testable.
     """
     import numpy as np
 
@@ -141,7 +148,8 @@ def _move_origin_mask(regions, width, height):
     mask = np.zeros((height, width), dtype=np.uint8)
     for region in regions:
         if (not region_moved(region) or region.kind == "text"
-                or region_ref_image(region) or region.op == "cutout"):
+                or region_ref_image(region) or region.op == "cutout"
+                or region.edit_by == "model"):
             continue
         mask = np.maximum(mask, _silhouette_at(region, region.source.box, width, height))
     return mask & ~_kept_pixels(regions, width, height)

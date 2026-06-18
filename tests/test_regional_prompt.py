@@ -1431,6 +1431,61 @@ class TestCompositeMovedRegions:
         assert float(out[0, 12, 12, 0]) == 1.0   # patch landed at destination
 
 
+class TestReapplyOccluder:
+    """Depth restored after a move: a higher-index static scanned region
+    re-covers a lower-index move it overlaps, while a lower-index static never
+    re-covers a higher-index move. The editor canvas mirrors these exact rules
+    (web/regions occludesMove + the Pass-4 re-stamp)."""
+
+    @staticmethod
+    def _full_mask():
+        Image = pytest.importorskip("PIL.Image")
+        import base64
+        from io import BytesIO
+        buf = BytesIO()
+        Image.new("L", (8, 8), 255).save(buf, format="PNG")
+        return base64.b64encode(buf.getvalue()).decode()
+
+    def test_higher_index_static_recovers_lower_index_move(self):
+        torch = pytest.importorskip("torch")
+        m = self._full_mask()
+        image = torch.zeros((1, 20, 20, 3))
+        image[:, 0:8, 0:8, 0] = 1.0    # camera source pixels (red) at its origin
+        image[:, 0:8, 8:16, 1] = 1.0   # clock pixels (green) at its static box
+        camera = region(x=0.3, y=0.0, w=0.4, h=0.4, desc="camera", mask=m,
+                        src={"x": 0.0, "y": 0.0, "w": 0.4, "h": 0.4})   # idx 0, moved
+        clock = region(x=0.4, y=0.0, w=0.4, h=0.4, desc="clock", mask=m)  # idx 1, static
+        out = composite_moved_regions(image, [camera, clock])
+        # In the overlap (x8..14) the higher-index static clock is restored on top.
+        assert float(out[0, 4, 10, 1]) == 1.0    # green (clock) wins
+        assert float(out[0, 4, 10, 0]) == 0.0     # not the camera's red
+        # Where only the camera move landed (x6..8) its red paste stands.
+        assert float(out[0, 4, 7, 0]) == 1.0
+
+    def test_lower_index_static_does_not_recover_higher_index_move(self):
+        torch = pytest.importorskip("torch")
+        m = self._full_mask()
+        image = torch.zeros((1, 20, 20, 3))
+        image[:, 0:8, 0:8, 0] = 1.0    # camera (red) at its static box
+        image[:, 0:8, 8:16, 1] = 1.0   # clock source pixels (green) at its origin
+        camera = region(x=0.0, y=0.0, w=0.4, h=0.4, desc="camera", mask=m)  # idx 0, static
+        clock = region(x=0.05, y=0.0, w=0.4, h=0.4, desc="clock", mask=m,
+                       src={"x": 0.4, "y": 0.0, "w": 0.4, "h": 0.4})   # idx 1, moved
+        out = composite_moved_regions(image, [camera, clock])
+        # The higher-index move stays on top; the lower-index static is not restored.
+        assert float(out[0, 4, 4, 1]) == 1.0     # green (clock move) wins
+        assert float(out[0, 4, 4, 0]) == 0.0      # camera red not restored
+
+    def test_two_static_masked_regions_are_a_noop(self):
+        torch = pytest.importorskip("torch")
+        m = self._full_mask()
+        image = torch.zeros((1, 20, 20, 3))
+        camera = region(x=0.0, y=0.0, w=0.4, h=0.4, desc="camera", mask=m)
+        clock = region(x=0.3, y=0.0, w=0.4, h=0.4, desc="clock", mask=m)
+        out = composite_moved_regions(image, [camera, clock])
+        assert out is image   # nothing moved -> source-photo occlusion untouched
+
+
 class TestCropRegionSubject:
     """A model move's origin is cleared, so a crop of the original subject is
     attached as a reference image the edit model can reproduce."""
@@ -1499,8 +1554,10 @@ class TestCompositeRefAtBox:
         assert float(base[0, 10, 10, 0]) == 0.0
 
 
-class TestModelMoveReferenceCrop:
-    """execute() attaches the crop to image_refs and the prompt cites it."""
+class TestModelMoveKeepsObject:
+    """execute() leaves a model move's object in the image (origin not cleared, no
+    reference crop attached); the prompt relocates the visible object from its
+    origin marker to its destination marker."""
 
     @staticmethod
     def _doc():
@@ -1517,8 +1574,9 @@ class TestModelMoveReferenceCrop:
             }],
         })
 
-    def test_crop_appended_and_cited(self):
+    def test_no_ref_and_two_marker_move_clause(self):
         torch = pytest.importorskip("torch")
+        pytest.importorskip("PIL")
         image = torch.zeros((1, 40, 40, 3))
         image[:, 0:10, 0:10, :] = 1.0
         out = RegionalPromptBuilder.execute(
@@ -1526,9 +1584,11 @@ class TestModelMoveReferenceCrop:
             regions_data=self._doc(), image=image,
         )
         prompt, image_refs = out.args[0], out.args[5]
-        assert len(image_refs) == 1
-        assert float(image_refs[0][0, 2, 2, 0]) == 1.0   # the source subject
-        assert "Reproduce it exactly from image 2" in prompt
+        assert image_refs == []                            # no crop attached
+        assert "Reproduce it exactly from image" not in prompt
+        # The visible object is moved from its origin marker (A) to its target (B).
+        assert "Move it from marker A" in prompt
+        assert "to marker B" in prompt
 
 
 class TestNodeRefInsertion:
@@ -1796,6 +1856,16 @@ class TestModelEditMoves:
         assert "remove the duplicate" not in prompt
         assert "repositioned by pasting" not in prompt
 
+    def test_model_move_forbids_a_duplicate(self):
+        # The duplicate failure mode (model keeps a copy at the origin): the prompt
+        # is hardened to relocate the single object and leave no copy behind.
+        mv = self._model_move()
+        assign_markers([mv])
+        prompt = build_prompt("", 1000, 1000, [mv])
+        assert "do not add a new one" in prompt          # section rule
+        assert "leave no copy of it behind" in prompt     # the move line
+        assert "no copy remains" in prompt                # the marker clause
+
     def test_model_move_pins_size_to_box(self):
         # The box_2d carries the extent; the line states no percent/pixel size and
         # leans on the box with an explicit no-resize directive instead.
@@ -1878,17 +1948,11 @@ class TestModelEditMoves:
         prompt = build_prompt("", 1000, 1000, [self._model_move()])
         assert "Place it" not in prompt
 
-    def test_model_move_cites_reference_crop(self):
-        # The node clears the origin, so the model has no in-image reference; a
-        # crop is attached and the line tells the model to reproduce it from it.
+    def test_model_move_does_not_cite_a_reference(self):
+        # The object stays in the image (origin not cleared), so the model
+        # relocates what it can see — no reference crop, no "reproduce from image".
         lemur = self._lemur(x=0.5, y=0.5, w=0.1, h=0.1)
-        lemur.move_ref_image = 2
         prompt = build_prompt("", 1000, 1000, [lemur])
-        assert "Reproduce it exactly from image 2" in prompt
-        assert "image 1 is the image being edited" in prompt  # legend present
-
-    def test_model_move_without_crop_omits_reference(self):
-        prompt = build_prompt("", 1000, 1000, [self._model_move()])
         assert "Reproduce it exactly from image" not in prompt
         assert "image 1 is the image being edited" not in prompt
 
@@ -1927,9 +1991,9 @@ class TestModelEditMoves:
 
 
 class TestModelEditSkipsNodeFill:
-    """A model cut-out leaves its pixels for the model to remove. A model MOVE,
-    however, still has its origin cleared by the node: leaving the original in
-    place makes the edit model render a second copy at the destination."""
+    """A model edit leaves its pixels for the edit model: a model cut-out is not
+    erased, and a model MOVE keeps its object at the origin (the node no longer
+    clears it) so the model relocates the visible object from A to B."""
 
     def test_model_cutout_not_filled_by_node(self):
         cut = region(x=0.1, y=0.1, w=0.4, h=0.4, cutout=True, edit_by="model")
@@ -1941,23 +2005,25 @@ class TestModelEditSkipsNodeFill:
         mask = _cutout_mask([cut], 100, 100)
         assert mask[20, 20] == 255
 
-    def test_model_move_origin_is_cleared(self):
-        # Leaving the origin makes the model render a SECOND copy; the node clears
-        # it so only the destination render remains.
+    def test_model_move_origin_is_kept(self):
+        # The object stays at its origin for the edit model to relocate, so the
+        # node clears nothing — the origin mask is empty.
         mv = region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a hippo",
                     src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}, edit_by="model")
         mask = _move_origin_mask([mv], 100, 100)
-        assert mask[15, 15] == 255   # origin (px 10-30) is cleared
-        assert int(mask.sum()) > 0
+        assert int(mask.sum()) == 0   # origin (px 10-30) is NOT cleared
 
-    def test_model_move_clears_whole_origin_no_paste_to_spare(self):
-        # A node move spares where its paste lands; a model move composites no
-        # paste, so the entire origin silhouette is cleared even when the
-        # destination overlaps it.
-        mv = region(x=0.2, y=0.2, w=0.2, h=0.2, desc="a hippo",   # dest overlaps origin
-                    src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}, edit_by="model")
-        mask = _move_origin_mask([mv], 100, 100)
-        assert mask[25, 25] == 255   # inside the dest box, still cleared
+    def test_node_move_clear_spares_overlapping_model_move_object(self):
+        # A node move's origin clear must not erase a model move's object where the
+        # two overlap: the model move's origin silhouette is in the keep set.
+        node_mv = region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a tray",
+                         src={"x": 0.15, "y": 0.15, "w": 0.2, "h": 0.2})  # origin px 15-35
+        model_mv = region(x=0.7, y=0.1, w=0.2, h=0.2, desc="a hippo",
+                          src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2},   # origin px 10-30
+                          edit_by="model")
+        mask = _move_origin_mask([node_mv, model_mv], 100, 100)
+        assert mask[20, 20] == 0     # in both origins — model object spared
+        assert mask[32, 32] == 255   # node origin only — cleared
 
     def test_node_move_origin_still_erased(self):
         mv = region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a hippo",
@@ -2015,9 +2081,15 @@ class TestMarkerRegions:
         anchor = region(desc="a tree", src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2})
         assert marker_regions([anchor]) == []
 
-    def test_cutout_is_not_marked(self):
+    def test_node_cutout_is_not_marked(self):
         cut = region(desc="a sign", cutout=True)
         assert marker_regions([cut]) == []
+
+    def test_model_cutout_is_marked(self):
+        # A model cut-out leaves its object in the image for the model to remove;
+        # a marker tells the model which object to delete.
+        cut = region(desc="a sign", cutout=True, edit_by="model")
+        assert marker_regions([cut]) == [cut]
 
     def test_markers_off_opts_out(self):
         add = region(desc="a red hat", markers=False)
@@ -2042,6 +2114,25 @@ class TestAssignMarkers:
         assign_markers([r])
         assert "magenta" not in r.marker_color
 
+    def test_model_cutout_gets_single_marker(self):
+        cut = region(desc="a sign", cutout=True, edit_by="model")
+        assign_markers([cut])
+        assert cut.marker_color and cut.marker_label == "A"
+        assert getattr(cut, "marker_origin_color", None) is None  # one dot, not a move
+
+    def test_model_move_gets_origin_and_destination_markers(self):
+        # A model move is a relocation: it takes two markers (origin A, then
+        # destination B), each its own color; an addition keeps a single marker.
+        mv = region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a lemur",
+                    src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}, edit_by="model")
+        add = region(desc="a hat")
+        assign_markers([mv, add])
+        assert mv.marker_origin_label == "A" and mv.marker_label == "B"
+        assert mv.marker_origin_color and mv.marker_color
+        assert mv.marker_origin_color != mv.marker_color
+        assert add.marker_label == "C"
+        assert getattr(add, "marker_origin_color", None) is None
+
 
 class TestMarkerPrompt:
     """When a region carries a marker, the prompt explains the targets and cites
@@ -2060,6 +2151,25 @@ class TestMarkerPrompt:
         out = build_prompt("", 686, 386, [add], edit_mode=True)
         assert MARKER_HEADER not in out
         assert "Center it on marker" not in out
+
+    def test_model_cutout_removal_cites_its_marker(self):
+        cut = region(x=0.2, y=0.2, w=0.3, h=0.3, desc="a sign",
+                     cutout=True, edit_by="model")
+        assign_markers(marker_regions([cut]))
+        out = build_prompt("", 686, 386, [cut], edit_mode=True)
+        assert f"The object at marker {cut.marker_label}" in out
+        assert f"{cut.marker_color} dot" in out
+        assert "remove it and rebuild" in out
+
+    def test_model_move_cites_both_markers_as_a_move(self):
+        mv = region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a lemur",
+                    src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2}, edit_by="model")
+        assign_markers([mv])
+        out = build_prompt("", 686, 386, [mv], edit_mode=True)
+        assert f"Move it from marker {mv.marker_origin_label}" in out
+        assert f"to marker {mv.marker_label}" in out
+        assert f"{mv.marker_origin_color} dot" in out
+        assert "Center it on marker" not in out  # a move is not "centered"
 
 
 class TestDrawPlacementMarkers:
@@ -2101,6 +2211,19 @@ class TestDrawPlacementMarkers:
         assign_markers([add])
         draw_placement_markers(base, [add])
         assert float(base[0, 50, 50, 0]) == 0.0
+
+    def test_model_move_stamps_origin_and_destination_dots(self):
+        torch = pytest.importorskip("torch")
+        pytest.importorskip("PIL")
+        base = torch.zeros((1, 200, 200, 3))
+        mv = region(x=0.6, y=0.6, w=0.2, h=0.2, desc="a lemur",   # dest center px (140,140)
+                    src={"x": 0.1, "y": 0.1, "w": 0.2, "h": 0.2},  # origin center px (40,40)
+                    edit_by="model")
+        assign_markers([mv])
+        out = draw_placement_markers(base, [mv])
+        assert float(out[0, 40, 32, :].sum()) > 0     # origin dot fill (off the glyph)
+        assert float(out[0, 140, 132, :].sum()) > 0   # destination dot fill
+        assert float(out[0, 5, 5, :].sum()) == 0      # untouched corner
 
 
 class TestExecuteMarkers:

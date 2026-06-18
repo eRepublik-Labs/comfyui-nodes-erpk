@@ -25,6 +25,7 @@ export function installLayers(E) {
         E.panel.remove();
         E.panel = null;
         panelList = null;
+        E.panelDetail = null;
         E.panelDimFields = null;
         E.panelNameInput = null;
         E.panelDescInput = null;
@@ -509,11 +510,12 @@ export function installLayers(E) {
             document.addEventListener("pointerup", up);
         });
 
-        // Right-clicking a region shows its detail above the list. Empty-canvas
-        // right-clicks open just the list.
-        if (hit >= 0) {
-            E.buildDetail(panel);
-        }
+        // The detail inspector is built unconditionally and lifted above the
+        // list; refreshPanelDetail hides it when nothing is selected, so an
+        // empty-canvas right-click still shows just the list, while selecting any
+        // row later (including a cut-out, which has no clickable canvas face)
+        // reveals it.
+        E.buildDetail(panel);
 
         panelList = document.createElement("div");
         panel.appendChild(panelList);

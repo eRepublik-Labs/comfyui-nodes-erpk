@@ -261,17 +261,9 @@ class RegionalPromptBuilder(IO.ComfyNode):
         regions += parse_regions(kwargs.get("regions"))
         if not regions and not prompt.strip():
             raise ValueError("Describe the scene or add at least one region")
-        # A model move's origin is cleared deterministically below, leaving the
-        # edit model no in-image copy to reproduce; attach a crop of the original
-        # subject (taken from the still-pristine image) as a reference it cites.
-        for region in regions:
-            if (region.edit_by == "model" and region_moved(region)
-                    and region.kind != "text" and region.op != "cutout"
-                    and not region_ref_image(region)):
-                crop = crop_region_subject(image, region)
-                if crop is not None:
-                    image_refs.append(crop)
-                    region.move_ref_image = len(image_refs) + 1
+        # A model move keeps its object in the image — the node does not clear its
+        # origin — so the edit model relocates the visible object (from its origin
+        # marker to its destination marker) and needs no reference crop.
         # Chroma key fill for cleared areas when selected, else cv2 inpaint.
         chroma = (kwargs.get("chroma_color", "#00B140")
                   if kwargs.get("removal_fill") == "chroma" else None)

@@ -182,20 +182,31 @@ MARKER_COLORS = [
 ]
 
 
-def assign_markers(to_mark):
-    """Give each region a distinct marker color and label letter.
+def _is_model_move(region):
+    """True for a relocation the edit model performs (gets a from/to marker pair)."""
+    return (region_moved(region) and region.edit_by == "model"
+            and region.kind != "text" and region.op != "cutout")
 
-    Two independent identifiers make the mark unmistakable: a color name (set on
+
+def assign_markers(to_mark):
+    """Give each region distinct marker color(s) and label letter(s).
+
+    Two independent identifiers make a mark unmistakable: a color name (set on
     region.marker_color, skipping any color word already in the description so a
     magenta object never gets a magenta marker) and a sequential letter A, B, C…
     (region.marker_label) that the drawn glyph and the prompt's "marker A" both
-    cite. A letter, not a number, avoids colliding with the prompt's own numbered
-    element list. Pure (no image work); both are runtime attributes the prompt
-    reads via getattr, mirroring ref_image.
+    cite. A model move is a relocation, so it gets TWO markers — its ORIGIN
+    (marker_origin_color/marker_origin_label, allocated first) and its DESTINATION
+    — and the prompt reads "move it from marker A to marker B". A letter, not a
+    number, avoids colliding with the prompt's own numbered element list. Pure (no
+    image work); all are runtime attributes the prompt reads via getattr,
+    mirroring ref_image.
     """
     used = set()
-    for index, region in enumerate(to_mark):
-        desc = (region.content.desc or "").lower()
+    counter = 0
+
+    def take(desc):
+        nonlocal counter
         choice = next(
             (name for name, _ in MARKER_COLORS
              if name not in used and name.split()[-1] not in desc),
@@ -205,8 +216,15 @@ def assign_markers(to_mark):
             choice = next((name for name, _ in MARKER_COLORS if name not in used),
                           MARKER_COLORS[0][0])
         used.add(choice)
-        region.marker_color = choice
-        region.marker_label = chr(ord("A") + index) if index < 26 else str(index + 1)
+        label = chr(ord("A") + counter) if counter < 26 else str(counter + 1)
+        counter += 1
+        return choice, label
+
+    for region in to_mark:
+        desc = (region.content.desc or "").lower()
+        if _is_model_move(region):
+            region.marker_origin_color, region.marker_origin_label = take(desc)
+        region.marker_color, region.marker_label = take(desc)
 
 
 def _marker_font(size):
@@ -233,15 +251,22 @@ def _draw_marker(draw, cx, cy, r, rgb, label):
     luminance = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
     ink = (0, 0, 0, 255) if luminance > 150 else (255, 255, 255, 255)
     font = _marker_font(max(11, int(r * 1.3)))
-    left, top, right, bottom = draw.textbbox((0, 0), label, font=font)
+    # Faux-bold: a stroke in the ink color thickens the glyph so the letter reads
+    # boldly on the dot (the default font has no bold weight), making the marker a
+    # stronger signal the edit model is less likely to overlook.
+    stroke = max(1, r // 10)
+    left, top, right, bottom = draw.textbbox((0, 0), label, font=font,
+                                             stroke_width=stroke)
     tx = cx - (right - left) / 2 - left
     ty = cy - (bottom - top) / 2 - top
-    draw.text((tx, ty), label, fill=ink, font=font)
+    draw.text((tx, ty), label, fill=ink, font=font,
+              stroke_width=stroke, stroke_fill=ink)
 
 
 def draw_placement_markers(image, regions):
-    """Stamp a solid colored dot with a centered label letter at the box center of
-    every region carrying a marker_color.
+    """Stamp a solid colored dot with a centered label letter for every region
+    carrying a marker_color: at its box center, plus — for a model move — a second
+    dot at its origin (marker_origin_color), so the pair reads as "from A to B".
 
     A bold filled dot (over a dark halo) reads on any background far better than a
     thin outline, and the letter inside gives the prompt a second referent. The
@@ -261,29 +286,38 @@ def draw_placement_markers(image, regions):
                for name, rgb in MARKER_COLORS}
     result = image.clone()
     height, width = int(result.shape[1]), int(result.shape[2])
+
+    def stamp(frame, color_name, label, box):
+        rgb = palette.get(color_name)
+        if rgb is None:
+            return
+        x0, y0, x1, y1 = mask_pixel_box(box, width, height)
+        cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
+        r = int(min(max(min(x1 - x0, y1 - y0) * 0.18, 10), 30))
+        pad = 3
+        tx0, ty0 = max(0, cx - r - pad), max(0, cy - r - pad)
+        tx1, ty1 = min(width, cx + r + pad), min(height, cy + r + pad)
+        tw, th = tx1 - tx0, ty1 - ty0
+        if tw <= 0 or th <= 0:
+            return
+        tile = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
+        _draw_marker(ImageDraw.Draw(tile), cx - tx0, cy - ty0, r, rgb, label)
+        overlay = np.asarray(tile, dtype=np.float32) / 255.0
+        alpha = overlay[:, :, 3:4]
+        sub = result[frame, ty0:ty1, tx0:tx1, :].cpu().numpy()
+        blended = overlay[:, :, :3] * alpha + sub * (1.0 - alpha)
+        result[frame, ty0:ty1, tx0:tx1, :] = torch.from_numpy(blended).to(
+            device=result.device, dtype=result.dtype)
+
     for frame in range(int(result.shape[0])):
         for region in marked:
-            rgb = palette.get(region.marker_color)
-            if rgb is None:
-                continue
-            x0, y0, x1, y1 = mask_pixel_box(region.box, width, height)
-            cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
-            r = int(min(max(min(x1 - x0, y1 - y0) * 0.18, 10), 30))
-            pad = 3
-            tx0, ty0 = max(0, cx - r - pad), max(0, cy - r - pad)
-            tx1, ty1 = min(width, cx + r + pad), min(height, cy + r + pad)
-            tw, th = tx1 - tx0, ty1 - ty0
-            if tw <= 0 or th <= 0:
-                continue
-            tile = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
-            _draw_marker(ImageDraw.Draw(tile), cx - tx0, cy - ty0, r, rgb,
-                         getattr(region, "marker_label", None))
-            overlay = np.asarray(tile, dtype=np.float32) / 255.0
-            alpha = overlay[:, :, 3:4]
-            sub = result[frame, ty0:ty1, tx0:tx1, :].cpu().numpy()
-            blended = overlay[:, :, :3] * alpha + sub * (1.0 - alpha)
-            result[frame, ty0:ty1, tx0:tx1, :] = torch.from_numpy(blended).to(
-                device=result.device, dtype=result.dtype)
+            stamp(frame, region.marker_color,
+                  getattr(region, "marker_label", None), region.box)
+            origin_color = getattr(region, "marker_origin_color", None)
+            if origin_color and region.source is not None:
+                stamp(frame, origin_color,
+                      getattr(region, "marker_origin_label", None),
+                      region.source.box)
     return result
 
 

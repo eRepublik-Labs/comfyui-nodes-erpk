@@ -10,6 +10,7 @@ import {
     rectFrom,
     ratioString,
     fitFrameToImage,
+    occludesMove,
 } from "./geometry.js";
 import {
     frameAspect,
@@ -114,24 +115,78 @@ export function installRenderer(E) {
     // A moved region's origin erase-preview (the checkerboard silhouette where
     // it used to be) is a vacated/background area, so it draws backmost — the
     // same lowest-depth rule as cut-outs — and a region moved over it paints on
-    // top instead of sliding under it.
+    // top instead of sliding under it. Hidden regions draw nothing, including
+    // their ghost. A node move's origin is cleared, so its checker is solid; a
+    // model move's origin is NOT cleared (the object stays for the edit model), so
+    // its checker draws at half opacity — the object shows through, reading as
+    // "moving from here" rather than "removed".
     function drawMoveGhost(box) {
-        if (box.cutout || !(box.mask && E.regionMoved(box))) return;
-        ensureMaskImg(box, render);
+        if (box.cutout || box.kind === "text" || !E.regionMoved(box)
+            || E.effectiveHidden(box)) return;
         const gx = box.src.x * state.cssW;
         const gy = box.src.y * state.cssH;
         const gw = box.src.w * state.cssW;
         const gh = box.src.h * state.cssH;
-        const ghost = ghostCheckerFor(box, gw, gh);
-        if (ghost) ctx.drawImage(ghost, gx, gy, gw, gh);
+        ctx.save();
+        if (box.edit_by === "model") ctx.globalAlpha = 0.5;
+        if (box.mask && !box._erpkMaskFailed) {
+            ensureMaskImg(box, render);
+            const ghost = ghostCheckerFor(box, gw, gh);
+            if (ghost) ctx.drawImage(ghost, gx, gy, gw, gh);
+            // Masked but still decoding: draw nothing (re-renders on mask load).
+        } else {
+            // Maskless move (or a mask that failed to decode): the whole source
+            // box is vacated, so show a full-box checker — matching the full
+            // rectangle the Python composite clears at a maskless move's origin.
+            ctx.fillStyle = checkerPattern(ctx);
+            ctx.fillRect(gx, gy, gw, gh);
+        }
+        ctx.restore();
+    }
+
+    // Moves stamped at their destination in the preview (Node- and Model-applied
+    // alike), as {index, box} of their DEST boxes — the depth inputs for the
+    // occluder re-stamp so a dest stamp sits behind any higher-index static it
+    // overlaps. Excludes text, cut-outs, and ref inserts (none stamp a relocated
+    // object). For Node moves this mirrors the Python `moved` set; for Model moves
+    // it is an editor-only convenience (the node defers their placement, but the
+    // preview still shows the intended front/back).
+    function movePreviewBoxes() {
+        const moves = [];
+        state.boxes.forEach((box, i) => {
+            if (E.regionMoved(box) && box.kind !== "text" && !box.cutout
+                && !E.refWiredFor(box)) {
+                moves.push({ index: i, box: { x: box.x, y: box.y, w: box.w, h: box.h } });
+            }
+        });
+        return moves;
+    }
+
+    // Re-stamp a static scanned region's own silhouette over any lower-index
+    // move it overlaps, so the move reads as behind it — the canvas mirror of
+    // the Python composite's _reapply_occluders. cutoutFor reads the pristine
+    // source crop, exactly as Python re-copies from the untouched image. Static
+    // vs static never qualifies (no move in range), so true source-photo
+    // occlusion between two unmoved objects is left untouched.
+    function drawOccluderRestamp(box, index, moveBoxes) {
+        if (E.effectiveHidden(box) || box.cutout || box.kind === "text"
+            || E.regionMoved(box) || !box.mask) return;
+        if (!occludesMove(index, box, moveBoxes)) return;
+        const cut = cutoutFor(box, upstreamImage(node, "image"), render);
+        if (!cut) return;
+        ctx.drawImage(cut, box.x * state.cssW, box.y * state.cssH,
+            box.w * state.cssW, box.h * state.cssH);
     }
 
     function drawBox(box, index) {
         if (E.effectiveHidden(box)) return;
-        // A cut-out region renders only as the transparency checker behind its
+        // A Node cut-out renders only as the transparency checker behind its
         // mask (or its whole box when maskless) — no box, label, or handles. It
-        // reads as "already removed", matching the transparent image output.
-        if (box.cutout) {
+        // reads as "already removed", matching the transparent image output. A
+        // Model cut-out is not erased by the node (the edit model removes it), so
+        // it falls through to normal rendering — the object stays visible with
+        // the ✦ chip flagging it for model removal.
+        if (box.cutout && box.edit_by !== "model") {
             const cx = box.x * state.cssW, cy = box.y * state.cssH;
             const cw = box.w * state.cssW, ch = box.h * state.cssH;
             ensureMaskImg(box, render);  // decode the mask so the silhouette survives reload
@@ -154,18 +209,27 @@ export function installRenderer(E) {
         const isSelected = state.selection.has(box);
 
         // A moved scanned region previews its relocation: the origin shows an
-        // erase-preview (a checkerboard silhouette — "already cut out") and
-        // the masked cut-out follows the box ABOVE it, so a small nudge reads
-        // as the object sliding off its own hole. Clicking the ghost snaps
-        // back; an arrow ties origin to destination.
-        if (box.mask && E.regionMoved(box)) {
+        // erase-preview (a checkerboard silhouette — "already cut out") and the
+        // cut-out follows the box, so a small nudge reads as the object sliding
+        // off its own hole. Clicking the ghost snaps back; an arrow ties origin
+        // to destination. cutoutFor yields the masked silhouette, or the full
+        // source rectangle for a maskless move. Node- and Model-applied moves
+        // alike preview at the destination; the occluder re-stamp (in paint())
+        // then re-covers either behind a higher-index static region, so the
+        // canvas shows the intended front/back even for a Model move the node
+        // leaves to the edit model.
+        if (E.regionMoved(box)) {
             ensureMaskImg(box, render);  // decode the mask so the ghost survives reload
             const gx = box.src.x * state.cssW;
             const gy = box.src.y * state.cssH;
             const gw = box.src.w * state.cssW;
             const gh = box.src.h * state.cssH;
-            // The origin checkerboard itself is drawn backmost by drawMoveGhost;
-            // here only the relocated object, its origin outline, and the arrow.
+            // The relocated object is stamped at the destination for both Node and
+            // Model moves — the preview shows where it lands — with its origin
+            // outline and the arrow tying it back. A Model move shows NO origin
+            // checkerboard (drawMoveGhost skips it): the node does not actually
+            // clear the origin, so the object still sits in the image the edit
+            // model receives; the dashed outline alone marks where it came from.
             const cutout = cutoutFor(box, upstreamImage(node, "image"), render);
             if (cutout) ctx.drawImage(cutout, x, y, w, h);
             ctx.save();
@@ -230,31 +294,29 @@ export function installRenderer(E) {
             }
         }
 
-        // A crosshair at the box center previews the placement dot drawn at
-        // execute time, for the elements the model places itself: additions and
-        // model-applied moves with their marker on. Node-composited moves and
-        // node-inserted refs already have their pixels, and an unmoved scanned
-        // region is an anchor — none get a dot, so none get a crosshair.
+        // A crosshair previews each marker dot drawn at execute time, for the
+        // elements the model acts on by reading pixels: additions and model-moves
+        // (placement) and model cut-outs (removal), with their marker on. A model
+        // move shows TWO — one at its origin (the object the model relocates) and
+        // one at its destination; an addition or a model cut-out shows one. Node-
+        // composited moves/cut-outs and node-inserted refs already have their
+        // pixels, and an unmoved scanned region is an anchor — none get a dot.
         const moved = E.regionMoved(box);
         const nodeRefInsert = E.refWiredFor(box) && box.edit_by !== "model";
-        const showCrosshair = box.markers !== false && !box.cutout && !nodeRefInsert
-            && (moved ? box.edit_by === "model" : box.src == null);
+        const modelCutout = box.cutout && box.edit_by === "model";
+        const showCrosshair = box.markers !== false && !nodeRefInsert && (
+            modelCutout
+            || (!box.cutout && (moved ? box.edit_by === "model" : box.src == null)));
         if (showCrosshair) {
-            const cx = x + w / 2;
-            const cy = y + h / 2;
-            const r = Math.max(3, Math.min(9, Math.min(w, h) * 0.18));
-            ctx.save();
-            ctx.lineCap = "round";
-            ctx.lineWidth = 1.5;
-            ctx.strokeStyle = color;
-            ctx.globalAlpha = 0.55;
-            ctx.beginPath();
-            ctx.moveTo(cx - r, cy);
-            ctx.lineTo(cx + r, cy);
-            ctx.moveTo(cx, cy - r);
-            ctx.lineTo(cx, cy + r);
-            ctx.stroke();
-            ctx.restore();
+            drawCrosshair(x + w / 2, y + h / 2, Math.min(w, h), color);
+            // A move adds a second crosshair at its origin (the A→B pair); an
+            // addition or a cut-out has a single dot.
+            if (moved && box.src && !box.cutout) {
+                drawCrosshair((box.src.x + box.src.w / 2) * state.cssW,
+                              (box.src.y + box.src.h / 2) * state.cssH,
+                              Math.min(box.src.w * state.cssW, box.src.h * state.cssH),
+                              color);
+            }
         }
 
         // Text regions preview their literal text like a signage mock.
@@ -663,10 +725,20 @@ export function installRenderer(E) {
             // Backmost first: cut-out checkerboards and moved-region origin
             // ghosts are vacated/background areas, so every kept region paints on
             // top of them (matching the output). Each box keeps its real index so
-            // colors and labels stay correct.
-            state.boxes.forEach((box, i) => { if (box.cutout) drawBox(box, i); });
+            // colors and labels stay correct. A Model-applied cut-out is NOT
+            // erased by the node (the edit model removes it), so it renders as a
+            // normal present region (with the ✦ chip), not the erase checker.
+            const nodeCutout = (box) => box.cutout && box.edit_by !== "model";
+            state.boxes.forEach((box, i) => { if (nodeCutout(box)) drawBox(box, i); });
             state.boxes.forEach((box) => drawMoveGhost(box));
-            state.boxes.forEach((box, i) => { if (!box.cutout) drawBox(box, i); });
+            state.boxes.forEach((box, i) => { if (!nodeCutout(box)) drawBox(box, i); });
+            // Finally re-cover moves with the higher-index static scanned regions
+            // that occlude them, mirroring the output's _reapply_occluders so the
+            // preview shows the same front/back. Skipped when nothing moved.
+            const moveBoxes = movePreviewBoxes();
+            if (moveBoxes.length) {
+                state.boxes.forEach((box, i) => drawOccluderRestamp(box, i, moveBoxes));
+            }
         }
         if (state.drag?.mode === "create" || state.drag?.mode === "marquee") drawPending();
         if (state.drag?.mode === "resize") drawResizeBadge(state.drag.box);
@@ -700,6 +772,24 @@ export function installRenderer(E) {
         ctx.fillRect(px - 5, py - 11, tw + 10, 16);
         ctx.fillStyle = "rgba(255, 255, 255, 0.95)";
         ctx.fillText(text, px, py);
+        ctx.restore();
+    }
+
+    // A small cross marking a model-placed dot's center; span is the smaller box
+    // dimension so the cross scales with the region without overwhelming it.
+    function drawCrosshair(cx, cy, span, color) {
+        const r = Math.max(3, Math.min(9, span * 0.18));
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.55;
+        ctx.beginPath();
+        ctx.moveTo(cx - r, cy);
+        ctx.lineTo(cx + r, cy);
+        ctx.moveTo(cx, cy - r);
+        ctx.lineTo(cx, cy + r);
+        ctx.stroke();
         ctx.restore();
     }
 

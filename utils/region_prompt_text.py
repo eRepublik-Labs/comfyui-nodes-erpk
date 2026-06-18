@@ -44,11 +44,12 @@ REPOSITION_HEADER = (
 # only at its origin, with nothing pasted at the destination — so the prompt asks
 # the model to perform the relocation itself rather than to clean up a paste.
 MODEL_REPOSITION_HEADER = (
-    "Move the elements below to new positions. For each, erase it completely "
-    "from its current location and rebuild that area as natural background that "
-    "continues the surrounding scene, then render it at the target location, "
-    'blending naturally (areas are "box_2d = [ymin, xmin, ymax, xmax]" on a '
-    "0-1000 grid with top-left origin):"
+    "Relocate the elements below — move each existing object, do not add a new "
+    "one. There is exactly one of each: erase it completely from its current "
+    "location (rebuild that area as natural background that continues the "
+    "surrounding scene, leaving no copy or trace of it behind), then render that "
+    'same object at the target location, blending naturally (areas are "box_2d = '
+    '[ymin, xmin, ymax, xmax]" on a 0-1000 grid with top-left origin):'
 )
 ANCHORS_LINE = (
     "Every other element in the image stays exactly where it is — do not "
@@ -99,15 +100,18 @@ INSERT_HEADER = (
 # reads pixels, so the dot is a target it can actually see; it must be painted out
 # so it never survives into the result.
 MARKER_HEADER = (
-    "Solid colored dots have been drawn on the image to mark where each new "
-    "element goes — each is a filled dot in a unique color with a label letter "
-    "inside it, and each element below names its marker by letter and color. The "
-    "dots are guides, not part of the scene: place the named element centered on "
-    "its dot at the described size, then paint the dot out completely so none of "
-    "it remains. Each dot is the exact, required location for its element — put "
-    "the element on its dot even if a different spot in the scene looks more "
-    "natural or more typical for it; never move it off its dot to a more likely "
-    "place."
+    "Solid colored dots have been drawn on the image to mark placements — each is "
+    "a filled dot in a unique color with a label letter inside it, and each "
+    "element below names its marker(s) by letter and color. A newly added element "
+    "has one dot: place it centered there. A move has two dots — one on the object "
+    "at its current spot and one at its target — so move that object from the "
+    "first dot onto the second. An object to be removed has one dot on it: delete "
+    "that object and rebuild the background where it was. The dots are guides, not "
+    "part of the scene: paint every dot out completely so none of it remains. Each "
+    "dot is the exact, required location for its element — put the element on its "
+    "dot even if a "
+    "different spot in the scene looks more natural or more typical for it; never "
+    "move it off its dot to a more likely place."
 )
 
 
@@ -390,26 +394,26 @@ def _placement_anchors(region, regions):
 
 
 def _model_move_line(region, regions):
-    # No composite happened, so the object is still at its origin. Lead with the
+    # No composite happened — the object is still visible at its origin — so the
+    # prompt asks the model to relocate the object it can see. Lead with the
     # destination (the action the model must perform) and name the origin second
     # (the cleanup); models weight the first instruction, and one box per clause
     # keeps the two coordinate sets from being conflated. The box_2d pins the
     # target extent; a spelled-out percent/pixel size on top of it competes with
-    # the box and places worse, so size rides on the box plus a no-resize cue.
+    # the box and places worse, so size rides on the box plus a no-resize cue. The
+    # caller appends the marker clause, which names the from/to dots the model
+    # actually follows.
     src = region.source.box
     dest = region.box
     placement = placement_phrase(dest.x, dest.y, dest.w, dest.h)
     subject = region.content.desc or "The element"
-    crop = getattr(region, "move_ref_image", None)
-    reference = (f" Reproduce it exactly from image {crop} — keep the same shape, "
-                 f"colors, and markings.") if crop else ""
     return (
         f"{subject}: its new position is {placement}, exactly filling box_2d = "
         f"{box_2d(dest)}. Keep it at the size of that box; do not enlarge or "
         f"shrink it.{_placement_anchors(region, regions)} It is currently at "
-        f"box_2d = {box_2d(src)}; erase it there and rebuild that area as natural "
-        f"background. Render it at the new position, matching lighting, shadows, "
-        f"and perspective.{reference}"
+        f"box_2d = {box_2d(src)}; erase it there completely — leave no copy of it "
+        f"behind — and rebuild that area as natural background. Render the same "
+        f"object at the new position, matching lighting, shadows, and perspective."
     )
 
 
@@ -443,25 +447,40 @@ def _classify_regions(regions):
 
 
 def marker_regions(regions):
-    """The regions that get a visual placement marker: the ones the edit model
-    places itself — additions and model-applied moves — with markers left on.
-    Node-composited moves and inserted refs already have their pixels and never
-    do, and a region with markers off opts out.
+    """The regions that get a visual marker: the ones the edit model acts on by
+    reading pixels — additions and model-applied moves (placement) and model
+    cut-outs (removal) — with markers left on. Node-composited moves/cut-outs and
+    inserted refs already have their pixels done, so they never do, and a region
+    with markers off opts out.
     """
     _, moves, _, additions = _classify_regions(regions)
     model_moves = [region for region in moves if region.edit_by == "model"]
-    return [region for region in model_moves + additions
+    model_cutouts = [region for region in regions
+                     if region.op == "cutout" and region.kind != "text"
+                     and region.edit_by == "model"]
+    return [region for region in model_moves + additions + model_cutouts
             if getattr(region, "markers", True)]
 
 
 def _marker_clause(region):
-    """A trailing clause pointing an element at its drawn marker, or "" if unmarked."""
+    """A trailing clause pointing an element at its drawn marker(s), or "" if
+    unmarked. A model move carries two markers and reads as a from/to move; an
+    addition carries one and is centered on its dot."""
     color = getattr(region, "marker_color", None)
     if not color:
         return ""
     label = getattr(region, "marker_label", None)
-    target = f"marker {label} (the {color} dot)" if label else f"the {color} dot"
-    return f" Center it on {target}."
+    dest = f"marker {label} (the {color} dot)" if label else f"the {color} dot"
+    origin_color = getattr(region, "marker_origin_color", None)
+    if origin_color:
+        origin_label = getattr(region, "marker_origin_label", None)
+        origin = (f"marker {origin_label} (the {origin_color} dot it sits on now)"
+                  if origin_label else f"the {origin_color} dot it sits on now")
+        spot = f"marker {origin_label}" if origin_label else "that dot"
+        return (f" Move it from {origin} to {dest}: there is only one of it — "
+                f"erase it completely from {spot} so no copy remains, then paint "
+                f"out both dots.")
+    return f" Center it on {dest}."
 
 
 def _chroma_note(color):
@@ -586,7 +605,19 @@ def build_prompt(prompt, width, height, regions, edit_mode=False, chroma=None):
         lines.append("")
         lines.append(REMOVAL_HEADER)
         for index, region in enumerate(removals, start=1):
-            lines.append(f"{index}. box_2d = {box_2d(region.box)}")
+            # A model cut-out still has its object in the image; a marker on it
+            # tells the model which object to delete (pixels, not coordinates). A
+            # node cut-out is already cleared, so only its area is named.
+            color = getattr(region, "marker_color", None)
+            if color and region.edit_by == "model":
+                label = getattr(region, "marker_label", None)
+                mark = (f"marker {label} (the {color} dot)" if label
+                        else f"the {color} dot")
+                lines.append(f"{index}. The object at {mark}, box_2d = "
+                             f"{box_2d(region.box)}: remove it and rebuild that "
+                             f"area as natural background, then paint the dot out.")
+            else:
+                lines.append(f"{index}. box_2d = {box_2d(region.box)}")
     if moves or additions or inserts:
         lines.append(LAYOUT_FOOTER)
     return "\n".join(lines)

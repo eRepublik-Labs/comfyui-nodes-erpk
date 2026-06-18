@@ -79,6 +79,24 @@ export function ratioString(w, h) {
     return `${Math.round(w / d)}:${Math.round(h / d)}`;
 }
 
+// Axis-aligned overlap test for two {x, y, w, h} rects.
+export function rectsOverlap(a, b) {
+    return a.x < b.x + b.w && b.x < a.x + a.w
+        && a.y < b.y + b.h && b.y < a.y + a.h;
+}
+
+// The composite's depth test, mirrored for the canvas preview: a static scanned
+// region re-covers (sits in front of) a node-move only when the move's array
+// index is strictly LOWER and their boxes overlap — the same `j < index` rule as
+// the Python _reapply_occluders. `moves` is the list of node-move {index, box}
+// pairs. Two static regions never enter `moves`, so their source-photo occlusion
+// is left untouched; this never reorders static-over-static.
+export function occludesMove(staticIndex, staticBox, moves) {
+    return moves.some(
+        (m) => m.index < staticIndex && rectsOverlap(staticBox, m.box),
+    );
+}
+
 // Frame dimensions matching an image's aspect, scaled into the widget
 // range and snapped to the widgets' step of 8.
 export function fitFrameToImage(iw, ih) {
