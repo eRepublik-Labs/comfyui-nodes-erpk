@@ -15,11 +15,38 @@ import asyncio
 import time
 import io
 import requests
-from typing import Optional, Dict, Any
+from typing import Callable, Optional, Dict, Any
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from .utils import BaseRequest
+
+
+try:
+    from comfy.model_management import InterruptProcessingException as _InterruptBase
+except Exception:
+    _InterruptBase = Exception
+
+
+class WaveSpeedInterrupted(_InterruptBase):
+    """Raised when the user hit Cancel/interrupt during WaveSpeed task polling.
+
+    Subclasses ComfyUI's InterruptProcessingException when available so the
+    executor recognizes it as a clean cancel (no red error node); falls back to
+    plain Exception outside ComfyUI (unit tests, smoke scripts).
+    """
+
+
+def _resolve_interrupt_checker() -> Callable[[], bool]:
+    """Return a callable reporting whether ComfyUI's interrupt flag is set.
+
+    Falls back to a no-op when run outside ComfyUI (unit tests, smoke scripts).
+    """
+    try:
+        from comfy import model_management
+        return model_management.processing_interrupted
+    except Exception:
+        return lambda: False
 
 
 class WaveSpeedClient:
@@ -240,10 +267,17 @@ class WaveSpeedClient:
         if not request_id:
             raise Exception("No valid task ID provided")
 
+        is_interrupted = _resolve_interrupt_checker()
         start_time = time.time()
         last_status = None
 
         while time.time() - start_time < timeout:
+            # ComfyUI's Cancel only sets a flag; a long-running node must poll
+            # it. Check before each status request so Cancel bails out fast.
+            if is_interrupted():
+                raise WaveSpeedInterrupted(
+                    f"WaveSpeed task {request_id} polling aborted by ComfyUI interrupt"
+                )
             try:
                 task_status = await self.check_task_status(request_id)
                 status = task_status.get("status")
@@ -259,17 +293,41 @@ class WaveSpeedClient:
                     error_message = task_status.get("error", "Task failed")
                     raise Exception(f"Task failed: {error_message}")
 
-                await asyncio.sleep(polling_interval)
+                await self._interruptible_sleep(polling_interval, is_interrupted)
 
+            except WaveSpeedInterrupted:
+                # User interrupt must not be swallowed by the retry-and-continue path.
+                raise
             except Exception as e:
                 # If it's a task failure, re-raise
                 if "Task failed" in str(e):
                     raise
                 # Otherwise log and continue polling
                 print(f"[WaveSpeed] Error checking task status: {e}")
-                await asyncio.sleep(polling_interval)
+                await self._interruptible_sleep(polling_interval, is_interrupted)
 
         raise Exception(f"Task timed out after {timeout} seconds")
+
+    async def _interruptible_sleep(
+        self,
+        seconds: float,
+        is_interrupted: Callable[[], bool],
+        check_interval: float = 0.5,
+    ) -> None:
+        """Sleep up to `seconds`, bailing out within `check_interval` of an interrupt.
+
+        Polling intervals are long (10s for video jobs); a single asyncio.sleep
+        would leave Cancel unnoticed until it elapses. Sleeping in small chunks
+        keeps the event loop shared with other API nodes while making Cancel
+        feel immediate.
+        """
+        elapsed = 0.0
+        while elapsed < seconds:
+            if is_interrupted():
+                raise WaveSpeedInterrupted("WaveSpeed task polling aborted by ComfyUI interrupt")
+            step = min(check_interval, seconds - elapsed)
+            await asyncio.sleep(step)
+            elapsed += step
 
     async def send_request(
         self,
