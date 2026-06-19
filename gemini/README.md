@@ -180,7 +180,7 @@ Generate images from text descriptions using Gemini's image generation models.
 - `model`: gemini-3.1-flash-image-preview (default, recommended), gemini-3-pro-image-preview (professional), or gemini-2.5-flash-image (fast)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
 - `aspect_ratio`: Image dimensions - 14 ratios for 3.1 Flash (including 1:4, 4:1, 1:8, 8:1), 10 ratios for others
-- `image_size`: Resolution - "default", "512px", "1K", "2K", "4K" (512px-4K for 3.1 Flash, 1K-4K for 3 Pro; 2.5 Flash fixed at 1024px)
+- `image_size`: Resolution - "default", "1K", "2K", "4K" (1K-4K for 3.1 Flash and 3 Pro; 2.5 Flash fixed at 1024px)
 - `response_modalities`: "IMAGE" (image only) or "TEXT+IMAGE" (image + text description)
 - `enable_google_search`: Enable Google Search grounding (Gemini 3 models only)
 
@@ -194,7 +194,7 @@ Generate images from text descriptions using Gemini's image generation models.
 - Three image models: 3.1 Flash (best balance), 3 Pro (professional quality), 2.5 Flash (speed)
 - Configurable creativity with temperature
 - Full aspect ratio support (up to 14 options)
-- Resolution control from 512px to 4K
+- Resolution control from 1K to 4K
 - Google Search grounding for factually accurate images
 
 **Example Prompts:**
@@ -216,7 +216,7 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 - `model`: gemini-3.1-flash-image-preview (default, recommended), gemini-3-pro-image-preview (professional), or gemini-2.5-flash-image (fast)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
 - `aspect_ratio`: Image dimensions - 14 ratios for 3.1 Flash (including 1:4, 4:1, 1:8, 8:1), 10 ratios for others
-- `image_size`: Resolution - "default", "512px", "1K", "2K", "4K" (512px-4K for 3.1 Flash, 1K-4K for 3 Pro; 2.5 Flash fixed at 1024px)
+- `image_size`: Resolution - "default", "1K", "2K", "4K" (1K-4K for 3.1 Flash and 3 Pro; 2.5 Flash fixed at 1024px)
 - `response_modalities`: "IMAGE" (image only) or "TEXT+IMAGE" (image + text description)
 - `enable_google_search`: Enable Google Search grounding (Gemini 3 models only)
 - `additional_images`: Optional additional reference images (combined with primary image input, up to 14 total)
@@ -231,7 +231,7 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 - Image-to-image editing with natural language instructions
 - Compatible with all ComfyUI image nodes
 - Full aspect ratio support (up to 14 options)
-- Resolution control from 512px to 4K
+- Resolution control from 1K to 4K
 - Google Search grounding for factual accuracy in edits
 
 **Example Use Cases:**
@@ -380,7 +380,7 @@ Generate videos from an input image and optional text prompt.
 | **gemini-3-pro-image-preview** | Professional quality | Nano Banana Pro, best for character consistency (up to 14 reference images) |
 | **gemini-2.5-flash-image** | Fast image generation | Stable, lowest latency |
 
-**Note:** Image generation models output images instead of text. Resolution for `gemini-3.1-flash-image-preview` ranges from 512px to 4K; `gemini-3-pro-image-preview` supports 1K to 4K; `gemini-2.5-flash-image` is fixed at 1024px.
+**Note:** Image generation models output images instead of text. Resolution for `gemini-3.1-flash-image-preview` and `gemini-3-pro-image-preview` ranges from 1K to 4K; `gemini-2.5-flash-image` is fixed at 1024px.
 
 ### Video Generation Models (Veo)
 

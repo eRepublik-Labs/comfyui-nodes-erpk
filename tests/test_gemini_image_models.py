@@ -58,7 +58,7 @@ class TestImageSchemaOptions:
         "default", "1:1", "1:4", "1:8", "2:3", "3:2", "3:4",
         "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9",
     ]
-    EXPECTED_IMAGE_SIZES = ["default", "512px", "1K", "2K", "4K"]
+    EXPECTED_IMAGE_SIZES = ["default", "1K", "2K", "4K"]
 
     def test_generate_image_aspect_ratios(self):
         schema = GeminiImageGeneration.define_schema()

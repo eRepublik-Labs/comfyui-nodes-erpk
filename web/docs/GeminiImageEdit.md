@@ -15,7 +15,7 @@ Edits and modifies existing images using text prompts. Supports up to 14 referen
 | model | Combo | gemini-3.1-flash-image-preview | Image model: gemini-3.1-flash-image-preview, gemini-3-pro-image-preview, gemini-2.5-flash-image (optional) |
 | temperature | Float | 1.0 | Creativity level, 0.0-2.0 (optional) |
 | aspect_ratio | Combo | default | Image aspect ratio: default, 1:1, 1:4, 1:8, 2:3, 3:2, 3:4, 4:1, 4:3, 4:5, 5:4, 8:1, 9:16, 16:9, 21:9 (optional) |
-| image_size | Combo | default | Resolution: default, 512px, 1K, 2K, 4K (optional) |
+| image_size | Combo | default | Resolution: default, 1K, 2K, 4K (optional) |
 | response_modalities | Combo | IMAGE | IMAGE (image only) or TEXT+IMAGE (image + text description) (optional) |
 | enable_google_search | Boolean | false | Enable Google Search grounding, Gemini 3 models only (optional) |
 | additional_images | IMAGE | - | Additional reference images, combined with primary input up to 14 total (optional) |

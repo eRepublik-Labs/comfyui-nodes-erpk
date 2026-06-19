@@ -1123,10 +1123,10 @@ class GeminiImageGeneration(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "image_size",
-                    options=["default", "512px", "1K", "2K", "4K"],
+                    options=["default", "1K", "2K", "4K"],
                     default="default",
                     optional=True,
-                    tooltip="Image resolution (512px-4K for 3.1 Flash, 1K-4K for 3 Pro; 2.5 Flash fixed at 1024px)",
+                    tooltip="Image resolution (1K-4K for 3.1 Flash and 3 Pro; 2.5 Flash fixed at 1024px)",
                 ),
                 IO.Combo.Input(
                     "response_modalities",
@@ -1360,10 +1360,10 @@ class GeminiImageEdit(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "image_size",
-                    options=["default", "512px", "1K", "2K", "4K"],
+                    options=["default", "1K", "2K", "4K"],
                     default="default",
                     optional=True,
-                    tooltip="Image resolution (512px-4K for 3.1 Flash, 1K-4K for 3 Pro; 2.5 Flash fixed at 1024px)",
+                    tooltip="Image resolution (1K-4K for 3.1 Flash and 3 Pro; 2.5 Flash fixed at 1024px)",
                 ),
                 IO.Combo.Input(
                     "response_modalities",
