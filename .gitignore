@@ -27,3 +27,8 @@ __pycache__/
 .cs/
 AGENTS.md
 .omc/
+.cs/local/
+.cs/archives/
+.cs/.narrative-reminder-cooldown
+.claude/settings.local.json
+.obsidian/
