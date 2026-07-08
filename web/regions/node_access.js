@@ -8,10 +8,31 @@ import {
     ROOT_PADDING_H,
     CANVAS_MIN_H,
     EDITOR_CHROME_V,
+    REMOVAL_FILL_OPTIONS,
+    DEFAULT_REMOVAL_FILL,
+    DEFAULT_CHROMA_COLOR,
+    HEX_COLOR_RE,
 } from "./constants.js";
 
 export function findWidget(node, name) {
     return node.widgets?.find((w) => w.name === name) ?? null;
+}
+
+// LiteGraph restores widget values by position (widgets_values[i]), and the
+// canvas DOM widget serializes a trailing entry after the Python widgets. A
+// workflow saved when removal_fill and chroma_color did not exist therefore
+// lands that trailing entry in removal_fill's slot, and ComfyUI refuses to
+// queue a combo value outside its option list. Hold both widgets to a legal
+// value so a restored workflow stays queueable.
+export function repairManagedWidgetValues(node) {
+    const fill = findWidget(node, "removal_fill");
+    if (fill && !REMOVAL_FILL_OPTIONS.includes(fill.value)) {
+        fill.value = DEFAULT_REMOVAL_FILL;
+    }
+    const color = findWidget(node, "chroma_color");
+    if (color && !HEX_COLOR_RE.test(color.value)) {
+        color.value = DEFAULT_CHROMA_COLOR;
+    }
 }
 
 export function frameDims(node) {

@@ -22,6 +22,14 @@ export const REGION_REF_INPUTS = 10;
 export const SCAN_MAX_OBJECTS = 20;
 export const SCAN_MAX_EDGE_PX = 1536;
 
+// Mirror the removal_fill / chroma_color widget contract on the Python side.
+// ComfyUI rejects the prompt when a combo value falls outside its option list,
+// so these are the values a restored workflow is held to.
+export const REMOVAL_FILL_OPTIONS = ["inpaint", "chroma"];
+export const DEFAULT_REMOVAL_FILL = "inpaint";
+export const DEFAULT_CHROMA_COLOR = "#00B140";
+export const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
 // Grid cell size is expressed in frame pixels, so the grid quantizes to the
 // generated image's own pixel space (64 aligns with latent blocks).
 export const GRID_MIN_CELL_PX = 8;

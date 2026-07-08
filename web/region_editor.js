@@ -8,7 +8,11 @@ import { app } from "../../../scripts/app.js";
 
 import { createRegionEditor } from "./regions/editor.js";
 import { NODE_ID, MIN_NODE_WIDTH } from "./regions/constants.js";
-import { desiredEditorHeight, pinRootWidth } from "./regions/node_access.js";
+import {
+    desiredEditorHeight,
+    pinRootWidth,
+    repairManagedWidgetValues,
+} from "./regions/node_access.js";
 
 app.registerExtension({
     name: "erpk.regionEditor",
@@ -62,6 +66,9 @@ app.registerExtension({
         const onConfigure = nodeType.prototype.onConfigure;
         nodeType.prototype.onConfigure = function (info) {
             const r = onConfigure?.apply(this, arguments);
+            // The restore can leave removal_fill/chroma_color holding a value the
+            // node no longer accepts; settle them before anything can queue.
+            repairManagedWidgetValues(this);
             const editor = this._erpkRegionEditor;
             if (editor) {
                 // Widget values from the workflow JSON land during configure;
