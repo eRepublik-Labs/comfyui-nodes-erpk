@@ -5,7 +5,7 @@
 
 A monorepo for ERPK's custom ComfyUI nodes, extending ComfyUI's functionality through integrations with various AI services and APIs.
 
-**Current Version:** 2026.6.6 (CalVer)
+**Current Version:** 2026.7.1 (CalVer)
 
 ## Repository Structure
 
@@ -165,7 +165,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Veo video generation** with text-to-video and image-to-video (Veo 3 includes audio)
 - Each node selects its own model for maximum flexibility
 - State-of-the-art reasoning with Gemini 3.1 Pro and 2.5 Pro
-- Image generation with Gemini 3.1 Flash (recommended), 3 Pro, and 2.5 Flash models (512px to 4K resolution)
+- Image generation with Gemini 3.1 Flash (recommended), 3 Pro, and 2.5 Flash models (1K to 4K resolution)
 - Image editing with natural language instructions (up to 14 reference images)
 - Simple, straightforward API integration
 - Vision capabilities with batch image support

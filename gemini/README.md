@@ -2,7 +2,7 @@
 
 Complete Google Gemini API integration providing text generation, vision analysis, multi-turn conversations, image generation, image editing, **video generation (Veo)**, and safety controls for ComfyUI workflows.
 
-**Version:** 2026.6.2
+**Version:** 2026.7.1
 **Category in ComfyUI:** `ERPK/Gemini` and `ERPK/Gemini/Veo`
 **SDK requirement:** `google-genai>=2.2.0` (per `gemini/requirements.txt`)
 
