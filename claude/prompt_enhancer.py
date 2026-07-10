@@ -1,6 +1,8 @@
 # ABOUTME: ComfyUI V3 node for enhancing simple prompts with rich detail and style using Claude.
 # ABOUTME: Supports 51 enhancement styles and configurable detail levels for image generation prompts.
 
+import asyncio
+
 from comfy_api.latest import IO
 
 
@@ -315,7 +317,9 @@ Emphasize architectural beauty and structural design."""
             messages = [{"role": "user", "content": user_message}]
 
             if use_streaming and client.enable_streaming:
-                enhanced = cls._generate_streaming(client, messages, system_prompt, temperature, max_tokens)
+                enhanced = await asyncio.to_thread(
+                    cls._generate_streaming, client, messages, system_prompt, temperature, max_tokens
+                )
             else:
                 enhanced = await cls._generate_standard(client, messages, system_prompt, temperature, max_tokens)
 

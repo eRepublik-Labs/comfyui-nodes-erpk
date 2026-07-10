@@ -1,6 +1,8 @@
 # ABOUTME: ComfyUI V3 node for general-purpose text generation using Claude models.
 # ABOUTME: Supports standard and streaming modes with configurable temperature and tokens.
 
+import asyncio
+
 from comfy_api.latest import IO
 
 
@@ -99,7 +101,9 @@ class ClaudeTextGeneration(IO.ComfyNode):
             system = system_prompt.strip() if system_prompt and system_prompt.strip() else None
 
             if use_streaming and client.enable_streaming:
-                response_text = cls._generate_streaming(client, messages, system, temperature, max_tokens)
+                response_text = await asyncio.to_thread(
+                    cls._generate_streaming, client, messages, system, temperature, max_tokens
+                )
             else:
                 response_text = await cls._generate_standard(client, messages, system, temperature, max_tokens)
 
