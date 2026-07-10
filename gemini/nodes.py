@@ -1100,7 +1100,7 @@ class GeminiImageGeneration(IO.ComfyNode):
                 IO.Combo.Input(
                     "model",
                     options=IMAGE_MODELS,
-                    default="gemini-3.1-flash-image-preview",
+                    default="gemini-3.1-flash-image",
                     optional=True,
                     tooltip="Image generation model (overrides client model)",
                 ),
@@ -1167,7 +1167,7 @@ class GeminiImageGeneration(IO.ComfyNode):
 
         prompt = kwargs.get("prompt", "")
         client = kwargs.get("client")
-        model = kwargs.get("model", "gemini-3.1-flash-image-preview")
+        model = kwargs.get("model", "gemini-3.1-flash-image")
         temperature = kwargs.get("temperature", 1.0)
         aspect_ratio = kwargs.get("aspect_ratio", "default")
         image_size = kwargs.get("image_size", "default")
@@ -1337,7 +1337,7 @@ class GeminiImageEdit(IO.ComfyNode):
                 IO.Combo.Input(
                     "model",
                     options=IMAGE_MODELS,
-                    default="gemini-3.1-flash-image-preview",
+                    default="gemini-3.1-flash-image",
                     optional=True,
                     tooltip="Image generation model (overrides client model)",
                 ),
@@ -1417,7 +1417,7 @@ class GeminiImageEdit(IO.ComfyNode):
         image = kwargs.get("image")
         prompt = kwargs.get("prompt", "")
         client = kwargs.get("client")
-        model = kwargs.get("model", "gemini-3.1-flash-image-preview")
+        model = kwargs.get("model", "gemini-3.1-flash-image")
         temperature = kwargs.get("temperature", 1.0)
         aspect_ratio = kwargs.get("aspect_ratio", "default")
         image_size = kwargs.get("image_size", "default")

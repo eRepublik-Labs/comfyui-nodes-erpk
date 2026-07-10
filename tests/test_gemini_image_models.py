@@ -15,16 +15,21 @@ class TestImageModelsConstant:
 
     def test_image_models_contains_expected_models(self):
         expected = [
-            "gemini-3.1-flash-image-preview",
-            "gemini-3-pro-image-preview",
+            "gemini-3.1-flash-image",
+            "gemini-3-pro-image",
             "gemini-2.5-flash-image",
         ]
         for model in expected:
             assert model in GeminiClient.IMAGE_MODELS
 
+    def test_dead_preview_image_models_removed(self):
+        # Past their Google shutdown date (2026-06-25); must not be selectable.
+        for dead in ("gemini-3.1-flash-image-preview", "gemini-3-pro-image-preview"):
+            assert dead not in GeminiClient.IMAGE_MODELS, f"{dead} is past shutdown; remove it"
+
     def test_image_models_order(self):
-        """3.1 Flash should be first (the recommended default)."""
-        assert GeminiClient.IMAGE_MODELS[0] == "gemini-3.1-flash-image-preview"
+        """3.1 Flash (GA) should be first (the recommended default)."""
+        assert GeminiClient.IMAGE_MODELS[0] == "gemini-3.1-flash-image"
 
     def test_image_gen_uses_client_image_models(self):
         schema = GeminiImageGeneration.define_schema()
@@ -43,12 +48,12 @@ class TestImageModelDefaults:
     def test_generate_image_default(self):
         schema = GeminiImageGeneration.define_schema()
         model_input = [i for i in schema.inputs if i.id == "model"][0]
-        assert model_input.default == "gemini-3.1-flash-image-preview"
+        assert model_input.default == "gemini-3.1-flash-image"
 
     def test_edit_image_default(self):
         schema = GeminiImageEdit.define_schema()
         model_input = [i for i in schema.inputs if i.id == "model"][0]
-        assert model_input.default == "gemini-3.1-flash-image-preview"
+        assert model_input.default == "gemini-3.1-flash-image"
 
 
 class TestImageSchemaOptions:

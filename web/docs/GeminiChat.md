@@ -11,7 +11,7 @@ Multi-turn conversation with Gemini that preserves message history. Chain multip
 |-----------|------|---------|-------------|
 | prompt | String | "" | Your message in the conversation |
 | client | GEMINI_API_CLIENT | - | Gemini API client (optional if API key is configured in Settings) |
-| model | Combo | gemini-3.5-flash | Model to use: gemini-3.1-pro-preview, gemini-3-pro-preview, gemini-3.5-flash, gemini-3-flash-preview, gemini-3.1-flash-lite-preview, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite (optional) |
+| model | Combo | gemini-3.5-flash | Model to use: gemini-3.1-pro-preview, gemini-3.5-flash, gemini-3-flash-preview, gemini-3.1-flash-lite, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite (optional) |
 | chat_session | GEMINI_CHAT_SESSION | - | Previous chat session from another Chat node (optional) |
 | reset_conversation | Boolean | false | Start a new conversation, discarding history (optional) |
 | temperature | Float | 0.7 | Creativity level, 0.0-2.0 (optional) |

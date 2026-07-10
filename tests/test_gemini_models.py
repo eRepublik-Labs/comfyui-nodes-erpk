@@ -26,21 +26,27 @@ class TestModelsDict:
         desc = GeminiClient.MODELS["gemini-3.5-flash"]
         assert "intelligence" in desc.lower() or "fast" in desc.lower() or "speed" in desc.lower()
 
-    def test_gemini_31_flash_lite_preview_in_models(self):
-        assert "gemini-3.1-flash-lite-preview" in GeminiClient.MODELS
+    def test_gemini_31_flash_lite_in_models(self):
+        assert "gemini-3.1-flash-lite" in GeminiClient.MODELS
 
     def test_gemini_31_flash_lite_description_mentions_speed_or_cost(self):
-        desc = GeminiClient.MODELS["gemini-3.1-flash-lite-preview"]
+        desc = GeminiClient.MODELS["gemini-3.1-flash-lite"]
         assert "fast" in desc.lower() or "cost" in desc.lower() or "efficient" in desc.lower()
 
-    def test_all_existing_models_still_present(self):
+    def test_all_current_models_present(self):
         expected = [
-            "gemini-3-pro-preview",
+            "gemini-3.1-pro-preview",
+            "gemini-3.5-flash",
             "gemini-3-flash-preview",
-            "gemini-3.1-flash-lite-preview",
+            "gemini-3.1-flash-lite",
             "gemini-2.5-pro",
             "gemini-2.5-flash",
             "gemini-2.5-flash-lite",
         ]
         for model_id in expected:
             assert model_id in GeminiClient.MODELS, f"{model_id} missing from MODELS"
+
+    def test_dead_preview_models_removed(self):
+        # Past their Google shutdown date; must not be selectable.
+        for dead in ("gemini-3-pro-preview", "gemini-3.1-flash-lite-preview"):
+            assert dead not in GeminiClient.MODELS, f"{dead} is past shutdown; remove it"
