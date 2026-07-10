@@ -31,7 +31,7 @@ class ClaudeClient:
     """
 
     # Default configuration
-    DEFAULT_MODEL = "claude-sonnet-4-6"
+    DEFAULT_MODEL = "claude-sonnet-5"
     DEFAULT_MAX_TOKENS = 1024
     DEFAULT_TEMPERATURE = 0.7
     MAX_RETRIES = 3
@@ -40,7 +40,7 @@ class ClaudeClient:
     # Models that reject sampling params (temperature/top_p/top_k) and require
     # thinking={"type": "adaptive"}. Anthropic returns 400 if sampling params
     # are present or if thinking uses the legacy {"type": "enabled", ...} form.
-    THINKING_ONLY_MODELS = {"claude-opus-4-7"}
+    THINKING_ONLY_MODELS = {"claude-opus-4-7", "claude-opus-4-8", "claude-sonnet-5"}
 
     def __init__(
         self,

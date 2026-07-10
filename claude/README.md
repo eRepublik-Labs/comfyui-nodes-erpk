@@ -75,7 +75,7 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 Initializes the Claude API client. Optional if API key is configured in ComfyUI Settings — generation nodes can run standalone.
 
 **Inputs:**
-- `model`: claude-sonnet-4-6 (default), claude-opus-4-7, claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929 (legacy)
+- `model`: claude-sonnet-5 (default), claude-opus-4-8, claude-fable-5, claude-opus-4-7, claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929 (legacy)
 - `api_key`: Optional API key (uses Settings/config if empty)
 - `enable_streaming`: Enable streaming responses
 - `enable_caching`: Enable prompt caching for cost savings
@@ -288,10 +288,10 @@ Enabled by default. Caches system prompts to reduce costs by up to 90% for repea
 - Subsequent requests with same system prompt read from cache
 - Cache read tokens cost 0.1x of regular input tokens
 
-**Pricing (Claude Sonnet 4.6):**
-- Input: $3 / million tokens
-- Output: $15 / million tokens
-- Cache Read: $0.30 / million tokens (90% savings)
+**Pricing (Claude Sonnet 5):**
+- Input: $2 / million tokens (intro through 2026-08-31; then $3)
+- Output: $10 / million tokens (intro; then $15)
+- Cache Read: $0.20 / million tokens (90% savings)
 
 ### Token Management
 - Use Token Counter node to check prompt lengths before generation
@@ -299,10 +299,13 @@ Enabled by default. Caches system prompts to reduce costs by up to 90% for repea
 - Monitor usage with Usage Stats node
 
 ### Model Selection
+- **Claude Sonnet 5**: $2/1M in, $10/1M out (intro through 2026-08-31) - Best balance (default), 1M context; rejects sampling params (temperature omitted automatically)
+- **Claude Opus 4.8**: $5/1M in, $25/1M out - Current flagship, reasoning-first, 1M context; rejects sampling params
+- **Claude Fable 5**: $10/1M in, $50/1M out - Creative-writing specialist, 1M context; accepts temperature
 - **Claude Haiku 4.5**: $1/1M in, $5/1M out - Fastest, cheapest for simple tasks
-- **Claude Sonnet 4.6**: $3/1M in, $15/1M out - Best balance (default)
+- **Claude Sonnet 4.6**: $3/1M in, $15/1M out - Previous Sonnet
 - **Claude Opus 4.6**: $5/1M in, $25/1M out - Previous-gen flagship
-- **Claude Opus 4.7**: $15/1M in, $75/1M out - Current flagship (1M context, 128K output); reasoning-first model for agents, coding, and the hardest prompts
+- **Claude Opus 4.7**: previous flagship; reasoning-first, rejects sampling params
 
 ## Workflow Examples
 

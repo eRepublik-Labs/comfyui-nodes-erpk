@@ -18,14 +18,17 @@ class ClaudeAPIClient(IO.ComfyNode):
                 IO.Combo.Input(
                     "model",
                     options=[
-                        "claude-sonnet-4-6",
+                        "claude-sonnet-5",
+                        "claude-opus-4-8",
+                        "claude-fable-5",
                         "claude-opus-4-7",
+                        "claude-sonnet-4-6",
                         "claude-opus-4-6",
                         "claude-haiku-4-5-20251001",
                         "claude-sonnet-4-5-20250929",
                     ],
-                    default="claude-sonnet-4-6",
-                    tooltip="Claude model to use. Sonnet 4.6 offers best balance of performance and cost.",
+                    default="claude-sonnet-5",
+                    tooltip="Claude model to use. Sonnet 5 offers the best balance of performance and cost.",
                 ),
                 IO.String.Input(
                     "api_key",
@@ -55,7 +58,7 @@ class ClaudeAPIClient(IO.ComfyNode):
     def execute(cls, **kwargs) -> IO.NodeOutput:
         from .claude_api.client import ClaudeClient
 
-        model = kwargs.get("model", "claude-sonnet-4-6")
+        model = kwargs.get("model", "claude-sonnet-5")
         api_key = kwargs.get("api_key", "")
         enable_streaming = kwargs.get("enable_streaming", False)
         enable_caching = kwargs.get("enable_caching", True)

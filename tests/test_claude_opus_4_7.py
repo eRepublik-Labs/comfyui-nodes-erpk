@@ -20,6 +20,9 @@ import pytest
 
 OPUS_4_7 = "claude-opus-4-7"
 SONNET_4_6 = "claude-sonnet-4-6"
+OPUS_4_8 = "claude-opus-4-8"
+SONNET_5 = "claude-sonnet-5"
+FABLE_5 = "claude-fable-5"
 
 
 # --- Schema / model list assertions ------------------------------------------
@@ -253,3 +256,89 @@ class TestSendRequestStreamingSonnet46:
                 pass
             kwargs = messages.stream.call_args.kwargs
             assert "thinking" not in kwargs
+
+
+# --- Current flagship models: Opus 4.8, Sonnet 5, Fable 5 --------------------
+
+
+def test_new_flagships_in_client_node_model_list():
+    from claude.nodes import ClaudeAPIClient
+    options = next(i for i in ClaudeAPIClient.define_schema().inputs if i.id == "model").options
+    for model in (OPUS_4_8, SONNET_5, FABLE_5):
+        assert model in options, f"{model} missing from ClaudeAPIClient model list"
+
+
+def test_new_flagships_in_token_counter_model_list():
+    from claude.token_counter import ClaudeTokenCounter
+    options = next(i for i in ClaudeTokenCounter.define_schema().inputs if i.id == "model").options
+    for model in (OPUS_4_8, SONNET_5, FABLE_5):
+        assert model in options, f"{model} missing from ClaudeTokenCounter model list"
+
+
+def test_default_model_is_sonnet_5():
+    from claude.claude_api.client import ClaudeClient
+    assert ClaudeClient.DEFAULT_MODEL == SONNET_5
+
+
+def test_client_node_default_is_sonnet_5():
+    from claude.nodes import ClaudeAPIClient
+    model_input = next(i for i in ClaudeAPIClient.define_schema().inputs if i.id == "model")
+    assert model_input.default == SONNET_5
+
+
+def test_new_flagships_context_windows_are_1m():
+    from claude.claude_api.utils import TokenManager
+    for model in (OPUS_4_8, SONNET_5, FABLE_5):
+        assert TokenManager.CONTEXT_WINDOWS.get(model) == 1_000_000
+
+
+def test_new_flagships_in_pricing_json():
+    import json
+    import os
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "claude", "pricing.json"
+    )
+    with open(path) as f:
+        models = json.load(f)["models"]
+    assert models[OPUS_4_8]["input_price_per_mtok"] == 5.0
+    assert models[OPUS_4_8]["output_price_per_mtok"] == 25.0
+    assert models[SONNET_5]["input_price_per_mtok"] == 2.0
+    assert models[SONNET_5]["output_price_per_mtok"] == 10.0
+    assert models[FABLE_5]["input_price_per_mtok"] == 10.0
+    assert models[FABLE_5]["output_price_per_mtok"] == 50.0
+
+
+def test_opus_4_8_and_sonnet_5_are_thinking_only():
+    # Both reject temperature/top_p/top_k (400) per Anthropic docs.
+    from claude.claude_api.client import ClaudeClient
+    assert OPUS_4_8 in ClaudeClient.THINKING_ONLY_MODELS
+    assert SONNET_5 in ClaudeClient.THINKING_ONLY_MODELS
+
+
+def test_fable_5_is_not_thinking_only():
+    # Fable 5 is absent from the temperature-400 list; it keeps sampling params.
+    from claude.claude_api.client import ClaudeClient
+    assert FABLE_5 not in ClaudeClient.THINKING_ONLY_MODELS
+
+
+class TestNewFlagshipSamplingParams:
+    def test_opus_4_8_strips_temperature(self):
+        with _patched_anthropic() as messages:
+            asyncio.run(_make_client().send_request(
+                messages=[{"role": "user", "content": "hi"}], model=OPUS_4_8, temperature=0.5,
+            ))
+            assert "temperature" not in messages.create.call_args.kwargs
+
+    def test_sonnet_5_strips_temperature(self):
+        with _patched_anthropic() as messages:
+            asyncio.run(_make_client().send_request(
+                messages=[{"role": "user", "content": "hi"}], model=SONNET_5, temperature=0.5,
+            ))
+            assert "temperature" not in messages.create.call_args.kwargs
+
+    def test_fable_5_preserves_temperature(self):
+        with _patched_anthropic() as messages:
+            asyncio.run(_make_client().send_request(
+                messages=[{"role": "user", "content": "hi"}], model=FABLE_5, temperature=0.5,
+            ))
+            assert messages.create.call_args.kwargs.get("temperature") == 0.5
