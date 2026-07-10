@@ -146,11 +146,13 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
 
         try:
             pil_image = image_converter.tensor_to_pil(primary_image)
-            is_valid, error = image_converter.validate_image_for_claude(pil_image)
-            if not is_valid:
-                print(f"[Claude] Warning: {error}. Attempting to resize...")
+            w, h = pil_image.size
+            if w > 8000 or h > 8000:
+                print(f"[Claude] Warning: image {w}x{h} exceeds 8000px. Attempting to resize...")
                 pil_image = image_converter.resize_if_needed(pil_image, max_dimension=8000)
-            base64_str = image_converter.pil_to_base64(pil_image, format="PNG")
+            base64_str, size_warning = image_converter.encode_and_validate_for_claude(pil_image, format="PNG")
+            if size_warning:
+                print(f"[Claude] Warning: {size_warning}")
             images.append(base64_str)
         except Exception as e:
             raise ValueError(f"Failed to process primary image: {str(e)}")
@@ -164,19 +166,23 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
                         for i in range(min(batch_size, 19)):
                             single_image = additional_images[i:i+1]
                             pil_image = image_converter.tensor_to_pil(single_image)
-                            is_valid, error = image_converter.validate_image_for_claude(pil_image)
-                            if not is_valid:
-                                print(f"[Claude] Warning for image {i+2}: {error}. Resizing...")
+                            w, h = pil_image.size
+                            if w > 8000 or h > 8000:
+                                print(f"[Claude] Warning for image {i+2}: {w}x{h} exceeds 8000px. Resizing...")
                                 pil_image = image_converter.resize_if_needed(pil_image, max_dimension=8000)
-                            base64_str = image_converter.pil_to_base64(pil_image, format="PNG")
+                            base64_str, size_warning = image_converter.encode_and_validate_for_claude(pil_image, format="PNG")
+                            if size_warning:
+                                print(f"[Claude] Warning for image {i+2}: {size_warning}")
                             images.append(base64_str)
                     else:
                         pil_image = image_converter.tensor_to_pil(additional_images)
-                        is_valid, error = image_converter.validate_image_for_claude(pil_image)
-                        if not is_valid:
-                            print(f"[Claude] Warning: {error}. Resizing...")
+                        w, h = pil_image.size
+                        if w > 8000 or h > 8000:
+                            print(f"[Claude] Warning: image {w}x{h} exceeds 8000px. Resizing...")
                             pil_image = image_converter.resize_if_needed(pil_image, max_dimension=8000)
-                        base64_str = image_converter.pil_to_base64(pil_image, format="PNG")
+                        base64_str, size_warning = image_converter.encode_and_validate_for_claude(pil_image, format="PNG")
+                        if size_warning:
+                            print(f"[Claude] Warning: {size_warning}")
                         images.append(base64_str)
             except Exception as e:
                 print(f"[Claude] Warning: Failed to process additional images: {str(e)}")

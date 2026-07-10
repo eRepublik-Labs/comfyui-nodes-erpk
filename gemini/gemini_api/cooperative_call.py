@@ -22,7 +22,12 @@ def resolve_timeout_ms() -> int:
     except (ImportError, ValueError, TypeError):
         return _DEFAULT_TIMEOUT_MS
 
-_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="erpk-gemini-call")
+# A cancelled or timed-out call cannot abort its blocking thread (Python has no
+# preemption), so the slot stays busy until the genai HTTP timeout
+# (resolve_timeout_ms, pushed into the Client) elapses and the thread returns.
+# Size the pool so a burst of interrupted calls does not starve fresh ones
+# during that window.
+_executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="erpk-gemini-call")
 
 
 class GeminiCallInterrupted(Exception):

@@ -367,6 +367,21 @@ class ImageConverter:
         return base64.b64encode(buffered.getvalue()).decode('utf-8')
 
     @staticmethod
+    def encode_and_validate_for_claude(pil_image: Image.Image, format: str = "PNG") -> Tuple[str, Optional[str]]:
+        """Encode to base64 once and check Claude's 5MB size limit on the same
+        bytes, so callers don't PNG-encode each image twice per request.
+
+        Returns (base64_str, size_warning_or_None). Dimension limits are cheap
+        to check on pil_image.size and remain the caller's responsibility.
+        """
+        buffered = io.BytesIO()
+        pil_image.save(buffered, format=format)
+        data = buffered.getvalue()
+        size_mb = len(data) / (1024 * 1024)
+        warning = f"Image file size too large: {size_mb:.2f}MB. Max 5MB." if size_mb > 5 else None
+        return base64.b64encode(data).decode('utf-8'), warning
+
+    @staticmethod
     def tensor_to_base64(tensor, format: str = "PNG") -> str:
         """
         Convert ComfyUI tensor to base64 string.

@@ -12,6 +12,7 @@ while releasing the event loop during network I/O.
 
 import asyncio
 import os
+import threading
 import time
 from typing import Dict, Any, Generator, Optional
 from anthropic import Anthropic, AnthropicError, APIError, RateLimitError, APIConnectionError
@@ -80,7 +81,10 @@ class ClaudeClient:
 
         self.client = Anthropic(**client_kwargs)
 
-        # Track usage statistics
+        # Track usage statistics. When one client is shared across concurrent
+        # nodes these counters are updated from asyncio.to_thread worker threads,
+        # so guard the non-atomic += with a lock to avoid lost increments.
+        self._usage_lock = threading.Lock()
         self.total_input_tokens = 0
         self.total_output_tokens = 0
         self.cache_read_tokens = 0
@@ -179,14 +183,15 @@ class ClaudeClient:
             try:
                 response = self.client.messages.create(**params)
 
-                # Track token usage
+                # Track token usage (guarded: client may be shared across threads)
                 usage = response.usage
-                self.total_input_tokens += usage.input_tokens
-                self.total_output_tokens += usage.output_tokens
-                if hasattr(usage, 'cache_read_input_tokens'):
-                    self.cache_read_tokens += usage.cache_read_input_tokens or 0
-                if hasattr(usage, 'cache_creation_input_tokens'):
-                    self.cache_creation_tokens += usage.cache_creation_input_tokens or 0
+                with self._usage_lock:
+                    self.total_input_tokens += usage.input_tokens
+                    self.total_output_tokens += usage.output_tokens
+                    if hasattr(usage, 'cache_read_input_tokens'):
+                        self.cache_read_tokens += usage.cache_read_input_tokens or 0
+                    if hasattr(usage, 'cache_creation_input_tokens'):
+                        self.cache_creation_tokens += usage.cache_creation_input_tokens or 0
 
                 return response
 
@@ -314,12 +319,13 @@ class ClaudeClient:
                 # Get final message for usage tracking
                 final_message = stream.get_final_message()
                 usage = final_message.usage
-                self.total_input_tokens += usage.input_tokens
-                self.total_output_tokens += usage.output_tokens
-                if hasattr(usage, 'cache_read_input_tokens'):
-                    self.cache_read_tokens += usage.cache_read_input_tokens or 0
-                if hasattr(usage, 'cache_creation_input_tokens'):
-                    self.cache_creation_tokens += usage.cache_creation_input_tokens or 0
+                with self._usage_lock:
+                    self.total_input_tokens += usage.input_tokens
+                    self.total_output_tokens += usage.output_tokens
+                    if hasattr(usage, 'cache_read_input_tokens'):
+                        self.cache_read_tokens += usage.cache_read_input_tokens or 0
+                    if hasattr(usage, 'cache_creation_input_tokens'):
+                        self.cache_creation_tokens += usage.cache_creation_input_tokens or 0
 
         except AnthropicError as e:
             raise APIError(f"Streaming request failed: {str(e)}") from e
