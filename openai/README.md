@@ -86,7 +86,7 @@ General-purpose text generation and completion.
 **Inputs:**
 - `client`: OpenAI API client
 - `prompt`: Text prompt
-- `model`: gpt-5.5 (default), gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini, o4-mini, o3, o3-mini, o3-pro
+- `model`: gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini, o4-mini, o3, o3-mini, o3-pro
 - `temperature`: 0.0-2.0 (creativity level, default: 0.7)
 - `max_tokens`: 256-16384 (output length, default: 4096)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 1.0, set <1.0 to enable)
@@ -113,7 +113,7 @@ Multi-turn conversation with message history preservation.
 **Inputs:**
 - `client`: OpenAI API client
 - `prompt`: Your message
-- `model`: gpt-5.5 (default), gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini, o4-mini, o3, o3-mini, o3-pro
+- `model`: gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini, o4-mini, o3, o3-mini, o3-pro
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
 - `temperature`: 0.0-2.0 (default: 0.7)
@@ -142,7 +142,7 @@ Analyze images with questions or instructions.
 - `client`: OpenAI API client
 - `image`: ComfyUI image tensor (supports batches)
 - `prompt`: Question or instruction about the image(s)
-- `model`: gpt-5.5 (default), gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini
+- `model`: gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini
 - `detail`: Image analysis detail level - "auto" (default), "low" (faster/cheaper), "high" (more detailed)
 - `max_tokens`: 256-16384 (default: 4096)
 - `temperature`: 0.0-2.0 (default: 0.4, lower for more factual)
@@ -222,7 +222,7 @@ Generate images via the OpenAI Responses API with a mainline reasoning model dri
 **Inputs:**
 - `prompt`: Image description (the mainline model may auto-revise before dispatch)
 - `client`: Optional OpenAI API client
-- `mainline_model`: Text/reasoning model that orchestrates the call — gpt-5.5 (default, premium tier), gpt-5.5-pro (extended-compute), gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, o3, o4-mini, etc.
+- `mainline_model`: Text/reasoning model that orchestrates the call — gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-5.5 (premium tier), gpt-5.5-pro (extended-compute), gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, o3, o4-mini, etc.
 - `image_model`: Underlying GPT Image model — gpt-image-2 (default), gpt-image-1.5, gpt-image-1, gpt-image-1-mini
 - `reasoning_effort`: none (default), minimal, low, medium, high, xhigh (only reasoning-capable mainlines use this)
 - `size`: 1024x1024 (default) and common variants
@@ -283,7 +283,10 @@ Edit and modify existing images using text prompts with optional masking.
 
 | Model | Best For | Context Window | Notes |
 |-------|----------|----------------|-------|
-| **gpt-5.5** | Premium flagship — most complex professional work | 1.05M tokens | **Node default**, $5/$30 per MTok (2x of 5.4); highest reasoning tier; sessions over 272K input billed at 2x input / 1.5x output |
+| **gpt-5.6-sol** | Current flagship — most complex professional work | — | **Node default**, highest GPT-5.6 capability tier |
+| **gpt-5.6-terra** | Balanced GPT-5.6 tier | — | Mid capability/cost |
+| **gpt-5.6-luna** | Fast, cost-efficient GPT-5.6 tier | — | Lowest GPT-5.6 cost |
+| **gpt-5.5** | Previous premium flagship | 1.05M tokens | $5/$30 per MTok (2x of 5.4); highest reasoning tier; sessions over 272K input billed at 2x input / 1.5x output |
 | **gpt-5.5-pro** | Extended-compute premium tier | 1.05M tokens | $30/$180 per MTok (no streaming, no cached input discount); slowest; recommend background mode for long requests |
 | **gpt-5.4** | Cost-sensitive flagship alternative | 1M tokens | $2.50/$15 per MTok; configurable reasoning_effort |
 | **gpt-5.4-pro** | Extended compute | 1M tokens | Responses API only; highest quality |

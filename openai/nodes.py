@@ -509,7 +509,7 @@ class OpenAIVision(IO.ComfyNode):
         from .openai_api.utils import ImageConverter
 
         client = kwargs.get("client")
-        model = kwargs.get("model", "gpt-4o")
+        model = kwargs.get("model", OpenAIClient.DEFAULT_MODEL)
         detail = kwargs.get("detail", "auto")
         max_tokens = kwargs.get("max_tokens", 4096)
         temperature = kwargs.get("temperature", 0.4)

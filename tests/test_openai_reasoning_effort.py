@@ -91,18 +91,18 @@ class TestGPT55FamilyInModels:
             f"{model_id} must be selectable as a mainline model on the Image Responses node"
         )
 
-    def test_gpt_5_5_appears_first_in_dropdown(self):
-        """5.5 (base) is the premium flagship — should be first in the model dropdown."""
+    def test_flagship_appears_first_in_dropdown(self):
+        """gpt-5.6-sol is the current flagship — should be first in the model dropdown."""
         from openai.nodes import TEXT_MODELS
-        assert TEXT_MODELS[0] == "gpt-5.5", (
-            f"gpt-5.5 should be the first option in TEXT_MODELS, got {TEXT_MODELS[0]}"
+        assert TEXT_MODELS[0] == "gpt-5.6-sol", (
+            f"gpt-5.6-sol should be the first option in TEXT_MODELS, got {TEXT_MODELS[0]}"
         )
 
-    def test_gpt_5_5_pro_appears_second_in_dropdown(self):
-        """5.5-pro is the premium-of-premium tier — should sit right after 5.5."""
+    def test_flagship_terra_appears_second_in_dropdown(self):
+        """gpt-5.6-terra is the balanced GPT-5.6 tier — should sit right after Sol."""
         from openai.nodes import TEXT_MODELS
-        assert TEXT_MODELS[1] == "gpt-5.5-pro", (
-            f"gpt-5.5-pro should be the second option in TEXT_MODELS, got {TEXT_MODELS[1]}"
+        assert TEXT_MODELS[1] == "gpt-5.6-terra", (
+            f"gpt-5.6-terra should be the second option in TEXT_MODELS, got {TEXT_MODELS[1]}"
         )
 
 

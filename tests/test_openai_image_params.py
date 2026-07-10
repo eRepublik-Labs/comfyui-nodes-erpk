@@ -162,26 +162,11 @@ class TestModeration:
 
 
 class TestNValidation:
-    """dall-e-3 only supports n=1; all other models accept n=1-10."""
-
-    def test_dall_e_3_n_2_raises(self):
-        client, _ = _make_client_with_mock()
-        with pytest.raises(ValueError, match="dall-e-3 supports n=1 only"):
-            asyncio.run(client.generate_image(prompt="x", model="dall-e-3", n=2))
-
-    def test_dall_e_3_n_10_raises(self):
-        client, _ = _make_client_with_mock()
-        with pytest.raises(ValueError, match="dall-e-3 supports n=1 only"):
-            asyncio.run(client.generate_image(prompt="x", model="dall-e-3", n=10))
-
-    def test_dall_e_3_n_1_passes(self):
-        client, mock = _make_client_with_mock()
-        asyncio.run(client.generate_image(prompt="x", model="dall-e-3", n=1))
-        assert mock.images.generate.called
+    """GPT Image models accept n=1-10."""
 
     @pytest.mark.parametrize("model", ["gpt-image-2", "gpt-image-1.5", "gpt-image-1",
-                                       "gpt-image-1-mini", "dall-e-2"])
-    def test_other_models_accept_n_up_to_10(self, model):
+                                       "gpt-image-1-mini"])
+    def test_models_accept_n_up_to_10(self, model):
         client, mock = _make_client_with_mock()
         # gpt-image-2 needs a valid size (n validation happens after size validation)
         asyncio.run(client.generate_image(prompt="x", model=model, size="1024x1024", n=10))

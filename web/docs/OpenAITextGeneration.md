@@ -11,7 +11,7 @@ General-purpose text generation using OpenAI models. Supports the full GPT-5.x f
 |-----------|------|---------|-------------|
 | prompt | String | (empty) | Text prompt for OpenAI |
 | client | OPENAI_API_CLIENT | — | OpenAI API client (optional if API key is in Settings) |
-| model | Combo | gpt-5.5 | Model to use. Options include gpt-5.5, gpt-5.5-pro, gpt-5.4 family, gpt-5.2, gpt-5.1, gpt-5, gpt-4.1, gpt-4o, o3, o4-mini and more (optional) |
+| model | Combo | gpt-5.6-sol | Model to use. Options include gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4 family, gpt-5.2, gpt-5.1, gpt-5, gpt-4.1, gpt-4o, o3, o4-mini and more (optional) |
 | temperature | Float | 0.7 | Creativity level, 0.0=focused to 2.0=very creative (optional). Range: 0.0–2.0. Ignored by reasoning models (gpt-5.x reasoning + o-series) |
 | max_tokens | Int | 4096 | Maximum response length (optional). Range: 256–16384. Sent as `max_completion_tokens` for newer models |
 | top_p | Float | 1.0 | Nucleus sampling threshold, 1.0=disabled (optional). Range: 0.0–1.0. Ignored by reasoning models |
@@ -34,4 +34,4 @@ General-purpose text generation using OpenAI models. Supports the full GPT-5.x f
 - Stop sequences are separated by newlines — each line is a separate stop string
 - `reasoning_effort` only applies to gpt-5.x reasoning models (5.5, 5.5-pro, 5.4 family) and o-series (o3, o3-mini, o3-pro, o4-mini). Other models silently drop it
 - `verbosity` only applies to the gpt-5.x family (5.5, 5.5-pro, 5.4 family, 5.2 family, 5.1, 5/mini/nano). Older families silently drop it. Distinct from `max_tokens` — it shapes verbosity, not the hard length cap
-- `gpt-5.5` is the new default flagship (1.05M context, $5/$30 per MTok). `gpt-5.5-pro` is the extended-compute premium tier ($30/$180 per MTok, no streaming)
+- `gpt-5.6-sol` is the current default flagship (Sol/Terra/Luna tiers). `gpt-5.5` (1.05M context, $5/$30 per MTok) and `gpt-5.5-pro` (extended-compute, $30/$180 per MTok, no streaming) remain available

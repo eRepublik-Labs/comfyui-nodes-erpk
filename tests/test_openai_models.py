@@ -65,6 +65,19 @@ class TestOpenAIModels:
             assert model in OpenAIClient.MODELS, f"Missing model: {model}"
 
     def test_default_model_is_current_flagship(self):
-        """Default model is the premium flagship — gpt-5.5."""
+        """Default model is the current flagship — gpt-5.6-sol."""
         from openai.openai_api.client import OpenAIClient
-        assert OpenAIClient.DEFAULT_MODEL == "gpt-5.5"
+        assert OpenAIClient.DEFAULT_MODEL == "gpt-5.6-sol"
+
+    def test_gpt_56_tiers_present(self):
+        """GPT-5.6 Sol/Terra/Luna are selectable in MODELS."""
+        from openai.openai_api.client import OpenAIClient
+        for m in ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"):
+            assert m in OpenAIClient.MODELS, f"{m} missing from MODELS"
+
+    def test_gpt_56_sol_in_config_sets(self):
+        """GPT-5.6 Sol is a gpt-5.x flagship: reasoning + new token param + verbosity."""
+        from openai.openai_api.client import OpenAIClient
+        assert "gpt-5.6-sol" in OpenAIClient.REASONING_MODELS
+        assert "gpt-5.6-sol" in OpenAIClient.NEW_TOKEN_PARAM_MODELS
+        assert "gpt-5.6-sol" in OpenAIClient.VERBOSITY_MODELS

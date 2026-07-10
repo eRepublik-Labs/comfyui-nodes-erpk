@@ -21,6 +21,9 @@ class OpenAIClient:
 
     # Available text/vision models
     MODELS = {
+        "gpt-5.6-sol": "GPT-5.6 Sol (Current flagship, highest capability tier)",
+        "gpt-5.6-terra": "GPT-5.6 Terra (Balanced GPT-5.6 tier)",
+        "gpt-5.6-luna": "GPT-5.6 Luna (Fast, cost-efficient GPT-5.6 tier)",
         "gpt-5.5": "GPT-5.5 (Premium flagship, 1.05M context, highest reasoning tier)",
         "gpt-5.5-pro": "GPT-5.5 Pro (Extended compute, no streaming, $30/$180 per MTok)",
         "gpt-5.4": "GPT-5.4 (Recommended default, 1M context)",
@@ -68,7 +71,7 @@ class OpenAIClient:
     GPT_IMAGE_2_MAX_EDGE = 3840
 
     # Default configuration
-    DEFAULT_MODEL = "gpt-5.5"
+    DEFAULT_MODEL = "gpt-5.6-sol"
     DEFAULT_MAX_TOKENS = 4096
     DEFAULT_TEMPERATURE = 0.7
     MAX_RETRIES = 3
@@ -76,6 +79,7 @@ class OpenAIClient:
 
     # Models that use max_completion_tokens instead of max_tokens
     NEW_TOKEN_PARAM_MODELS = {
+        "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
         "gpt-5.5", "gpt-5.5-pro",
         "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
         "gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano",
@@ -84,6 +88,7 @@ class OpenAIClient:
 
     # Reasoning models that support reasoning_effort parameter
     REASONING_MODELS = {
+        "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
         "gpt-5.5", "gpt-5.5-pro",
         "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
         "o3", "o3-mini", "o3-pro", "o4-mini",
@@ -94,6 +99,7 @@ class OpenAIClient:
     # own default. Sending verbosity to a model that doesn't support it returns
     # 400, so we silently drop it for older families.
     VERBOSITY_MODELS = {
+        "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
         "gpt-5.5", "gpt-5.5-pro",
         "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
         "gpt-5.2", "gpt-5.2-pro", "gpt-5.1",
@@ -533,7 +539,7 @@ class OpenAIClient:
 
         Args:
             prompt: Text description of image to generate
-            model: Image model (gpt-image-1, dall-e-3, dall-e-2)
+            model: Image model (gpt-image-2, gpt-image-1.5, gpt-image-1, gpt-image-1-mini)
             size: Image size (1024x1024, 1024x1536, 1536x1024, etc.)
             quality: Image quality (auto, low, medium, high - gpt-image-1 only)
             background: Background type (auto, transparent, opaque - GPT Image models only)
@@ -548,9 +554,6 @@ class OpenAIClient:
         # Preflight size validation for gpt-image-2 (stricter than other models)
         if model in self.GPT_IMAGE_2_MODELS:
             self._validate_size_for_gpt_image_2(size)
-
-        # Preflight n validation — dall-e-3 is the only model that caps at n=1.
-        self._validate_n_for_model(n, model)
 
         params = {
             "model": model,
@@ -568,10 +571,6 @@ class OpenAIClient:
             if moderation != "auto":
                 params["moderation"] = moderation
             # GPT Image models always return base64, do not accept response_format
-        elif model == "dall-e-3":
-            if quality in ["hd", "standard"]:
-                params["quality"] = quality
-            params["response_format"] = "b64_json"
         else:
             params["response_format"] = "b64_json"
 
@@ -613,7 +612,7 @@ class OpenAIClient:
 
         Args:
             prompt: Text description of image to generate
-            model: Image model (gpt-image-1, dall-e-3, dall-e-2)
+            model: Image model (gpt-image-2, gpt-image-1.5, gpt-image-1, gpt-image-1-mini)
             size: Image size (1024x1024, 1024x1536, 1536x1024, etc.)
             quality: Image quality (auto, low, medium, high - gpt-image-1 only)
             background: Background type (auto, transparent, opaque - GPT Image models only)
@@ -628,19 +627,6 @@ class OpenAIClient:
             model=model, size=size, quality=quality,
             background=background, moderation=moderation, n=n, **kwargs
         )
-
-    def _validate_n_for_model(self, n: int, model: str):
-        """OpenAI's images API accepts n=1-10 for most models. dall-e-3 is the
-        sole exception (hard-capped at n=1). Called in generate_image so users
-        get a friendly preflight message instead of a raw 400.
-        Source: https://developers.openai.com/api/reference/resources/images/methods/generate
-        """
-        if model == "dall-e-3" and n is not None and n > 1:
-            raise ValueError(
-                f"dall-e-3 supports n=1 only (you requested n={n}). For multiple "
-                f"images per call, use gpt-image-2, gpt-image-1.5, gpt-image-1, "
-                f"or gpt-image-1-mini (all support n=1-10)."
-            )
 
     def _validate_size_for_gpt_image_2(self, size: str):
         """Raise ValueError with a clear, actionable message if `size` doesn't
