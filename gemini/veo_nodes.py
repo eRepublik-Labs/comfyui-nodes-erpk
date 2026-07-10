@@ -13,9 +13,6 @@ VEO_MODELS = [
     "veo-3.1-generate-preview",
     "veo-3.1-fast-generate-preview",
     "veo-3.1-lite-generate-preview",
-    "veo-3.0-generate-001",
-    "veo-3.0-fast-generate-001",
-    "veo-2.0-generate-001",
 ]
 
 VEO_ASPECT_RATIOS = ["16:9", "9:16"]
@@ -27,21 +24,16 @@ VEO_PERSON_GENERATION_OPTIONS = ["allow_adult", "dont_allow", "allow_all"]
 
 
 _VEO_LITE = "veo-3.1-lite-generate-preview"
-_VEO_2 = "veo-2.0-generate-001"
-_VEO_3_FAMILY = {"veo-3.0-generate-001", "veo-3.0-fast-generate-001"}
 _VEO_31_FAMILY = {"veo-3.1-generate-preview", "veo-3.1-fast-generate-preview"}
 
 # Per-model capability gates derived from
 # https://ai.google.dev/gemini-api/docs/video and the lite preview model card.
-_MODELS_NO_4K = {_VEO_LITE, _VEO_2}
-_MODELS_NO_RESOLUTION_PARAM = {_VEO_2}        # Veo 2 has no resolution control; skip the param.
-_MODELS_WITH_REFERENCE_IMAGES = _VEO_31_FAMILY  # Lite, Veo 3, Veo 2 do not support reference_images.
+_MODELS_NO_4K = {_VEO_LITE}
+_MODELS_WITH_REFERENCE_IMAGES = _VEO_31_FAMILY  # Lite does not support reference_images.
 
 
 def _veo_valid_durations(model):
     """Allowed durationSeconds values per the Veo API parameters table."""
-    if model == _VEO_2:
-        return {5, 6, 8}
     return {4, 6, 8}
 
 
@@ -62,20 +54,13 @@ def _validate_veo_config(model, duration, resolution, has_reference_images=False
         )
         duration = nearest
 
-    if model in _MODELS_NO_RESOLUTION_PARAM:
-        if resolution and resolution != "720p":
-            warnings.append(
-                f"{model} does not accept a resolution parameter; dropping resolution={resolution}"
-            )
-        return duration, None, warnings
-
     if resolution == "4k" and model in _MODELS_NO_4K:
         warnings.append(f"{model} does not support 4k output; clamping to 1080p")
         resolution = "1080p"
 
     # 8s gate per Veo API docs: 8s requires resolution >= 1080p OR reference_images.
-    # Applies uniformly across all Veo 3.x models; Veo 2 has no such gate.
-    if duration == 8 and model != _VEO_2:
+    # Applies uniformly across the Veo 3.1 family.
+    if duration == 8:
         if resolution == "720p" and not has_reference_images:
             warnings.append(
                 f"{model} requires resolution >= 1080p (or reference_images) for 8s output; "
@@ -90,11 +75,11 @@ def _veo_valid_person_generation(model, is_image_to_video):
     """Allowed person_generation values per the Gemini Developer API.
 
     Veo 3.x image-to-video rejects allow_all server-side; only allow_adult and
-    dont_allow are accepted. Veo 2 and all text-to-video paths accept the full
-    enum. The API returns 400 INVALID_ARGUMENT with the message
+    dont_allow are accepted. Text-to-video paths accept the full enum. The API
+    returns 400 INVALID_ARGUMENT with the message
     "allow_all for personGeneration is currently not supported" when violated.
     """
-    veo_3x_models = _VEO_31_FAMILY | _VEO_3_FAMILY | {_VEO_LITE}
+    veo_3x_models = _VEO_31_FAMILY | {_VEO_LITE}
     if is_image_to_video and model in veo_3x_models:
         return {"allow_adult", "dont_allow"}
     return set(VEO_PERSON_GENERATION_OPTIONS)

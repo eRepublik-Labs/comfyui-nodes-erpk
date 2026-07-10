@@ -79,41 +79,6 @@ def test_lite_8s_at_720p_bumps_resolution():
     assert res == "1080p"
 
 
-def test_veo_3_supports_4_6_8():
-    # Per the Veo API parameters table, Veo 3 / Veo 3 Fast accept {4, 6, 8}.
-    dur, res, warnings = veo._validate_veo_config("veo-3.0-generate-001", 6, "720p")
-    assert dur == 6
-    assert all("duration" not in w for w in warnings)
-
-
-def test_veo_3_8s_at_720p_bumps_resolution():
-    # The 8s gate applies uniformly across all Veo 3.x models.
-    dur, res, warnings = veo._validate_veo_config(
-        "veo-3.0-fast-generate-001", 8, "720p", has_reference_images=False
-    )
-    assert dur == 8
-    assert res == "1080p"
-
-
-def test_veo_2_clamps_7s_to_nearest():
-    # Veo 2 valid set is {5, 6, 8}; 7s is invalid and clamps to nearest (6 or 8).
-    dur, res, warnings = veo._validate_veo_config("veo-2.0-generate-001", 7, "720p")
-    assert dur in (6, 8)
-    assert any("duration" in w for w in warnings)
-
-
-def test_veo_2_drops_resolution_param():
-    dur, res, warnings = veo._validate_veo_config("veo-2.0-generate-001", 6, "1080p")
-    assert res is None
-    assert any("resolution" in w for w in warnings)
-
-
-def test_veo_2_accepts_5s():
-    dur, res, warnings = veo._validate_veo_config("veo-2.0-generate-001", 5, "720p")
-    assert dur == 5
-    assert all("duration" not in w for w in warnings)
-
-
 def test_veo_3_x_rejects_5s_clamps_to_nearest():
     # 5s is invalid on Veo 3.x; both 4 and 6 are tied for nearest valid value.
     dur, res, warnings = veo._validate_veo_config("veo-3.1-generate-preview", 5, "720p")
@@ -131,18 +96,22 @@ def test_lite_model_in_models_list():
     assert "veo-3.1-lite-generate-preview" in veo.VEO_MODELS
 
 
+def test_dead_veo_models_removed():
+    # Veo 3.0 / 2.0 shut down 2026-06-30; only the 3.1 family remains selectable.
+    for dead in ("veo-3.0-generate-001", "veo-3.0-fast-generate-001", "veo-2.0-generate-001"):
+        assert dead not in veo.VEO_MODELS, f"{dead} is past shutdown; remove it"
+
+
 def test_reference_image_capable_models():
     assert "veo-3.1-generate-preview" in veo._MODELS_WITH_REFERENCE_IMAGES
     assert "veo-3.1-fast-generate-preview" in veo._MODELS_WITH_REFERENCE_IMAGES
     assert "veo-3.1-lite-generate-preview" not in veo._MODELS_WITH_REFERENCE_IMAGES
-    assert "veo-2.0-generate-001" not in veo._MODELS_WITH_REFERENCE_IMAGES
 
 
 def test_veo_3x_i2v_rejects_allow_all():
     import pytest
     for model in ("veo-3.1-generate-preview", "veo-3.1-fast-generate-preview",
-                  "veo-3.1-lite-generate-preview", "veo-3.0-generate-001",
-                  "veo-3.0-fast-generate-001"):
+                  "veo-3.1-lite-generate-preview"):
         with pytest.raises(ValueError, match="allow_all"):
             veo._validate_person_generation(model, "allow_all", is_image_to_video=True)
 
@@ -156,12 +125,6 @@ def test_veo_3x_i2v_accepts_allow_adult_and_dont_allow():
 def test_veo_3x_t2v_accepts_allow_all():
     veo._validate_person_generation(
         "veo-3.1-generate-preview", "allow_all", is_image_to_video=False
-    )
-
-
-def test_veo_2_i2v_accepts_allow_all():
-    veo._validate_person_generation(
-        "veo-2.0-generate-001", "allow_all", is_image_to_video=True
     )
 
 

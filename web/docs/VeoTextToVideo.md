@@ -11,7 +11,7 @@ Generates videos from text prompts using Google's Veo models. Veo 3+ models gene
 |-----------|------|---------|-------------|
 | client | GEMINI_API_CLIENT | - | Gemini API client from Gemini API Config node |
 | prompt | String | "" | Text description of the video to generate (max 2500 characters) |
-| model | Combo | veo-3.1-generate-preview | Veo model: veo-3.1-generate-preview, veo-3.1-fast-generate-preview, veo-3.0-generate-001, veo-3.0-fast-generate-001, veo-2.0-generate-001 (optional) |
+| model | Combo | veo-3.1-generate-preview | Veo model: veo-3.1-generate-preview, veo-3.1-fast-generate-preview, veo-3.1-lite-generate-preview (optional) |
 | aspect_ratio | Combo | 16:9 | Video aspect ratio: 16:9 (landscape) or 9:16 (portrait) (optional) |
 | duration_seconds | Combo | 8 | Video duration: 5, 6, 7, or 8 seconds (optional) |
 | person_generation | Combo | allow_adult | Person generation safety: allow_adult, dont_allow, allow_all. Veo 3 only supports allow_all (optional) |
@@ -30,6 +30,5 @@ Generates videos from text prompts using Google's Veo models. Veo 3+ models gene
 
 - Video generation is asynchronous and may take 2-10 minutes depending on duration and model
 - Veo 3+ models generate synchronized audio along with video
-- Veo 2 does not support audio generation
 - The node polls every 20 seconds and times out after 40 minutes
 - Pricing: $0.75 per second of video output for Veo 3+ models

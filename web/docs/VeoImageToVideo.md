@@ -12,7 +12,7 @@ Generates videos from an input image and optional text prompt using Google's Veo
 | client | GEMINI_API_CLIENT | - | Gemini API client from Gemini API Config node |
 | image | IMAGE | - | Input image to generate video from (used as first frame) |
 | prompt | String | "" | Text description to guide the video generation (optional) |
-| model | Combo | veo-3.1-generate-preview | Veo model: veo-3.1-generate-preview, veo-3.1-fast-generate-preview, veo-3.0-generate-001, veo-3.0-fast-generate-001, veo-2.0-generate-001 (optional) |
+| model | Combo | veo-3.1-generate-preview | Veo model: veo-3.1-generate-preview, veo-3.1-fast-generate-preview, veo-3.1-lite-generate-preview (optional) |
 | aspect_ratio | Combo | 16:9 | Video aspect ratio: 16:9 (landscape) or 9:16 (portrait) (optional) |
 | duration_seconds | Combo | 8 | Video duration: 5, 6, 7, or 8 seconds (optional) |
 | person_generation | Combo | allow_adult | Person generation safety: allow_adult, dont_allow, allow_all. Veo 3 only supports allow_all (optional) |

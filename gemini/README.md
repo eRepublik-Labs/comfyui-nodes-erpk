@@ -305,7 +305,7 @@ Generate videos from text prompts using Google's Veo models.
 **Inputs:**
 - `client`: Gemini API client (from Gemini API Config node)
 - `prompt`: Text description of the video to generate (max 2500 characters)
-- `model`: veo-3.1-generate-preview (default, includes audio), veo-3.1-fast-generate-preview, veo-3.0-generate-001, veo-3.0-fast-generate-001, or veo-2.0-generate-001
+- `model`: veo-3.1-generate-preview (default, includes audio), veo-3.1-fast-generate-preview, or veo-3.1-lite-generate-preview
 - `aspect_ratio`: 16:9 (landscape) or 9:16 (portrait)
 - `duration_seconds`: 5, 6, 7, or 8 seconds (Veo 3+ defaults to 8)
 - `person_generation`: Safety setting - allow_adult (default), dont_allow, or allow_all
@@ -337,7 +337,7 @@ Generate videos from an input image and optional text prompt.
 - `client`: Gemini API client (from Gemini API Config node)
 - `image`: Input image (ComfyUI IMAGE tensor) - used as first frame or style reference
 - `prompt`: Optional text description to guide the video generation
-- `model`: veo-3.1-generate-preview (default, includes audio), veo-3.1-fast-generate-preview, veo-3.0-generate-001, veo-3.0-fast-generate-001, or veo-2.0-generate-001
+- `model`: veo-3.1-generate-preview (default, includes audio), veo-3.1-fast-generate-preview, or veo-3.1-lite-generate-preview
 - `aspect_ratio`: 16:9 (landscape) or 9:16 (portrait)
 - `duration_seconds`: 5, 6, 7, or 8 seconds (Veo 3+ defaults to 8)
 - `person_generation`: Safety setting - allow_adult (default), dont_allow, or allow_all
@@ -387,9 +387,7 @@ Generate videos from an input image and optional text prompt.
 |-------|----------|-------|
 | **veo-3.1-generate-preview** | Highest quality, latest features | Default, generates synchronized audio |
 | **veo-3.1-fast-generate-preview** | Fast generation with audio | Faster variant of Veo 3.1 |
-| **veo-3.0-generate-001** | Stable Veo 3 | Generates synchronized audio |
-| **veo-3.0-fast-generate-001** | Fast Veo 3 | Faster variant of Veo 3 |
-| **veo-2.0-generate-001** | Legacy video generation | No audio support |
+| **veo-3.1-lite-generate-preview** | Lightweight, lower cost | No reference-image support |
 
 **Pricing:** Veo 3+ is priced at $0.75 per second of video output.
 
@@ -399,9 +397,9 @@ Generate videos from an input image and optional text prompt.
 
 Both Veo nodes run client-side validators before submitting the long-running job, to avoid eating a 4-5 minute generation just to see an opaque 400 from the API:
 
-- **Duration normalization** — Veo 2 accepts `{5, 6, 8}`; Veo 3.x accepts `{4, 6, 8}`. Out-of-range values are snapped to the nearest valid duration with a warning.
-- **Resolution gating** — Models without a resolution parameter drop the field; models that don't accept `4k` are clamped to `1080p`. On Veo 3.x, an 8s duration with `720p` and no reference images is auto-bumped to `1080p`.
-- **person_generation** — Veo 3.x image-to-video rejects `allow_all` server-side; the validator raises a `ValueError` early. Veo 2 and all text-to-video paths accept the full enum.
+- **Duration normalization** — Veo 3.x accepts `{4, 6, 8}`. Out-of-range values are snapped to the nearest valid duration with a warning.
+- **Resolution gating** — Models that don't accept `4k` (Lite) are clamped to `1080p`. On Veo 3.x, an 8s duration with `720p` and no reference images is auto-bumped to `1080p`.
+- **person_generation** — Veo 3.x image-to-video rejects `allow_all` server-side; the validator raises a `ValueError` early. Text-to-video paths accept the full enum.
 - **i2v feature combos (Veo 3.1)** — `image + last_frame` interpolation requires `duration_seconds=8`; `reference_images` requires `duration_seconds=8` and `aspect_ratio=16:9`; `reference_images` cannot be combined with `image`/`last_frame`. These gates are not documented in Google's parameter table but are confirmed by Google staff in forum threads — see `gemini/veo_nodes.py` for the linked discussions.
 
 ## Example Workflows
