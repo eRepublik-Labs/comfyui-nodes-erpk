@@ -19,26 +19,24 @@ class GrokClient:
     config.ini.
     """
 
-    DEFAULT_TEXT_MODEL = "grok-4.3"
+    DEFAULT_TEXT_MODEL = "grok-4.5"
     DEFAULT_IMAGE_MODEL = "grok-imagine-image"
     DEFAULT_VIDEO_MODEL = "grok-imagine-video"
+    VIDEO_MODELS = ["grok-imagine-video", "grok-imagine-video-1.5"]
 
-    # Canonical model IDs come first; aliases follow so the Combo dropdown
-    # still accepts saved workflows that reference the docs-only name.
-    # ComfyUI's frontend validates Combo values against this options list
-    # BEFORE execute runs, so the alias must be present in IMAGE_MODELS too —
-    # remapping only at execute time isn't enough.
+    # Current Grok image models per docs.x.ai. grok-imagine-image-quality is a
+    # distinct premium tier (the successor grok-imagine-image-pro redirected to),
+    # not an alias, so it is sent to the API unchanged. grok-imagine-image-pro
+    # was retired and is dropped.
     IMAGE_MODELS = [
         "grok-imagine-image",
-        "grok-imagine-image-pro",
-        "grok-imagine-image-quality",  # alias of grok-imagine-image; remapped at execute
+        "grok-imagine-image-quality",
     ]
 
-    # Translated at execute time so the SDK call uses the canonical ID even
-    # when the saved widget value is the docs-only alias.
-    IMAGE_MODEL_ALIASES = {
-        "grok-imagine-image-quality": "grok-imagine-image",
-    }
+    # Retired-ID remaps applied at execute time. Empty today; kept so a future
+    # retired ID can map to its canonical successor while staying selectable in
+    # saved workflows (ComfyUI validates Combo values before execute).
+    IMAGE_MODEL_ALIASES = {}
     IMAGE_ASPECT_RATIOS = ["1:1", "16:9", "9:16", "4:3", "3:4", "2:1", "1:2", "auto"]
     IMAGE_RESOLUTIONS = ["1k", "2k"]
 

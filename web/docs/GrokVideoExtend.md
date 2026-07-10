@@ -13,7 +13,7 @@ Appends new content to the end of an existing video. The `duration` parameter co
 | video_url | String | (empty) | Public HTTPS URL of the source video to extend |
 | duration | Int | 5 | Length of the **extended portion only**, in seconds (1–15). A 10 s source + duration=5 = 15 s output |
 | prompt | String | (empty) | Optional guidance for the new content (optional) |
-| model | Combo | grok-imagine-video | Video model (optional) |
+| model | Combo | grok-imagine-video | Video model: grok-imagine-video, grok-imagine-video-1.5 (optional) |
 | seed | Int | -1 | Cache-invalidation only — not forwarded to xAI. -1 randomizes (optional) |
 
 ## Output

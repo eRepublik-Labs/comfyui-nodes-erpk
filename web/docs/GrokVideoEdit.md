@@ -12,7 +12,7 @@ Edits an existing video using a text prompt. The output inherits the source vide
 | client | GROK_API_CLIENT | — | Grok API client (optional if API key is in Settings) |
 | prompt | String | (empty) | Editing instructions describing the desired changes |
 | video_url | String | (empty) | Public HTTPS URL of the source video to edit |
-| model | Combo | grok-imagine-video | Video model (optional) |
+| model | Combo | grok-imagine-video | Video model: grok-imagine-video, grok-imagine-video-1.5 (optional) |
 | seed | Int | -1 | Cache-invalidation only — not forwarded to xAI. -1 randomizes (optional) |
 
 ## Output

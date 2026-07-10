@@ -10,16 +10,18 @@ from comfy_api.latest import IO
 from .grok_api.client import GrokClient
 from ..utils.safe_fetch import fetch_remote_bytes
 
-# Known Grok text models per xai_sdk.sync.chat.Client.create() Literal type
-# (xai-sdk 1.14.0). The "-latest" suffix variants are aliased server-side.
-# grok-2 is intentionally absent — not in the SDK's accepted model list.
+# Current Grok chat/code models per docs.x.ai. grok-4.5 is the recommended
+# flagship; grok-build-0.1 is the coding model that replaced the retired
+# grok-code-fast-1. grok-3 was retired (redirects to grok-4.3 and rebills at
+# the new rate). grok-4 / grok-4-fast / grok-3-mini are kept until confirmed
+# retired.
 TEXT_MODELS = [
+    "grok-4.5",
     "grok-4.3",
     "grok-4-fast",
     "grok-4",
-    "grok-3",
     "grok-3-mini",
-    "grok-code-fast-1",
+    "grok-build-0.1",
 ]
 
 

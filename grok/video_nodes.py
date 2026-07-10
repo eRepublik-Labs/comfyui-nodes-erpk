@@ -42,7 +42,7 @@ class GrokTextToVideo(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "model",
-                    options=[GrokClient.DEFAULT_VIDEO_MODEL],
+                    options=GrokClient.VIDEO_MODELS,
                     default=GrokClient.DEFAULT_VIDEO_MODEL,
                     optional=True,
                     tooltip="xAI video model.",
@@ -165,7 +165,7 @@ class GrokRefToVideo(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "model",
-                    options=[GrokClient.DEFAULT_VIDEO_MODEL],
+                    options=GrokClient.VIDEO_MODELS,
                     default=GrokClient.DEFAULT_VIDEO_MODEL,
                     optional=True,
                     tooltip="xAI video model.",
@@ -293,7 +293,7 @@ class GrokVideoEdit(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "model",
-                    options=[GrokClient.DEFAULT_VIDEO_MODEL],
+                    options=GrokClient.VIDEO_MODELS,
                     default=GrokClient.DEFAULT_VIDEO_MODEL,
                     optional=True,
                     tooltip="xAI video model.",
@@ -393,7 +393,7 @@ class GrokVideoExtend(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "model",
-                    options=[GrokClient.DEFAULT_VIDEO_MODEL],
+                    options=GrokClient.VIDEO_MODELS,
                     default=GrokClient.DEFAULT_VIDEO_MODEL,
                     optional=True,
                     tooltip="xAI video model.",

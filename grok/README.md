@@ -8,11 +8,11 @@ Complete xAI Grok integration providing text generation, multi-turn chat, image 
 
 ## Features
 
-- **Text Generation** — One-shot prompt → text via `grok-4.3` and earlier models
+- **Text Generation** — One-shot prompt → text via `grok-4.5` and other Grok models
 - **Multi-turn Chat** — Persistent conversation threading via the `GROK_CHAT_SESSION` custom type
 - **Image Generation** — Text-to-image via `grok-imagine-image-quality` (1k/2k, 8 aspect ratios)
 - **Image Editing** — Single or multi-image editing (up to 3 source images; xAI's documented cap)
-- **Text-to-Video** — `grok-imagine-video`, 1–15 s clips, 7 aspect ratios, 480p or 720p
+- **Text-to-Video** — `grok-imagine-video` / `grok-imagine-video-1.5`, 1–15 s clips, 7 aspect ratios, 480p or 720p
 - **Reference-to-Video** — Guide generation with up to 3 reference images; address them inline via `<IMAGE_N>` tokens
 - **Video Edit** — Edit an existing video URL with a text prompt (output capped at 720p per xAI)
 - **Video Extension** — Append new content to an existing video by N more seconds
@@ -83,10 +83,11 @@ Complete xAI Grok integration providing text generation, multi-turn chat, image 
 
 | Model ID | Used by | Notes |
 |---|---|---|
-| `grok-4.3` | Text Generation, Chat (default) | Latest Grok text model |
-| `grok-3`, `grok-3-mini`, `grok-2` | Text Generation, Chat | Available via the model Combo input |
-| `grok-imagine-image-quality` | Image Generation, Image Edit | Only image model currently available |
-| `grok-imagine-video` | All video nodes | Only video model |
+| `grok-4.5` | Text Generation, Chat (default) | Current Grok flagship |
+| `grok-4.3`, `grok-4-fast`, `grok-4`, `grok-3-mini` | Text Generation, Chat | Available via the model Combo input |
+| `grok-build-0.1` | Text Generation, Chat | Coding model (replaces the retired grok-code-fast-1) |
+| `grok-imagine-image`, `grok-imagine-image-quality` | Image Generation, Image Edit | image = standard; quality = premium tier |
+| `grok-imagine-video`, `grok-imagine-video-1.5` | All video nodes | Video models |
 
 ## Notes
 

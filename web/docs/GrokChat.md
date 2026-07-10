@@ -11,7 +11,7 @@ Maintains a multi-turn conversation by threading message history between Grok Ch
 |-----------|------|---------|-------------|
 | prompt | String | (empty) | Your message in the conversation |
 | client | GROK_API_CLIENT | — | Grok API client (optional if API key is in Settings) |
-| model | Combo | grok-4.3 | Grok model (optional) |
+| model | Combo | grok-4.5 | Grok model (optional) |
 | chat_session | GROK_CHAT_SESSION | — | Previous chat session output (optional). Leave disconnected to start fresh |
 | reset_conversation | Boolean | false | Discard `chat_session` and start a new conversation (optional) |
 | temperature | Float | 0.7 | Creativity. Range: 0.0–2.0 (optional) |

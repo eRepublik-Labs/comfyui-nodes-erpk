@@ -12,7 +12,7 @@ Generates a video guided by one to three reference images and a text prompt. Ref
 | client | GROK_API_CLIENT | — | Grok API client (optional if API key is in Settings) |
 | prompt | String | (empty) | Video description. May reference inputs via `<IMAGE_1>`, `<IMAGE_2>`, `<IMAGE_3>` tokens |
 | reference_images | IMAGE | — | Batched IMAGE tensor — up to 3 frames used as references |
-| model | Combo | grok-imagine-video | Video model (optional) |
+| model | Combo | grok-imagine-video | Video model: grok-imagine-video, grok-imagine-video-1.5 (optional) |
 | aspect_ratio | Combo | 16:9 | One of: 16:9, 9:16, 1:1, 4:3, 3:4, 3:2, 2:3 (optional) |
 | resolution | Combo | 720p | 480p (faster) or 720p (HD) (optional) |
 | duration | Int | 5 | Video length in seconds (1–15) (optional) |
