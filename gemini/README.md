@@ -297,6 +297,31 @@ Configure content safety filters.
 
 ---
 
+### Gemini Omni Video Generation
+
+Generate 3-10 second video at 720p / 24 FPS with Gemini Omni Flash.
+
+Unlike Veo, this model is reached through Google's Interactions API and returns the
+video directly, so a generation completes in a single call with no polling.
+
+**Inputs:**
+- `prompt`: What the video should show. Negative prompts are unsupported — state exclusions inline ("Do not show text on screen")
+- `client`: Gemini API client (optional when the key is in ComfyUI Settings)
+- `image`: Optional start image. Connecting one switches the model to image-to-video
+- `aspect_ratio`: 16:9 (landscape) or 9:16 (portrait)
+- `output_directory`: Where to save the video (default: ComfyUI output folder)
+- `seed`: Cache control only — Omni Flash takes no API seed, so this is never sent. A fixed seed reuses the video you already paid for; -1 regenerates every queue
+
+**Outputs:**
+- `video_path`: Path to the generated video file (.mp4)
+
+**Not supported by this model:** system instructions, temperature, top_p, stop
+sequences, negative prompts, video extension, interpolation between first and last
+frames, and audio-reference upload. Duration and resolution are fixed. All output
+carries a SynthID watermark.
+
+---
+
 ### Veo Video Generation Nodes
 
 #### Veo Text to Video
