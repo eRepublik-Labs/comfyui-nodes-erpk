@@ -11,7 +11,7 @@ General-purpose text generation using OpenAI models. Supports the full GPT-5.x f
 |-----------|------|---------|-------------|
 | prompt | String | (empty) | Text prompt for OpenAI |
 | client | OPENAI_API_CLIENT | — | OpenAI API client (optional if API key is in Settings) |
-| model | Combo | gpt-5.6-sol | Model to use. Options include gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4 family, gpt-5.2, gpt-5.1, gpt-5, gpt-4.1, gpt-4o, o3, o4-mini and more (optional) |
+| model | Combo | gpt-5.6-sol | Model to use. Options include gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4 family, gpt-5.2, gpt-5.1, gpt-5, gpt-4.1, gpt-4o, chat-latest, o3, o4-mini and more (optional) |
 | temperature | Float | 0.7 | Creativity level, 0.0=focused to 2.0=very creative (optional). Range: 0.0–2.0. Ignored by reasoning models (gpt-5.x reasoning + o-series) |
 | max_tokens | Int | 4096 | Maximum response length (optional). Range: 256–16384. Sent as `max_completion_tokens` for newer models |
 | top_p | Float | 1.0 | Nucleus sampling threshold, 1.0=disabled (optional). Range: 0.0–1.0. Ignored by reasoning models |

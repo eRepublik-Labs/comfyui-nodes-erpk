@@ -3,6 +3,8 @@
 
 from comfy_api.latest import IO
 
+from .models import DEFAULT_TEXT_MODEL, TEXT_MODELS
+
 
 class ClaudeAPIClient(IO.ComfyNode):
     """Initializes and provides a Claude API client for use by other nodes."""
@@ -17,18 +19,9 @@ class ClaudeAPIClient(IO.ComfyNode):
             inputs=[
                 IO.Combo.Input(
                     "model",
-                    options=[
-                        "claude-sonnet-5",
-                        "claude-opus-4-8",
-                        "claude-fable-5",
-                        "claude-opus-4-7",
-                        "claude-sonnet-4-6",
-                        "claude-opus-4-6",
-                        "claude-haiku-4-5-20251001",
-                        "claude-sonnet-4-5-20250929",
-                    ],
-                    default="claude-sonnet-5",
-                    tooltip="Claude model to use. Sonnet 5 offers the best balance of performance and cost.",
+                    options=TEXT_MODELS,
+                    default=DEFAULT_TEXT_MODEL,
+                    tooltip="Claude model to use. Sonnet 5 offers the best balance of performance and cost; Opus 5 is the highest-capability tier.",
                 ),
                 IO.String.Input(
                     "api_key",

@@ -38,6 +38,35 @@ def _is_gemini_3x(model: str) -> bool:
     return model.startswith("gemini-3")
 
 
+# Output resolutions each image model accepts. A model absent from this map is
+# assumed to accept the full 1K/2K/4K range. An empty set means the model emits
+# a fixed resolution and rejects the image_size field entirely.
+_IMAGE_SIZES = {
+    "gemini-2.5-flash-image": set(),          # fixed 1024px
+    "gemini-3.1-flash-lite-image": {"1K"},    # Nano Banana 2 Lite emits 1K only
+}
+
+
+def _resolve_image_size(model, image_size):
+    """Return the image_size to send for this model, or None to omit the field.
+
+    A request above a model's ceiling is clamped rather than rejected: the user
+    finds out at queue time either way, and clamping still returns an image.
+    """
+    if image_size == "default":
+        return None
+    allowed = _IMAGE_SIZES.get(model)
+    if allowed is None:
+        return image_size
+    if not allowed:
+        return None
+    if image_size in allowed:
+        return image_size
+    clamped = sorted(allowed)[0]
+    print(f"[Gemini] {model} supports {sorted(allowed)} only; using {clamped} instead of {image_size}")
+    return clamped
+
+
 _FINISH_REASON_HINTS = {
     "IMAGE_OTHER": (
         "Gemini soft-refused image generation without a specific reason. "
@@ -1222,9 +1251,10 @@ class GeminiImageGeneration(IO.ComfyNode):
             image_config_params = {}
             if aspect_ratio != "default":
                 image_config_params["aspect_ratio"] = aspect_ratio
-            if image_size != "default" and model != "gemini-2.5-flash-image":
+            resolved_size = _resolve_image_size(model, image_size)
+            if resolved_size is not None:
                 if "image_size" in types.ImageConfig.model_fields:
-                    image_config_params["image_size"] = image_size
+                    image_config_params["image_size"] = resolved_size
                 else:
                     print(f"[Gemini] Warning: image_size not supported by SDK, ignoring")
 
@@ -1487,9 +1517,10 @@ class GeminiImageEdit(IO.ComfyNode):
             image_config_params = {}
             if aspect_ratio != "default":
                 image_config_params["aspect_ratio"] = aspect_ratio
-            if image_size != "default" and model != "gemini-2.5-flash-image":
+            resolved_size = _resolve_image_size(model, image_size)
+            if resolved_size is not None:
                 if "image_size" in types.ImageConfig.model_fields:
-                    image_config_params["image_size"] = image_size
+                    image_config_params["image_size"] = resolved_size
                 else:
                     print(f"[Gemini] Warning: image_size not supported by SDK, ignoring")
 

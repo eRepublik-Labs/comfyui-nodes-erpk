@@ -25,6 +25,7 @@ API_NODES = [
     ("gemini.nodes", "GeminiImageEdit"),
     ("gemini.veo_nodes", "VeoTextToVideo"),
     ("gemini.veo_nodes", "VeoImageToVideo"),
+    ("gemini.omni_nodes", "GeminiOmniVideoGeneration"),
     # OpenAI
     ("openai.nodes", "OpenAITextGeneration"),
     ("openai.nodes", "OpenAIChat"),

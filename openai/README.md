@@ -86,7 +86,7 @@ General-purpose text generation and completion.
 **Inputs:**
 - `client`: OpenAI API client
 - `prompt`: Text prompt
-- `model`: gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini, o4-mini, o3, o3-mini, o3-pro
+- `model`: gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini, chat-latest, o4-mini, o3, o3-mini, o3-pro
 - `temperature`: 0.0-2.0 (creativity level, default: 0.7)
 - `max_tokens`: 256-16384 (output length, default: 4096)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 1.0, set <1.0 to enable)
@@ -113,7 +113,7 @@ Multi-turn conversation with message history preservation.
 **Inputs:**
 - `client`: OpenAI API client
 - `prompt`: Your message
-- `model`: gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini, o4-mini, o3, o3-mini, o3-pro
+- `model`: gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini, chat-latest, o4-mini, o3, o3-mini, o3-pro
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
 - `temperature`: 0.0-2.0 (default: 0.7)

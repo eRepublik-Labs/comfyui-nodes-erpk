@@ -3,6 +3,8 @@
 
 from comfy_api.latest import IO
 
+from .models import INHERIT_FROM_CLIENT, TEXT_MODELS
+
 
 class ClaudeVisionAnalysis(IO.ComfyNode):
     """Analyzes images using Claude's vision capabilities."""
@@ -33,18 +35,8 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "model",
-                    options=[
-                        "(inherit from client)",
-                        "claude-sonnet-5",
-                        "claude-opus-4-8",
-                        "claude-fable-5",
-                        "claude-opus-4-7",
-                        "claude-sonnet-4-6",
-                        "claude-opus-4-6",
-                        "claude-haiku-4-5-20251001",
-                        "claude-sonnet-4-5-20250929",
-                    ],
-                    default="(inherit from client)",
+                    options=[INHERIT_FROM_CLIENT] + TEXT_MODELS,
+                    default=INHERIT_FROM_CLIENT,
                     optional=True,
                     tooltip="Override the client's model for this vision call. Opus 4.7 supports 2576px image resolution (vs 1568px on prior models).",
                 ),

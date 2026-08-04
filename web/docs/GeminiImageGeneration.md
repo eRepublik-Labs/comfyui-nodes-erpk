@@ -11,7 +11,7 @@ Generates images from text descriptions using Gemini's image generation models. 
 |-----------|------|---------|-------------|
 | prompt | String | "" | Description of the image to generate |
 | client | GEMINI_API_CLIENT | - | Gemini API client (optional, uses API key from config) |
-| model | Combo | gemini-3.1-flash-image | Image model: gemini-3.1-flash-image, gemini-3-pro-image, gemini-2.5-flash-image (optional) |
+| model | Combo | gemini-3.1-flash-image | Image model: gemini-3.1-flash-image, gemini-3.1-flash-lite-image, gemini-3-pro-image, gemini-2.5-flash-image (optional) |
 | temperature | Float | 1.0 | Creativity level, 0.0-2.0 (optional) |
 | aspect_ratio | Combo | default | Image aspect ratio: default, 1:1, 1:4, 1:8, 2:3, 3:2, 3:4, 4:1, 4:3, 4:5, 5:4, 8:1, 9:16, 16:9, 21:9 (optional) |
 | image_size | Combo | default | Resolution: default, 1K, 2K, 4K. 1K-4K for 3.1 Flash and 3 Pro, 2.5 Flash fixed at 1024px (optional) |

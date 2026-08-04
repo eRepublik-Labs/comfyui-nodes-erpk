@@ -84,7 +84,9 @@ Complete xAI Grok integration providing text generation, multi-turn chat, image 
 | Model ID | Used by | Notes |
 |---|---|---|
 | `grok-4.5` | Text Generation, Chat (default) | Current Grok flagship |
-| `grok-4.3`, `grok-4-fast`, `grok-4`, `grok-3-mini` | Text Generation, Chat | Available via the model Combo input |
+| `grok-4.3` | Text Generation, Chat | Migration target for the retired grok-3 / grok-4 IDs |
+| `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning` | Text Generation, Chat | 1M context (vs 500k on grok-4.5); no reasoning_effort control |
+| `grok-4.20-multi-agent-0309` | Text Generation, Chat | 1M context; tighter rate limits (9 rps / 450 rpm) than its siblings |
 | `grok-build-0.1` | Text Generation, Chat | Coding model (replaces the retired grok-code-fast-1) |
 | `grok-imagine-image`, `grok-imagine-image-quality` | Image Generation, Image Edit | image = standard; quality = premium tier |
 | `grok-imagine-video`, `grok-imagine-video-1.5` | All video nodes | Video models |
