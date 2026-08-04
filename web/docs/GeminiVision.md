@@ -12,7 +12,7 @@ Analyzes images using Gemini's multimodal vision capabilities. Supports single i
 | image | IMAGE | - | Image(s) to analyze (supports batches) |
 | prompt | String | "Describe this image in detail." | Question or instruction about the image(s) |
 | client | GEMINI_API_CLIENT | - | Gemini API client (optional if API key is configured in Settings) |
-| model | Combo | gemini-3.5-flash | Model to use: gemini-3.1-pro-preview, gemini-3.5-flash, gemini-3-flash-preview, gemini-3.1-flash-lite, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite (optional) |
+| model | Combo | gemini-3.5-flash | Model to use: gemini-3.1-pro-preview, gemini-3.6-flash, gemini-3.5-flash, gemini-3.5-flash-lite, gemini-3-flash-preview, gemini-3.1-flash-lite, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite (optional) |
 | max_tokens | Int | 8192 | Maximum analysis length, 256-65536 (optional) |
 | temperature | Float | 0.4 | Creativity level, lower=more factual, 0.0-2.0 (optional) |
 | top_p | Float | 0.95 | Nucleus sampling threshold, 0.0=disabled (optional) |

@@ -36,6 +36,7 @@ class OpenAIClient:
         "gpt-5": "GPT-5 (Reasoning model for coding/agents)",
         "gpt-5-mini": "GPT-5 Mini (Fast, cost-efficient)",
         "gpt-5-nano": "GPT-5 Nano (Fastest, lowest cost)",
+        "chat-latest": "ChatGPT Instant (Non-reasoning, 400K context, $5/$30 per MTok)",
         "gpt-4.1": "GPT-4.1 (Smartest non-reasoning model)",
         "gpt-4.1-mini": "GPT-4.1 Mini (Fast, cost-effective)",
         "gpt-4.1-nano": "GPT-4.1 Nano (Fastest, lowest cost GPT-4.1)",
@@ -84,6 +85,7 @@ class OpenAIClient:
         "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
         "gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano",
         "o3", "o3-mini", "o3-pro", "o4-mini",
+        "chat-latest",
     }
 
     # Reasoning models that support reasoning_effort parameter

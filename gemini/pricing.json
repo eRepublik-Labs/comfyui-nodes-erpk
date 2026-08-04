@@ -10,6 +10,16 @@
       "input_price_per_mtok": 2.0,
       "output_price_per_mtok": 12.0
     },
+    "gemini-3.6-flash": {
+      "name": "Gemini 3.6 Flash",
+      "input_price_per_mtok": 1.50,
+      "output_price_per_mtok": 7.50
+    },
+    "gemini-3.5-flash-lite": {
+      "name": "Gemini 3.5 Flash-Lite",
+      "input_price_per_mtok": 0.30,
+      "output_price_per_mtok": 2.50
+    },
     "gemini-3.5-flash": {
       "name": "Gemini 3.5 Flash",
       "input_price_per_mtok": 1.5,

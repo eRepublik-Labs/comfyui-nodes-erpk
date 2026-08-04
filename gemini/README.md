@@ -88,7 +88,7 @@ General-purpose text generation and completion.
 **Inputs:**
 - `client`: Gemini API client (optional)
 - `prompt`: Text prompt
-- `model`: gemini-3.5-flash (default), gemini-3.1-pro-preview, gemini-3-flash-preview, gemini-3.1-flash-lite, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+- `model`: gemini-3.5-flash (default), gemini-3.1-pro-preview, gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3-flash-preview, gemini-3.1-flash-lite, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
 - `temperature`: 0.0-2.0 (creativity level, default: 0.7)
 - `max_tokens`: 256-65536 (output length, default: 8192)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
@@ -117,7 +117,7 @@ Multi-turn conversation with message history preservation.
 **Inputs:**
 - `client`: Gemini API client (optional)
 - `prompt`: Your message
-- `model`: gemini-3.5-flash (default), gemini-3.1-pro-preview, gemini-3-flash-preview, gemini-3.1-flash-lite, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+- `model`: gemini-3.5-flash (default), gemini-3.1-pro-preview, gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3-flash-preview, gemini-3.1-flash-lite, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
 - `temperature`: 0.0-2.0 (default: 0.7)
@@ -148,7 +148,7 @@ Analyze images with questions or instructions.
 - `client`: Gemini API client (optional)
 - `image`: ComfyUI image tensor (supports batches)
 - `prompt`: Question or instruction about the image(s)
-- `model`: gemini-3.5-flash (default), gemini-3.1-pro-preview, gemini-3-flash-preview, gemini-3.1-flash-lite, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+- `model`: gemini-3.5-flash (default), gemini-3.1-pro-preview, gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3-flash-preview, gemini-3.1-flash-lite, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
 - `max_tokens`: 256-65536 (default: 8192)
 - `temperature`: 0.0-2.0 (default: 0.4, lower for more factual)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
@@ -177,7 +177,7 @@ Generate images from text descriptions using Gemini's image generation models.
 **Inputs:**
 - `prompt`: Text description of the image to generate
 - `client`: Optional Gemini API client (from Gemini API Config node)
-- `model`: gemini-3.1-flash-image (default, recommended), gemini-3-pro-image (professional), or gemini-2.5-flash-image (fast)
+- `model`: gemini-3.1-flash-image (default, recommended), gemini-3.1-flash-lite-image (Nano Banana 2 Lite, 1K only), gemini-3-pro-image (professional), or gemini-2.5-flash-image (fast)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
 - `aspect_ratio`: Image dimensions - 14 ratios for 3.1 Flash (including 1:4, 4:1, 1:8, 8:1), 10 ratios for others
 - `image_size`: Resolution - "default", "1K", "2K", "4K" (1K-4K for 3.1 Flash and 3 Pro; 2.5 Flash fixed at 1024px)
@@ -213,7 +213,7 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 - `image`: Input image(s) to edit (up to 14 reference images). Use ComfyUI's **Batch Images** node to combine multiple images.
 - `prompt`: Text description of how to modify the image(s)
 - `client`: Optional Gemini API client (from Gemini API Config node)
-- `model`: gemini-3.1-flash-image (default, recommended), gemini-3-pro-image (professional), or gemini-2.5-flash-image (fast)
+- `model`: gemini-3.1-flash-image (default, recommended), gemini-3.1-flash-lite-image (Nano Banana 2 Lite, 1K only), gemini-3-pro-image (professional), or gemini-2.5-flash-image (fast)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
 - `aspect_ratio`: Image dimensions - 14 ratios for 3.1 Flash (including 1:4, 4:1, 1:8, 8:1), 10 ratios for others
 - `image_size`: Resolution - "default", "1K", "2K", "4K" (1K-4K for 3.1 Flash and 3 Pro; 2.5 Flash fixed at 1024px)
@@ -379,7 +379,7 @@ Generate videos from an input image and optional text prompt.
 | **gemini-3-pro-image** | Professional quality | Nano Banana Pro, best for character consistency (up to 14 reference images) |
 | **gemini-2.5-flash-image** | Fast image generation | Stable, lowest latency |
 
-**Note:** Image generation models output images instead of text. Resolution for `gemini-3.1-flash-image` and `gemini-3-pro-image` ranges from 1K to 4K; `gemini-2.5-flash-image` is fixed at 1024px.
+**Note:** Image generation models output images instead of text. Resolution for `gemini-3.1-flash-image` and `gemini-3-pro-image` ranges from 1K to 4K; `gemini-3.1-flash-lite-image` emits 1K only (higher requests are clamped); `gemini-2.5-flash-image` is fixed at 1024px.
 
 ### Video Generation Models (Veo)
 

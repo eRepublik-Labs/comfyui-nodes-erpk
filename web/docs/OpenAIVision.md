@@ -12,7 +12,7 @@ Analyzes images using OpenAI's vision capabilities. Supports multiple images in 
 | image | Image | — | Image(s) to analyze (ComfyUI tensor) |
 | prompt | String | Describe this image in detail. | Question or instruction about the image(s) |
 | client | OPENAI_API_CLIENT | — | OpenAI API client (optional if API key is in Settings) |
-| model | Combo | gpt-5.6-sol | Vision model. Options include gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4 family, gpt-5.2, gpt-5.1, gpt-5, gpt-4.1, gpt-4o, gpt-4o-mini (optional) |
+| model | Combo | gpt-5.6-sol | Vision model. Options include gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4 family, gpt-5.2, gpt-5.1, gpt-5, gpt-4.1, gpt-4o, gpt-4o-mini, chat-latest (optional) |
 | detail | Combo | auto | Image detail level: auto, low (faster/cheaper), or high (more detailed) (optional) |
 | max_tokens | Int | 4096 | Maximum analysis length (optional). Range: 256–16384 |
 | temperature | Float | 0.4 | Creativity level, lower=more factual (optional). Range: 0.0–2.0 |
