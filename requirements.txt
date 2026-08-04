@@ -4,10 +4,10 @@
 
 # Core dependencies (all packages)
 requests>=2.33.0
-Pillow>=12.2.0
+Pillow>=12.3.0
 pydantic>=2.0.0
 urllib3>=2.7.0
-cryptography>=46.0.7
+cryptography>=48.0.1
 
 # Claude API integration
 anthropic>=0.96.0

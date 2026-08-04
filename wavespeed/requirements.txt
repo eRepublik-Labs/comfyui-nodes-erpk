@@ -1,5 +1,5 @@
 # WaveSpeed AI ComfyUI Nodes Requirements
 pydantic>=2.0.0
 requests>=2.33.0
-Pillow>=12.2.0
+Pillow>=12.3.0
 urllib3>=2.7.0

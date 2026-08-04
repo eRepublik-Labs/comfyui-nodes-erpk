@@ -7,7 +7,7 @@ anthropic>=0.96.0
 pydantic>=2.0.0
 
 # Image processing
-Pillow>=12.2.0
+Pillow>=12.3.0
 
 # HTTP requests and utilities
 requests>=2.33.0
