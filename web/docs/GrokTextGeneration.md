@@ -11,7 +11,7 @@ Sends a single prompt to xAI's Grok and returns the generated text. Stateless �
 |-----------|------|---------|-------------|
 | prompt | String | (empty) | Text prompt to send to Grok |
 | client | GROK_API_CLIENT | — | Grok API client (optional if API key is in Settings) |
-| model | Combo | grok-4.5 | Grok model. Options: grok-4.5, grok-4.3, grok-4-fast, grok-4, grok-3-mini, grok-build-0.1 (optional) |
+| model | Combo | grok-4.5 | Grok model. Options: grok-4.5, grok-4.3, grok-4.20-0309-reasoning, grok-4.20-0309-non-reasoning, grok-4.20-multi-agent-0309, grok-build-0.1 (optional) |
 | temperature | Float | 0.7 | Creativity (0.0 focused → 2.0 very creative). Range: 0.0–2.0 (optional) |
 | max_tokens | Int | 4096 | Maximum response tokens. Range: 256–16384 (optional) |
 

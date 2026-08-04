@@ -216,7 +216,7 @@ xAI Grok integration — text, multi-turn chat, image generation/editing (up to 
 #### Text & Chat Nodes
 
 - **Grok API Client** - Initialize the xAI client (optional for downstream nodes)
-- **Grok Text Generation** - One-shot text completion via `grok-4.3` / `grok-3` / `grok-3-mini` / `grok-2`
+- **Grok Text Generation** - One-shot text completion via `grok-4.5` / `grok-4.3` / the `grok-4.20` family / `grok-build-0.1`
 - **Grok Chat** - Multi-turn conversation threaded via `GROK_CHAT_SESSION`
 
 #### Image Nodes
