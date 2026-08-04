@@ -9,7 +9,7 @@ Initializes a Claude API client for use by other nodes. Optional if your API key
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| model | Combo | claude-sonnet-5 | Claude model to use. Options: claude-sonnet-5, claude-opus-4-8, claude-fable-5, claude-opus-4-7, claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929 |
+| model | Combo | claude-sonnet-5 | Claude model to use. Options: claude-sonnet-5, claude-opus-5, claude-opus-4-8, claude-fable-5, claude-opus-4-7, claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929 |
 | api_key | String | (empty) | Anthropic API key (optional). If empty, uses Settings or config.ini |
 | enable_streaming | Boolean | False | Enable streaming responses (optional). ComfyUI may not display streaming in real-time |
 | enable_caching | Boolean | True | Enable prompt caching for cost optimization (optional). Up to 90% savings on repeated prompts |
