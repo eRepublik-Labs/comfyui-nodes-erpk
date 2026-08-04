@@ -84,13 +84,16 @@ class TokenManager:
     """
 
     # Context window sizes for different Claude models
+    # Claude 4.6 and later carry the full 1M window at standard pricing — no
+    # beta header, no long-context premium. The 4.5 family is capped at 200K.
     CONTEXT_WINDOWS = {
         "claude-sonnet-5": 1_000_000,
+        "claude-opus-5": 1_000_000,
         "claude-opus-4-8": 1_000_000,
         "claude-fable-5": 1_000_000,
-        "claude-sonnet-4-6": 200_000,
         "claude-opus-4-7": 1_000_000,
-        "claude-opus-4-6": 200_000,
+        "claude-sonnet-4-6": 1_000_000,
+        "claude-opus-4-6": 1_000_000,
         "claude-haiku-4-5-20251001": 200_000,
         "claude-sonnet-4-5-20250929": 200_000,
     }

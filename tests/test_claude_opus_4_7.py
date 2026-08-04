@@ -19,6 +19,7 @@ import pytest
 
 
 OPUS_4_7 = "claude-opus-4-7"
+OPUS_5 = "claude-opus-5"
 SONNET_4_6 = "claude-sonnet-4-6"
 OPUS_4_8 = "claude-opus-4-8"
 SONNET_5 = "claude-sonnet-5"
@@ -73,8 +74,9 @@ def test_opus_4_7_in_pricing_json():
         data = json.load(f)
     assert OPUS_4_7 in data["models"]
     entry = data["models"][OPUS_4_7]
-    assert entry["input_price_per_mtok"] == 15.0
-    assert entry["output_price_per_mtok"] == 75.0
+    # Anthropic's published rate is $5 / $25 per MTok. $15 / $75 is Opus 4.1's.
+    assert entry["input_price_per_mtok"] == 5.0
+    assert entry["output_price_per_mtok"] == 25.0
 
 
 def test_thinking_only_models_contains_opus_4_7():
@@ -315,10 +317,11 @@ def test_opus_4_8_and_sonnet_5_are_thinking_only():
     assert SONNET_5 in ClaudeClient.THINKING_ONLY_MODELS
 
 
-def test_fable_5_is_not_thinking_only():
-    # Fable 5 is absent from the temperature-400 list; it keeps sampling params.
+def test_fable_5_is_thinking_only():
+    # Fable 5 is a Claude 4.7-and-later model: temperature/top_p/top_k return
+    # 400, and thinking is always on. {"type": "adaptive"} is the accepted form.
     from claude.claude_api.client import ClaudeClient
-    assert FABLE_5 not in ClaudeClient.THINKING_ONLY_MODELS
+    assert FABLE_5 in ClaudeClient.THINKING_ONLY_MODELS
 
 
 class TestNewFlagshipSamplingParams:
@@ -336,9 +339,24 @@ class TestNewFlagshipSamplingParams:
             ))
             assert "temperature" not in messages.create.call_args.kwargs
 
-    def test_fable_5_preserves_temperature(self):
+    def test_fable_5_strips_temperature(self):
         with _patched_anthropic() as messages:
             asyncio.run(_make_client().send_request(
                 messages=[{"role": "user", "content": "hi"}], model=FABLE_5, temperature=0.5,
             ))
-            assert messages.create.call_args.kwargs.get("temperature") == 0.5
+            assert "temperature" not in messages.create.call_args.kwargs
+
+    def test_opus_5_strips_temperature(self):
+        with _patched_anthropic() as messages:
+            asyncio.run(_make_client().send_request(
+                messages=[{"role": "user", "content": "hi"}], model=OPUS_5, temperature=0.5,
+            ))
+            assert "temperature" not in messages.create.call_args.kwargs
+
+    def test_opus_5_requests_adaptive_thinking(self):
+        with _patched_anthropic() as messages:
+            asyncio.run(_make_client().send_request(
+                messages=[{"role": "user", "content": "hi"}], model=OPUS_5,
+            ))
+            thinking = messages.create.call_args.kwargs["thinking"]
+            assert thinking == {"type": "adaptive", "display": "summarized"}
