@@ -94,8 +94,9 @@ jobs:
         run: |
           VERSION=$(grep -E '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
           VERSIONS_URL="https://api.comfy.org/nodes/comfyui-nodes-erpk/versions?limit=10"
-          # 2026.8.3 was still Pending 15 minutes after upload, so a scan that is
-          # merely slow must not read as a rejection. 45 minutes is 3x that.
+          # 2026.8.3 was still Pending 52 minutes after upload, so no deadline
+          # short enough to be useful can tell a slow scan from a stuck one.
+          # Only a terminal status is a verdict; Pending at the deadline warns.
           TIMEOUT_SECONDS=2700
           STATUS=""
 
@@ -121,5 +122,9 @@ jobs:
             sleep 60
           done
 
-          echo "::error title=Registry never activated $VERSION::Still ${STATUS:-unlisted} after $((TIMEOUT_SECONDS / 60)) minutes. This is not proof of a rejection - a slow scan looks the same - but nothing is being served to users until it reaches Active. Check https://api.comfy.org/nodes/comfyui-nodes-erpk/versions before assuming the release landed."
-          exit 1
+          # Deliberately a warning, not a failure. Pending is a legitimate state that
+          # has been observed to last beyond this deadline, so failing here would red
+          # the build on healthy releases and the check would end up muted. Only a
+          # terminal Flagged/Banned above is treated as a verdict.
+          echo "::warning title=Registry has not activated $VERSION yet::Still ${STATUS:-unlisted} after $((TIMEOUT_SECONDS / 60)) minutes. Not a rejection - scans routinely take longer - but nothing reaches users until it is Active. Confirm with: curl -s https://api.comfy.org/nodes/comfyui-nodes-erpk | jq -r .latest_version.version"
+          echo "Publish uploaded successfully; activation still outstanding."
