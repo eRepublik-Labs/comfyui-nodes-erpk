@@ -39,8 +39,10 @@ jobs:
           echo "Version: $VERSION"
 
           # Get release notes from GitHub release using gh CLI (avoids shell interpolation issues).
-          # RELEASE_TAG arrives through env rather than ${{ }} so a crafted tag name cannot
-          # break out of the script: https://github.blog/security/vulnerability-research/how-to-catch-github-actions-workflow-injections-before-attackers-do/
+          # RELEASE_TAG arrives through env rather than a GitHub expression spliced into this
+          # script, so a crafted tag name cannot break out of the shell. Note that expressions
+          # are evaluated inside run blocks even within comments, so do not write one here:
+          # https://github.blog/security/vulnerability-research/how-to-catch-github-actions-workflow-injections-before-attackers-do/
           RELEASE_BODY=$(gh release view "$RELEASE_TAG" --json body -q .body 2>/dev/null || echo "")
 
           echo "Release tag: $RELEASE_TAG"
