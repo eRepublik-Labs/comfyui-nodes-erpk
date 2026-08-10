@@ -14,7 +14,7 @@ Part of the [ERPK Custom Nodes Collection](../../README.md) for ComfyUI.
 ## Qwen Image Nodes
 ![Qwen Nodes Preview](assets/qwen-preview.png)
 
-ComfyUI custom nodes for WaveSpeed AI integration. Covers image generation (ByteDance Seedream V4/V4.5/V5.0 Lite, Qwen Image family, Qwen Image 2.0, Dreamina, JibMix) and video generation (Bytedance Seedance 2.0, Alibaba WAN 2.7, Kling 2.5 Turbo / 2.6 / 3.0 / O3 with Kling Elements, Lightricks LTX 2 Pro, WaveSpeed LTX 2.3).
+ComfyUI custom nodes for WaveSpeed AI integration. Covers image generation (ByteDance Seedream V4/V4.5/V5.0 Lite, Qwen Image family, Qwen Image 2.0, Dreamina, JibMix) and video generation (Bytedance Seedance 2.0 and 2.5, Alibaba WAN 2.7, Kling 2.5 Turbo / 2.6 / 3.0 / O3 with Kling Elements, Lightricks LTX 2 Pro, WaveSpeed LTX 2.3).
 
 ## Features
 
@@ -82,6 +82,10 @@ Video nodes return a STRING URL (pipe to `WaveSpeed Preview Video` or the Previe
 |------|----------------|-------------|----------|---------------------|----------|
 | **Bytedance Seedance 2.0 Text-to-Video** | Seedance 2.0, Turbo, Fast, Fast Turbo | Native audio-visual generation; up to 4 reference images / videos / audios (IMAGE batch input also accepted) | 4-15s | 16:9/9:16/4:3/3:4/1:1/21:9 · 480p/720p/1080p (Turbo variants: 720p/1080p only) | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedance-2.0-text-to-video) |
 | **Bytedance Seedance 2.0 Image-to-Video** | Seedance 2.0, Turbo, Fast, Fast Turbo | Animate source image with audio; optional end frame. Accepts IMAGE tensor inputs (encoded as base64 data URIs) or URL strings | 4-15s | Same as T2V | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedance-2.0-image-to-video) |
+| **Bytedance Seedance 2.5 Text-to-Video** | Seedance 2.5, Turbo | Longer clips and 4k; up to 4 reference images / videos / audios (IMAGE batch input also accepted) | 4-30s | 16:9/9:16/4:3/3:4/1:1/21:9 · 480p/720p/1080p/4k | [Link](https://wavespeed.ai/models/bytedance/seedance-2.5/text-to-video) |
+| **Bytedance Seedance 2.5 Image-to-Video** | Seedance 2.5, Turbo, Spicy | Animate source image with audio; optional ending frame. Accepts IMAGE tensor inputs or URL strings. Aspect ratio follows the input image | 4-30s | 480p/720p/1080p/4k | [Link](https://wavespeed.ai/models/bytedance/seedance-2.5/image-to-video) |
+| **Bytedance Seedance 2.5 Video Edit** | Seedance 2.5, Turbo | Rewrite an existing clip from a prompt; chains off any node's video_url. Duration follows the input | follows input | 480p/720p/1080p/4k | [Link](https://wavespeed.ai/models/bytedance/seedance-2.5/video-edit) |
+| **Bytedance Seedance 2.5 Video Extend** | Seedance 2.5 | Continue a clip past its final frame, reading up to 30s as context; chains off any node's video_url | 4-30s new segment | 480p/720p/1080p/4k | [Link](https://wavespeed.ai/models/bytedance/seedance-2.5/video-extend) |
 | **Alibaba WAN 2.7 Text-to-Video** | WAN 2.7 | Long-form video from text | 2-15s | 16:9/9:16/1:1 · 720p/1080p | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-text-to-video) |
 | **Alibaba WAN 2.7 Image-to-Video** | WAN 2.7 | Animate a source image | 2-15s | Same as T2V | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-image-to-video) |
 | **Alibaba WAN 2.7 Video Extend** | WAN 2.7 | Continue an existing clip | Configurable | Same as T2V | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-video-extend) |
@@ -559,6 +563,10 @@ Image (ByteDance Dreamina):
 Video:
 - Bytedance Seedance 2.0 Text-to-Video
 - Bytedance Seedance 2.0 Image-to-Video
+- Bytedance Seedance 2.5 Text-to-Video
+- Bytedance Seedance 2.5 Image-to-Video
+- Bytedance Seedance 2.5 Video Edit
+- Bytedance Seedance 2.5 Video Extend
 - Alibaba WAN 2.7 Text-to-Video
 - Alibaba WAN 2.7 Image-to-Video
 - Alibaba WAN 2.7 Video Extend
@@ -589,7 +597,7 @@ This package follows **Calendar Versioning (CalVer)**: `YYYY.MM.PATCH`
 ### Version History
 
 See the [project changelog on GitHub Releases](https://github.com/eRepublik-Labs/comfyui-nodes-erpk/releases) for the authoritative history. Notable WaveSpeed additions in the 2026.4.x and 2026.5.x series:
-- **Video generation** — Seedance 2.0, Alibaba WAN 2.7 (T2V/I2V/Extend), Kling 2.5 Turbo (I2V/T2V), Kling 2.6 (I2V/T2V Std/Pro), Kling 3.0 (T2V/I2V Std/Pro/4K) with full parameter surface, Kling O3 (T2V/I2V Std/Pro with element_list on Pro), Kling Elements, WaveSpeed LTX 2.3, Lightricks LTX 2 Pro
+- **Video generation** — Seedance 2.0, Seedance 2.5 (T2V/I2V/Edit/Extend), Alibaba WAN 2.7 (T2V/I2V/Extend), Kling 2.5 Turbo (I2V/T2V), Kling 2.6 (I2V/T2V Std/Pro), Kling 3.0 (T2V/I2V Std/Pro/4K) with full parameter surface, Kling O3 (T2V/I2V Std/Pro with element_list on Pro), Kling Elements, WaveSpeed LTX 2.3, Lightricks LTX 2 Pro
 - **Image generation** — Qwen Image 2.0 family (replaces 12 Qwen 1.x nodes long-term), Seedream V5.0 Lite family, ByteDance Dreamina V3.0/V3.1
 - **Infrastructure** — multi-user settings resolution, API-key masked preview, Preview Anything integration for all video node outputs, dual-input pattern (IMAGE tensor + URL fallback) on all Kling i2v nodes
 

@@ -31,6 +31,10 @@ from .dreamina_text_to_image import DreaminaTextToImageNode
 from .dreamina_edit import DreaminaEditNode
 from .seedance_2_0_text_to_video import Seedance20TextToVideoNode
 from .seedance_2_0_image_to_video import Seedance20ImageToVideoNode
+from .seedance_2_5_text_to_video import Seedance25TextToVideoNode
+from .seedance_2_5_image_to_video import Seedance25ImageToVideoNode
+from .seedance_2_5_video_edit import Seedance25VideoEditNode
+from .seedance_2_5_video_extend import Seedance25VideoExtendNode
 from .wan_2_7_text_to_video import Wan27TextToVideoNode
 from .wan_2_7_image_to_video import Wan27ImageToVideoNode
 from .wan_2_7_video_extend import Wan27VideoExtendNode
@@ -82,6 +86,10 @@ NODES = [
     DreaminaEditNode,
     Seedance20TextToVideoNode,
     Seedance20ImageToVideoNode,
+    Seedance25TextToVideoNode,
+    Seedance25ImageToVideoNode,
+    Seedance25VideoEditNode,
+    Seedance25VideoExtendNode,
     Wan27TextToVideoNode,
     Wan27ImageToVideoNode,
     Wan27VideoExtendNode,
