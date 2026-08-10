@@ -91,6 +91,7 @@ Video nodes return a STRING URL that works directly with the **Preview Anything*
 - **Bytedance Seedance 2.0 Text-to-Video** / **Image-to-Video** - Native audio-visual generation across four model variants (Seedance 2.0, Turbo, Fast, Fast Turbo). T2V supports reference images/videos/audios; I2V supports optional end frame. Turbo variants are 720p/1080p only.
 - **Bytedance Seedance 2.5 Text-to-Video** / **Image-to-Video** - Longer clips (4-30s) and 4k output across the Seedance 2.5, Turbo and Spicy tiers. T2V supports reference images/videos/audios; I2V supports an optional ending frame
 - **Bytedance Seedance 2.5 Video Edit** / **Video Extend** - Rewrite an existing clip from a prompt, or continue one past its final frame. Both take the source as a video URL, so they chain off any video node's output
+- **MiniMax H3 Text-to-Video** / **Image-to-Video** / **Reference-to-Video** - Picture and native stereo audio in a single pass at 24fps. Audio is steered by an `Audio:` line in the prompt rather than a toggle. Reference-to-Video takes up to 9 images, 3 videos and 3 audios, each cited in the prompt by bracket tag
 - **Alibaba WAN 2.7 Text-to-Video** / **Image-to-Video** / **Video Extend** - WAN 2.7 with extension support for continuing existing clips
 - **WaveSpeed Veo 3.1 Text-to-Video** / **Image-to-Video** - Google Veo 3.1 via WaveSpeed billing (distinct from the Gemini-direct Veo nodes under `ERPK/Gemini/Veo`)
 - **Kling 3.0 Image-to-Video** - Kling v3.0 i2v with Standard and Pro quality tiers

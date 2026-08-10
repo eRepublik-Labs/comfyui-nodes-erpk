@@ -35,6 +35,9 @@ from .seedance_2_5_text_to_video import Seedance25TextToVideoNode
 from .seedance_2_5_image_to_video import Seedance25ImageToVideoNode
 from .seedance_2_5_video_edit import Seedance25VideoEditNode
 from .seedance_2_5_video_extend import Seedance25VideoExtendNode
+from .minimax_h3_text_to_video import MinimaxH3TextToVideoNode
+from .minimax_h3_image_to_video import MinimaxH3ImageToVideoNode
+from .minimax_h3_reference_to_video import MinimaxH3ReferenceToVideoNode
 from .wan_2_7_text_to_video import Wan27TextToVideoNode
 from .wan_2_7_image_to_video import Wan27ImageToVideoNode
 from .wan_2_7_video_extend import Wan27VideoExtendNode
@@ -90,6 +93,9 @@ NODES = [
     Seedance25ImageToVideoNode,
     Seedance25VideoEditNode,
     Seedance25VideoExtendNode,
+    MinimaxH3TextToVideoNode,
+    MinimaxH3ImageToVideoNode,
+    MinimaxH3ReferenceToVideoNode,
     Wan27TextToVideoNode,
     Wan27ImageToVideoNode,
     Wan27VideoExtendNode,
