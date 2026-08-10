@@ -32,13 +32,15 @@ jobs:
         env:
           REGISTRY_TOKEN: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           # Extract version from pyproject.toml
           VERSION=$(grep -E '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
           echo "Version: $VERSION"
 
-          # Get release notes from GitHub release using gh CLI (avoids shell interpolation issues)
-          RELEASE_TAG="${{ github.event.release.tag_name }}"
+          # Get release notes from GitHub release using gh CLI (avoids shell interpolation issues).
+          # RELEASE_TAG arrives through env rather than ${{ }} so a crafted tag name cannot
+          # break out of the script: https://github.blog/security/vulnerability-research/how-to-catch-github-actions-workflow-injections-before-attackers-do/
           RELEASE_BODY=$(gh release view "$RELEASE_TAG" --json body -q .body 2>/dev/null || echo "")
 
           echo "Release tag: $RELEASE_TAG"
@@ -80,3 +82,42 @@ jobs:
             echo "Warning: Changelog update returned HTTP $HTTP_STATUS"
             # Don't fail the workflow - publishing succeeded
           fi
+
+      # A successful upload is not a successful release. The Registry scans the
+      # version afterwards, and a scan that marks it Flagged leaves the previous
+      # Active version being served to users while this workflow still reports
+      # green. 2026.8.1 and 2026.8.2 sat Flagged for a month before anyone
+      # noticed. Poll until the version reaches a terminal state.
+      - name: Verify the Registry is serving this version
+        run: |
+          VERSION=$(grep -E '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          VERSIONS_URL="https://api.comfy.org/nodes/comfyui-nodes-erpk/versions?limit=10"
+          # 2026.8.3 was still Pending 15 minutes after upload, so a scan that is
+          # merely slow must not read as a rejection. 45 minutes is 3x that.
+          TIMEOUT_SECONDS=2700
+          STATUS=""
+
+          echo "Waiting for $VERSION to leave Pending (up to $((TIMEOUT_SECONDS / 60)) minutes)..."
+
+          while [ "$SECONDS" -lt "$TIMEOUT_SECONDS" ]; do
+            STATUS=$(curl -s "$VERSIONS_URL" \
+              | jq -r --arg v "$VERSION" '.[] | select(.version == $v) | .status')
+
+            echo "[$(date -u +%H:%M:%S)] $VERSION -> ${STATUS:-not listed yet}"
+
+            case "$STATUS" in
+              NodeVersionStatusActive)
+                echo "The Registry is serving $VERSION."
+                exit 0
+                ;;
+              NodeVersionStatusFlagged|NodeVersionStatusBanned)
+                echo "::error title=Registry rejected $VERSION::Status is $STATUS, so $VERSION is not installable and the Registry keeps serving the previous Active version. Open a manual review request at https://github.com/Comfy-Org/registry-backend/issues with the version UUID."
+                exit 1
+                ;;
+            esac
+
+            sleep 60
+          done
+
+          echo "::error title=Registry never activated $VERSION::Still ${STATUS:-unlisted} after $((TIMEOUT_SECONDS / 60)) minutes. This is not proof of a rejection - a slow scan looks the same - but nothing is being served to users until it reaches Active. Check https://api.comfy.org/nodes/comfyui-nodes-erpk/versions before assuming the release landed."
+          exit 1
