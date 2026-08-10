@@ -76,7 +76,7 @@ Same capabilities as V4.5 with higher minimum resolution (1440px) at a lower pri
 
 ### Video Generation Models
 
-Video nodes return a STRING URL (pipe to `WaveSpeed Preview Video` or the Preview Anything utility node). Long-running polling: 10s interval, 15-minute timeout.
+Video nodes return a STRING URL (pipe to `WaveSpeed Preview Video` or the Preview Anything utility node). Long-running polling: 10s interval, timing out after 15 minutes on most nodes, 20 on MiniMax H3 Reference-to-Video and 30 on the Seedance 2.5 family.
 
 | Node | Models / Tiers | Description | Duration | Aspect / Resolution | API Docs |
 |------|----------------|-------------|----------|---------------------|----------|
@@ -514,7 +514,7 @@ pip install -r requirements.txt
 ```
 [ERPK] Loaded <N> V3 nodes
 ```
-The WaveSpeed module alone contributes 49 nodes as of 2026.5.5.
+The WaveSpeed module alone contributes 56 nodes.
 
 ### Common Issues
 
@@ -603,7 +603,7 @@ This package follows **Calendar Versioning (CalVer)**: `YYYY.MM.PATCH`
 ### Version History
 
 See the [project changelog on GitHub Releases](https://github.com/eRepublik-Labs/comfyui-nodes-erpk/releases) for the authoritative history. Notable WaveSpeed additions in the 2026.4.x and 2026.5.x series:
-- **Video generation** — Seedance 2.0, Seedance 2.5 (T2V/I2V/Edit/Extend), Alibaba WAN 2.7 (T2V/I2V/Extend), Kling 2.5 Turbo (I2V/T2V), Kling 2.6 (I2V/T2V Std/Pro), Kling 3.0 (T2V/I2V Std/Pro/4K) with full parameter surface, Kling O3 (T2V/I2V Std/Pro with element_list on Pro), Kling Elements, WaveSpeed LTX 2.3, Lightricks LTX 2 Pro
+- **Video generation** — Seedance 2.0, Alibaba WAN 2.7 (T2V/I2V/Extend), Kling 2.5 Turbo (I2V/T2V), Kling 2.6 (I2V/T2V Std/Pro), Kling 3.0 (T2V/I2V Std/Pro/4K) with full parameter surface, Kling O3 (T2V/I2V Std/Pro with element_list on Pro), Kling Elements, WaveSpeed LTX 2.3, Lightricks LTX 2 Pro
 - **Image generation** — Qwen Image 2.0 family (replaces 12 Qwen 1.x nodes long-term), Seedream V5.0 Lite family, ByteDance Dreamina V3.0/V3.1
 - **Infrastructure** — multi-user settings resolution, API-key masked preview, Preview Anything integration for all video node outputs, dual-input pattern (IMAGE tensor + URL fallback) on all Kling i2v nodes
 

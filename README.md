@@ -60,7 +60,6 @@ ComfyUI-Custom-Nodes/
 Custom nodes for WaveSpeed AI's image generation and editing APIs.
 
 **Category in ComfyUI:** `ERPK/WaveSpeedAI`
-**Version:** 2026.2.15
 
 #### ByteDance Seedream V4 Models
 
@@ -86,10 +85,10 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 
 #### Video Generation
 
-Video nodes return a STRING URL that works directly with the **Preview Anything** node for preview/download. Longer polling (10s interval, 15-minute timeout) handles multi-minute generation runs.
+Video nodes return a STRING URL that works directly with the **Preview Anything** node for preview/download. Polling runs at a 10s interval, timing out after 15 minutes on most video nodes, 20 on MiniMax H3 Reference-to-Video and 30 on the Seedance 2.5 family, which run longest.
 
 - **Bytedance Seedance 2.0 Text-to-Video** / **Image-to-Video** - Native audio-visual generation across four model variants (Seedance 2.0, Turbo, Fast, Fast Turbo). T2V supports reference images/videos/audios; I2V supports optional end frame. Turbo variants are 720p/1080p only.
-- **Bytedance Seedance 2.5 Text-to-Video** / **Image-to-Video** - Longer clips (4-30s) and 4k output across the Seedance 2.5, Turbo and Spicy tiers. T2V supports reference images/videos/audios; I2V supports an optional ending frame
+- **Bytedance Seedance 2.5 Text-to-Video** / **Image-to-Video** - Longer clips (4-30s) and 4k output. T2V offers the Seedance 2.5 and Turbo tiers and supports reference images/videos/audios; I2V adds a Spicy tier and an optional ending frame
 - **Bytedance Seedance 2.5 Video Edit** / **Video Extend** - Rewrite an existing clip from a prompt, or continue one past its final frame. Both take the source as a video URL, so they chain off any video node's output
 - **MiniMax H3 Text-to-Video** / **Image-to-Video** / **Reference-to-Video** - Picture and native stereo audio in a single pass at 24fps. Audio is steered by an `Audio:` line in the prompt rather than a toggle. Reference-to-Video takes up to 9 images, 3 videos and 3 audios, each cited in the prompt by bracket tag
 - **Alibaba WAN 2.7 Text-to-Video** / **Image-to-Video** / **Video Extend** - WAN 2.7 with extension support for continuing existing clips
@@ -112,7 +111,6 @@ The Kling (2.5 Turbo, 2.6, Elements) and LTX 2 Pro nodes expose a **seed** widge
 Claude API integration for text generation, prompt enhancement, vision analysis, and conversational AI.
 
 **Category in ComfyUI:** `ERPK/Claude`
-**Version:** 2026.2.15
 
 #### Nodes
 
@@ -143,7 +141,6 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 Google Gemini API integration for text generation, vision analysis, multi-turn conversations, image generation, image editing, and **Veo video generation**.
 
 **Category in ComfyUI:** `ERPK/Gemini` and `ERPK/Gemini/Veo`
-**Version:** 2026.2.15
 
 #### Nodes
 
@@ -183,7 +180,6 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 OpenAI API integration for text generation, vision analysis, multi-turn conversations, image generation, and image editing.
 
 **Category in ComfyUI:** `ERPK/OpenAI`
-**Version:** 2026.2.15
 
 #### Nodes
 
@@ -214,7 +210,6 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 xAI Grok integration — text, multi-turn chat, image generation/editing (up to 3 source images), and full video coverage (text-to-video, reference-to-video, edit, extend).
 
 **Category in ComfyUI:** `ERPK/Grok` and `ERPK/Grok/Video`
-**Version:** 2026.5.15
 **SDK requirement:** `xai-sdk>=1.14.0`
 
 #### Text & Chat Nodes
