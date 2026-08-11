@@ -239,7 +239,7 @@ class WaveSpeedClient:
             raise Exception("No valid task ID provided")
 
         # Use 30s timeout for status checks - these should be quick
-        return await self.get(f"/api/v2/predictions/{request_id}/result", timeout=30)
+        return await self.get(f"/api/v3/predictions/{request_id}/result", timeout=30)
 
     async def wait_for_task(
         self,
@@ -389,44 +389,88 @@ class WaveSpeedClient:
 
         return task_result
 
-    def _upload_file_sync(self, image) -> str:
-        url = f"{self.BASE_URL}/api/v2/media/upload/binary"
+    def _request_upload_ticket(self, filename: str, size: int, content_type: str) -> Dict[str, Any]:
+        """
+        Ask the API where to put a file's bytes.
 
-        # Convert image to PNG bytes
-        buffered = io.BytesIO()
-        image.save(buffered, format="PNG")
-        buffered.seek(0)
+        Args:
+            filename: Name the file will be stored under, including extension
+            size: Exact byte count of the payload; the API caps this at 200 MiB
+            content_type: MIME type of the payload
 
-        files = {'file': ('image.png', buffered, 'image/png')}
+        Returns:
+            dict: Ticket carrying `download_url` and an `upload` block describing
+                  the storage request to make next
 
-        # Set timeout for file uploads
-        timeout_tuple = (15, 180)  # 15s connect, 180s read for uploads
+        Raises:
+            Exception: If the API rejects the request or returns no ticket
+        """
+        url = f"{self.BASE_URL}/api/v3/media/uploads"
+        payload = {"filename": filename, "size": size, "content_type": content_type}
 
+        response = self.session.post(
+            url,
+            headers=self.headers,
+            json=payload,
+            timeout=(15, 30)
+        )
+
+        if response.status_code != 200:
+            raise Exception(f"Upload ticket request failed: {response.status_code}")
+
+        response_data = response.json()
+        if isinstance(response_data, dict) and 'code' in response_data:
+            if response_data['code'] != 200:
+                raise Exception(f"API Error: {response_data.get('message', 'Unknown error')}")
+            ticket = response_data.get('data', {})
+            if "download_url" in ticket and "upload" in ticket:
+                return ticket
+
+        raise Exception("No upload ticket in response")
+
+    def _upload_bytes_sync(self, filename: str, content_type: str, data: bytes) -> str:
+        """
+        Upload raw bytes and return the URL they can be read back from.
+
+        The bytes go straight to storage rather than through the API gateway, so
+        the ticket request is the only call that carries the API key. Sending it
+        to the storage URL would leak it to a third party.
+
+        Args:
+            filename: Name the file will be stored under, including extension
+            content_type: MIME type of the payload
+            data: The file contents
+
+        Returns:
+            str: URL the uploaded file can be downloaded from
+
+        Raises:
+            Exception: If the ticket request or the storage upload fails
+        """
         try:
-            response = self.session.post(
-                url,
-                headers={'Authorization': f'Bearer {self.api_key}'},
-                files=files,
-                timeout=timeout_tuple
+            ticket = self._request_upload_ticket(filename, len(data), content_type)
+            destination = ticket["upload"]
+
+            response = self.session.put(
+                destination["url"],
+                headers=destination.get("headers", {}),
+                data=data,
+                timeout=(15, 300)
             )
 
-            if response.status_code != 200:
+            if not 200 <= response.status_code < 300:
                 raise Exception(f"Upload failed: {response.status_code}")
 
-            response_data = response.json()
-
-            # Handle API response format
-            if isinstance(response_data, dict) and 'code' in response_data:
-                if response_data['code'] != 200:
-                    raise Exception(f"API Error: {response_data.get('message', 'Unknown error')}")
-                data = response_data.get('data', {})
-                if "download_url" in data:
-                    return data["download_url"]
-
-            raise Exception("No download URL in response")
+            return ticket["download_url"]
 
         except requests.exceptions.RequestException as e:
             raise Exception(f"Upload failed: {str(e)}")
+
+    def _upload_file_sync(self, image) -> str:
+        buffered = io.BytesIO()
+        image.save(buffered, format="PNG")
+
+        return self._upload_bytes_sync("image.png", "image/png", buffered.getvalue())
 
     async def upload_file(self, image) -> str:
         """
