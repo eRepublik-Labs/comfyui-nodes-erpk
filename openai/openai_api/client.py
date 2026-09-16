@@ -89,6 +89,24 @@ class OpenAIClient:
     MAX_RETRIES = 3
     INITIAL_RETRY_DELAY = 1.0
 
+    # reasoning_effort values a model's page does not list. gpt-5.6 Sol/Terra/
+    # Luna document none/low/medium/high/xhigh/max; gpt-6-astra documents
+    # low/medium/high/xhigh/max. Unlisted values clamp to low.
+    UNSUPPORTED_EFFORT = {
+        "gpt-5.6-sol": {"minimal"},
+        "gpt-5.6-terra": {"minimal"},
+        "gpt-5.6-luna": {"minimal"},
+        "gpt-6-astra": {"minimal", "none"},
+    }
+
+    @classmethod
+    def _effort_for(cls, model: str, effort: str) -> str:
+        """Clamp a reasoning_effort the model does not document down to low."""
+        if effort in cls.UNSUPPORTED_EFFORT.get(model, ()):
+            print(f"[OpenAI] {model} does not support reasoning_effort '{effort}'; using 'low'")
+            return "low"
+        return effort
+
     @classmethod
     def _quality_for(cls, model: str, quality: str) -> str:
         """Clamp xhigh/max down to high on models that stop at high."""
@@ -287,7 +305,7 @@ class OpenAIClient:
                 params["stop"] = stop_sequences
 
         if reasoning_effort and is_reasoning:
-            params["reasoning_effort"] = reasoning_effort
+            params["reasoning_effort"] = self._effort_for(model_to_use, reasoning_effort)
 
         if verbosity and verbosity != "default" and model_to_use in self.VERBOSITY_MODELS:
             params["verbosity"] = verbosity
@@ -461,7 +479,7 @@ class OpenAIClient:
                 params["stop"] = stop_sequences
 
         if reasoning_effort and is_reasoning:
-            params["reasoning_effort"] = reasoning_effort
+            params["reasoning_effort"] = self._effort_for(model_to_use, reasoning_effort)
 
         if verbosity and verbosity != "default" and model_to_use in self.VERBOSITY_MODELS:
             params["verbosity"] = verbosity

@@ -17,7 +17,7 @@ if not hasattr(_local_openai, "APIError"):
 from openai.openai_api.client import OpenAIClient
 
 
-GPT_IMAGE_MODELS = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
+GPT_IMAGE_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
 DALLE_MODELS = ["dall-e-3", "dall-e-2"]
 
 

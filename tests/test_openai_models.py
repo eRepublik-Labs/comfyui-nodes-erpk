@@ -122,3 +122,22 @@ class TestGptImage25:
         assert OpenAIClient._quality_for("gpt-image-2", "xhigh") == "high"
         assert OpenAIClient._quality_for("gpt-image-2", "low") == "low"
 
+
+class TestReasoningEffortClamp:
+    """gpt-5.6 Sol/Terra/Luna document none/low/medium/high/xhigh/max and
+    gpt-6-astra documents low/medium/high/xhigh/max; neither lists minimal.
+    The node offers minimal and none, so unsupported values clamp to low
+    rather than earning a 400."""
+
+    def test_minimal_clamps_to_low_on_56_and_6(self):
+        for m in ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-6-astra"):
+            assert OpenAIClient._effort_for(m, "minimal") == "low", m
+
+    def test_none_clamps_only_on_gpt_6(self):
+        assert OpenAIClient._effort_for("gpt-6-astra", "none") == "low"
+        assert OpenAIClient._effort_for("gpt-5.6-sol", "none") == "none"
+
+    def test_documented_values_pass_through(self):
+        assert OpenAIClient._effort_for("gpt-6-astra", "xhigh") == "xhigh"
+        assert OpenAIClient._effort_for("gpt-5.4", "minimal") == "minimal"
+
