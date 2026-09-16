@@ -1,11 +1,11 @@
 {
   "_comment": "Claude API Pricing - Update from https://www.anthropic.com/pricing",
-  "_last_updated": "2026-08-04",
+  "_last_updated": "2026-09-16",
   "_version": "1.0",
 
   "models": {
     "claude-sonnet-5": {
-      "name": "Claude Sonnet 5 (intro pricing through 2026-08-31; then 3.0/15.0)",
+      "name": "Claude Sonnet 5",
       "input_price_per_mtok": 2.0,
       "output_price_per_mtok": 10.0,
       "cache_read_price_per_mtok": 0.2
@@ -21,6 +21,12 @@
       "input_price_per_mtok": 5.0,
       "output_price_per_mtok": 25.0,
       "cache_read_price_per_mtok": 0.5
+    },
+    "claude-fable-5-1": {
+      "name": "Claude Fable 5.1",
+      "input_price_per_mtok": 10.0,
+      "output_price_per_mtok": 50.0,
+      "cache_read_price_per_mtok": 0.25
     },
     "claude-fable-5": {
       "name": "Claude Fable 5",

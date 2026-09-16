@@ -90,6 +90,7 @@ class TokenManager:
         "claude-sonnet-5": 1_000_000,
         "claude-opus-5": 1_000_000,
         "claude-opus-4-8": 1_000_000,
+        "claude-fable-5-1": 1_000_000,
         "claude-fable-5": 1_000_000,
         "claude-opus-4-7": 1_000_000,
         "claude-sonnet-4-6": 1_000_000,

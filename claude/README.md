@@ -75,7 +75,7 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 Initializes the Claude API client. Optional if API key is configured in ComfyUI Settings — generation nodes can run standalone.
 
 **Inputs:**
-- `model`: claude-sonnet-5 (default), claude-opus-5, claude-opus-4-8, claude-fable-5, claude-opus-4-7, claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929 (legacy)
+- `model`: claude-sonnet-5 (default), claude-opus-5, claude-opus-4-8, claude-fable-5-1, claude-fable-5, claude-opus-4-7, claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929 (legacy)
 - `api_key`: Optional API key (uses Settings/config if empty)
 - `enable_streaming`: Enable streaming responses
 - `enable_caching`: Enable prompt caching for cost savings
@@ -301,7 +301,8 @@ Enabled by default. Caches system prompts to reduce costs by up to 90% for repea
 ### Model Selection
 - **Claude Sonnet 5**: $2/1M in, $10/1M out (intro through 2026-08-31) - Best balance (default), 1M context; rejects sampling params (temperature omitted automatically)
 - **Claude Opus 4.8**: $5/1M in, $25/1M out - Current flagship, reasoning-first, 1M context; rejects sampling params
-- **Claude Fable 5**: $10/1M in, $50/1M out - Creative-writing specialist, 1M context; accepts temperature
+- **Claude Fable 5.1**: $10/1M in, $50/1M out - Most capable model, 1M context, adaptive thinking always on; rejects temperature
+- **Claude Fable 5**: $10/1M in, $50/1M out - Previous Fable generation, 1M context; rejects temperature
 - **Claude Haiku 4.5**: $1/1M in, $5/1M out - Fastest, cheapest for simple tasks
 - **Claude Sonnet 4.6**: $3/1M in, $15/1M out - Previous Sonnet
 - **Claude Opus 4.6**: $5/1M in, $25/1M out - Previous-gen flagship

@@ -24,6 +24,7 @@ from claude.vision_analysis import ClaudeVisionAnalysis
 
 OPUS_5 = "claude-opus-5"
 FABLE_5 = "claude-fable-5"
+FABLE_5_1 = "claude-fable-5-1"
 OPUS_4_7 = "claude-opus-4-7"
 SONNET_4_6 = "claude-sonnet-4-6"
 OPUS_4_6 = "claude-opus-4-6"
@@ -74,6 +75,33 @@ def test_opus_5_has_1m_context():
 def test_opus_5_rejects_sampling_params():
     # Claude 4.7 and later 400 on a non-default temperature/top_p/top_k.
     assert OPUS_5 in ClaudeClient.THINKING_ONLY_MODELS
+
+
+def test_fable_5_1_offered_in_every_dropdown():
+    for node in (ClaudeAPIClient, ClaudeTokenCounter, ClaudeVisionAnalysis):
+        assert FABLE_5_1 in _combo_options(node)
+
+
+def test_fable_5_1_is_not_the_default():
+    # $10 / $50 per MTok must be opted into, not handed to every new node.
+    assert _combo_options(ClaudeAPIClient)[0] != FABLE_5_1
+
+
+def test_fable_5_1_priced_at_published_rate():
+    # https://platform.claude.com/docs/en/about-claude/pricing — $10 / $50 per
+    # MTok; cache hits are 0.025x base on Fable 5.1 ($0.25), not the usual 0.1x.
+    entry = _pricing()[FABLE_5_1]
+    assert entry["input_price_per_mtok"] == 10.0
+    assert entry["output_price_per_mtok"] == 50.0
+    assert entry["cache_read_price_per_mtok"] == 0.25
+
+
+def test_fable_5_1_has_1m_context():
+    assert TokenManager.CONTEXT_WINDOWS[FABLE_5_1] == 1_000_000
+
+
+def test_fable_5_1_rejects_sampling_params():
+    assert FABLE_5_1 in ClaudeClient.THINKING_ONLY_MODELS
 
 
 # --- Defects in the existing model metadata ---------------------------------

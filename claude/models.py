@@ -13,6 +13,7 @@ TEXT_MODELS = [
     "claude-sonnet-5",
     "claude-opus-5",
     "claude-opus-4-8",
+    "claude-fable-5-1",
     "claude-fable-5",
     "claude-opus-4-7",
     "claude-sonnet-4-6",
