@@ -28,10 +28,10 @@ def _config(**kwargs):
     return _build_omni_video_request(**kwargs)
 
 
-def test_model_id_is_the_preview_string():
-    # The models overview shows "gemini-omni-flash"; the model reference page and
-    # the API guide both give the -preview suffix, which is what the API accepts.
-    assert OMNI_MODEL == "gemini-omni-flash-preview"
+def test_model_id_is_the_stable_omni_11_string():
+    # gemini-omni-flash-preview shuts down 2026-09-30; the Gemini deprecations
+    # page names gemini-omni-1.1-flash as its replacement.
+    assert OMNI_MODEL == "gemini-omni-1.1-flash"
 
 
 def test_text_only_request_uses_text_to_video_task():

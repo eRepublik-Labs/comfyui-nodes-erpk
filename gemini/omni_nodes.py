@@ -10,10 +10,9 @@ import time
 from comfy_api.latest import IO
 
 
-# The models overview table shows the code as "gemini-omni-flash"; the model
-# reference page and the Interactions API guide both give the -preview suffix,
-# which is the string the API accepts.
-OMNI_MODEL = "gemini-omni-flash-preview"
+# Stable Omni Flash 1.1 ID from the Interactions API guide. The earlier
+# gemini-omni-flash-preview ID shuts down on 2026-09-30.
+OMNI_MODEL = "gemini-omni-1.1-flash"
 
 ASPECT_RATIOS = ["16:9", "9:16"]
 
@@ -23,8 +22,9 @@ def _build_omni_video_request(aspect_ratio, has_image):
 
     Omni Flash rejects system instructions, temperature, top_p, stop sequences
     and negative prompts, so none of them appear here — put negatives in the
-    prompt itself ("Do not do X"). Output is fixed at 720p / 24 FPS / 3-10s, so
-    there is no resolution or duration knob to expose.
+    prompt itself ("Do not do X"). Output is 3-10s at 24 FPS; the API also
+    accepts a response_format resolution (360p/720p/1080p/4k, default 720p)
+    that this node does not expose, so every run renders at 720p.
 
     background/store/stream are all disabled: that is the documented fast path
     for a single synchronous generation, which is what a node execution wants.

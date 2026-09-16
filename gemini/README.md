@@ -299,7 +299,7 @@ Configure content safety filters.
 
 ### Gemini Omni Video Generation
 
-Generate 3-10 second video at 720p / 24 FPS with Gemini Omni Flash.
+Generate 3-10 second video at 720p / 24 FPS with Gemini Omni Flash 1.1 (`gemini-omni-1.1-flash`).
 
 Unlike Veo, this model is reached through Google's Interactions API and returns the
 video directly, so a generation completes in a single call with no polling.
