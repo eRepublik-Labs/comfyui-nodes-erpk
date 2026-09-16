@@ -5,7 +5,7 @@ from comfy_api.latest import IO
 from .openai_api.client import OpenAIClient
 
 IMAGE_MODELS = list(OpenAIClient.IMAGE_MODELS.keys())
-EDIT_MODELS = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
+EDIT_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
 
 # Mainline (text/reasoning) models accepted by Responses API when the
 # image_generation tool is attached. Full list per OpenAI's tools page.
@@ -97,10 +97,10 @@ class OpenAIImageGeneration(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "quality",
-                    options=["auto", "low", "medium", "high", "hd", "standard"],
+                    options=["auto", "low", "medium", "high", "xhigh", "max", "hd", "standard"],
                     default="auto",
                     optional=True,
-                    tooltip="Image quality. auto/low/medium/high for GPT Image family; hd/standard are legacy DALL-E values, kept for compatibility.",
+                    tooltip="Image quality. auto/low/medium/high for the GPT Image family; xhigh/max only on GPT Image 2.5 (clamped to high elsewhere); hd/standard are legacy DALL-E values, kept for compatibility.",
                 ),
                 IO.Combo.Input(
                     "background",
@@ -510,10 +510,10 @@ class OpenAIImageEdit(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "quality",
-                    options=["auto", "low", "medium", "high"],
+                    options=["auto", "low", "medium", "high", "xhigh", "max"],
                     default="auto",
                     optional=True,
-                    tooltip="Image quality (gpt-image-1 only)",
+                    tooltip="Image quality for GPT Image models; xhigh/max only on GPT Image 2.5 (clamped to high elsewhere).",
                 ),
                 IO.Combo.Input(
                     "moderation",

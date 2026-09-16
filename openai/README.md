@@ -86,7 +86,7 @@ General-purpose text generation and completion.
 **Inputs:**
 - `client`: OpenAI API client
 - `prompt`: Text prompt
-- `model`: gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini, chat-latest, o4-mini, o3, o3-mini, o3-pro
+- `model`: gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-6-astra, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini, chat-latest, o4-mini, o3, o3-mini, o3-pro
 - `temperature`: 0.0-2.0 (creativity level, default: 0.7)
 - `max_tokens`: 256-16384 (output length, default: 4096)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 1.0, set <1.0 to enable)
@@ -113,7 +113,7 @@ Multi-turn conversation with message history preservation.
 **Inputs:**
 - `client`: OpenAI API client
 - `prompt`: Your message
-- `model`: gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini, chat-latest, o4-mini, o3, o3-mini, o3-pro
+- `model`: gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-6-astra, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini, chat-latest, o4-mini, o3, o3-mini, o3-pro
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
 - `temperature`: 0.0-2.0 (default: 0.7)
@@ -187,7 +187,7 @@ Generate images from text descriptions using OpenAI's image generation models.
 **Inputs:**
 - `prompt`: Text description of the image to generate
 - `client`: Optional OpenAI API client (from OpenAI API Config node)
-- `model`: gpt-image-2 (default, latest flagship), gpt-image-1.5, gpt-image-1, gpt-image-1-mini
+- `model`: gpt-image-2 (default), gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-1.5, gpt-image-1, gpt-image-1-mini
 - `size`: Free-form WIDTHxHEIGHT string (default 1024x1024). Each model has its own supported sizes; the API rejects unsupported values.
 - `quality`: Image quality - auto (default), low, medium, high (GPT Image family)
 - `background`: Background type - auto, transparent, opaque (GPT Image family)
@@ -252,7 +252,7 @@ Edit and modify existing images using text prompts with optional masking.
 - `prompt`: Text description of how to modify the image
 - `client`: Optional OpenAI API client (from OpenAI API Config node)
 - `mask`: Optional mask (ComfyUI MASK tensor) - white areas will be edited
-- `model`: gpt-image-2 (default, latest flagship), gpt-image-1.5, gpt-image-1, gpt-image-1-mini
+- `model`: gpt-image-2 (default), gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-1.5, gpt-image-1, gpt-image-1-mini
 - `size`: Output image size - 1024x1024 (default), 1024x1536, 1536x1024, 512x512, 256x256
 - `quality`: Image quality - auto (default), low, medium, high
 - `background`: auto / transparent / opaque (GPT Image family)
@@ -312,6 +312,8 @@ Edit and modify existing images using text prompts with optional masking.
 
 | Model | Best For | Notes |
 |-------|----------|-------|
+| **gpt-image-2.5-sunburst** | Highest quality | 4K output, `xhigh`/`max` quality tiers, transparent background |
+| **gpt-image-2.5-flare** | Fastest 2.5 tier | 4K output, `xhigh`/`max` quality tiers, transparent background |
 | **gpt-image-2** | Latest flagship | **Default**, 4K output, multilingual text, no transparent background |
 | **gpt-image-1.5** | Previous flagship | 2K output, transparent background support |
 | **gpt-image-1** | High quality | Editing, transparent backgrounds |

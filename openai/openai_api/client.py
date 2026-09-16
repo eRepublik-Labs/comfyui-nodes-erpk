@@ -24,6 +24,7 @@ class OpenAIClient:
         "gpt-5.6-sol": "GPT-5.6 Sol (Current flagship, highest capability tier)",
         "gpt-5.6-terra": "GPT-5.6 Terra (Balanced GPT-5.6 tier)",
         "gpt-5.6-luna": "GPT-5.6 Luna (Fast, cost-efficient GPT-5.6 tier)",
+        "gpt-6-astra": "GPT-6 Astra (Top tier above Sol, 1.05M context, $10/$50 per MTok)",
         "gpt-5.5": "GPT-5.5 (Premium flagship, 1.05M context, highest reasoning tier)",
         "gpt-5.5-pro": "GPT-5.5 Pro (Extended compute, no streaming, $30/$180 per MTok)",
         "gpt-5.4": "GPT-5.4 (Recommended default, 1M context)",
@@ -50,6 +51,8 @@ class OpenAIClient:
 
     # Available image generation models
     IMAGE_MODELS = {
+        "gpt-image-2.5-sunburst": "GPT Image 2.5 Sunburst (Highest quality, xhigh/max quality tiers)",
+        "gpt-image-2.5-flare": "GPT Image 2.5 Flare (Fastest 2.5 tier, xhigh/max quality tiers)",
         "gpt-image-2": "GPT Image 2 (Latest flagship, 4K, multilingual text)",
         "gpt-image-1.5": "GPT Image 1.5 (Previous flagship, 2K)",
         "gpt-image-1": "GPT Image 1 (High quality, editing support)",
@@ -58,10 +61,18 @@ class OpenAIClient:
 
     # Image models on the GPT Image family — share parameter conventions
     # (quality + background). dall-e-2/3 use different parameter rules.
-    GPT_IMAGE_MODELS = {"gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"}
+    GPT_IMAGE_MODELS = {
+        "gpt-image-2.5-sunburst", "gpt-image-2.5-flare",
+        "gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini",
+    }
 
-    # gpt-image-2 always processes at high fidelity and rejects input_fidelity param.
-    GPT_IMAGE_2_MODELS = {"gpt-image-2"}
+    # gpt-image-2 and later always process at high fidelity, reject the
+    # input_fidelity param, and share the same size envelope.
+    GPT_IMAGE_2_MODELS = {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"}
+
+    # Only GPT Image 2.5 accepts the xhigh and max quality tiers; earlier GPT
+    # Image models stop at high.
+    EXTENDED_QUALITY_MODELS = {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare"}
 
     # gpt-image-2 size constraints (from OpenAI docs):
     # - max edge <= 3840px, both edges multiples of 16
@@ -78,8 +89,17 @@ class OpenAIClient:
     MAX_RETRIES = 3
     INITIAL_RETRY_DELAY = 1.0
 
+    @classmethod
+    def _quality_for(cls, model: str, quality: str) -> str:
+        """Clamp xhigh/max down to high on models that stop at high."""
+        if quality in ("xhigh", "max") and model not in cls.EXTENDED_QUALITY_MODELS:
+            print(f"[OpenAI] {model} supports quality up to 'high'; using 'high' instead of '{quality}'")
+            return "high"
+        return quality
+
     # Models that use max_completion_tokens instead of max_tokens
     NEW_TOKEN_PARAM_MODELS = {
+        "gpt-6-astra",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
         "gpt-5.5", "gpt-5.5-pro",
         "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
@@ -90,6 +110,7 @@ class OpenAIClient:
 
     # Reasoning models that support reasoning_effort parameter
     REASONING_MODELS = {
+        "gpt-6-astra",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
         "gpt-5.5", "gpt-5.5-pro",
         "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
@@ -567,7 +588,7 @@ class OpenAIClient:
         # Model-specific parameters
         if model in self.GPT_IMAGE_MODELS:
             if quality != "auto":
-                params["quality"] = quality
+                params["quality"] = self._quality_for(model, quality)
             if background != "auto":
                 params["background"] = background
             if moderation != "auto":
@@ -892,7 +913,7 @@ class OpenAIClient:
         if model in self.GPT_IMAGE_MODELS:
             # GPT Image models always return base64, do not accept response_format
             if quality != "auto":
-                params["quality"] = quality
+                params["quality"] = self._quality_for(model, quality)
             if moderation != "auto":
                 params["moderation"] = moderation
             if background and background != "auto":
