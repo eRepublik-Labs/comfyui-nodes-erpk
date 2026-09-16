@@ -1,18 +1,18 @@
-# ABOUTME: Tests the MiniMax H3 text-to-video, image-to-video and reference-to-video nodes.
-# ABOUTME: MiniMax H3 takes a real API seed, unlike Seedance 2.5's cache-control-only seed.
+# ABOUTME: Tests the MiniMax H3 nodes: three official-edition video nodes plus the open-weights image and chaining nodes.
+# ABOUTME: The official edition takes no API seed; the open-weights endpoints do.
 
 """
-MiniMax H3 is the first MiniMax family in this package. WaveSpeed exposes 13
-endpoints: every video and image capability has a `-lora` twin that adds one
-optional `loras` array and nothing else, and image-to-video has a Spicy tier.
-The `-lora` twins are reached from the same node by connecting a LoRA stack;
-Spicy is a `model` Combo on the image-to-video node, the Seedance convention.
+WaveSpeed hosts two MiniMax H3 editions. The three video generators
+(text/image/reference-to-video) call MiniMax's own `minimax/h3` endpoints:
+768p or 2k, 4-15s, six aspect ratios, and NO seed parameter, so their seed is
+cache-control only and never sent, the Seedance 2.5 convention. The image,
+video-edit, video-extend and LoRA-stack nodes call the open-weights
+`wavespeed-ai/minimax-h3` endpoints, which document a seed and, for the image
+endpoints, a `-lora` twin that adds one optional `loras` array.
 
-The distinction these tests pin down hardest is the seed. Seedance 2.5 documents
-no seed, so its nodes keep the value out of the payload. MiniMax H3 documents one
-and honours it, so here the seed must reach the API. Getting that backwards
-either silently ignores reproducibility or re-bills a run that could have been
-reused.
+The seed plumbing is the fact these tests pin hardest, because the two editions
+are opposite: sending a seed the official API does not document is a silent
+no-op at best; dropping the open-weights seed throws away reproducibility.
 
 Reference-to-video accepts more references than any other node here: 9 images
 against the 4 the Seedance helpers cap at.
@@ -30,7 +30,6 @@ from wavespeed.minimax_h3_reference_to_video import MinimaxH3ReferenceToVideoNod
 from wavespeed.wavespeed_api.requests.minimax_h3_text_to_video import MinimaxH3TextToVideo
 from wavespeed.wavespeed_api.requests.minimax_h3_image_to_video import MinimaxH3ImageToVideo
 from wavespeed.wavespeed_api.requests.minimax_h3_reference_to_video import MinimaxH3ReferenceToVideo
-from wavespeed.wavespeed_api.requests.minimax_h3_image_to_video_spicy import MinimaxH3ImageToVideoSpicy
 from wavespeed.minimax_h3_lora_stack import MinimaxH3LoraStackNode
 from wavespeed.minimax_h3_text_to_image import MinimaxH3TextToImageNode
 from wavespeed.minimax_h3_image_edit import MinimaxH3ImageEditNode
@@ -49,6 +48,7 @@ ALL_NODES = [
 ]
 
 BASE = "/api/v3/wavespeed-ai/minimax-h3"
+OFFICIAL = "/api/v3/minimax/h3"
 
 
 def _schema(node):
@@ -70,15 +70,15 @@ def _has_input(node, name):
 
 
 @pytest.mark.parametrize("request_cls,path,extra", [
-    (MinimaxH3TextToVideo, f"{BASE}/text-to-video", {}),
-    (MinimaxH3ImageToVideo, f"{BASE}/image-to-video", {"image": "https://example.com/a.png"}),
-    (MinimaxH3ReferenceToVideo, f"{BASE}/reference-to-video", {"reference_images": ["https://example.com/a.png"]}),
+    (MinimaxH3TextToVideo, f"{OFFICIAL}/text-to-video", {}),
+    (MinimaxH3ImageToVideo, f"{OFFICIAL}/image-to-video", {"image": "https://example.com/a.png"}),
+    (MinimaxH3ReferenceToVideo, f"{OFFICIAL}/reference-to-video", {"reference_images": ["https://example.com/a.png"]}),
 ])
 def test_request_routes_to_documented_endpoint(request_cls, path, extra):
     assert request_cls(prompt="x", **extra).get_api_path() == path
 
 
-# --- The seed IS sent, unlike Seedance 2.5 -----------------------------------
+# --- The official edition takes no seed ---------------------------------------
 
 
 @pytest.mark.parametrize("request_cls,extra", [
@@ -86,9 +86,10 @@ def test_request_routes_to_documented_endpoint(request_cls, path, extra):
     (MinimaxH3ImageToVideo, {"image": "https://example.com/a.png"}),
     (MinimaxH3ReferenceToVideo, {"reference_images": ["https://example.com/a.png"]}),
 ])
-def test_seed_reaches_the_api(request_cls, extra):
-    payload = request_cls(prompt="x", seed=1234, **extra).build_payload()
-    assert payload["seed"] == 1234
+def test_official_requests_have_no_seed_field(request_cls, extra):
+    assert "seed" not in request_cls.model_fields
+    assert "loras" not in request_cls.model_fields
+    assert "seed" not in request_cls(prompt="x", **extra).build_payload()
 
 
 @pytest.mark.parametrize("node", ALL_NODES)
@@ -117,16 +118,25 @@ def test_execute_is_async(node):
 
 
 @pytest.mark.parametrize("node", ALL_NODES)
-def test_duration_spans_3_to_15(node):
+def test_duration_spans_4_to_15(node):
+    # minimax/h3 model pages: "Supported values: 4 ... 15".
     d = _input(node, "duration")
-    assert (d.min, d.max) == (3, 15)
+    assert (d.min, d.max) == (4, 15)
 
 
 @pytest.mark.parametrize("node", ALL_NODES)
-def test_resolution_offers_four_tiers(node):
-    # docs-api parameter table: 480p, 540p (1.5x the 480p price), 768p (native
-    # canvas), 1080p (2x the 768p price). Appended options keep saved values.
-    assert list(_input(node, "resolution").options) == ["480p", "540p", "768p", "1080p"]
+def test_resolution_offers_768p_and_2k(node):
+    # minimax/h3 model pages: "Supported values: 768p or 2k".
+    assert list(_input(node, "resolution").options) == ["768p", "2k"]
+
+
+@pytest.mark.parametrize("node", ALL_NODES)
+def test_video_nodes_keep_a_cache_only_seed_and_no_lora_socket(node):
+    # Same widget positions as before the edition switch; trailing loras/model
+    # widgets removed, which is migration-safe.
+    ids = [s.id for s in _schema(node).inputs]
+    assert "seed" in ids and "loras" not in ids and "model" not in ids
+    assert ids[-1] == "seed"
 
 
 @pytest.mark.parametrize("node", ALL_NODES)
@@ -142,9 +152,11 @@ def test_image_to_video_has_no_aspect_ratio():
 
 
 @pytest.mark.parametrize("node", [MinimaxH3TextToVideoNode, MinimaxH3ReferenceToVideoNode])
-def test_aspect_ratio_offers_all_seven(node):
+def test_aspect_ratio_offers_the_official_six(node):
+    # 9:21 exists only on the open-weights edition; kept out so the API never
+    # sees a value it does not document.
     assert list(_input(node, "aspect_ratio").options) == [
-        "16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "9:21",
+        "16:9", "9:16", "1:1", "4:3", "3:4", "21:9",
     ]
 
 
@@ -185,27 +197,6 @@ def test_node_is_registered(node):
 LORAS = [{"path": "https://example.com/a.safetensors", "scale": 0.8}]
 
 
-@pytest.mark.parametrize("request_cls,extra", [
-    (MinimaxH3TextToVideo, {}),
-    (MinimaxH3ImageToVideo, {"image": "https://example.com/a.png"}),
-    (MinimaxH3ReferenceToVideo, {"reference_images": ["https://example.com/a.png"]}),
-])
-def test_loras_route_to_the_lora_twin(request_cls, extra):
-    plain = request_cls(prompt="x", **extra)
-    with_loras = request_cls(prompt="x", loras=LORAS, **extra)
-    assert with_loras.get_api_path() == plain.get_api_path() + "-lora"
-    assert with_loras.build_payload()["loras"] == LORAS
-    assert "loras" not in plain.build_payload()
-
-
-@pytest.mark.parametrize("node", ALL_NODES)
-def test_video_nodes_accept_a_lora_stack_last(node):
-    # Appended after every widget so saved widgets_values keep their slots.
-    spec = _schema(node).inputs[-1]
-    assert spec.id == "loras"
-    assert spec.io_type == "MINIMAX_H3_LORAS"
-
-
 def test_lora_stack_builds_the_documented_shape():
     loras = MinimaxH3LoraStackNode._build_loras(
         "https://example.com/a.safetensors", 0.8, "", 1.0, " https://example.com/c.safetensors ", 1.2)
@@ -220,6 +211,13 @@ def test_lora_stack_requires_at_least_one_path():
         MinimaxH3LoraStackNode._build_loras("", 1.0, "", 1.0, "", 1.0)
 
 
+def test_lora_stack_feeds_the_image_nodes():
+    # The official video edition has no -lora twin; only the open-weights image
+    # endpoints do, so only those nodes expose the socket.
+    assert _schema(MinimaxH3TextToImageNode).inputs[-1].io_type == "MINIMAX_H3_LORAS"
+    assert _schema(MinimaxH3ImageEditNode).inputs[-1].io_type == "MINIMAX_H3_LORAS"
+
+
 def test_lora_stack_is_a_config_node():
     # No seed, so no fingerprint_inputs: an always-NaN fingerprint here would
     # cascade re-billing into every video node downstream.
@@ -228,19 +226,6 @@ def test_lora_stack_is_a_config_node():
     assert [o.io_type for o in _schema(MinimaxH3LoraStackNode).outputs] == ["MINIMAX_H3_LORAS"]
 
 
-# --- Spicy tier ---------------------------------------------------------------
-
-
-def test_spicy_request_routes_to_its_own_endpoint_without_a_prompt():
-    req = MinimaxH3ImageToVideoSpicy(image="https://example.com/a.png")
-    assert req.get_api_path() == f"{BASE}/image-to-video-spicy"
-    assert "prompt" not in req.build_payload()
-
-
-def test_image_to_video_offers_standard_and_spicy():
-    assert list(_input(MinimaxH3ImageToVideoNode, "model").options) == ["MiniMax H3", "MiniMax H3 Spicy"]
-    assert MinimaxH3ImageToVideoNode._request_class_for("MiniMax H3 Spicy") is MinimaxH3ImageToVideoSpicy
-    assert MinimaxH3ImageToVideoNode._request_class_for("MiniMax H3") is MinimaxH3ImageToVideo
 
 
 # --- Image and video-chaining nodes ------------------------------------------

@@ -1,5 +1,5 @@
 # ABOUTME: MiniMax H3 image-to-video generation node for WaveSpeed AI.
-# ABOUTME: Animates a first frame, optionally interpolating toward a last frame.
+# ABOUTME: Calls MiniMax's own minimax/h3 endpoint; animates a first frame toward an optional last frame.
 
 from comfy_api.latest import IO
 
@@ -14,17 +14,7 @@ class MinimaxH3ImageToVideoNode(IO.ComfyNode):
     Returns a URL string suitable for the Preview Anything utility.
     """
 
-    MODELS = ["MiniMax H3", "MiniMax H3 Spicy"]
-    RESOLUTIONS = ["480p", "540p", "768p", "1080p"]
-
-    @classmethod
-    def _request_class_for(cls, model):
-        from .wavespeed_api.requests.minimax_h3_image_to_video import MinimaxH3ImageToVideo
-        from .wavespeed_api.requests.minimax_h3_image_to_video_spicy import MinimaxH3ImageToVideoSpicy
-
-        if model == "MiniMax H3 Spicy":
-            return MinimaxH3ImageToVideoSpicy
-        return MinimaxH3ImageToVideo
+    RESOLUTIONS = ["768p", "2k"]
 
     @classmethod
     def define_schema(cls):
@@ -45,18 +35,14 @@ class MinimaxH3ImageToVideoNode(IO.ComfyNode):
                                 tooltip="Last frame image URL. Fallback when `last_frame` is not connected."),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
-                IO.Int.Input("duration", optional=True, default=5, min=3, max=15,
-                             tooltip="Video duration in seconds (3-15). Snaps to the model's frame grid, so a 5s request lands near 5.2s."),
+                IO.Int.Input("duration", optional=True, default=5, min=4, max=15,
+                             tooltip="Video duration in seconds (4-15)."),
                 IO.Combo.Input("resolution", optional=True,
-                               options=cls.RESOLUTIONS, default="480p",
-                               tooltip="Video resolution. Roughly $0.04/s at 480p, $0.06/s at 540p, $0.08/s at 768p (native canvas) and $0.16/s at 1080p; the -lora twin costs about 25% more."),
+                               options=cls.RESOLUTIONS, default="768p",
+                               tooltip="Video resolution. $0.10/s at 768p, $0.14/s at 2k."),
                 IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647,
                              control_after_generate="randomize",
-                             tooltip="Generation seed, sent to the API. A fixed seed reproduces the same video and lets ComfyUI reuse the cached result; -1 generates a new one each queue."),
-                IO.Combo.Input("model", optional=True, options=cls.MODELS, default="MiniMax H3",
-                               tooltip="Model tier. Spicy animates a start frame with an optional prompt and has no LoRA twin. Same per-second price."),
-                IO.Custom("MINIMAX_H3_LORAS").Input("loras", optional=True,
-                    tooltip="LoRA stack from the MiniMax H3 LoRA Stack node. When connected, the call goes to the endpoint's -lora twin (higher per-second rate)."),
+                             tooltip="Cache control only. The MiniMax-hosted H3 endpoint takes no API seed, so this is never sent. A fixed seed reuses the video you already paid for; -1 generates again on every queue."),
             ],
             outputs=[
                 IO.String.Output("video_url"),
@@ -72,20 +58,17 @@ class MinimaxH3ImageToVideoNode(IO.ComfyNode):
     @classmethod
     async def execute(cls, prompt="", first_frame=None, first_frame_url="",
                 last_frame=None, last_frame_url="", client=None,
-                duration=5, resolution="480p", seed=-1, model="MiniMax H3", loras=None,
-                **kwargs):
+                duration=5, resolution="768p", seed=-1, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.utils import image_to_data_uri
+        from .wavespeed_api.requests.minimax_h3_image_to_video import MinimaxH3ImageToVideo
 
         if client is None:
             from .nodes import WaveSpeedAIAPIClient
             client = WaveSpeedAIAPIClient.execute()[0]
 
-        spicy = model == "MiniMax H3 Spicy"
-        if not spicy and (prompt is None or prompt == ""):
+        if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
-        if spicy and loras:
-            raise ValueError("MiniMax H3 Spicy has no LoRA twin; disconnect the LoRA stack or choose MiniMax H3")
 
         first_value = image_to_data_uri(first_frame) if first_frame is not None else (first_frame_url or None)
         if not first_value:
@@ -93,17 +76,13 @@ class MinimaxH3ImageToVideoNode(IO.ComfyNode):
 
         last_value = image_to_data_uri(last_frame) if last_frame is not None else (last_frame_url or None)
 
-        request_kwargs = dict(
-            prompt=prompt or None,
+        request = MinimaxH3ImageToVideo(
+            prompt=prompt,
             image=first_value,
             last_image=last_value,
             resolution=resolution,
             duration=duration,
-            seed=seed,
         )
-        if not spicy:
-            request_kwargs["loras"] = loras or None
-        request = cls._request_class_for(model)(**request_kwargs)
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
         response = await waveSpeedClient.send_request(request, True, polling_interval=10, timeout=900)

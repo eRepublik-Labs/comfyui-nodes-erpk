@@ -1,61 +1,51 @@
 # ABOUTME: MiniMax H3 reference-to-video request for WaveSpeed AI.
-# ABOUTME: Routes to the wavespeed-ai/minimax-h3 reference-to-video endpoint.
+# ABOUTME: Routes to MiniMax's own minimax/h3 reference-to-video endpoint.
 
-from typing import Dict, List, Optional, Union
+from typing import List, Optional
 from pydantic import Field
 from ..utils import BaseRequest
 
 
 class MinimaxH3ReferenceToVideo(BaseRequest):
     """
-    MiniMax H3 reference-to-video model.
+    MiniMax H3 reference-to-video model, MiniMax-hosted edition.
 
     Generates video guided by reference images, videos, and audio. The prompt
     must cite each reference with bracket tags such as `<Picture 1>`, `<Video 1>`
     and `<Audio 1>`; plain-text mentions are ignored. At least one reference
-    image or video is required, and audio cannot be supplied alone.
+    image or video is required, and audio cannot be supplied alone. The
+    endpoint documents no seed.
     """
 
     prompt: str = Field(..., description="Prompt citing references as <Picture N>, <Video N>, <Audio N>.")
     reference_images: Optional[List[str]] = Field(
         default=None,
-        description="Reference image URLs, cited as <Picture 1> through <Picture 9>.",
+        description="Reference image URLs, cited as <Picture 1> through <Picture 9>. First 5 free, then $0.05 each.",
         max_length=9,
     )
     reference_videos: Optional[List[str]] = Field(
         default=None,
-        description="Reference video URLs, cited as <Video 1> through <Video 3>. Total duration shares a 15s budget.",
+        description="Reference video URLs, cited as <Video 1> through <Video 3>. Each normalised to 2-15s; combined duration capped at 15s and billed per second.",
         max_length=3,
     )
     reference_audios: Optional[List[str]] = Field(
         default=None,
-        description="Reference audio URLs, cited as <Audio 1> through <Audio 3>. Each is trimmed to 15s.",
+        description="Reference audio URLs, cited as <Audio 1> through <Audio 3>. Cannot be supplied alone.",
         max_length=3,
     )
     aspect_ratio: Optional[str] = Field(
         default="16:9",
-        description="Video aspect ratio: 16:9, 9:16, 1:1, 4:3, 3:4, 21:9, or 9:21.",
+        description="Video aspect ratio: 21:9, 16:9, 4:3, 1:1, 3:4, or 9:16.",
     )
     resolution: Optional[str] = Field(
-        default="480p",
-        description="Video resolution: 480p, 540p, 768p or 1080p. References are conformed to a 480p budget internally, so any output resolution works.",
+        default="768p",
+        description="Video resolution: 768p or 2k.",
     )
     duration: Optional[int] = Field(
         default=5,
         description="Video duration in seconds.",
-        ge=3,
+        ge=4,
         le=15,
-    )
-    loras: Optional[List[Dict[str, Union[str, float]]]] = Field(
-        default=None,
-        description="Up to 3 LoRA weights as {path, scale}; routes the call to the -lora twin.",
-        max_length=3,
-    )
-    seed: Optional[int] = Field(
-        default=-1,
-        description="Random seed; -1 generates a random seed.",
-        ge=-1,
-        le=2147483647,
     )
 
     def build_payload(self) -> dict:
@@ -68,16 +58,12 @@ class MinimaxH3ReferenceToVideo(BaseRequest):
             "aspect_ratio": self.aspect_ratio,
             "resolution": self.resolution,
             "duration": self.duration,
-            "loras": self.loras,
-            "seed": self.seed,
         }
         return self._remove_empty_fields(payload)
 
     def get_api_path(self):
         """Gets the API path. Corresponds to api_path in the JSON."""
-        if self.loras:
-            return "/api/v3/wavespeed-ai/minimax-h3/reference-to-video-lora"
-        return "/api/v3/wavespeed-ai/minimax-h3/reference-to-video"
+        return "/api/v3/minimax/h3/reference-to-video"
 
     def field_required(self):
         return ["prompt"]
@@ -91,6 +77,4 @@ class MinimaxH3ReferenceToVideo(BaseRequest):
             "aspect_ratio",
             "resolution",
             "duration",
-            "loras",
-            "seed",
         ]

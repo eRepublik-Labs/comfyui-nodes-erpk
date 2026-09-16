@@ -1,9 +1,9 @@
 <!-- ABOUTME: Help documentation for the MiniMax H3 Reference-to-Video ComfyUI node. -->
-<!-- ABOUTME: Generates video guided by up to 9 reference images, 3 videos and 3 audios. -->
+<!-- ABOUTME: Generates video guided by up to 9 reference images, 3 videos and 3 audios via MiniMax's hosted H3. -->
 
 # MiniMax H3 Reference-to-Video
 
-Generates video guided by reference images, videos and audio, with native stereo audio.
+Generates video guided by reference images, videos and audio, with native stereo audio, using MiniMax's hosted H3 endpoint.
 
 ## Parameters
 
@@ -11,15 +11,14 @@ Generates video guided by reference images, videos and audio, with native stereo
 |-----------|------|---------|-------------|
 | prompt | String (multiline) | (empty) | Prompt citing each reference by bracket tag. See below |
 | reference_images | String | (empty) | Reference image URL(s), up to 9 (optional) |
-| reference_videos | String | (empty) | Reference video URL(s), up to 3, sharing a 15s budget (optional) |
-| reference_audios | String | (empty) | Reference audio URL(s), up to 3, each trimmed to 15s (optional) |
+| reference_videos | String | (empty) | Reference video URL(s), up to 3, combined 15s cap (optional) |
+| reference_audios | String | (empty) | Reference audio URL(s), up to 3; cannot be used alone (optional) |
 | reference_images_tensor | IMAGE | (none) | Reference images as a ComfyUI IMAGE batch, capped at 9. Takes precedence over reference_images (optional) |
 | client | WAVESPEED_AI_API_CLIENT | (none) | WaveSpeed API client (optional if API key is in Settings) |
-| duration | Int | 5 | Video duration in seconds. Range: 3-15 (optional) |
-| aspect_ratio | Combo | 16:9 | 16:9, 9:16, 1:1, 4:3, 3:4, 21:9, 9:21 (optional) |
-| resolution | Combo | 480p | 480p, 540p, 768p or 1080p (optional) |
-| seed | Int | -1 | Generation seed, sent to the API (optional) |
-| loras | MINIMAX_H3_LORAS | (none) | LoRA stack from the MiniMax H3 LoRA Stack node. When connected the call goes to the -lora twin (optional) |
+| duration | Int | 5 | Video duration in seconds. Range: 4-15 (optional) |
+| aspect_ratio | Combo | 16:9 | 16:9, 9:16, 1:1, 4:3, 3:4, 21:9 (optional) |
+| resolution | Combo | 768p | 768p or 2k (optional) |
+| seed | Int | -1 | Cache control only; never sent to the API (optional) |
 
 ## Output
 
@@ -27,44 +26,40 @@ Generates video guided by reference images, videos and audio, with native stereo
 |--------|------|-------------|
 | video_url | String | URL of the generated video, ready for Preview Anything |
 
+## Which edition this calls
+
+This node calls MiniMax's own hosted H3 endpoint on WaveSpeed (`minimax/h3/...`), not the open-weights edition WaveSpeed hosts itself (`wavespeed-ai/minimax-h3/...`). The hosted edition offers 768p and 2k, 4-15s clips, and takes no seed or LoRA parameters. The MiniMax H3 Text-to-Image, Image Edit, Video Edit, Video Extend and LoRA Stack nodes still use the open-weights edition.
+
+## The seed is cache control only
+
+The endpoint documents no seed, so the widget is never sent. A fixed seed lets ComfyUI reuse the video you already paid for; -1 generates again on every queue.
+
+## There is no audio toggle
+
+Audio is generated natively in one pass and steered by an `Audio:` line in the prompt, for example:
+
+```
+A lighthouse in a storm, slow dolly in.
+Audio: waves crashing, wind, a distant foghorn.
+```
+
 ## You must cite references by tag
 
-This is the part that catches people out. A reference is only used if the prompt names it with an exact bracket tag. Mentioning it in plain prose does nothing.
-
-```
-<Picture 1> walks through the doorway from <Picture 2>,
-matching the camera move in <Video 1>.
-Audio: <Audio 1>
-```
-
-Tags are numbered per type in input order: `<Picture 1>` to `<Picture 9>`, `<Video 1>` to `<Video 3>`, `<Audio 1>` to `<Audio 3>`.
-
-A reference video's own audio automatically fills the earliest `<Audio>` slots before any standalone audio you supply, so number your audio tags with that in mind.
-
-## At least one image or video is required
-
-Audio alone is rejected. The node raises before spending anything if you supply neither an image nor a video.
+The prompt must name each reference with its bracket tag: `<Picture 1>` to `<Picture 9>`, `<Video 1>` to `<Video 3>`, `<Audio 1>` to `<Audio 3>`. A reference mentioned only in plain text is ignored by the model. At least one reference image or video is required; audio cannot be supplied alone.
 
 ## Cost
 
-Every reference adds to the bill on top of the output:
+| Item | Rate |
+|------|------|
+| Output at 768p | $0.10 / second |
+| Output at 2k | $0.14 / second |
+| Reference video | billed at the output rate per normalised second (each clip 2-15s, combined cap 15s) |
+| Reference images | first 5 free, then $0.05 each |
+| Reference audio | free |
 
-| Item | Price |
-|---|---|
-| Output at 480p | $0.05 / second |
-| Output at 540p | $0.075 / second |
-| Output at 768p | $0.125 / second |
-| Output at 1080p | $0.25 / second |
-| Each reference image | $0.02 |
-| Each reference audio | $0.02 |
-| Reference video | $0.05 / second (roughly; the -lora twin itemizes $0.06-$0.27 by resolution) |
-
-WaveSpeed's worked example: a 10s 480p video with 2 reference images and a 5s reference video totals about $0.79, roughly four times the base rate.
+WaveSpeed's worked example: 5 seconds of normalised reference video plus 5 seconds of output costs $1.00 at 768p or $1.40 at 2k.
 
 ## Notes
 
-- Reference videos are conformed to a 480p budget internally, so they work at any output resolution
-- With a LoRA stack connected the -lora twin charges about 20% more per output second
-- Reference videos share a 15-second budget; longer inputs are trimmed
-- Output is MP4 with stereo audio at 24fps
-- Median generation time is around 279 seconds, longer than the other H3 nodes
+- Polling times out after 20 minutes on this node; reference runs take longer than text or image ones
+- Workflows saved with the earlier 480p/540p/1080p tiers or the 9:21 ratio are remapped on load (480p/540p to 768p, 1080p to 2k, 9:21 to 21:9)

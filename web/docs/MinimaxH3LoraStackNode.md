@@ -28,11 +28,11 @@ It calls no API and takes no seed, so ComfyUI caches it like any other input. On
 
 ## Which nodes accept it
 
-Text-to-Video, Image-to-Video (standard tier only), Reference-to-Video, Text-to-Image and Image Edit. Video Edit and Video Extend have no `-lora` endpoint and no socket. Selecting the Spicy tier on Image-to-Video with a stack connected raises an error.
+Text-to-Image and Image Edit, which call the open-weights edition. The three video generators call MiniMax's hosted edition, which has no `-lora` endpoints; Video Edit and Video Extend have none either, so none of the video nodes expose a socket.
 
 ## Cost
 
-Video `-lora` twins charge a higher per-second rate (about 25% more on text/image-to-video, 20% more on reference-to-video). Image `-lora` twins add a flat $0.015 per image.
+Image `-lora` twins add a flat $0.015 per image.
 
 ## Notes
 
