@@ -42,12 +42,24 @@ class MinimaxH3VideoExtendNode(IO.ComfyNode):
                 IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647,
                              control_after_generate="randomize",
                              tooltip="Generation seed, sent to the API. A fixed seed reproduces the same video and lets ComfyUI reuse the cached result; -1 generates a new one each queue."),
+                IO.Video.Input("video", optional=True,
+                               tooltip="Source clip as a ComfyUI VIDEO. Uploaded to WaveSpeed and used instead of `video_url` when connected."),
             ],
             outputs=[
                 IO.String.Output("video_url"),
             ],
             not_idempotent=True,
         )
+
+
+    @staticmethod
+    async def _media_url(client, media, to_bytes):
+        """Upload a connected VIDEO or AUDIO and return its URL."""
+        from .wavespeed_api.client import WaveSpeedClient
+
+        filename, content_type, data = to_bytes(media)
+        uploader = WaveSpeedClient(client["api_key"])
+        return await uploader.upload_media(filename, content_type, data)
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
@@ -56,7 +68,7 @@ class MinimaxH3VideoExtendNode(IO.ComfyNode):
 
     @classmethod
     async def execute(cls, prompt="", video_url="", last_frame=None, last_frame_url="",
-                client=None, duration=5, resolution="480p", seed=-1, **kwargs):
+                client=None, duration=5, resolution="480p", seed=-1, video=None, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.utils import image_to_data_uri
         from .wavespeed_api.requests.minimax_h3_video_extend import MinimaxH3VideoExtend
@@ -67,14 +79,20 @@ class MinimaxH3VideoExtendNode(IO.ComfyNode):
 
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
-        if not video_url:
-            raise ValueError("A source video URL is required")
+
+        if video is not None:
+            from .wavespeed_api.media import video_to_bytes
+            video_value = await cls._media_url(client, video, video_to_bytes)
+        else:
+            video_value = video_url
+        if not video_value:
+            raise ValueError("A source video is required, as either a VIDEO input or a URL")
 
         last_value = image_to_data_uri(last_frame) if last_frame is not None else (last_frame_url or None)
 
         request = MinimaxH3VideoExtend(
             prompt=prompt,
-            video=video_url,
+            video=video_value,
             last_image=last_value,
             resolution=resolution,
             duration=duration,

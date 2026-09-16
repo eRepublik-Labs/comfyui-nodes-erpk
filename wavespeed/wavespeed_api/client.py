@@ -472,6 +472,27 @@ class WaveSpeedClient:
 
         return self._upload_bytes_sync("image.png", "image/png", buffered.getvalue())
 
+    async def upload_media(self, filename: str, content_type: str, data: bytes) -> str:
+        """
+        Upload arbitrary media bytes and return the URL they can be read from.
+
+        Used for video and audio references, which the API accepts only as
+        URLs. Images can travel as base64 data URIs instead, so they do not
+        need this.
+
+        Args:
+            filename: Name the file will be stored under, including extension
+            content_type: MIME type of the payload
+            data: The file contents
+
+        Returns:
+            str: URL of the uploaded file
+
+        Raises:
+            Exception: If upload fails
+        """
+        return await asyncio.to_thread(self._upload_bytes_sync, filename, content_type, data)
+
     async def upload_file(self, image) -> str:
         """
         Upload an image file to WaveSpeed AI API.

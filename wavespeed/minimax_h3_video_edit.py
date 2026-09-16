@@ -47,12 +47,12 @@ class MinimaxH3VideoEditNode(IO.ComfyNode):
                                 tooltip="What to change: lighting, weather, style, environment or specific elements. Cite references as <Picture N> and <Audio N>."),
                 IO.String.Input("video_url", optional=True, default="",
                                 tooltip="Source video URL. Connect the video_url output of any video node in this package. Input seconds are billed alongside output seconds, each capped at 15."),
-                IO.String.Input("reference_images", optional=True, default="",
-                                tooltip="Reference image URL(s), cited as <Picture N>. Up to 9, about $0.02 each. Ignored when `reference_images_tensor` is connected."),
-                IO.String.Input("reference_audios", optional=True, default="",
+                IO.String.Input("reference_images_url", optional=True, default="",
+                                tooltip="Reference image URL(s), cited as <Picture N>. Up to 9, about $0.02 each. Ignored when `reference_images` is connected."),
+                IO.String.Input("reference_audios_url", optional=True, default="",
                                 tooltip="Reference audio URL(s), cited as <Audio N>. Up to 3, about $0.02 each."),
-                IO.Image.Input("reference_images_tensor", optional=True,
-                               tooltip="Reference images as a ComfyUI IMAGE batch (B,H,W,C), capped at 9. Takes precedence over `reference_images` URLs."),
+                IO.Image.Input("reference_images", optional=True,
+                               tooltip="Reference images as a ComfyUI IMAGE batch (B,H,W,C), capped at 9. Takes precedence over `reference_images_url`."),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
                 IO.Combo.Input("resolution", optional=True,
@@ -68,6 +68,10 @@ class MinimaxH3VideoEditNode(IO.ComfyNode):
                 IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647,
                              control_after_generate="randomize",
                              tooltip="Generation seed, sent to the API. A fixed seed reproduces the same video and lets ComfyUI reuse the cached result; -1 generates a new one each queue."),
+                IO.Video.Input("video", optional=True,
+                               tooltip="Source clip as a ComfyUI VIDEO. Uploaded to WaveSpeed and used instead of `video_url` when connected."),
+                IO.Audio.Input("reference_audio", optional=True,
+                               tooltip="A reference audio track, cited as <Audio 1>. Encoded to MP3, uploaded to WaveSpeed and prepended to `reference_audios_url`."),
             ],
             outputs=[
                 IO.String.Output("video_url"),
@@ -75,15 +79,26 @@ class MinimaxH3VideoEditNode(IO.ComfyNode):
             not_idempotent=True,
         )
 
+
+    @staticmethod
+    async def _media_url(client, media, to_bytes):
+        """Upload a connected VIDEO or AUDIO and return its URL."""
+        from .wavespeed_api.client import WaveSpeedClient
+
+        filename, content_type, data = to_bytes(media)
+        uploader = WaveSpeedClient(client["api_key"])
+        return await uploader.upload_media(filename, content_type, data)
+
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
         seed = kwargs.get("seed", -1)
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    async def execute(cls, prompt="", video_url="", reference_images="", reference_audios="",
-                reference_images_tensor=None, client=None, resolution="480p", aspect_ratio="auto",
-                duration=0, generate_audio=True, seed=-1, **kwargs):
+    async def execute(cls, prompt="", video_url="", reference_images_url="", reference_audios_url="",
+                reference_images=None, client=None, resolution="480p", aspect_ratio="auto",
+                duration=0, generate_audio=True, seed=-1, video=None, reference_audio=None,
+                **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.utils import images_to_data_uris
         from .wavespeed_api.requests.minimax_h3_video_edit import MinimaxH3VideoEdit
@@ -94,19 +109,31 @@ class MinimaxH3VideoEditNode(IO.ComfyNode):
 
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
-        if not video_url:
-            raise ValueError("A source video URL is required")
 
-        if reference_images_tensor is not None:
-            images_value = images_to_data_uris(reference_images_tensor, max_count=cls.MAX_IMAGES)
+        if video is not None:
+            from .wavespeed_api.media import video_to_bytes
+            video_value = await cls._media_url(client, video, video_to_bytes)
         else:
-            images_value = cls._normalize_url_list(reference_images, cls.MAX_IMAGES)
+            video_value = video_url
+        if not video_value:
+            raise ValueError("A source video is required, as either a VIDEO input or a URL")
+
+        if reference_images is not None:
+            images_value = images_to_data_uris(reference_images, max_count=cls.MAX_IMAGES)
+        else:
+            images_value = cls._normalize_url_list(reference_images_url, cls.MAX_IMAGES)
+
+        audios_value = cls._normalize_url_list(reference_audios_url, cls.MAX_AUDIOS) or []
+        if reference_audio is not None:
+            from .wavespeed_api.media import audio_to_bytes
+            audios_value = [await cls._media_url(client, reference_audio, audio_to_bytes)] + audios_value
+        audios_value = audios_value[:cls.MAX_AUDIOS] or None
 
         request = MinimaxH3VideoEdit(
             prompt=prompt,
-            video=video_url,
+            video=video_value,
             reference_images=images_value,
-            reference_audios=cls._normalize_url_list(reference_audios, cls.MAX_AUDIOS),
+            reference_audios=audios_value,
             resolution=resolution,
             aspect_ratio=None if aspect_ratio in ("auto", "") else aspect_ratio,
             duration=cls._duration_or_none(duration),

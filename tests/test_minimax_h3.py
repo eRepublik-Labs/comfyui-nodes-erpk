@@ -136,7 +136,7 @@ def test_video_nodes_keep_a_cache_only_seed_and_no_lora_socket(node):
     # widgets removed, which is migration-safe.
     ids = [s.id for s in _schema(node).inputs]
     assert "seed" in ids and "loras" not in ids and "model" not in ids
-    assert ids[-1] == "seed"
+    assert _widget_ids(node)[-1] == "seed"
 
 
 @pytest.mark.parametrize("node", ALL_NODES)
@@ -179,7 +179,8 @@ def test_reference_videos_and_audios_cap_at_three():
 
 
 def test_reference_to_video_exposes_all_three_reference_kinds():
-    for name in ("reference_images", "reference_videos", "reference_audios"):
+    for name in ("reference_images", "reference_video", "reference_audio",
+                 "reference_images_url", "reference_videos_url", "reference_audios_url"):
         assert _has_input(MinimaxH3ReferenceToVideoNode, name)
 
 
@@ -312,3 +313,66 @@ def test_video_edit_can_keep_the_source_audio():
 def test_video_extend_accepts_a_target_last_frame():
     for name in ("last_frame", "last_frame_url"):
         assert _has_input(MinimaxH3VideoExtendNode, name)
+
+
+# --- Typed media inputs -------------------------------------------------------
+
+"""
+The API takes URLs for every reference. Images may also be base64 data URIs
+(verified live against minimax/h3/reference-to-video on 2026-09-16), so the
+IMAGE socket inlines them. Video and audio would be tens of megabytes inline,
+so those sockets upload through the v3 media ticket flow and send the URL.
+"""
+
+
+WIDGET_TYPES = {"STRING", "INT", "FLOAT", "BOOLEAN", "COMBO"}
+
+
+def _widget_ids(node):
+    """Widget ids in order; only these occupy widgets_values slots."""
+    return [s.id for s in _schema(node).inputs if s.io_type in WIDGET_TYPES]
+
+
+@pytest.mark.parametrize("node,name,io_type", [
+    (MinimaxH3ReferenceToVideoNode, "reference_images", "IMAGE"),
+    (MinimaxH3ReferenceToVideoNode, "reference_video", "VIDEO"),
+    (MinimaxH3ReferenceToVideoNode, "reference_audio", "AUDIO"),
+    (MinimaxH3VideoEditNode, "reference_images", "IMAGE"),
+    (MinimaxH3VideoEditNode, "reference_audio", "AUDIO"),
+    (MinimaxH3VideoEditNode, "video", "VIDEO"),
+    (MinimaxH3VideoExtendNode, "video", "VIDEO"),
+])
+def test_media_arrives_on_a_typed_socket(node, name, io_type):
+    assert _input(node, name).io_type == io_type
+
+
+@pytest.mark.parametrize("node,plain,url_field", [
+    (MinimaxH3ReferenceToVideoNode, "reference_images", "reference_images_url"),
+    (MinimaxH3ReferenceToVideoNode, "reference_video", "reference_videos_url"),
+    (MinimaxH3ReferenceToVideoNode, "reference_audio", "reference_audios_url"),
+    (MinimaxH3VideoEditNode, "video", "video_url"),
+    (MinimaxH3VideoExtendNode, "video", "video_url"),
+])
+def test_every_typed_socket_keeps_a_url_fallback(node, plain, url_field):
+    # A URL the user already has should never require a download-and-reupload.
+    assert _has_input(node, plain) and _has_input(node, url_field)
+
+
+@pytest.mark.parametrize("node", [
+    MinimaxH3ReferenceToVideoNode,
+    MinimaxH3VideoEditNode,
+    MinimaxH3VideoExtendNode,
+])
+def test_widget_order_is_unchanged_by_the_typed_sockets(node):
+    # Sockets take no widgets_values slot, so saved workflows keep their values
+    # as long as the widget sequence itself does not move.
+    widgets = _widget_ids(node)
+    assert widgets[0] == "prompt"
+    assert widgets[-1] == "seed"
+
+
+def test_reference_node_names_the_tensor_input_plainly():
+    # Matches first_frame / first_frame_url on Image-to-Video: the typed input
+    # holds the plain name and the URL fallback carries the suffix.
+    assert _has_input(MinimaxH3ReferenceToVideoNode, "reference_images")
+    assert not _has_input(MinimaxH3ReferenceToVideoNode, "reference_images_tensor")
