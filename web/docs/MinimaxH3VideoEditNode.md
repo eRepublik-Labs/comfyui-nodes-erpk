@@ -16,8 +16,8 @@ Rewrites lighting, style, environment or specific elements of an input video whi
 | reference_images_tensor | IMAGE | (none) | Reference images as an IMAGE batch, capped at 9. Takes precedence over reference_images (optional) |
 | client | WAVESPEED_AI_API_CLIENT | (none) | WaveSpeed API client (optional if API key is in Settings) |
 | resolution | Combo | 480p | 480p, 540p, 768p or 1080p (optional) |
-| aspect_ratio | Combo | (empty) | 16:9, 9:16, 1:1, 4:3, 3:4, 21:9, 9:21. Empty adapts to the input video (optional) |
-| duration | Int | 0 | Output duration in seconds, 3-15. 0 follows the input clip (optional) |
+| aspect_ratio | Combo | auto | auto, 16:9, 9:16, 1:1, 4:3, 3:4, 21:9, 9:21. auto adapts to the input video (optional) |
+| duration | Int | 0 | Output duration in seconds, 3-15. Below 3 follows the input clip (optional) |
 | generate_audio | Boolean | true | Generate a new soundtrack. Off keeps the input's audio track (optional) |
 | seed | Int | -1 | Generation seed, sent to the API (optional) |
 

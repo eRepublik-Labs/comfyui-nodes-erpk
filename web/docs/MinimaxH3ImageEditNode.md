@@ -13,7 +13,7 @@ Re-renders the subject of 1 to 9 reference images into a new scene, outfit, pose
 | images | IMAGE | (none) | Reference images as a ComfyUI IMAGE batch, capped at 9. Takes precedence over image_urls (optional) |
 | image_urls | String | (empty) | Reference image URL(s), single URL or list, up to 9. Fallback when images is not connected (optional) |
 | client | WAVESPEED_AI_API_CLIENT | (none) | WaveSpeed API client (optional if API key is in Settings) |
-| aspect_ratio | Combo | (empty) | Output aspect ratio. Empty follows the first reference image (optional) |
+| aspect_ratio | Combo | auto | Output aspect ratio. auto follows the first reference image (optional) |
 | resolution | Combo | 1k | 1k or 2k (optional) |
 | output_format | Combo | jpeg | jpeg, png or webp (optional) |
 | seed | Int | -1 | Generation seed, sent to the API (optional) |

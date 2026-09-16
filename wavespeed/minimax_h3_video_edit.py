@@ -15,7 +15,7 @@ class MinimaxH3VideoEditNode(IO.ComfyNode):
     Returns a URL string suitable for the Preview Anything utility.
     """
 
-    ASPECT_RATIOS = [""] + ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "9:21"]
+    ASPECT_RATIOS = ["auto"] + ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "9:21"]
     RESOLUTIONS = ["480p", "540p", "768p", "1080p"]
     MAX_IMAGES = 9
     MAX_AUDIOS = 3
@@ -33,8 +33,8 @@ class MinimaxH3VideoEditNode(IO.ComfyNode):
 
     @staticmethod
     def _duration_or_none(duration):
-        """0 means follow the input clip, which the endpoint does when duration is omitted."""
-        return None if not duration else duration
+        """Below the endpoint's 3s floor means follow the input clip, which it does when duration is omitted."""
+        return None if not duration or duration < 3 else duration
 
     @classmethod
     def define_schema(cls):
@@ -59,10 +59,10 @@ class MinimaxH3VideoEditNode(IO.ComfyNode):
                                options=cls.RESOLUTIONS, default="480p",
                                tooltip="Output resolution. Roughly $0.05 per counted second at 480p, $0.075 at 540p, $0.125 at 768p and $0.25 at 1080p; counted seconds are input plus output."),
                 IO.Combo.Input("aspect_ratio", optional=True,
-                               options=cls.ASPECT_RATIOS, default="",
-                               tooltip="Output aspect ratio. Leave empty to adapt to the input video."),
+                               options=cls.ASPECT_RATIOS, default="auto",
+                               tooltip="Output aspect ratio. auto adapts to the input video."),
                 IO.Int.Input("duration", optional=True, default=0, min=0, max=15,
-                             tooltip="Output duration in seconds (3-15). 0 follows the input clip."),
+                             tooltip="Output duration in seconds (3-15). Below 3 follows the input clip."),
                 IO.Boolean.Input("generate_audio", optional=True, default=True,
                                  tooltip="Generate a new soundtrack. Off keeps the input video's audio track."),
                 IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647,
@@ -82,7 +82,7 @@ class MinimaxH3VideoEditNode(IO.ComfyNode):
 
     @classmethod
     async def execute(cls, prompt="", video_url="", reference_images="", reference_audios="",
-                reference_images_tensor=None, client=None, resolution="480p", aspect_ratio="",
+                reference_images_tensor=None, client=None, resolution="480p", aspect_ratio="auto",
                 duration=0, generate_audio=True, seed=-1, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.utils import images_to_data_uris
@@ -108,7 +108,7 @@ class MinimaxH3VideoEditNode(IO.ComfyNode):
             reference_images=images_value,
             reference_audios=cls._normalize_url_list(reference_audios, cls.MAX_AUDIOS),
             resolution=resolution,
-            aspect_ratio=aspect_ratio or None,
+            aspect_ratio=None if aspect_ratio in ("auto", "") else aspect_ratio,
             duration=cls._duration_or_none(duration),
             generate_audio=generate_audio,
             seed=seed,

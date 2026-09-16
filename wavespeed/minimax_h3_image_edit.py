@@ -14,7 +14,7 @@ class MinimaxH3ImageEditNode(IO.ComfyNode):
     the -lora twin.
     """
 
-    ASPECT_RATIOS = [""] + ["1:1", "1:2", "2:1", "1:3", "3:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "9:21", "21:9"]
+    ASPECT_RATIOS = ["auto"] + ["1:1", "1:2", "2:1", "1:3", "3:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "9:21", "21:9"]
     RESOLUTIONS = ["1k", "2k"]
     MAX_IMAGES = 9
 
@@ -45,8 +45,8 @@ class MinimaxH3ImageEditNode(IO.ComfyNode):
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
                 IO.Combo.Input("aspect_ratio", optional=True,
-                               options=cls.ASPECT_RATIOS, default="",
-                               tooltip="Output aspect ratio. Leave empty to follow the first reference image."),
+                               options=cls.ASPECT_RATIOS, default="auto",
+                               tooltip="Output aspect ratio. auto follows the first reference image."),
                 IO.Combo.Input("resolution", optional=True,
                                options=cls.RESOLUTIONS, default="1k",
                                tooltip="Output resolution. 1k is about $0.03/image, 2k about $0.09."),
@@ -72,7 +72,7 @@ class MinimaxH3ImageEditNode(IO.ComfyNode):
 
     @classmethod
     async def execute(cls, prompt="", images=None, image_urls="", client=None,
-                aspect_ratio="", resolution="1k", output_format="jpeg", seed=-1,
+                aspect_ratio="auto", resolution="1k", output_format="jpeg", seed=-1,
                 loras=None, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.utils import imageurl2tensor, images_to_data_uris
@@ -95,7 +95,7 @@ class MinimaxH3ImageEditNode(IO.ComfyNode):
         request = MinimaxH3ImageEdit(
             prompt=prompt,
             images=images_value,
-            aspect_ratio=aspect_ratio or None,
+            aspect_ratio=None if aspect_ratio in ("auto", "") else aspect_ratio,
             resolution=resolution,
             output_format=output_format,
             seed=seed,

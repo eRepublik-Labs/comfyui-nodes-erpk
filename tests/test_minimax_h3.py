@@ -297,10 +297,11 @@ def test_text_to_image_offers_all_fifteen_ratios():
 
 
 def test_image_edit_follows_the_first_reference_by_default():
-    # aspect_ratio is optional on the endpoint; the empty option means "omit".
-    spec = _input(MinimaxH3ImageEditNode, "aspect_ratio")
-    assert spec.options[0] == "" and spec.default == ""
-    assert MinimaxH3ImageEdit(prompt="x", images=["u"], aspect_ratio="").build_payload().get("aspect_ratio") is None
+    # aspect_ratio is optional on the endpoint; "auto" means omit the field.
+    for node in (MinimaxH3ImageEditNode, MinimaxH3VideoEditNode):
+        spec = _input(node, "aspect_ratio")
+        assert spec.options[0] == "auto" and spec.default == "auto"
+    assert MinimaxH3ImageEdit(prompt="x", images=["u"], aspect_ratio=None).build_payload().get("aspect_ratio") is None
 
 
 @pytest.mark.parametrize("node", CHAIN_NODES)
@@ -313,6 +314,8 @@ def test_chain_nodes_take_a_video_url_and_return_one(node):
 def test_video_edit_duration_zero_follows_the_input():
     # The endpoint has no default: unset means the output matches the input.
     assert MinimaxH3VideoEditNode._duration_or_none(0) is None
+    assert MinimaxH3VideoEditNode._duration_or_none(2) is None
+    assert MinimaxH3VideoEditNode._duration_or_none(3) == 3
     assert MinimaxH3VideoEditNode._duration_or_none(8) == 8
     assert "duration" not in MinimaxH3VideoEdit(prompt="x", video="u").build_payload()
 
