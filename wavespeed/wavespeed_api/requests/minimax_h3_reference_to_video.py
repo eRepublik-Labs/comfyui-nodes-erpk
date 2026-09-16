@@ -1,7 +1,7 @@
 # ABOUTME: MiniMax H3 reference-to-video request for WaveSpeed AI.
 # ABOUTME: Routes to the wavespeed-ai/minimax-h3 reference-to-video endpoint.
 
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
 from pydantic import Field
 from ..utils import BaseRequest
 
@@ -24,7 +24,7 @@ class MinimaxH3ReferenceToVideo(BaseRequest):
     )
     reference_videos: Optional[List[str]] = Field(
         default=None,
-        description="Reference video URLs, cited as <Video 1> through <Video 3>. Forces 480p output; total duration shares a 15s budget.",
+        description="Reference video URLs, cited as <Video 1> through <Video 3>. Total duration shares a 15s budget.",
         max_length=3,
     )
     reference_audios: Optional[List[str]] = Field(
@@ -38,13 +38,18 @@ class MinimaxH3ReferenceToVideo(BaseRequest):
     )
     resolution: Optional[str] = Field(
         default="480p",
-        description="Video resolution: 480p or 768p. Reference videos force 480p.",
+        description="Video resolution: 480p, 540p, 768p or 1080p. References are conformed to a 480p budget internally, so any output resolution works.",
     )
     duration: Optional[int] = Field(
         default=5,
         description="Video duration in seconds.",
         ge=3,
         le=15,
+    )
+    loras: Optional[List[Dict[str, Union[str, float]]]] = Field(
+        default=None,
+        description="Up to 3 LoRA weights as {path, scale}; routes the call to the -lora twin.",
+        max_length=3,
     )
     seed: Optional[int] = Field(
         default=-1,
@@ -63,12 +68,15 @@ class MinimaxH3ReferenceToVideo(BaseRequest):
             "aspect_ratio": self.aspect_ratio,
             "resolution": self.resolution,
             "duration": self.duration,
+            "loras": self.loras,
             "seed": self.seed,
         }
         return self._remove_empty_fields(payload)
 
     def get_api_path(self):
         """Gets the API path. Corresponds to api_path in the JSON."""
+        if self.loras:
+            return "/api/v3/wavespeed-ai/minimax-h3/reference-to-video-lora"
         return "/api/v3/wavespeed-ai/minimax-h3/reference-to-video"
 
     def field_required(self):
@@ -83,5 +91,6 @@ class MinimaxH3ReferenceToVideo(BaseRequest):
             "aspect_ratio",
             "resolution",
             "duration",
+            "loras",
             "seed",
         ]

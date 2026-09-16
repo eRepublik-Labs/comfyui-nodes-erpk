@@ -1,7 +1,7 @@
 # ABOUTME: MiniMax H3 text-to-video request for WaveSpeed AI.
 # ABOUTME: Routes to the wavespeed-ai/minimax-h3 text-to-video endpoint.
 
-from typing import Optional
+from typing import Dict, List, Optional, Union
 from pydantic import Field
 from ..utils import BaseRequest
 
@@ -22,13 +22,18 @@ class MinimaxH3TextToVideo(BaseRequest):
     )
     resolution: Optional[str] = Field(
         default="480p",
-        description="Video resolution: 480p or 768p.",
+        description="Video resolution: 480p, 540p, 768p or 1080p.",
     )
     duration: Optional[int] = Field(
         default=5,
         description="Video duration in seconds.",
         ge=3,
         le=15,
+    )
+    loras: Optional[List[Dict[str, Union[str, float]]]] = Field(
+        default=None,
+        description="Up to 3 LoRA weights as {path, scale}; routes the call to the -lora twin.",
+        max_length=3,
     )
     seed: Optional[int] = Field(
         default=-1,
@@ -44,16 +49,19 @@ class MinimaxH3TextToVideo(BaseRequest):
             "aspect_ratio": self.aspect_ratio,
             "resolution": self.resolution,
             "duration": self.duration,
+            "loras": self.loras,
             "seed": self.seed,
         }
         return self._remove_empty_fields(payload)
 
     def get_api_path(self):
         """Gets the API path. Corresponds to api_path in the JSON."""
+        if self.loras:
+            return "/api/v3/wavespeed-ai/minimax-h3/text-to-video-lora"
         return "/api/v3/wavespeed-ai/minimax-h3/text-to-video"
 
     def field_required(self):
         return ["prompt"]
 
     def field_order(self):
-        return ["prompt", "aspect_ratio", "resolution", "duration", "seed"]
+        return ["prompt", "aspect_ratio", "resolution", "duration", "loras", "seed"]

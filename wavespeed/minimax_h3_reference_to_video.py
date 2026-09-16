@@ -16,7 +16,7 @@ class MinimaxH3ReferenceToVideoNode(IO.ComfyNode):
     """
 
     ASPECT_RATIOS = ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "9:21"]
-    RESOLUTIONS = ["480p", "768p"]
+    RESOLUTIONS = ["480p", "540p", "768p", "1080p"]
     MAX_IMAGES = 9
     MAX_VIDEOS = 3
     MAX_AUDIOS = 3
@@ -44,7 +44,7 @@ class MinimaxH3ReferenceToVideoNode(IO.ComfyNode):
                 IO.String.Input("reference_images", optional=True, default="",
                                 tooltip="Reference image URL(s), cited as <Picture N>. Single URL or list. Up to 9. Billed $0.02 each. Ignored when `reference_images_tensor` is connected."),
                 IO.String.Input("reference_videos", optional=True, default="",
-                                tooltip="Reference video URL(s), cited as <Video N>. Up to 3, sharing a 15s budget. Supplying any forces 480p output. Billed $0.05 per second."),
+                                tooltip="Reference video URL(s), cited as <Video N>. Up to 3, sharing a 15s budget. Conformed to a 480p budget internally, so any output resolution works. Billed per second of reference video."),
                 IO.String.Input("reference_audios", optional=True, default="",
                                 tooltip="Reference audio URL(s), cited as <Audio N>. Up to 3, each trimmed to 15s. Billed $0.02 each. A reference video's own audio fills the earliest <Audio> slots first."),
                 IO.Image.Input("reference_images_tensor", optional=True,
@@ -58,10 +58,12 @@ class MinimaxH3ReferenceToVideoNode(IO.ComfyNode):
                                tooltip="Video aspect ratio"),
                 IO.Combo.Input("resolution", optional=True,
                                options=cls.RESOLUTIONS, default="480p",
-                               tooltip="Video resolution. Roughly $0.05/s at 480p and $0.125/s at 768p, before reference charges. Reference videos force 480p."),
+                               tooltip="Video resolution. Roughly $0.05/s at 480p, $0.075/s at 540p, $0.125/s at 768p and $0.25/s at 1080p, before reference charges; the -lora twin costs about 20% more."),
                 IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647,
                              control_after_generate="randomize",
                              tooltip="Generation seed, sent to the API. A fixed seed reproduces the same video and lets ComfyUI reuse the cached result; -1 generates a new one each queue."),
+                IO.Custom("MINIMAX_H3_LORAS").Input("loras", optional=True,
+                    tooltip="LoRA stack from the MiniMax H3 LoRA Stack node. When connected, the call goes to the endpoint's -lora twin (higher per-second rate)."),
             ],
             outputs=[
                 IO.String.Output("video_url"),
@@ -77,7 +79,8 @@ class MinimaxH3ReferenceToVideoNode(IO.ComfyNode):
     @classmethod
     async def execute(cls, prompt="", reference_images="", reference_videos="",
                 reference_audios="", reference_images_tensor=None, client=None,
-                duration=5, aspect_ratio="16:9", resolution="480p", seed=-1, **kwargs):
+                duration=5, aspect_ratio="16:9", resolution="480p", seed=-1,
+                loras=None, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.utils import images_to_data_uris
         from .wavespeed_api.requests.minimax_h3_reference_to_video import MinimaxH3ReferenceToVideo
@@ -108,6 +111,7 @@ class MinimaxH3ReferenceToVideoNode(IO.ComfyNode):
             resolution=resolution,
             duration=duration,
             seed=seed,
+            loras=loras or None,
         )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])

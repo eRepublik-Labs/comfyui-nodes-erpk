@@ -55,6 +55,10 @@ API_NODES = [
     ("wavespeed.minimax_h3_text_to_video", "MinimaxH3TextToVideoNode"),
     ("wavespeed.minimax_h3_image_to_video", "MinimaxH3ImageToVideoNode"),
     ("wavespeed.minimax_h3_reference_to_video", "MinimaxH3ReferenceToVideoNode"),
+    ("wavespeed.minimax_h3_text_to_image", "MinimaxH3TextToImageNode"),
+    ("wavespeed.minimax_h3_image_edit", "MinimaxH3ImageEditNode"),
+    ("wavespeed.minimax_h3_video_edit", "MinimaxH3VideoEditNode"),
+    ("wavespeed.minimax_h3_video_extend", "MinimaxH3VideoExtendNode"),
     ("wavespeed.seedance_2_5_text_to_video", "Seedance25TextToVideoNode"),
     ("wavespeed.seedance_2_5_image_to_video", "Seedance25ImageToVideoNode"),
     ("wavespeed.seedance_2_5_video_edit", "Seedance25VideoEditNode"),
@@ -148,6 +152,7 @@ CONFIG_NODES = [
     ("utils.regional_prompt", "RegionalPromptBuilder"),
     ("openai.nodes", "OpenAIAPIConfig"),
     ("openai.nodes", "OpenAISystemInstruction"),
+    ("wavespeed.minimax_h3_lora_stack", "MinimaxH3LoraStackNode"),
 ]
 
 

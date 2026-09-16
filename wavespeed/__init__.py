@@ -38,6 +38,11 @@ from .seedance_2_5_video_extend import Seedance25VideoExtendNode
 from .minimax_h3_text_to_video import MinimaxH3TextToVideoNode
 from .minimax_h3_image_to_video import MinimaxH3ImageToVideoNode
 from .minimax_h3_reference_to_video import MinimaxH3ReferenceToVideoNode
+from .minimax_h3_text_to_image import MinimaxH3TextToImageNode
+from .minimax_h3_image_edit import MinimaxH3ImageEditNode
+from .minimax_h3_video_edit import MinimaxH3VideoEditNode
+from .minimax_h3_video_extend import MinimaxH3VideoExtendNode
+from .minimax_h3_lora_stack import MinimaxH3LoraStackNode
 from .wan_2_7_text_to_video import Wan27TextToVideoNode
 from .wan_2_7_image_to_video import Wan27ImageToVideoNode
 from .wan_2_7_video_extend import Wan27VideoExtendNode
@@ -96,6 +101,11 @@ NODES = [
     MinimaxH3TextToVideoNode,
     MinimaxH3ImageToVideoNode,
     MinimaxH3ReferenceToVideoNode,
+    MinimaxH3TextToImageNode,
+    MinimaxH3ImageEditNode,
+    MinimaxH3VideoEditNode,
+    MinimaxH3VideoExtendNode,
+    MinimaxH3LoraStackNode,
     Wan27TextToVideoNode,
     Wan27ImageToVideoNode,
     Wan27VideoExtendNode,

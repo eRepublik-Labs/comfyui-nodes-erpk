@@ -14,7 +14,7 @@ class MinimaxH3TextToVideoNode(IO.ComfyNode):
     """
 
     ASPECT_RATIOS = ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "9:21"]
-    RESOLUTIONS = ["480p", "768p"]
+    RESOLUTIONS = ["480p", "540p", "768p", "1080p"]
 
     @classmethod
     def define_schema(cls):
@@ -34,10 +34,12 @@ class MinimaxH3TextToVideoNode(IO.ComfyNode):
                                tooltip="Video aspect ratio"),
                 IO.Combo.Input("resolution", optional=True,
                                options=cls.RESOLUTIONS, default="480p",
-                               tooltip="Video resolution. Roughly $0.04/s at 480p and $0.10/s at 768p."),
+                               tooltip="Video resolution. Roughly $0.04/s at 480p, $0.06/s at 540p, $0.08/s at 768p (native canvas) and $0.16/s at 1080p; the -lora twin costs about 25% more."),
                 IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647,
                              control_after_generate="randomize",
                              tooltip="Generation seed, sent to the API. A fixed seed reproduces the same video and lets ComfyUI reuse the cached result; -1 generates a new one each queue."),
+                IO.Custom("MINIMAX_H3_LORAS").Input("loras", optional=True,
+                    tooltip="LoRA stack from the MiniMax H3 LoRA Stack node. When connected, the call goes to the endpoint's -lora twin (higher per-second rate)."),
             ],
             outputs=[
                 IO.String.Output("video_url"),
@@ -52,7 +54,7 @@ class MinimaxH3TextToVideoNode(IO.ComfyNode):
 
     @classmethod
     async def execute(cls, prompt="", client=None, duration=5,
-                aspect_ratio="16:9", resolution="480p", seed=-1, **kwargs):
+                aspect_ratio="16:9", resolution="480p", seed=-1, loras=None, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
         from .wavespeed_api.requests.minimax_h3_text_to_video import MinimaxH3TextToVideo
 
@@ -69,6 +71,7 @@ class MinimaxH3TextToVideoNode(IO.ComfyNode):
             resolution=resolution,
             duration=duration,
             seed=seed,
+            loras=loras or None,
         )
 
         waveSpeedClient = WaveSpeedClient(client["api_key"])
