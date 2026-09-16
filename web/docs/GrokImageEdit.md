@@ -12,7 +12,7 @@ Edits one or more input images using a text prompt. Pass a batched IMAGE tensor 
 | image | IMAGE | — | Source image(s). Batched tensor allowed — up to 3 frames used (xAI cap) |
 | prompt | String | (empty) | Editing instructions |
 | client | GROK_API_CLIENT | — | Grok API client (optional if API key is in Settings) |
-| model | Combo | grok-imagine-image-quality | Image model (optional) |
+| model | Combo | grok-imagine-image | Image model (optional) |
 | aspect_ratio | Combo | auto | "auto" preserves source ratio; otherwise one of 1:1, 16:9, 9:16, 4:3, 3:4, 2:1, 1:2 (optional) |
 
 ## Output

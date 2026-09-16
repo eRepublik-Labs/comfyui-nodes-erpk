@@ -11,15 +11,17 @@ from .grok_api.client import GrokClient
 from ..utils.safe_fetch import fetch_remote_bytes
 
 # Current Grok chat/code models per the catalog embedded in docs.x.ai/docs/models.
-# grok-4.5 is the recommended flagship; grok-build-0.1 is the coding model that
-# replaced grok-code-fast-1. The grok-4.20 family carries a 1M context (vs
-# grok-4.5's 500k) and exposes no reasoning_effort control — on the multi-agent
+# grok-4.6 is the recommended flagship (500k context, image input);
+# grok-build-0.1 is the coding model that replaced grok-code-fast-1. The
+# grok-4.20 family carries a 1M context (vs 500k on grok-4.6 / grok-4.5) and
+# exposes no reasoning_effort control — on the multi-agent
 # variant, effort selects agent count (4 or 16) rather than reasoning depth.
 #
 # Listed under their canonical catalog names rather than the short aliases
 # (grok-4.20, grok-4.20-reasoning, ...) so a saved workflow keeps resolving to
 # the same model if an alias is later repointed.
 TEXT_MODELS = [
+    "grok-4.6",
     "grok-4.5",
     "grok-4.3",
     "grok-4.20-0309-reasoning",
