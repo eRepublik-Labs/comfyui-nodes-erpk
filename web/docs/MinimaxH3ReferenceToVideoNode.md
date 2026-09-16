@@ -11,14 +11,15 @@ Generates video guided by reference images, videos and audio, with native stereo
 |-----------|------|---------|-------------|
 | prompt | String (multiline) | (empty) | Prompt citing each reference by bracket tag. See below |
 | reference_images | String | (empty) | Reference image URL(s), up to 9 (optional) |
-| reference_videos | String | (empty) | Reference video URL(s), up to 3. Forces 480p output (optional) |
+| reference_videos | String | (empty) | Reference video URL(s), up to 3, sharing a 15s budget (optional) |
 | reference_audios | String | (empty) | Reference audio URL(s), up to 3, each trimmed to 15s (optional) |
 | reference_images_tensor | IMAGE | (none) | Reference images as a ComfyUI IMAGE batch, capped at 9. Takes precedence over reference_images (optional) |
 | client | WAVESPEED_AI_API_CLIENT | (none) | WaveSpeed API client (optional if API key is in Settings) |
 | duration | Int | 5 | Video duration in seconds. Range: 3-15 (optional) |
 | aspect_ratio | Combo | 16:9 | 16:9, 9:16, 1:1, 4:3, 3:4, 21:9, 9:21 (optional) |
-| resolution | Combo | 480p | 480p or 768p (optional) |
+| resolution | Combo | 480p | 480p, 540p, 768p or 1080p (optional) |
 | seed | Int | -1 | Generation seed, sent to the API (optional) |
+| loras | MINIMAX_H3_LORAS | (none) | LoRA stack from the MiniMax H3 LoRA Stack node. When connected the call goes to the -lora twin (optional) |
 
 ## Output
 
@@ -51,16 +52,19 @@ Every reference adds to the bill on top of the output:
 | Item | Price |
 |---|---|
 | Output at 480p | $0.05 / second |
+| Output at 540p | $0.075 / second |
 | Output at 768p | $0.125 / second |
+| Output at 1080p | $0.25 / second |
 | Each reference image | $0.02 |
 | Each reference audio | $0.02 |
-| Reference video | $0.05 / second |
+| Reference video | $0.05 / second (roughly; the -lora twin itemizes $0.06-$0.27 by resolution) |
 
 WaveSpeed's worked example: a 10s 480p video with 2 reference images and a 5s reference video totals about $0.79, roughly four times the base rate.
 
 ## Notes
 
-- Supplying any reference video forces 480p output
+- Reference videos are conformed to a 480p budget internally, so they work at any output resolution
+- With a LoRA stack connected the -lora twin charges about 20% more per output second
 - Reference videos share a 15-second budget; longer inputs are trimmed
 - Output is MP4 with stereo audio at 24fps
 - Median generation time is around 279 seconds, longer than the other H3 nodes

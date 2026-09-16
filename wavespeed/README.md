@@ -14,7 +14,7 @@ Part of the [ERPK Custom Nodes Collection](../../README.md) for ComfyUI.
 ## Qwen Image Nodes
 ![Qwen Nodes Preview](assets/qwen-preview.png)
 
-ComfyUI custom nodes for WaveSpeed AI integration. Covers image generation (ByteDance Seedream V4/V4.5/V5.0 Lite, Qwen Image family, Qwen Image 2.0, Dreamina, JibMix) and video generation (Bytedance Seedance 2.0 and 2.5, Alibaba WAN 2.7, Kling 2.5 Turbo / 2.6 / 3.0 / O3 with Kling Elements, Lightricks LTX 2 Pro, WaveSpeed LTX 2.3, MiniMax H3).
+ComfyUI custom nodes for WaveSpeed AI integration. Covers image generation (ByteDance Seedream V4/V4.5/V5.0 Lite, Qwen Image family, Qwen Image 2.0, Dreamina, JibMix, MiniMax H3) and video generation (Bytedance Seedance 2.0 and 2.5, Alibaba WAN 2.7, Kling 2.5 Turbo / 2.6 / 3.0 / O3 with Kling Elements, Lightricks LTX 2 Pro, WaveSpeed LTX 2.3, MiniMax H3).
 
 ## Features
 
@@ -67,6 +67,14 @@ Same capabilities as V4.5 with higher minimum resolution (1440px) at a lower pri
 | **Qwen Image Max Edit** | Qwen Image Max | Premium 20B multi-reference editing | 256-1536px (step 8) | Up to 6 required | 🇨🇳 🇬🇧 | Single image | $0.07/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-max-edit) |
 | **JibMix Qwen Image** | JibMix Qwen | Portrait-optimized text-to-image | 256-1536px (step 8)<br>Default: 1024x1024 | N/A | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/jib-mix-qwen-image-text-to-image) |
 
+### MiniMax H3 Image Models
+
+| Node | Description | Resolution | Input Images | Pricing | API Docs |
+|------|-------------|------------|--------------|---------|----------|
+| **MiniMax H3 Text-to-Image** | Single image in one of 15 aspect ratios; connect a LoRA Stack for the -lora endpoint | 1k (~1MP) / 2k (~4MP) | N/A | $0.02 (1k) / $0.06 (2k); +$0.015 with LoRAs | [Link](https://wavespeed.ai/models/wavespeed-ai/minimax-h3/text-to-image) |
+| **MiniMax H3 Image Edit** | Re-render a subject from reference images into a new scene, outfit or style, preserving identity; cite references as `<Picture N>` | 1k / 2k | 1-9 (IMAGE batch or URLs) | $0.03 (1k) / $0.09 (2k); +$0.005 per extra reference; +$0.015 with LoRAs | [Link](https://wavespeed.ai/models/wavespeed-ai/minimax-h3/image-edit) |
+| **MiniMax H3 LoRA Stack** | Config node: up to 3 `{path, scale}` LoRA weights. Connect to any H3 node's `loras` socket | - | - | Free (no API call) | - |
+
 ### ByteDance Dreamina Models
 
 | Node | Models | Description | Dimensions | Input Images | Output | Pricing | API Docs |
@@ -76,7 +84,7 @@ Same capabilities as V4.5 with higher minimum resolution (1440px) at a lower pri
 
 ### Video Generation Models
 
-Video nodes return a STRING URL (pipe to `WaveSpeed Preview Video` or the Preview Anything utility node). Long-running polling: 10s interval, timing out after 15 minutes on most nodes, 20 on MiniMax H3 Reference-to-Video and 30 on the Seedance 2.5 family.
+Video nodes return a STRING URL (pipe to `WaveSpeed Preview Video` or the Preview Anything utility node). Long-running polling: 10s interval, timing out after 15 minutes on most nodes, 20 on MiniMax H3 Reference-to-Video and 30 on the Seedance 2.5 family and MiniMax H3 Video Edit.
 
 | Node | Models / Tiers | Description | Duration | Aspect / Resolution | API Docs |
 |------|----------------|-------------|----------|---------------------|----------|
@@ -86,9 +94,11 @@ Video nodes return a STRING URL (pipe to `WaveSpeed Preview Video` or the Previe
 | **Bytedance Seedance 2.5 Image-to-Video** | Seedance 2.5, Turbo, Spicy | Animate source image with audio; optional ending frame. Accepts IMAGE tensor inputs or URL strings. Aspect ratio follows the input image | 4-30s | 480p/720p/1080p/4k | [Link](https://wavespeed.ai/models/bytedance/seedance-2.5/image-to-video) |
 | **Bytedance Seedance 2.5 Video Edit** | Seedance 2.5, Turbo | Rewrite an existing clip from a prompt; chains off any node's video_url. Duration follows the input | follows input | 480p/720p/1080p/4k | [Link](https://wavespeed.ai/models/bytedance/seedance-2.5/video-edit) |
 | **Bytedance Seedance 2.5 Video Extend** | Seedance 2.5 | Continue a clip past its final frame, reading up to 30s as context; chains off any node's video_url | 4-30s new segment | 480p/720p/1080p/4k | [Link](https://wavespeed.ai/models/bytedance/seedance-2.5/video-extend) |
-| **MiniMax H3 Text-to-Video** | MiniMax H3 | Picture and native stereo audio in one pass; audio steered by an `Audio:` line in the prompt | 3-15s | 16:9/9:16/1:1/4:3/3:4/21:9/9:21 · 480p/768p | [Link](https://wavespeed.ai/models/wavespeed-ai/minimax-h3/text-to-video) |
-| **MiniMax H3 Image-to-Video** | MiniMax H3 | Animate a first frame, optionally interpolating toward a last frame. Canvas follows the first image | 3-15s | 480p/768p | [Link](https://wavespeed.ai/models/wavespeed-ai/minimax-h3/image-to-video) |
-| **MiniMax H3 Reference-to-Video** | MiniMax H3 | Up to 9 reference images, 3 videos, 3 audios, each cited in the prompt by `<Picture N>` / `<Video N>` / `<Audio N>` tags | 3-15s | 480p/768p (reference videos force 480p) | [Link](https://wavespeed.ai/models/wavespeed-ai/minimax-h3/reference-to-video) |
+| **MiniMax H3 Text-to-Video** | MiniMax H3 (+ LoRA twin) | Picture and native stereo audio in one pass; audio steered by an `Audio:` line in the prompt. Connect a LoRA Stack to use the -lora endpoint | 3-15s | 16:9/9:16/1:1/4:3/3:4/21:9/9:21 · 480p/540p/768p/1080p | [Link](https://wavespeed.ai/models/wavespeed-ai/minimax-h3/text-to-video) |
+| **MiniMax H3 Image-to-Video** | MiniMax H3, Spicy (+ LoRA twin) | Animate a first frame, optionally interpolating toward a last frame. Canvas follows the first image. Spicy makes the prompt optional | 3-15s | 480p/540p/768p/1080p | [Link](https://wavespeed.ai/models/wavespeed-ai/minimax-h3/image-to-video) |
+| **MiniMax H3 Reference-to-Video** | MiniMax H3 (+ LoRA twin) | Up to 9 reference images, 3 videos, 3 audios, each cited in the prompt by `<Picture N>` / `<Video N>` / `<Audio N>` tags | 3-15s | 480p/540p/768p/1080p | [Link](https://wavespeed.ai/models/wavespeed-ai/minimax-h3/reference-to-video) |
+| **MiniMax H3 Video Edit** | MiniMax H3 | Rewrite lighting, style, environment or elements of a clip; up to 9 reference images and 3 audios; chains off any node's video_url. Duration and aspect follow the input unless set | follows input or 3-15s | 480p/540p/768p/1080p | [Link](https://wavespeed.ai/models/wavespeed-ai/minimax-h3/video-edit) |
+| **MiniMax H3 Video Extend** | MiniMax H3 | Append a new segment after a clip's last frame, optionally toward a target end frame; chains off any node's video_url | 3-15s new segment | 480p/540p/768p/1080p | [Link](https://wavespeed.ai/models/wavespeed-ai/minimax-h3/video-extend) |
 | **Alibaba WAN 2.7 Text-to-Video** | WAN 2.7 | Long-form video from text | 2-15s | 16:9/9:16/1:1 · 720p/1080p | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-text-to-video) |
 | **Alibaba WAN 2.7 Image-to-Video** | WAN 2.7 | Animate a source image | 2-15s | Same as T2V | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-image-to-video) |
 | **Alibaba WAN 2.7 Video Extend** | WAN 2.7 | Continue an existing clip | Configurable | Same as T2V | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-video-extend) |
@@ -514,7 +524,7 @@ pip install -r requirements.txt
 ```
 [ERPK] Loaded <N> V3 nodes
 ```
-The WaveSpeed module alone contributes 56 nodes.
+The WaveSpeed module alone contributes 61 nodes.
 
 ### Common Issues
 
@@ -573,6 +583,11 @@ Video:
 - MiniMax H3 Text-to-Video
 - MiniMax H3 Image-to-Video
 - MiniMax H3 Reference-to-Video
+- MiniMax H3 Video Edit
+- MiniMax H3 Video Extend
+- MiniMax H3 Text-to-Image (image)
+- MiniMax H3 Image Edit (image)
+- MiniMax H3 LoRA Stack (config)
 - Alibaba WAN 2.7 Text-to-Video
 - Alibaba WAN 2.7 Image-to-Video
 - Alibaba WAN 2.7 Video Extend

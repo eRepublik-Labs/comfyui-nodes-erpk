@@ -75,6 +75,12 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 - **Seedream V4.5 Edit** - Image editing with enhanced text rendering (up to 10 reference images)
 - **Seedream V4.5 Edit Sequential** - Multi-image editing with typography (1-15 images, $0.027/image)
 
+#### MiniMax H3 Image Models
+
+- **MiniMax H3 Text-to-Image** - 1k/2k images in 15 aspect ratios ($0.02-$0.06/image)
+- **MiniMax H3 Image Edit** - Identity-preserving re-render from 1-9 reference images cited as `<Picture N>` ($0.03-$0.09/image)
+- **MiniMax H3 LoRA Stack** - Config node holding up to 3 LoRA weights; connect to any H3 node to call its `-lora` twin
+
 #### Qwen Image Models
 
 - **Qwen Image Text-to-Image** - Bilingual text-to-image generation (Chinese/English, max 1536×1536, $0.02/image)
@@ -85,12 +91,14 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 
 #### Video Generation
 
-Video nodes return a STRING URL that works directly with the **Preview Anything** node for preview/download. Polling runs at a 10s interval, timing out after 15 minutes on most video nodes, 20 on MiniMax H3 Reference-to-Video and 30 on the Seedance 2.5 family, which run longest.
+Video nodes return a STRING URL that works directly with the **Preview Anything** node for preview/download. Polling runs at a 10s interval, timing out after 15 minutes on most video nodes, 20 on MiniMax H3 Reference-to-Video and 30 on the Seedance 2.5 family and MiniMax H3 Video Edit, which run longest.
 
 - **Bytedance Seedance 2.0 Text-to-Video** / **Image-to-Video** - Native audio-visual generation across four model variants (Seedance 2.0, Turbo, Fast, Fast Turbo). T2V supports reference images/videos/audios; I2V supports optional end frame. Turbo variants are 720p/1080p only.
 - **Bytedance Seedance 2.5 Text-to-Video** / **Image-to-Video** - Longer clips (4-30s) and 4k output. T2V offers the Seedance 2.5 and Turbo tiers and supports reference images/videos/audios; I2V adds a Spicy tier and an optional ending frame
 - **Bytedance Seedance 2.5 Video Edit** / **Video Extend** - Rewrite an existing clip from a prompt, or continue one past its final frame. Both take the source as a video URL, so they chain off any video node's output
-- **MiniMax H3 Text-to-Video** / **Image-to-Video** / **Reference-to-Video** - Picture and native stereo audio in a single pass at 24fps. Audio is steered by an `Audio:` line in the prompt rather than a toggle. Reference-to-Video takes up to 9 images, 3 videos and 3 audios, each cited in the prompt by bracket tag
+- **MiniMax H3 Text-to-Video** / **Image-to-Video** / **Reference-to-Video** - Picture and native stereo audio in a single pass at 24fps at 480p-1080p. Audio is steered by an `Audio:` line in the prompt rather than a toggle. Image-to-Video adds a Spicy tier; Reference-to-Video takes up to 9 images, 3 videos and 3 audios, each cited in the prompt by bracket tag
+- **MiniMax H3 Video Edit** / **Video Extend** - Rewrite a clip's lighting, style or elements, or append a new segment after its last frame. Both take the source as a video URL, so they chain off any video node's output
+- **MiniMax H3 Text-to-Image** / **Image Edit** / **LoRA Stack** - 1k/2k image generation and identity-preserving edits from up to 9 references. The LoRA Stack config node feeds up to 3 LoRA weights into any H3 node, which then calls the endpoint's `-lora` twin
 - **Alibaba WAN 2.7 Text-to-Video** / **Image-to-Video** / **Video Extend** - WAN 2.7 with extension support for continuing existing clips
 - **WaveSpeed Veo 3.1 Text-to-Video** / **Image-to-Video** - Google Veo 3.1 via WaveSpeed billing (distinct from the Gemini-direct Veo nodes under `ERPK/Gemini/Veo`)
 - **Kling 3.0 Image-to-Video** - Kling v3.0 i2v with Standard and Pro quality tiers

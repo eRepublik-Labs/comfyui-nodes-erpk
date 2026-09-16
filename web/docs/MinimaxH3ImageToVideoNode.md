@@ -16,8 +16,10 @@ Animates a first-frame image with native stereo audio. Supply a last frame and t
 | last_frame_url | String | (empty) | Last frame image URL. Fallback when last_frame is not connected (optional) |
 | client | WAVESPEED_AI_API_CLIENT | (none) | WaveSpeed API client (optional if API key is in Settings) |
 | duration | Int | 5 | Video duration in seconds. Range: 3-15 (optional) |
-| resolution | Combo | 480p | 480p or 768p (optional) |
+| resolution | Combo | 480p | 480p, 540p, 768p or 1080p (optional) |
 | seed | Int | -1 | Generation seed, sent to the API (optional) |
+| model | Combo | MiniMax H3 | MiniMax H3 or MiniMax H3 Spicy. Spicy makes the prompt optional and has no LoRA twin (optional) |
+| loras | MINIMAX_H3_LORAS | (none) | LoRA stack from the MiniMax H3 LoRA Stack node. When connected the call goes to the -lora twin (optional) |
 
 ## Output
 
@@ -35,11 +37,12 @@ Audio is generated natively in one pass and steered by an `Audio:` line in the p
 
 ## Cost
 
-About $0.04/s at 480p and $0.10/s at 768p.
+About $0.04/s at 480p, $0.06/s at 540p, $0.08/s at 768p and $0.16/s at 1080p; Spicy costs the same. With a LoRA stack connected the -lora twin charges about 25% more per second.
 
 ## Notes
 
 - A first frame is required, as either an IMAGE tensor or a URL
+- Spicy animates the start frame with an optional prompt; connecting a LoRA stack while Spicy is selected raises an error because no spicy-lora endpoint exists
 - Output is MP4 with stereo audio at 24fps
 - Duration snaps to the model's frame grid, so a 5s request lands near 5.2s
 - Median generation time is around 141 seconds
