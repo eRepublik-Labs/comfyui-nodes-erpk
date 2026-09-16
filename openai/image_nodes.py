@@ -79,7 +79,8 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Image generation model. "
-                        "gpt-image-2: latest flagship, 4K output, multilingual text. "
+                        "gpt-image-2.5-sunburst / -flare: newest, add xhigh/max quality and transparent background. "
+                        "gpt-image-2: flagship, 4K output, multilingual text. "
                         "gpt-image-1.5: previous flagship, supports transparent background."
                     ),
                 ),

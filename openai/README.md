@@ -200,7 +200,7 @@ Generate images from text descriptions using OpenAI's image generation models.
 **Features:**
 - Credentials resolved from ComfyUI Settings, the node input, or config.ini
 - Direct image output compatible with all ComfyUI image nodes
-- Transparent background support with gpt-image-1.5 / gpt-image-1 / gpt-image-1-mini
+- Transparent background support with gpt-image-2.5-sunburst / gpt-image-2.5-flare / gpt-image-1.5 / gpt-image-1 / gpt-image-1-mini
 - n>1 returns a batched IMAGE tensor — no images are dropped
 - Free-form size input (validated against the model's supported sizes by the API)
 
