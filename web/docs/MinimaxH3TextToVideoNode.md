@@ -46,4 +46,4 @@ Billed per generated second: $0.10/s at 768p and $0.14/s at 2k. A 15-second 2k c
 ## Notes
 
 - Output is MP4 with stereo audio
-- Workflows saved with the earlier 480p/540p/1080p tiers or the 9:21 ratio are remapped on load (480p/540p to 768p, 1080p to 2k, 9:21 to 21:9)
+- Workflows saved with the earlier 480p/540p/1080p tiers or the 9:21 ratio are remapped on load (480p/540p to 768p, 1080p to 2k, 9:21 to 9:16)

@@ -62,4 +62,4 @@ WaveSpeed's worked example: 5 seconds of normalised reference video plus 5 secon
 ## Notes
 
 - Polling times out after 20 minutes on this node; reference runs take longer than text or image ones
-- Workflows saved with the earlier 480p/540p/1080p tiers or the 9:21 ratio are remapped on load (480p/540p to 768p, 1080p to 2k, 9:21 to 21:9)
+- Workflows saved with the earlier 480p/540p/1080p tiers or the 9:21 ratio are remapped on load (480p/540p to 768p, 1080p to 2k, 9:21 to 9:16)

@@ -12,7 +12,7 @@ const H3_VIDEO_NODES = new Set([
 // Open-weights tiers that no longer exist on the MiniMax-hosted endpoint.
 const RESOLUTION_MAP = { "480p": "768p", "540p": "768p", "1080p": "2k" };
 // 9:21 exists only on the open-weights edition.
-const ASPECT_MAP = { "9:21": "21:9" };
+const ASPECT_MAP = { "9:21": "9:16" };
 
 function migrate(node) {
     for (const widget of node.widgets ?? []) {
