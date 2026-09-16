@@ -47,6 +47,8 @@ class GeminiClient:
     # Available models
     MODELS = {
         "gemini-3.1-pro-preview": "Gemini 3.1 Pro Preview (Most advanced reasoning)",
+        "gemini-3.8-flash": "Gemini 3.8 Flash (Latest Flash; no minimal thinking)",
+        "gemini-3.7-flash": "Gemini 3.7 Flash (No minimal thinking)",
         "gemini-3.6-flash": "Gemini 3.6 Flash (Improved token efficiency, cheaper than 3.5 Flash)",
         "gemini-3.5-flash": "Gemini 3.5 Flash (Frontier intelligence, fast and cost-efficient)",
         "gemini-3.5-flash-lite": "Gemini 3.5 Flash-Lite (Fastest, most cost-effective 3.5 model)",

@@ -19,6 +19,8 @@ from gemini.nodes import IMAGE_MODELS, TEXT_MODELS, _resolve_image_size
 
 
 FLASH_3_6 = "gemini-3.6-flash"
+FLASH_3_7 = "gemini-3.7-flash"
+FLASH_3_8 = "gemini-3.8-flash"
 FLASH_LITE_3_5 = "gemini-3.5-flash-lite"
 NANO_BANANA_2_LITE = "gemini-3.1-flash-lite-image"
 
@@ -40,11 +42,27 @@ def test_gemini_3_5_flash_lite_offered():
     assert FLASH_LITE_3_5 in TEXT_MODELS
 
 
-def test_gemini_3_6_flash_priced():
-    # https://ai.google.dev/gemini-api/docs/pricing — $1.50 in / $7.50 out per 1M.
-    entry = _pricing()[FLASH_3_6]
-    assert entry["input_price_per_mtok"] == 1.50
-    assert entry["output_price_per_mtok"] == 7.50
+def test_gemini_3_7_and_3_8_flash_offered():
+    assert FLASH_3_7 in TEXT_MODELS
+    assert FLASH_3_8 in TEXT_MODELS
+
+
+def test_3_7_and_3_8_flash_clamp_minimal_thinking_to_low():
+    # Both model pages: "minimal is not supported and returns an error."
+    from gemini.nodes import _build_thinking_config
+    for model in (FLASH_3_7, FLASH_3_8):
+        assert _build_thinking_config("minimal", model).thinking_level == "LOW"
+    assert _build_thinking_config("minimal", FLASH_3_6).thinking_level == "MINIMAL"
+
+
+def test_gemini_3_6_through_3_8_flash_priced_at_current_rate():
+    # https://ai.google.dev/gemini-api/docs/pricing (read 2026-09-16): 3.6, 3.7
+    # and 3.8 Flash are "$0.75 [in] / $3.75 [out] through December 31, 2026.
+    # $1.50 / $7.50 starting January 1, 2027." Cost estimates use today's rate.
+    for model in (FLASH_3_6, FLASH_3_7, FLASH_3_8):
+        entry = _pricing()[model]
+        assert entry["input_price_per_mtok"] == 0.75, model
+        assert entry["output_price_per_mtok"] == 3.75, model
 
 
 def test_gemini_3_5_flash_lite_priced():

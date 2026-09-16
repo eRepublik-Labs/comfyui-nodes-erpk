@@ -38,6 +38,11 @@ def _is_gemini_3x(model: str) -> bool:
     return model.startswith("gemini-3")
 
 
+# Gemini 3.x models whose reference page says "`minimal` is not supported and
+# returns an error"; the node clamps minimal up to low for them.
+_NO_MINIMAL_THINKING = {"gemini-3.7-flash", "gemini-3.8-flash"}
+
+
 # Output resolutions each image model accepts. A model absent from this map is
 # assumed to accept the full 1K/2K/4K range. An empty set means the model emits
 # a fixed resolution and rejects the image_size field entirely.
@@ -134,6 +139,8 @@ def _build_thinking_config(thinking_level, model):
         print("[Gemini] Warning: ThinkingConfig not supported by SDK, ignoring")
         return None
     if _is_gemini_3x(model):
+        if thinking_level == "minimal" and model in _NO_MINIMAL_THINKING:
+            thinking_level = "low"
         return genai_types.ThinkingConfig(thinking_level=thinking_level.upper())
     budget_map = {"minimal": 0, "low": 512, "medium": 4096, "high": 16384}
     budget = budget_map.get(thinking_level, 0)
