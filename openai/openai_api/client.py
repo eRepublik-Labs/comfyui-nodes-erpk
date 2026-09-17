@@ -99,6 +99,55 @@ class OpenAIClient:
         "gpt-6-astra": {"minimal", "none"},
     }
 
+    # Codes the API uses to refuse on safety grounds. The images endpoints
+    # return moderation_blocked; the chat path has long reported
+    # content_policy_violation.
+    MODERATION_CODES = ("moderation_blocked", "content_policy_violation")
+
+    @classmethod
+    def _moderation_block(cls, error):
+        """Return the refusal's detail, or None when the error is something else.
+
+        Detail carries `stage` ("input" when the prompt was refused, "output"
+        when the finished image was) and coarse `categories`. Both are
+        optional in the response, so both may be absent.
+        """
+        if getattr(error, "code", None) not in cls.MODERATION_CODES:
+            return None
+
+        details = {}
+        body = getattr(error, "body", None)
+        if isinstance(body, dict):
+            inner = body.get("error")
+            if isinstance(inner, dict) and isinstance(inner.get("moderation_details"), dict):
+                details = inner["moderation_details"]
+
+        return {
+            "code": getattr(error, "code", None),
+            "stage": details.get("moderation_stage"),
+            "categories": list(details.get("categories") or []),
+            "message": str(error),
+        }
+
+    @staticmethod
+    def _moderation_message(block) -> str:
+        """Compose the sentence a node shows when a request is refused."""
+        stage = block.get("stage")
+        where = {
+            "input": "The prompt was refused",
+            "output": "The prompt passed but the generated image was refused",
+        }.get(stage, "The request was refused")
+
+        parts = [f"{where} by OpenAI's safety system."]
+        if block.get("categories"):
+            parts.append(f"Categories: {', '.join(block['categories'])}.")
+        if stage == "output":
+            parts.append("Rewording may not help; try a different subject.")
+        elif stage == "input":
+            parts.append("Try rewording the prompt.")
+        parts.append(block.get("message", ""))
+        return " ".join(p for p in parts if p)
+
     @classmethod
     def _effort_for(cls, model: str, effort: str) -> str:
         """Clamp a reasoning_effort the model does not document down to low."""
@@ -353,13 +402,15 @@ class OpenAIClient:
                     retry_delay *= 2
 
             except APIError as e:
-                # Check for content policy violation
-                if hasattr(e, 'code') and e.code == 'content_policy_violation':
+                block = self._moderation_block(e)
+                if block:
                     return {
                         "text": "",
                         "blocked": True,
                         "finish_reason": "CONTENT_FILTER",
-                        "error": str(e)
+                        "error": self._moderation_message(block),
+                        "moderation_stage": block["stage"],
+                        "moderation_categories": block["categories"],
                     }
                 last_exception = e
                 if attempt < self.MAX_RETRIES - 1:
@@ -629,11 +680,14 @@ class OpenAIClient:
             }
 
         except APIError as e:
-            if hasattr(e, 'code') and e.code == 'content_policy_violation':
+            block = self._moderation_block(e)
+            if block:
                 return {
                     "images": [],
                     "blocked": True,
-                    "error": str(e)
+                    "error": self._moderation_message(block),
+                    "moderation_stage": block["stage"],
+                    "moderation_categories": block["categories"],
                 }
             raise
 
@@ -821,11 +875,14 @@ class OpenAIClient:
             }
 
         except APIError as e:
-            if hasattr(e, "code") and e.code == "content_policy_violation":
+            block = self._moderation_block(e)
+            if block:
                 return {
                     "images": [],
                     "blocked": True,
-                    "error": str(e),
+                    "error": self._moderation_message(block),
+                    "moderation_stage": block["stage"],
+                    "moderation_categories": block["categories"],
                     "revised_prompt": "",
                     "reasoning_summary": "",
                 }
@@ -960,11 +1017,14 @@ class OpenAIClient:
             return {"images": images}
 
         except APIError as e:
-            if hasattr(e, 'code') and e.code == 'content_policy_violation':
+            block = self._moderation_block(e)
+            if block:
                 return {
                     "images": [],
                     "blocked": True,
-                    "error": str(e)
+                    "error": self._moderation_message(block),
+                    "moderation_stage": block["stage"],
+                    "moderation_categories": block["categories"],
                 }
             raise
 

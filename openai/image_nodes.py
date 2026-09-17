@@ -121,8 +121,10 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Content moderation level (GPT Image models only). "
-                        "'auto' uses OpenAI's default safety filters; 'low' relaxes "
-                        "them for permissive content."
+                        "'auto' uses OpenAI's default safety filters; 'low' asks for "
+                        "less restrictive filtering. How much 'low' actually relaxes varies "
+                        "by model and is not guaranteed; gpt-image-2 was observed to ignore it. "
+                        "Neither level permits graphic or violent content."
                     ),
                 ),
                 IO.Int.Input(
@@ -337,7 +339,7 @@ class OpenAIImageResponses(IO.ComfyNode):
                     options=["auto", "low"],
                     default="auto",
                     optional=True,
-                    tooltip="Content moderation level. 'low' relaxes default safety filters.",
+                    tooltip="Content moderation level. 'low' asks for less restrictive filtering; how much it relaxes varies by model and is not guaranteed.",
                 ),
                 IO.Boolean.Input(
                     "enable_web_search",
