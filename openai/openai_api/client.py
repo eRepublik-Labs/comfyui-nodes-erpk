@@ -774,6 +774,13 @@ class OpenAIClient:
             "input": prompt,
             "tools": tools,
         }
+
+        # The Responses API takes an `instructions` parameter and honours it,
+        # so a client configured by the System Instruction node steers the
+        # mainline model here. The images endpoints have no equivalent field.
+        if self.system_instruction and self.system_instruction.strip():
+            request_params["instructions"] = self.system_instruction
+
         if reasoning_effort and reasoning_effort != "none":
             request_params["reasoning"] = {
                 "effort": reasoning_effort,

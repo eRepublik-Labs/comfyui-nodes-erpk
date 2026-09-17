@@ -36,6 +36,7 @@ def _make_client_with_mock_response(output_items):
     mock_response = SimpleNamespace(status="completed", output=output_items)
     mock_sdk.responses.create.return_value = mock_response
     client.client = mock_sdk
+    client.system_instruction = None
     return client, mock_sdk
 
 
@@ -298,3 +299,47 @@ class TestOpenAIPackageRegistration:
         mod = importlib.import_module("openai")
         node_names = [cls.__name__ for cls in mod.NODES]
         assert "OpenAIImageResponses" in node_names
+
+
+class TestSystemInstruction:
+    """A configured system instruction reaches the Responses API.
+
+    The Responses API takes an `instructions` parameter and honours it
+    (verified live on 2026-09-17). The images endpoints have no equivalent, so
+    this node is the only image path where the OpenAI System Instruction node
+    can do anything at all.
+    """
+
+    def test_instruction_is_forwarded_as_instructions(self):
+        client, sdk = _make_client_with_mock_response([_image_call()])
+        client.system_instruction = "Render everything as a pencil sketch."
+
+        asyncio.run(client.generate_image_via_responses(prompt="a cat"))
+
+        assert sdk.responses.create.call_args.kwargs["instructions"] == "Render everything as a pencil sketch."
+
+    def test_instructions_omitted_when_unset(self):
+        # Sending instructions=None would override nothing but adds a null field.
+        client, sdk = _make_client_with_mock_response([_image_call()])
+
+        asyncio.run(client.generate_image_via_responses(prompt="a cat"))
+
+        assert "instructions" not in sdk.responses.create.call_args.kwargs
+
+    def test_instructions_omitted_when_blank(self):
+        client, sdk = _make_client_with_mock_response([_image_call()])
+        client.system_instruction = "   "
+
+        asyncio.run(client.generate_image_via_responses(prompt="a cat"))
+
+        assert "instructions" not in sdk.responses.create.call_args.kwargs
+
+    def test_prompt_still_travels_as_input(self):
+        # The instruction must not displace the prompt.
+        client, sdk = _make_client_with_mock_response([_image_call()])
+        client.system_instruction = "Be terse."
+
+        asyncio.run(client.generate_image_via_responses(prompt="a cat"))
+
+        assert sdk.responses.create.call_args.kwargs["input"] == "a cat"
+

@@ -44,6 +44,7 @@ Use **OpenAI Image Generation (Responses)** when you want:
 
 ## Notes
 
+- **System instructions apply here**: a connected OpenAI System Instruction node is forwarded as the Responses API instructions parameter and steers `mainline_model`. The direct Image Generation and Image Edit nodes cannot use it.
 - **Two models, not one**: `mainline_model` picks prompt interpretation / reasoning / tool orchestration; `image_model` picks pixel-level generation. They play different roles — don't confuse them.
 - **Cost**: you pay mainline-model input tokens for the prompt, mainline-model output tokens for reasoning (if enabled), and image_model output tokens for the image. Reasoning at high/xhigh can exceed the image cost itself.
 - **Organization verification**: same requirement as gpt-image-2 via the direct endpoint.

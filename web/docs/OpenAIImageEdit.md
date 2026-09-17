@@ -26,6 +26,7 @@ Edits existing images based on text prompts using OpenAI's image editing API. Su
 
 ## Notes
 
+- **System instructions do not apply**: the images endpoint accepts only a prompt, with no system or instructions field. Connecting an OpenAI System Instruction node upstream has no effect here; fold that guidance into the prompt. The OpenAI Image via Responses node is the one image path that does honour it.
 - Without a mask, the model edits the entire image based on the prompt
 - With a mask, only white areas are modified (inpainting mode)
 - The mask is converted to an alpha channel internally — white regions become transparent for the API

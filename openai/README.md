@@ -13,7 +13,7 @@ Complete OpenAI API integration providing text generation, vision analysis, mult
 - **Image Generation (Responses API)** - Orchestrated image generation via a mainline reasoning model with optional web-search grounding
 - **Image Editing** - Edit and inpaint images with natural language prompts
 - **Multi-turn Conversations** - Maintain chat history across requests
-- **System Instructions** - Set persistent instructions to guide model behavior
+- **System Instructions** - Set persistent instructions to guide model behavior (text, chat, vision and Image via Responses; the direct image endpoints take a prompt only)
 - **Full ComfyUI Integration** - Native node types, workflow compatibility
 
 ## Installation

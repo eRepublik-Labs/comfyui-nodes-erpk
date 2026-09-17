@@ -26,6 +26,7 @@ Generates images using OpenAI's image generation models including GPT-Image 1.5,
 
 ## Notes
 
+- **System instructions do not apply**: the images endpoint accepts only a prompt, with no system or instructions field. Connecting an OpenAI System Instruction node upstream has no effect here; fold that guidance into the prompt. The OpenAI Image via Responses node is the one image path that does honour it.
 - GPT-Image 1.5 is the latest and highest quality model
 - DALL-E 3 supports 1792x1024 and 1024x1792 sizes; GPT-Image models do not
 - Use "transparent" background for images with alpha channel (gpt-image models only)
