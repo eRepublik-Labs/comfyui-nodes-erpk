@@ -35,9 +35,8 @@ const GEN_SIZE_MAP = {
     ],
 };
 
-// Valid sizes per model for OpenAIImageEdit.
-// Per OpenAI docs the edit endpoint is tighter than generate — even gpt-image-2
-// is limited to the 1024-series and auto.
+// Valid sizes per model for OpenAIImageEdit. Only applies while the node's
+// size input is a Combo; a free-text size input is left alone.
 const EDIT_SIZE_MAP = {
     "gpt-image-2": ["auto", "1024x1024", "1024x1536", "1536x1024"],
     "gpt-image-1.5": ["auto", "1024x1024", "1024x1536", "1536x1024"],
@@ -63,7 +62,9 @@ function installDynamicSizeFilter(nodeType, sizeMap, fallback) {
 
         const modelWidget = this.widgets?.find((w) => w.name === "model");
         const sizeWidget = this.widgets?.find((w) => w.name === "size");
-        if (!modelWidget || !sizeWidget) return r;
+        // A free-text size widget accepts anything the API does; only a Combo
+        // needs its option list narrowed.
+        if (!modelWidget || !sizeWidget || sizeWidget.type !== "combo") return r;
 
         const updateSizeOptions = () => {
             const allowed = sizeMap[modelWidget.value] || fallback;

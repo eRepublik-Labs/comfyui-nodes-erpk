@@ -66,8 +66,10 @@ class OpenAIClient:
         "gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini",
     }
 
-    # gpt-image-2 and later always process at high fidelity, reject the
-    # input_fidelity param, and share the same size envelope.
+    # gpt-image-2 and the 2.5 models always process at high fidelity, reject
+    # the input_fidelity param (400 invalid_input_fidelity_model, measured
+    # 2026-09-21 despite the reference naming only gpt-image-2), and share
+    # the same size envelope.
     GPT_IMAGE_2_MODELS = {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"}
 
     # Only GPT Image 2.5 accepts the xhigh and max quality tiers; earlier GPT
@@ -645,7 +647,7 @@ class OpenAIClient:
 
         # Preflight size validation for gpt-image-2 (stricter than other models)
         if model in self.GPT_IMAGE_2_MODELS:
-            self._validate_size_for_gpt_image_2(size)
+            self._validate_size_for_gpt_image_2(size, model)
 
         params = {
             "model": model,
@@ -723,7 +725,7 @@ class OpenAIClient:
             background=background, moderation=moderation, n=n, **kwargs
         )
 
-    def _validate_size_for_gpt_image_2(self, size: str):
+    def _validate_size_for_gpt_image_2(self, size: str, model: str = "gpt-image-2"):
         """Raise ValueError with a clear, actionable message if `size` doesn't
         meet gpt-image-2's constraints. Called before the API call so users
         get a friendly preflight error instead of a raw 400.
@@ -740,12 +742,12 @@ class OpenAIClient:
 
         if max(width, height) > self.GPT_IMAGE_2_MAX_EDGE:
             raise ValueError(
-                f"gpt-image-2 requires max edge <= {self.GPT_IMAGE_2_MAX_EDGE}px. "
+                f"{model} requires max edge <= {self.GPT_IMAGE_2_MAX_EDGE}px. "
                 f"You requested {size} (max edge = {max(width, height)}px)."
             )
         if width % 16 != 0 or height % 16 != 0:
             raise ValueError(
-                f"gpt-image-2 requires both edges to be multiples of 16. "
+                f"{model} requires both edges to be multiples of 16. "
                 f"You requested {size}. Try rounding to nearest 16 "
                 f"(e.g., 1024x1024, 1536x1024)."
             )
@@ -753,20 +755,20 @@ class OpenAIClient:
         short_edge = min(width, height)
         if short_edge == 0 or (long_edge / short_edge) > 3:
             raise ValueError(
-                f"gpt-image-2 requires aspect ratio (long:short) <= 3:1. "
+                f"{model} requires aspect ratio (long:short) <= 3:1. "
                 f"You requested {size} ({long_edge}:{short_edge})."
             )
         pixels = width * height
         if pixels < self.GPT_IMAGE_2_MIN_PIXELS:
             raise ValueError(
-                f"gpt-image-2 requires at least {self.GPT_IMAGE_2_MIN_PIXELS:,} "
+                f"{model} requires at least {self.GPT_IMAGE_2_MIN_PIXELS:,} "
                 f"total pixels. You requested {size} = {pixels:,} pixels. "
                 f"Pick a larger size (e.g., 1024x1024 = 1,048,576 pixels) or "
                 f"switch to gpt-image-1.5 / gpt-image-1 which support smaller images."
             )
         if pixels > self.GPT_IMAGE_2_MAX_PIXELS:
             raise ValueError(
-                f"gpt-image-2 max is {self.GPT_IMAGE_2_MAX_PIXELS:,} total pixels. "
+                f"{model} max is {self.GPT_IMAGE_2_MAX_PIXELS:,} total pixels. "
                 f"You requested {size} = {pixels:,} pixels."
             )
 
@@ -967,6 +969,12 @@ class OpenAIClient:
 
         if not image_list:
             raise ValueError("edit_image requires at least one image")
+
+        # images.edit shares the generation size envelope on these models
+        # (measured 2026-09-21: 512x512 and 256x256 400 as "below the current
+        # minimum pixel budget", 1536x864 is accepted).
+        if model in self.GPT_IMAGE_2_MODELS:
+            self._validate_size_for_gpt_image_2(size, model)
 
         # Single image uses singular multipart field; multi-image uses array.
         # The OpenAI SDK accepts either shape on the `image` parameter.

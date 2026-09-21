@@ -208,6 +208,28 @@ class TestOpenAICustomTypes:
         assert key_inputs == []
 
 
+class TestOpenAIImageEditSize:
+    """images.edit accepts arbitrary WIDTHxHEIGHT and auto on gpt-image-2 and
+    the 2.5 models (measured live 2026-09-21), so size is free text like the
+    generation node, not a fixed Combo."""
+
+    def test_size_is_free_text_with_1024_default(self):
+        cls = _import_node("image_nodes", "OpenAIImageEdit")
+        schema = cls.define_schema()
+        size_inputs = [i for i in schema.inputs if i.id == "size"]
+        assert len(size_inputs) == 1
+        assert size_inputs[0].io_type == "STRING"
+        assert size_inputs[0].default == "1024x1024"
+
+    def test_size_keeps_its_widget_slot(self):
+        # widgets_values is positional: the STRING widget must sit where the
+        # Combo did, right after model, so saved workflows restore unchanged.
+        cls = _import_node("image_nodes", "OpenAIImageEdit")
+        widget_ids = [i.id for i in cls.define_schema().inputs
+                      if i.io_type in ("STRING", "INT", "FLOAT", "BOOLEAN", "COMBO")]
+        assert widget_ids.index("size") == widget_ids.index("model") + 1
+
+
 class TestOpenAIModelOptions:
     """Model COMBO options are correctly sourced from OpenAIClient constants."""
 

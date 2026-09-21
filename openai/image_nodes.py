@@ -44,11 +44,6 @@ GEN_SIZES = [
     "2048x2048", "2048x1152", "2560x1440", "3840x2160", "2160x3840",
 ]
 
-EDIT_SIZES = [
-    "1024x1024", "1024x1536", "1536x1024",
-    "512x512", "256x256",
-]
-
 
 class OpenAIImageGeneration(IO.ComfyNode):
     """Generates images using OpenAI's image generation models."""
@@ -500,15 +495,17 @@ class OpenAIImageEdit(IO.ComfyNode):
                         "gpt-image-1.5 / gpt-image-1 / gpt-image-1-mini remain available."
                     ),
                 ),
-                IO.Combo.Input(
+                IO.String.Input(
                     "size",
-                    options=EDIT_SIZES,
                     default="1024x1024",
                     optional=True,
                     tooltip=(
-                        "Output image size. Options auto-filter based on the "
-                        "selected model. Edit endpoint supports the 1024-series "
-                        "sizes (and auto) across all GPT Image models."
+                        "Output image size as WIDTHxHEIGHT or \"auto\". "
+                        "gpt-image-1.5 / gpt-image-1 / gpt-image-1-mini accept only "
+                        "1024x1024, 1024x1536, 1536x1024 and auto. "
+                        "gpt-image-2 and the 2.5 models accept arbitrary sizes: both edges "
+                        "divisible by 16, aspect ratio between 1:3 and 3:1, total pixels "
+                        "655,360 to 8,294,400, max edge 3840px."
                     ),
                 ),
                 IO.Combo.Input(
@@ -557,7 +554,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                     tooltip=(
                         "Fidelity to the original input image(s). 'high' preserves details "
                         "more aggressively; 'low' gives the model more creative freedom. "
-                        "Ignored by gpt-image-2 (always processes at high fidelity)."
+                        "Ignored by gpt-image-2 and the 2.5 models (always high fidelity)."
                     ),
                 ),
                 IO.Int.Input(

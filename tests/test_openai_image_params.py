@@ -222,6 +222,26 @@ class TestGptImage2SizeValidation:
         asyncio.run(client.generate_image(prompt="x", model="gpt-image-2", size="auto"))
         assert mock.images.generate.called
 
+    @pytest.mark.parametrize("model", sorted(OpenAIClient.GPT_IMAGE_2_MODELS))
+    def test_edit_rejects_sizes_below_pixel_budget_before_calling_api(self, model):
+        # Measured live 2026-09-21: images.edit 400s 512x512 and 256x256 on
+        # gpt-image-2 and both 2.5 models ("below the current minimum pixel budget").
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError, match=f"{model} requires at least 655,360"):
+            asyncio.run(client.edit_image(image_data=b"fakepng", prompt="x", model=model, size="512x512"))
+        assert not mock.images.edit.called
+
+    def test_edit_accepts_arbitrary_size_on_gpt_image_2(self):
+        # Measured live 2026-09-21: 1536x864 is accepted by images.edit on gpt-image-2.
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.edit_image(image_data=b"fakepng", prompt="x", model="gpt-image-2", size="1536x864"))
+        assert mock.images.edit.call_args[1]["size"] == "1536x864"
+
+    def test_edit_does_not_preflight_older_gpt_image_sizes(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.edit_image(image_data=b"fakepng", prompt="x", model="gpt-image-1.5", size="512x512"))
+        assert mock.images.edit.called
+
     def test_malformed_size_skips_validation(self):
         """Malformed strings fall through to the API, which returns its own
         error message. We don't try to second-guess the parser."""
