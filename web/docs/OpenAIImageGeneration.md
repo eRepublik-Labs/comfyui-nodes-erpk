@@ -12,7 +12,7 @@ Generates images using OpenAI's image generation models including GPT-Image 1.5,
 | prompt | String | (empty) | Description of the image to generate |
 | client | OPENAI_API_CLIENT | — | OpenAI API client (optional if API key is configured in Settings) |
 | model | Combo | gpt-image-2 | Image model: gpt-image-2, gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-1.5, gpt-image-1, gpt-image-1-mini (optional) |
-| size | Combo | 1024x1024 | Image size (optional). Options: 1024x1024, 1024x1536, 1536x1024, 512x512, 256x256, 1792x1024, 1024x1792 |
+| size | String | 1024x1024 | Image size as WIDTHxHEIGHT or `auto` (optional). GPT Image 1.x: 1024x1024, 1024x1536, 1536x1024, auto. gpt-image-2 and 2.5: arbitrary sizes, edges divisible by 16, aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels, max edge 3840; above 2560x1440 is experimental per OpenAI. DALL-E 3: 1024x1024, 1792x1024, 1024x1792. DALL-E 2: 256x256, 512x512, 1024x1024 |
 | quality | Combo | auto | Image quality (optional). gpt-image: low/medium/high/auto; xhigh/max on GPT Image 2.5 only (clamped to high elsewhere). dall-e-3: hd/standard |
 | background | Combo | auto | Background type: auto, transparent, opaque (optional). gpt-image models only |
 | n | Int | 1 | Number of images to generate (optional). Range: 1–4. DALL-E 3 only supports 1 |

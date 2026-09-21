@@ -14,7 +14,7 @@ Edits existing images based on text prompts using OpenAI's image editing API. Su
 | client | OPENAI_API_CLIENT | — | OpenAI API client (optional if API key is configured in Settings) |
 | mask | Mask | — | Areas to edit: white=edit, black=keep (optional). Enables inpainting |
 | model | Combo | gpt-image-2 | Editing model: gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-2, gpt-image-1.5, gpt-image-1, gpt-image-1-mini (optional) |
-| size | String | 1024x1024 | Output size as WIDTHxHEIGHT or `auto` (optional). gpt-image-1.5 / 1 / 1-mini: 1024x1024, 1024x1536, 1536x1024, auto only. gpt-image-2 and 2.5: arbitrary sizes, edges divisible by 16, aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels, max edge 3840 |
+| size | String | 1024x1024 | Output size as WIDTHxHEIGHT or `auto` (optional). gpt-image-1.5 / 1 / 1-mini: 1024x1024, 1024x1536, 1536x1024, auto only. gpt-image-2 and 2.5: arbitrary sizes, edges divisible by 16, aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels, max edge 3840. Above 2560x1440 is experimental per OpenAI |
 | quality | Combo | auto | Image quality: auto, low, medium, high, xhigh, max (optional). gpt-image models only; xhigh/max on GPT Image 2.5 only (clamped to high elsewhere) |
 | moderation | Combo | auto | Content filter strictness: auto or low (optional). See Notes |
 | n | Int | 1 | Number of images to generate (optional). Range: 1–10 |

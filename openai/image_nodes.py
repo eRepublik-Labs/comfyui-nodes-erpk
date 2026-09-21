@@ -40,7 +40,8 @@ REASONING_EFFORT_LEVELS = ["none", "minimal", "low", "medium", "high", "xhigh"]
 GEN_SIZES = [
     "1024x1024", "1024x1536", "1536x1024",
     "512x512", "256x256", "1792x1024", "1024x1792",
-    # gpt-image-2 4K options (older GPT image models will 400 on these)
+    # gpt-image-2 4K options (older GPT image models will 400 on these);
+    # OpenAI marks resolutions above 2560x1440 as experimental
     "2048x2048", "2048x1152", "2560x1440", "3840x2160", "2160x3840",
 ]
 
@@ -88,7 +89,8 @@ class OpenAIImageGeneration(IO.ComfyNode):
                         "Standard GPT Image sizes: 1024x1024, 1536x1024, 1024x1536. "
                         "gpt-image-2 accepts arbitrary sizes: both edges divisible by 16, "
                         "aspect ratio between 1:3 and 3:1, total pixels 655,360 to 8,294,400, "
-                        "max edge 3840px. Use \"auto\" to let the model choose."
+                        "max edge 3840px. Resolutions above 2560x1440 are experimental. "
+                        "Use \"auto\" to let the model choose."
                     ),
                 ),
                 IO.Combo.Input(
@@ -303,7 +305,7 @@ class OpenAIImageResponses(IO.ComfyNode):
                     options=GEN_SIZES,
                     default="1024x1024",
                     optional=True,
-                    tooltip="Image size. Same constraints as direct endpoint (gpt-image-2: min 655,360 pixels).",
+                    tooltip="Image size. Same constraints as direct endpoint (gpt-image-2: min 655,360 pixels). 3840x2160 / 2160x3840 are experimental per OpenAI.",
                 ),
                 IO.Combo.Input(
                     "quality",
@@ -505,7 +507,8 @@ class OpenAIImageEdit(IO.ComfyNode):
                         "1024x1024, 1024x1536, 1536x1024 and auto. "
                         "gpt-image-2 and the 2.5 models accept arbitrary sizes: both edges "
                         "divisible by 16, aspect ratio between 1:3 and 3:1, total pixels "
-                        "655,360 to 8,294,400, max edge 3840px."
+                        "655,360 to 8,294,400, max edge 3840px. Resolutions above "
+                        "2560x1440 are experimental."
                     ),
                 ),
                 IO.Combo.Input(

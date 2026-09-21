@@ -26,7 +26,7 @@ Use **OpenAI Image Generation (Responses)** when you want:
 | `image_model` | Combo | `gpt-image-2` | GPT Image model used for pixel generation inside the tool. Options: gpt-image-2, gpt-image-1.5, gpt-image-1, gpt-image-1-mini. |
 | `reasoning_effort` | Combo | `none` | Mainline-model reasoning depth: none / minimal / low / medium / high / xhigh. Only supported on reasoning-capable mainline models. |
 | `verbosity` | Combo | `default` | Mainline-model output verbosity for gpt-5.x: default / low / medium / high. Shapes how chatty the model is independent of token caps. Silently dropped for older mainlines. |
-| `size` | Combo | `1024x1024` | Image size. gpt-image-2 requires at least 655,360 pixels — small sizes like 512x512 are rejected at preflight. |
+| `size` | Combo | `1024x1024` | Image size. gpt-image-2 requires at least 655,360 pixels — small sizes like 512x512 are rejected at preflight. 3840x2160 / 2160x3840 are experimental per OpenAI. |
 | `quality` | Combo | `auto` | Image quality tier (auto / low / medium / high). |
 | `background` | Combo | `auto` | Background: auto / transparent / opaque. gpt-image-2 rejects transparent and auto-coerces to opaque with a warning. |
 | `output_format` | Combo | `png` | Output image format: png, jpeg, webp. |

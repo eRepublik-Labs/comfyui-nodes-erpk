@@ -208,6 +208,7 @@ Generate images from text descriptions using OpenAI's image generation models.
 - Max edge ≤ 3840px, both edges multiples of 16
 - Total pixels between 655,360 and 8,294,400
 - Aspect ratio (long:short) ≤ 3:1
+- Resolutions above 2560x1440 (up to 3840x2160) are accepted but marked experimental by OpenAI
 
 **Example Prompts:**
 - "A futuristic cityscape at sunset with flying cars"
