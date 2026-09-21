@@ -242,6 +242,36 @@ class TestGptImage2SizeValidation:
         asyncio.run(client.edit_image(image_data=b"fakepng", prompt="x", model="gpt-image-1.5", size="512x512"))
         assert mock.images.edit.called
 
+    def test_edit_min_pixel_floor_matches_api(self):
+        # Measured live 2026-09-21 on gpt-image-2 and gpt-image-2.5-flare:
+        # 816x800 (652,800 px) 400s, 1024x640 (655,360 px) is accepted.
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError, match="at least 655,360"):
+            asyncio.run(client.edit_image(image_data=b"fakepng", prompt="x", model="gpt-image-2", size="816x800"))
+        asyncio.run(client.edit_image(image_data=b"fakepng", prompt="x", model="gpt-image-2", size="1024x640"))
+        assert mock.images.edit.call_args[1]["size"] == "1024x640"
+
+
+class TestEditInputFidelity:
+    """images.edit rejects input_fidelity on gpt-image-2 AND both 2.5 models
+    (400 invalid_input_fidelity_model, measured live 2026-09-21). The OpenAI
+    reference names only gpt-image-2 as ignoring it; the reference is wrong."""
+
+    @pytest.mark.parametrize("model", sorted(OpenAIClient.GPT_IMAGE_2_MODELS))
+    def test_dropped_for_gpt_image_2_family(self, model):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.edit_image(
+            image_data=b"fakepng", prompt="x", model=model, input_fidelity="high",
+        ))
+        assert "input_fidelity" not in mock.images.edit.call_args[1]
+
+    def test_sent_for_gpt_image_1_5(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.edit_image(
+            image_data=b"fakepng", prompt="x", model="gpt-image-1.5", input_fidelity="high",
+        ))
+        assert mock.images.edit.call_args[1]["input_fidelity"] == "high"
+
     def test_malformed_size_skips_validation(self):
         """Malformed strings fall through to the API, which returns its own
         error message. We don't try to second-guess the parser."""

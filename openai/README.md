@@ -253,7 +253,7 @@ Edit and modify existing images using text prompts with optional masking.
 - `client`: Optional OpenAI API client (from OpenAI API Config node)
 - `mask`: Optional mask (ComfyUI MASK tensor) - white areas will be edited
 - `model`: gpt-image-2 (default), gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-1.5, gpt-image-1, gpt-image-1-mini
-- `size`: Free-form WIDTHxHEIGHT string or `auto` (default 1024x1024). gpt-image-1.5 / 1 / 1-mini accept only 1024x1024, 1024x1536, 1536x1024 and auto; gpt-image-2 and the 2.5 models accept arbitrary sizes within the gpt-image-2 constraints below
+- `size`: Free-form WIDTHxHEIGHT string or `auto` (default 1024x1024). gpt-image-1.5 / 1 / 1-mini accept only 1024x1024, 1024x1536, 1536x1024 and auto; gpt-image-2 and the 2.5 models accept arbitrary sizes within the gpt-image-2 constraints listed under OpenAI Image Generation
 - `quality`: Image quality - auto (default), low, medium, high, xhigh, max (xhigh/max on GPT Image 2.5 only)
 - `moderation`: auto (default) / low
 - `background`: auto / transparent / opaque (GPT Image family)

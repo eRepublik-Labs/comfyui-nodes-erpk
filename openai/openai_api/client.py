@@ -763,8 +763,8 @@ class OpenAIClient:
             raise ValueError(
                 f"{model} requires at least {self.GPT_IMAGE_2_MIN_PIXELS:,} "
                 f"total pixels. You requested {size} = {pixels:,} pixels. "
-                f"Pick a larger size (e.g., 1024x1024 = 1,048,576 pixels) or "
-                f"switch to gpt-image-1.5 / gpt-image-1 which support smaller images."
+                f"Pick a larger size (e.g., 1024x1024 = 1,048,576 pixels); "
+                f"no GPT Image model returns below 1024x1024."
             )
         if pixels > self.GPT_IMAGE_2_MAX_PIXELS:
             raise ValueError(
