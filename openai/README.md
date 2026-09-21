@@ -188,7 +188,8 @@ Generate images from text descriptions using OpenAI's image generation models.
 - `prompt`: Text description of the image to generate
 - `client`: Optional OpenAI API client (from OpenAI API Config node)
 - `model`: gpt-image-2 (default), gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-1.5, gpt-image-1, gpt-image-1-mini
-- `size`: Free-form WIDTHxHEIGHT string (default 1024x1024). Each model has its own supported sizes; the API rejects unsupported values.
+- `size`: Preset (auto, 1024x1024, 1024x1536, 1536x1024, 2048x2048, 2048x1152, 1152x2048, 3840x2160, 2160x3840) or Custom
+- `custom_width` / `custom_height`: Used when size is Custom (256 to 3840, step 16). Each model has its own supported sizes; the API rejects unsupported values.
 - `quality`: Image quality - auto (default), low, medium, high (GPT Image family)
 - `background`: Background type - auto, transparent, opaque (GPT Image family)
 - `n`: Number of images (1-10)
@@ -202,7 +203,7 @@ Generate images from text descriptions using OpenAI's image generation models.
 - Direct image output compatible with all ComfyUI image nodes
 - Transparent background support with gpt-image-2.5-sunburst / gpt-image-2.5-flare / gpt-image-1.5 / gpt-image-1 / gpt-image-1-mini
 - n>1 returns a batched IMAGE tensor — no images are dropped
-- Free-form size input (validated against the model's supported sizes by the API)
+- Size presets plus a Custom width/height pair (validated against the model's supported sizes by the API)
 
 **gpt-image-2 constraints** (enforced client-side as defense-in-depth):
 - Max edge ≤ 3840px, both edges multiples of 16
@@ -254,7 +255,8 @@ Edit and modify existing images using text prompts with optional masking.
 - `client`: Optional OpenAI API client (from OpenAI API Config node)
 - `mask`: Optional mask (ComfyUI MASK tensor) - white areas will be edited
 - `model`: gpt-image-2 (default), gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-1.5, gpt-image-1, gpt-image-1-mini
-- `size`: Free-form WIDTHxHEIGHT string or `auto` (default 1024x1024). gpt-image-1.5 / 1 / 1-mini accept only 1024x1024, 1024x1536, 1536x1024 and auto; gpt-image-2 and the 2.5 models accept arbitrary sizes within the gpt-image-2 constraints listed under OpenAI Image Generation
+- `size`: Preset (auto, 1024x1024, 1024x1536, 1536x1024, 2048x2048, 2048x1152, 1152x2048, 3840x2160, 2160x3840) or Custom. gpt-image-1.5 / 1 / 1-mini accept only the 1024-series and auto; gpt-image-2 and the 2.5 models accept any Custom size within the gpt-image-2 constraints listed under OpenAI Image Generation
+- `custom_width` / `custom_height`: Used when size is Custom (256 to 3840, step 16)
 - `quality`: Image quality - auto (default), low, medium, high, xhigh, max (xhigh/max on GPT Image 2.5 only)
 - `moderation`: auto (default) / low
 - `background`: auto / transparent / opaque (GPT Image family)
@@ -398,7 +400,7 @@ https://openai.com/pricing
 - Check your API quota and billing status
 - Some sizes are only available for certain models
 - Transparent backgrounds are supported by the GPT Image family. Pass-through values: any of `auto`, `transparent`, `opaque` go to the API as-is.
-- gpt-image-2 enforces min 655,360 total pixels and max-edge 3840 — the size input is free-form, so type a size your chosen model supports
+- gpt-image-2 enforces min 655,360 total pixels and max-edge 3840 — pick Custom and type a size your chosen model supports
 
 ### Rate limiting
 - The nodes include automatic retry with exponential backoff

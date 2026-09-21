@@ -208,26 +208,55 @@ class TestOpenAICustomTypes:
         assert key_inputs == []
 
 
-class TestOpenAIImageEditSize:
-    """images.edit accepts arbitrary WIDTHxHEIGHT and auto on gpt-image-2 and
-    the 2.5 models (measured live 2026-09-21), so size is free text like the
-    generation node, not a fixed Combo."""
+class TestOpenAIImageSizePresets:
+    """Both direct-endpoint image nodes expose size as a preset Combo plus
+    custom_width / custom_height Ints, matching the official ComfyUI GPT Image
+    node. The Ints sit right after size so a saved workflow's later slots
+    shift by exactly two (handled by web/openai_dynamic_sizes.js)."""
 
-    def test_size_is_free_text_with_1024_default(self):
-        cls = _import_node("image_nodes", "OpenAIImageEdit")
-        schema = cls.define_schema()
-        size_inputs = [i for i in schema.inputs if i.id == "size"]
-        assert len(size_inputs) == 1
-        assert size_inputs[0].io_type == "STRING"
-        assert size_inputs[0].default == "1024x1024"
+    PRESETS = [
+        "auto", "1024x1024", "1024x1536", "1536x1024",
+        "2048x2048", "2048x1152", "1152x2048", "3840x2160", "2160x3840",
+        "Custom",
+    ]
 
-    def test_size_keeps_its_widget_slot(self):
-        # widgets_values is positional: the STRING widget must sit where the
-        # Combo did, right after model, so saved workflows restore unchanged.
-        cls = _import_node("image_nodes", "OpenAIImageEdit")
-        widget_ids = [i.id for i in cls.define_schema().inputs
+    @pytest.mark.parametrize("class_name", ["OpenAIImageGeneration", "OpenAIImageEdit"])
+    def test_size_combo_has_presets_and_custom(self, class_name):
+        cls = _import_node("image_nodes", class_name)
+        size = [i for i in cls.define_schema().inputs if i.id == "size"][0]
+        assert size.io_type == "COMBO"
+        assert list(size.options) == self.PRESETS
+        assert size.default == "1024x1024"
+
+    @pytest.mark.parametrize("class_name", ["OpenAIImageGeneration", "OpenAIImageEdit"])
+    def test_custom_dimensions_follow_size(self, class_name):
+        cls = _import_node("image_nodes", class_name)
+        inputs = cls.define_schema().inputs
+        widget_ids = [i.id for i in inputs
                       if i.io_type in ("STRING", "INT", "FLOAT", "BOOLEAN", "COMBO")]
-        assert widget_ids.index("size") == widget_ids.index("model") + 1
+        i = widget_ids.index("size")
+        assert widget_ids[i + 1:i + 3] == ["custom_width", "custom_height"]
+        for dim_id in ("custom_width", "custom_height"):
+            dim = [x for x in inputs if x.id == dim_id][0]
+            assert dim.io_type == "INT"
+            assert dim.default == 1024
+            assert dim.step == 16
+
+
+class TestResolveSize:
+    """resolve_size turns the three size widgets into the one API string."""
+
+    def test_preset_passes_through(self):
+        from openai.image_nodes import resolve_size
+        assert resolve_size("1536x1024", 800, 600) == "1536x1024"
+
+    def test_auto_passes_through(self):
+        from openai.image_nodes import resolve_size
+        assert resolve_size("auto", 800, 600) == "auto"
+
+    def test_custom_joins_dimensions(self):
+        from openai.image_nodes import resolve_size
+        assert resolve_size("Custom", 1536, 864) == "1536x864"
 
 
 class TestOpenAIModelOptions:

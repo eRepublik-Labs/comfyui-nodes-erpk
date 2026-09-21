@@ -37,6 +37,57 @@ RESPONSES_IMAGE_MODELS = [
 
 REASONING_EFFORT_LEVELS = ["none", "minimal", "low", "medium", "high", "xhigh"]
 
+# Size presets shared by the generation and edit nodes, mirroring the official
+# ComfyUI GPT Image node. "Custom" reads custom_width / custom_height.
+SIZE_PRESETS = [
+    "auto", "1024x1024", "1024x1536", "1536x1024",
+    "2048x2048", "2048x1152", "1152x2048", "3840x2160", "2160x3840",
+    "Custom",
+]
+CUSTOM_SIZE = "Custom"
+
+
+def resolve_size(size, custom_width, custom_height):
+    """Turn the size Combo plus the two custom Ints into the API size string."""
+    if size == CUSTOM_SIZE:
+        return f"{custom_width}x{custom_height}"
+    return size
+
+
+def size_inputs(model_hint):
+    """The size Combo and its custom dimension Ints, in widget order."""
+    return [
+        IO.Combo.Input(
+            "size",
+            options=SIZE_PRESETS,
+            default="1024x1024",
+            optional=True,
+            tooltip=(
+                "Output image size. Select Custom to use custom_width and custom_height. "
+                + model_hint
+                + " Resolutions above 2560x1440 are experimental."
+            ),
+        ),
+        IO.Int.Input(
+            "custom_width",
+            default=1024,
+            min=256,
+            max=3840,
+            step=16,
+            optional=True,
+            tooltip="Width in pixels when size is Custom. Must be a multiple of 16.",
+        ),
+        IO.Int.Input(
+            "custom_height",
+            default=1024,
+            min=256,
+            max=3840,
+            step=16,
+            optional=True,
+            tooltip="Height in pixels when size is Custom. Must be a multiple of 16.",
+        ),
+    ]
+
 GEN_SIZES = [
     "1024x1024", "1024x1536", "1536x1024",
     "512x512", "256x256", "1792x1024", "1024x1792",
@@ -80,18 +131,11 @@ class OpenAIImageGeneration(IO.ComfyNode):
                         "gpt-image-1.5: previous flagship, supports transparent background."
                     ),
                 ),
-                IO.String.Input(
-                    "size",
-                    default="1024x1024",
-                    optional=True,
-                    tooltip=(
-                        "Image size as WIDTHxHEIGHT (e.g. \"1024x1024\", \"1536x864\"). "
-                        "Standard GPT Image sizes: 1024x1024, 1536x1024, 1024x1536. "
-                        "gpt-image-2 accepts arbitrary sizes: both edges divisible by 16, "
-                        "aspect ratio between 1:3 and 3:1, total pixels 655,360 to 8,294,400, "
-                        "max edge 3840px. Resolutions above 2560x1440 are experimental. "
-                        "Use \"auto\" to let the model choose."
-                    ),
+                *size_inputs(
+                    "gpt-image-2 and 2.5 accept any size with both edges divisible by 16, "
+                    "aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels and max edge 3840; "
+                    "GPT Image 1.x accept the 1024-series and auto; DALL-E 3 takes 1024x1024, "
+                    "1792x1024, 1024x1792; DALL-E 2 takes 256x256, 512x512, 1024x1024."
                 ),
                 IO.Combo.Input(
                     "quality",
@@ -160,7 +204,11 @@ class OpenAIImageGeneration(IO.ComfyNode):
 
         client = kwargs.get("client")
         model = kwargs.get("model", "gpt-image-2")
-        size = kwargs.get("size", "1024x1024")
+        size = resolve_size(
+            kwargs.get("size", "1024x1024"),
+            kwargs.get("custom_width", 1024),
+            kwargs.get("custom_height", 1024),
+        )
         quality = kwargs.get("quality", "auto")
         background = kwargs.get("background", "auto")
         moderation = kwargs.get("moderation", "auto")
@@ -497,19 +545,10 @@ class OpenAIImageEdit(IO.ComfyNode):
                         "gpt-image-1.5 / gpt-image-1 / gpt-image-1-mini remain available."
                     ),
                 ),
-                IO.String.Input(
-                    "size",
-                    default="1024x1024",
-                    optional=True,
-                    tooltip=(
-                        "Output image size as WIDTHxHEIGHT or \"auto\". "
-                        "gpt-image-1.5 / gpt-image-1 / gpt-image-1-mini accept only "
-                        "1024x1024, 1024x1536, 1536x1024 and auto. "
-                        "gpt-image-2 and the 2.5 models accept arbitrary sizes: both edges "
-                        "divisible by 16, aspect ratio between 1:3 and 3:1, total pixels "
-                        "655,360 to 8,294,400, max edge 3840px. Resolutions above "
-                        "2560x1440 are experimental."
-                    ),
+                *size_inputs(
+                    "gpt-image-1.5 / 1 / 1-mini accept only the 1024-series and auto; "
+                    "gpt-image-2 and 2.5 accept any size with both edges divisible by 16, "
+                    "aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels and max edge 3840."
                 ),
                 IO.Combo.Input(
                     "quality",
@@ -586,7 +625,11 @@ class OpenAIImageEdit(IO.ComfyNode):
         client = kwargs.get("client")
         mask = kwargs.get("mask")
         model = kwargs.get("model", "gpt-image-2")
-        size = kwargs.get("size", "1024x1024")
+        size = resolve_size(
+            kwargs.get("size", "1024x1024"),
+            kwargs.get("custom_width", 1024),
+            kwargs.get("custom_height", 1024),
+        )
         quality = kwargs.get("quality", "auto")
         moderation = kwargs.get("moderation", "auto")
         n = kwargs.get("n", 1)
