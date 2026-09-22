@@ -176,6 +176,19 @@ try:
     from server import PromptServer
     from aiohttp import web
     from . import shared_workflows
+    from .write_guard import check_write_request, write_token
+
+    def refuse_unless_page_request(request):
+        """403 response for a write request that fails the token gate, else None."""
+        try:
+            check_write_request(request.headers)
+        except PermissionError as e:
+            return web.json_response({"error": str(e)}, status=403)
+        return None
+
+    @PromptServer.instance.routes.get("/erpk/write_token")
+    async def erpk_write_token(request):
+        return web.json_response({"token": write_token()})
 
     @PromptServer.instance.routes.get("/erpk/shared_workflows")
     async def erpk_list_shared_workflows(request):
@@ -197,6 +210,9 @@ try:
 
     @PromptServer.instance.routes.post("/erpk/shared_workflows/trash/{trash_id}/restore")
     async def erpk_restore_shared_workflow(request):
+        refused = refuse_unless_page_request(request)
+        if refused:
+            return refused
         trash_id = request.match_info["trash_id"]
         try:
             try:
@@ -218,6 +234,9 @@ try:
 
     @PromptServer.instance.routes.delete("/erpk/shared_workflows/trash/{trash_id}")
     async def erpk_purge_shared_workflow(request):
+        refused = refuse_unless_page_request(request)
+        if refused:
+            return refused
         trash_id = request.match_info["trash_id"]
         try:
             try:
@@ -250,6 +269,9 @@ try:
 
     @PromptServer.instance.routes.post("/erpk/shared_workflows")
     async def erpk_save_shared_workflow(request):
+        refused = refuse_unless_page_request(request)
+        if refused:
+            return refused
         try:
             body = await request.json()
             name = body.get("name", "")
@@ -276,6 +298,9 @@ try:
 
     @PromptServer.instance.routes.delete("/erpk/shared_workflows/{name}")
     async def erpk_delete_shared_workflow(request):
+        refused = refuse_unless_page_request(request)
+        if refused:
+            return refused
         name = request.match_info["name"]
         try:
             try:

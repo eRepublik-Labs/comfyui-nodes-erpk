@@ -330,14 +330,20 @@ In multi-user ComfyUI (`--multi-user`), each user's workflows are sandboxed. Sha
 
 **Storage:** Workflows are saved as JSON files in `shared_workflows/` under the ComfyUI base directory (e.g., `~/Documents/ComfyUI/shared_workflows/`), alongside `input/`, `output/`, and `models/`. This location persists across plugin upgrades and ComfyUI restarts. Falls back to the extension directory when running outside ComfyUI. Each file uses an envelope format (`{meta, workflow}`) that stores authorship metadata alongside the workflow graph. No API keys or user-specific data are stored.
 
+**Write protection:** Every route that writes or deletes a file (save, delete, restore, purge) requires the `X-ERPK-Write-Token` header carrying the token served by `GET /erpk/write_token`. The token is generated once per server process. A page from another origin can send a request to the server but cannot read that token, and the routes also refuse a request whose `Origin` does not match the `Host` or that the browser marks `Sec-Fetch-Site: cross-site`. The bundled UI fetches the token on first use. Scripts calling the API directly fetch it the same way.
+
 **API Endpoints:**
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
+| `/erpk/write_token` | GET | Token required by every write route below |
 | `/erpk/shared_workflows` | GET | List all shared workflows (metadata including authorship) |
 | `/erpk/shared_workflows/{name}` | GET | Get a single workflow by name |
-| `/erpk/shared_workflows` | POST | Save a workflow (`{name, workflow}`); records user as author |
-| `/erpk/shared_workflows/{name}` | DELETE | Delete a workflow by name |
+| `/erpk/shared_workflows` | POST | Save a workflow (`{name, workflow}`); records user as author. Token required |
+| `/erpk/shared_workflows/{name}` | DELETE | Delete a workflow by name (moves it to trash). Token required |
+| `/erpk/shared_workflows/trash` | GET | List trashed workflows |
+| `/erpk/shared_workflows/trash/{trash_id}/restore` | POST | Restore a trashed workflow. Token required |
+| `/erpk/shared_workflows/trash/{trash_id}` | DELETE | Purge a trashed workflow. Token required |
 
 ### SaveImage Metadata Toggle
 
