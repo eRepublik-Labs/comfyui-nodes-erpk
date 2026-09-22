@@ -56,7 +56,7 @@ def _patched_client():
     """Build a mocked ClaudeClient whose send_request records kwargs."""
     client = MagicMock()
     mock_response = MagicMock()
-    mock_response.content = [MagicMock(text="mock analysis")]
+    mock_response.content = [MagicMock(type="text", text="mock analysis")]
     client.send_request = AsyncMock(return_value=mock_response)
     return client
 

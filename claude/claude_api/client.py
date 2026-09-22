@@ -19,6 +19,19 @@ from anthropic import Anthropic, AnthropicError, APIError, RateLimitError, APICo
 import configparser
 
 
+def response_text(response) -> str:
+    """Join the text blocks of a Messages response.
+
+    Thinking-only models return a thinking block ahead of the text, so the
+    first block is not necessarily the answer.
+    """
+    blocks = getattr(response, "content", None) or []
+    texts = [block.text for block in blocks if getattr(block, "type", None) == "text"]
+    if not texts:
+        raise ValueError("Claude returned no text block")
+    return "".join(texts)
+
+
 class ClaudeClient:
     """
     Client for interacting with Claude API.

@@ -295,7 +295,7 @@ Emphasize architectural beauty and structural design."""
 
     @classmethod
     async def execute(cls, **kwargs) -> IO.NodeOutput:
-        from .claude_api.client import ClaudeClient
+        from .claude_api.client import ClaudeClient, response_text
 
         prompt = kwargs.get("prompt", "")
         style = kwargs.get("style", "photorealistic")
@@ -368,10 +368,7 @@ Guidelines:
             temperature=temperature,
             max_tokens=max_tokens,
         )
-        if hasattr(response, 'content') and len(response.content) > 0:
-            return response.content[0].text
-        else:
-            raise ValueError("Invalid response format from Claude API")
+        return response_text(response)
 
     @classmethod
     def _generate_streaming(cls, client, messages, system, temperature, max_tokens):

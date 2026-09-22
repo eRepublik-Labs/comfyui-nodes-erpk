@@ -91,7 +91,7 @@ class ClaudeConversation(IO.ComfyNode):
 
     @classmethod
     async def execute(cls, **kwargs) -> IO.NodeOutput:
-        from .claude_api.client import ClaudeClient
+        from .claude_api.client import ClaudeClient, response_text
         from .claude_api.utils import TokenManager
 
         prompt = kwargs.get("prompt", "")
@@ -147,21 +147,18 @@ class ClaudeConversation(IO.ComfyNode):
                 max_tokens=max_tokens,
             )
 
-            if hasattr(response, 'content') and len(response.content) > 0:
-                response_text = response.content[0].text
-            else:
-                raise ValueError("Invalid response format from Claude API")
+            reply = response_text(response)
 
-            messages.append({"role": "assistant", "content": response_text})
+            messages.append({"role": "assistant", "content": reply})
 
             updated_state = {
                 "messages": messages,
                 "system": system,
             }
 
-            print(f"[Claude] Response generated ({len(response_text)} characters, {len(messages)} messages in history)")
+            print(f"[Claude] Response generated ({len(reply)} characters, {len(messages)} messages in history)")
 
-            return IO.NodeOutput(response_text, updated_state)
+            return IO.NodeOutput(reply, updated_state)
 
         except Exception as e:
             error_msg = f"Failed in conversation: {str(e)}"

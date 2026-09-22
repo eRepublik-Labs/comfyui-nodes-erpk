@@ -82,7 +82,7 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
 
     @classmethod
     async def execute(cls, **kwargs) -> IO.NodeOutput:
-        from .claude_api.client import ClaudeClient
+        from .claude_api.client import ClaudeClient, response_text
         from .claude_api.utils import ImageConverter
 
         image = kwargs.get("image")
@@ -118,10 +118,7 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
 
             response = await client.send_request(**send_kwargs)
 
-            if hasattr(response, 'content') and len(response.content) > 0:
-                analysis_text = response.content[0].text
-            else:
-                raise ValueError("Invalid response format from Claude API")
+            analysis_text = response_text(response)
 
             print(f"[Claude] Analysis completed ({len(analysis_text)} characters)")
             return IO.NodeOutput(analysis_text)
