@@ -24,8 +24,8 @@ ComfyUI custom nodes for WaveSpeed AI integration. Covers image generation (Byte
 |------|-------------|------------|--------------|--------|---------|----------|
 | **Seedream V4** | Text-to-image generation | 320-4096px (step 8)<br>Default: 1408×1408 | N/A | Single image | Standard | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4) |
 | **Seedream V4 Sequential** | Multi-image generation with cross-image consistency | 320-4096px (step 8)<br>Default: 1408×1408 | N/A | 1-15 images | $0.027/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-sequential) |
-| **Seedream V4 Edit** | Image-to-image editing | 320-4096px (step 8) | Up to 10 | Single image | Standard | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-edit) |
-| **Seedream V4 Edit Sequential** | Multi-image editing with coherent results | 320-4096px (step 8) | Up to 10 (optional) | 1-15 images | $0.027/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-edit-sequential) |
+| **Seedream V4 Edit** | Image-to-image editing | 320-4096px (step 8) | Up to 10, IMAGE batch or URLs | Single image | Standard | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-edit) |
+| **Seedream V4 Edit Sequential** | Multi-image editing with coherent results | 320-4096px (step 8) | Up to 10, IMAGE batch or URLs (optional) | 1-15 images | $0.027/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-edit-sequential) |
 
 ### ByteDance Seedream V4.5 Models
 
@@ -35,8 +35,8 @@ Enhanced typography and text rendering for posters, logos, UI, and marketing lay
 |------|-------------|------------|--------------|--------|---------|----------|
 | **Seedream V4.5** | Text-to-image with enhanced typography | 1024-4096px (step 8)<br>Default: 2048×2048 | N/A | Single image | Standard | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-5) |
 | **Seedream V4.5 Sequential** | Multi-image generation with typography | 1024-4096px (step 8)<br>Default: 2048×2048 | N/A | 1-15 images | $0.027/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-5-sequential) |
-| **Seedream V4.5 Edit** | Image editing with enhanced typography | 1024-4096px (step 8) | Up to 10 | Single image | Standard | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-5-edit) |
-| **Seedream V4.5 Edit Sequential** | Multi-image editing with typography | 1024-4096px (step 8) | Up to 10 (optional) | 1-15 images | $0.027/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-5-edit-sequential) |
+| **Seedream V4.5 Edit** | Image editing with enhanced typography | 1024-4096px (step 8) | Up to 10, IMAGE batch or URLs | Single image | Standard | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-5-edit) |
+| **Seedream V4.5 Edit Sequential** | Multi-image editing with typography | 1024-4096px (step 8) | Up to 10, IMAGE batch or URLs (optional) | 1-15 images | $0.027/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v4-5-edit-sequential) |
 
 ### ByteDance Seedream V5.0 Lite Models
 
@@ -46,8 +46,8 @@ Same capabilities as V4.5 with higher minimum resolution (1440px) at a lower pri
 |------|-------------|------------|--------------|--------|---------|----------|
 | **Seedream V5.0 Lite** | Text-to-image with higher minimum resolution | 1440-4096px (step 8)<br>Default: 2048x2048 | N/A | Single image | $0.035/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite) |
 | **Seedream V5.0 Lite Sequential** | Multi-image generation at higher resolution | 1440-4096px (step 8)<br>Default: 2048x2048 | N/A | 1-15 images | $0.035/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite-sequential) |
-| **Seedream V5.0 Lite Edit** | Image editing at higher resolution | 1440-4096px (step 8) | Up to 10 | Single image | $0.035/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite-edit) |
-| **Seedream V5.0 Lite Edit Sequential** | Multi-image editing at higher resolution | 1440-4096px (step 8) | Up to 10 (optional) | 1-15 images | $0.035/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite-edit-sequential) |
+| **Seedream V5.0 Lite Edit** | Image editing at higher resolution | 1440-4096px (step 8) | Up to 10, IMAGE batch or URLs | Single image | $0.035/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite-edit) |
+| **Seedream V5.0 Lite Edit Sequential** | Multi-image editing at higher resolution | 1440-4096px (step 8) | Up to 10, IMAGE batch or URLs (optional) | 1-15 images | $0.035/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite-edit-sequential) |
 
 ### Qwen Image Models
 
@@ -283,7 +283,7 @@ Optional if API key is configured via ComfyUI Settings or config.ini — WaveSpe
 
 1. Add the "WaveSpeedAI Bytedance Seedream V4 Edit" node to your workflow
 2. Connect your WaveSpeed AI API client
-3. Provide reference images (up to 10)
+3. Provide up to 10 images: connect an IMAGE batch to `images`, or enter URLs in `image_url`, one per line or comma separated. A connected batch wins. More than 10 is an error, never a silent cut
 4. Enter your editing prompt
 5. Configure dimensions and options
 6. Execute the workflow to edit images

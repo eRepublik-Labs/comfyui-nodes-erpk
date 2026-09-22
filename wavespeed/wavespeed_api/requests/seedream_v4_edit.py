@@ -15,7 +15,7 @@ class SeedreamV4Edit(BaseRequest):
     images: List[str] = Field(
         ...,
         description="The images to edit. A maximum of 10 reference images can be uploaded..",
-        max_items=10,
+        max_length=10,
     )
 
     size: Optional[str] = Field(

@@ -13,7 +13,8 @@ Edits images with sequential generation for multiple coherent results at higher 
 | max_images | Int | 4 | Number of images to generate (1-15) |
 | size_preset | Combo | "Custom" | Resolution preset. Select "Custom" to use manual width/height |
 | client | WAVESPEED_AI_API_CLIENT | -- | WaveSpeed API client (optional if API key is configured in Settings) |
-| image_url | String | -- | Image URL(s) to edit. Single URL or comma-separated. Max 10 images (optional) |
+| image_url | String | (empty) | Image URL(s) to edit, one per line or comma separated, up to 10 (optional) |
+| images | Image | -- | Images to edit as an IMAGE batch, one image per slice, up to 10 (optional). Sent inline as base64, no upload. Takes precedence over image_url. Batched images must share one size, so combine different sizes through URLs |
 | width | Int | 2048 | Custom width in pixels, 1440-4096, step 8 (optional) |
 | height | Int | 2048 | Custom height in pixels, 1440-4096, step 8 (optional) |
 | show_aspect_ratio | Boolean | true | Show aspect ratio in node title (optional) |

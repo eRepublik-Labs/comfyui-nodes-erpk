@@ -2,6 +2,9 @@
 # ABOUTME: Edits images with sequential generation for multiple coherent results.
 
 from comfy_api.latest import IO
+
+# WaveSpeed accepts up to 10 input images on every Seedream edit endpoint.
+MAX_INPUT_IMAGES = 10
 from .seedream_v4 import SEEDREAM_V4_SIZE_PRESETS
 
 
@@ -30,8 +33,12 @@ class SeedreamV4EditSequentialNode(IO.ComfyNode):
                                tooltip="Recommended resolution presets. Select 'Custom' to use manual width/height."),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
-                IO.String.Input("image_url", optional=True,
-                                tooltip="Image URL(s) to edit (optional). Accepts single URL (string) or multiple URLs (array). Max 10 images."),
+                IO.String.Input("image_url", optional=True, default="", multiline=True,
+                                tooltip="Image URL(s) to edit, one per line or comma separated. Up to 10. "
+                                         "Ignored when `images` is connected."),
+                IO.Image.Input("images", optional=True,
+                               tooltip="Images to edit as a ComfyUI IMAGE batch. Each slice is one image, up to 10. "
+                                       "Takes precedence over `image_url`. Sent inline as base64, no upload."),
                 IO.Int.Input("width", optional=True, default=1408, min=320, max=4096, step=8,
                              tooltip="Custom width (only used when size_preset is 'Custom')"),
                 IO.Int.Input("height", optional=True, default=1408, min=320, max=4096, step=8,
@@ -59,11 +66,11 @@ class SeedreamV4EditSequentialNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    async def execute(cls, prompt, max_images, size_preset, client=None, image_url=None,
+    async def execute(cls, prompt, max_images, size_preset, client=None, image_url="", images=None,
                 width=1408, height=1408, show_aspect_ratio=True, enable_sync_mode=False,
                 enable_base64_output=False, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
-        from .wavespeed_api.utils import imageurl2tensor
+        from .wavespeed_api.utils import imageurl2tensor, input_image_list
         from .wavespeed_api.requests.seedream_v4_edit_sequential import SeedreamV4EditSequential
 
         if client is None:
@@ -76,12 +83,7 @@ class SeedreamV4EditSequentialNode(IO.ComfyNode):
         if max_images < 1 or max_images > 15:
             raise ValueError("max_images must be between 1 and 15")
 
-        images_param = None
-        if image_url is not None and image_url != "":
-            if isinstance(image_url, list):
-                images_param = image_url[:10]
-            else:
-                images_param = [image_url]
+        images_param = input_image_list(images, image_url, MAX_INPUT_IMAGES)
 
         preset_dims = SEEDREAM_V4_SIZE_PRESETS.get(size_preset)
         if preset_dims:

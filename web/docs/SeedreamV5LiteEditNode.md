@@ -10,7 +10,8 @@ Edits images at higher minimum resolution (1440px) with enhanced typography usin
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | prompt | String | "" | Text description of the desired image modifications |
-| image_url | String | -- | Image URL(s) to edit. Single URL or comma-separated. Max 10 images |
+| image_url | String | (empty) | Image URL(s) to edit, one per line or comma separated, up to 10. Needed unless images is connected |
+| images | Image | -- | Images to edit as an IMAGE batch, one image per slice, up to 10 (optional). Sent inline as base64, no upload. Takes precedence over image_url. Batched images must share one size, so combine different sizes through URLs |
 | size_preset | Combo | "Custom" | Resolution preset. Select "Custom" to use manual width/height |
 | client | WAVESPEED_AI_API_CLIENT | -- | WaveSpeed API client (optional if API key is configured in Settings) |
 | width | Int | 2048 | Custom width in pixels, 1440-4096, step 8 (optional) |

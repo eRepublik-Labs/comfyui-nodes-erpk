@@ -2,6 +2,9 @@
 # ABOUTME: Edits images based on text prompts with configurable size presets.
 
 from comfy_api.latest import IO
+
+# WaveSpeed accepts up to 10 input images on every Seedream edit endpoint.
+MAX_INPUT_IMAGES = 10
 from .seedream_v4 import SEEDREAM_V4_SIZE_PRESETS
 
 
@@ -21,8 +24,12 @@ class SeedreamV4EditNode(IO.ComfyNode):
             inputs=[
                 IO.String.Input("prompt", multiline=True, default="",
                                 tooltip="Text description of the desired image modifications"),
-                IO.String.Input("image_url",
-                                tooltip="Image URL(s) to edit. Accepts single URL (string) or multiple URLs (array). Max 10 images."),
+                IO.String.Input("image_url", default="", multiline=True,
+                                tooltip="Image URL(s) to edit, one per line or comma separated. Up to 10. "
+                                         "Ignored when `images` is connected."),
+                IO.Image.Input("images", optional=True,
+                               tooltip="Images to edit as a ComfyUI IMAGE batch. Each slice is one image, up to 10. "
+                                       "Takes precedence over `image_url`. Sent inline as base64, no upload."),
                 IO.Combo.Input("size_preset",
                                options=list(SEEDREAM_V4_SIZE_PRESETS.keys()),
                                default="Custom",
@@ -56,11 +63,11 @@ class SeedreamV4EditNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    async def execute(cls, prompt, image_url, size_preset, client=None, width=1408, height=1408,
+    async def execute(cls, prompt, size_preset, image_url="", images=None, client=None, width=1408, height=1408,
                 show_aspect_ratio=True, enable_sync_mode=False, enable_base64_output=False,
                 **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
-        from .wavespeed_api.utils import imageurl2tensor
+        from .wavespeed_api.utils import imageurl2tensor, input_image_list
         from .wavespeed_api.requests.seedream_v4_edit import SeedreamV4Edit
 
         if client is None:
@@ -70,13 +77,9 @@ class SeedreamV4EditNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        if image_url is None or image_url == "":
-            raise ValueError("Image URL must be provided")
-
-        if isinstance(image_url, list):
-            images_param = image_url[:10]
-        else:
-            images_param = [image_url]
+        images_param = input_image_list(images, image_url, MAX_INPUT_IMAGES)
+        if images_param is None:
+            raise ValueError("Connect images or enter at least one image URL")
 
         preset_dims = SEEDREAM_V4_SIZE_PRESETS.get(size_preset)
         if preset_dims:

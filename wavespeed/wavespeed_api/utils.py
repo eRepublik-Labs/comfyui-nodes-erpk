@@ -3,6 +3,7 @@ Utility functions for WaveSpeed API integration
 """
 
 import base64
+import re
 import io
 import requests
 from typing import List, Optional, Union
@@ -273,6 +274,25 @@ def images_to_data_uris(tensor, max_count: Optional[int] = None) -> Optional[Lis
     if max_count is not None:
         b64_list = b64_list[:max_count]
     return [f"data:image/jpeg;base64,{b}" for b in b64_list]
+
+
+def input_image_list(images, image_url, max_count: int) -> Optional[List[str]]:
+    """The images to send to an edit endpoint, from an IMAGE batch or URL text.
+
+    A connected IMAGE batch wins and each slice becomes one base64 data URI.
+    Otherwise `image_url` is read as one or more URLs separated by newlines or
+    commas. Returns None when neither holds an image. More than `max_count`
+    images is an error rather than a silent cut, so the caller knows which
+    images the model never saw.
+    """
+    if images is not None:
+        sent = images_to_data_uris(images)
+    else:
+        urls = [part.strip() for part in re.split(r"[\n,]", image_url or "")]
+        sent = [url for url in urls if url] or None
+    if sent and len(sent) > max_count:
+        raise ValueError(f"Seedream accepts at most {max_count} input images, got {len(sent)}")
+    return sent
 
 
 class BaseRequest(BaseModel):
