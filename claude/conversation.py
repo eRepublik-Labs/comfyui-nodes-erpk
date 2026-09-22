@@ -2,6 +2,7 @@
 # ABOUTME: ClaudeConversation manages chat state; ClaudeConversationInfo displays conversation details.
 
 from comfy_api.latest import IO
+from .models import INHERIT_FROM_CLIENT, TEXT_MODELS
 
 
 class ClaudeConversation(IO.ComfyNode):
@@ -77,6 +78,13 @@ class ClaudeConversation(IO.ComfyNode):
                     control_after_generate="randomize",
                     tooltip="Seed for cache control. Randomizes by default to ensure fresh results each run.",
                 ),
+                IO.Combo.Input(
+                    "model",
+                    options=[INHERIT_FROM_CLIENT] + TEXT_MODELS,
+                    default=INHERIT_FROM_CLIENT,
+                    optional=True,
+                    tooltip="Override the client's model for this call. Without a client the default is the Claude API client's default model.",
+                ),
             ],
             outputs=[
                 IO.String.Output("response"),
@@ -102,6 +110,8 @@ class ClaudeConversation(IO.ComfyNode):
         reset_conversation = kwargs.get("reset_conversation", False)
         temperature = kwargs.get("temperature", 0.7)
         max_tokens = kwargs.get("max_tokens", 2048)
+        model = kwargs.get("model", INHERIT_FROM_CLIENT)
+        model_kwargs = {} if model == INHERIT_FROM_CLIENT else {"model": model}
 
         if client is None:
             client = ClaudeClient(api_key=None)
@@ -145,6 +155,7 @@ class ClaudeConversation(IO.ComfyNode):
                 system=system,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                **model_kwargs,
             )
 
             reply = response_text(response)

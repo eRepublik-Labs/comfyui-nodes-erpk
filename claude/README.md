@@ -94,6 +94,7 @@ Initializes the Claude API client. Optional if API key is configured in ComfyUI 
 - `temperature`: 0.0-1.0 (creativity level)
 - `max_tokens`: 256-4096 (output length)
 - `use_streaming`: Enable streaming
+- `model`: Model override for this call, or inherit the client's model (default)
 
 **Outputs:**
 - `enhanced_prompt`: Detailed, styled prompt
@@ -137,6 +138,7 @@ General-purpose text generation.
 - `temperature`: Creativity level
 - `max_tokens`: Output length
 - `use_streaming`: Enable streaming
+- `model`: Model override for this call, or inherit the client's model (default)
 
 **Outputs:**
 - `response`: Generated text
@@ -154,6 +156,7 @@ Multi-turn conversations with message history.
 - `auto_trim`: Auto-trim old messages to fit context window
 - `reset_conversation`: Start fresh conversation
 - `temperature`, `max_tokens`: Generation parameters
+- `model`: Model override for this call, or inherit the client's model (default)
 
 **Outputs:**
 - `response`: Claude's response

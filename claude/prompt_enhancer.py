@@ -4,6 +4,7 @@
 import asyncio
 
 from comfy_api.latest import IO
+from .models import INHERIT_FROM_CLIENT, TEXT_MODELS
 
 
 class ClaudePromptEnhancer(IO.ComfyNode):
@@ -282,6 +283,13 @@ Emphasize architectural beauty and structural design."""
                     control_after_generate="randomize",
                     tooltip="Seed for cache control. Randomizes by default to ensure fresh results each run.",
                 ),
+                IO.Combo.Input(
+                    "model",
+                    options=[INHERIT_FROM_CLIENT] + TEXT_MODELS,
+                    default=INHERIT_FROM_CLIENT,
+                    optional=True,
+                    tooltip="Override the client's model for this call. Without a client the default is the Claude API client's default model.",
+                ),
             ],
             outputs=[
                 IO.String.Output("enhanced_prompt"),
@@ -295,7 +303,7 @@ Emphasize architectural beauty and structural design."""
 
     @classmethod
     async def execute(cls, **kwargs) -> IO.NodeOutput:
-        from .claude_api.client import ClaudeClient, response_text
+        from .claude_api.client import ClaudeClient
 
         prompt = kwargs.get("prompt", "")
         style = kwargs.get("style", "photorealistic")
@@ -304,6 +312,8 @@ Emphasize architectural beauty and structural design."""
         temperature = kwargs.get("temperature", 0.7)
         max_tokens = kwargs.get("max_tokens", 1024)
         use_streaming = kwargs.get("use_streaming", False)
+        model = kwargs.get("model", INHERIT_FROM_CLIENT)
+        model_kwargs = {} if model == INHERIT_FROM_CLIENT else {"model": model}
 
         if client is None:
             client = ClaudeClient(api_key=None)
@@ -321,7 +331,7 @@ Emphasize architectural beauty and structural design."""
                     cls._generate_streaming, client, messages, system_prompt, temperature, max_tokens
                 )
             else:
-                enhanced = await cls._generate_standard(client, messages, system_prompt, temperature, max_tokens)
+                enhanced = await cls._generate_standard(client, messages, system_prompt, temperature, max_tokens, model_kwargs)
 
             print(f"[Claude] Prompt enhanced successfully")
             print(f"[Claude] Original: {prompt[:100]}...")
@@ -360,18 +370,21 @@ Guidelines:
 - Output ONLY the enhanced prompt, no explanation or preamble"""
 
     @classmethod
-    async def _generate_standard(cls, client, messages, system, temperature, max_tokens):
+    async def _generate_standard(cls, client, messages, system, temperature, max_tokens, model_kwargs):
         """Generate using standard (non-streaming) mode."""
+        from .claude_api.client import response_text
+
         response = await client.send_request(
             messages=messages,
             system=system,
             temperature=temperature,
             max_tokens=max_tokens,
+            **model_kwargs,
         )
         return response_text(response)
 
     @classmethod
-    def _generate_streaming(cls, client, messages, system, temperature, max_tokens):
+    def _generate_streaming(cls, client, messages, system, temperature, max_tokens, model_kwargs):
         """Generate using streaming mode."""
         chunks = []
         for chunk in client.send_request_streaming(
@@ -379,6 +392,7 @@ Guidelines:
             system=system,
             temperature=temperature,
             max_tokens=max_tokens,
+            **model_kwargs,
         ):
             chunks.append(chunk)
         return "".join(chunks)

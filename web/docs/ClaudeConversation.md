@@ -17,6 +17,7 @@ Maintains a multi-turn conversation with Claude, preserving message history acro
 | reset_conversation | Boolean | False | Start a new conversation, discarding history (optional) |
 | temperature | Float | 0.7 | Creativity level (optional). Min: 0.0, Max: 1.0, Step: 0.05 |
 | max_tokens | Int | 2048 | Maximum length of response (optional). Min: 256, Max: 4096, Step: 128 |
+| model | Combo | (inherit from client) | Model override for this call (optional). Choose a model from the list, or inherit the connected client's model. Without a client, inherit means the Claude API client's default model |
 
 ## Output
 

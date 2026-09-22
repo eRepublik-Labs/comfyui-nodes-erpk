@@ -15,6 +15,7 @@ General-purpose text generation using Claude for completion, creative writing, a
 | temperature | Float | 0.7 | Creativity level: 0.0 = focused, 1.0 = creative (optional). Min: 0.0, Max: 1.0, Step: 0.05 |
 | max_tokens | Int | 1024 | Maximum length of response (optional). Min: 256, Max: 8192, Step: 128 |
 | use_streaming | Boolean | False | Enable streaming responses (optional) |
+| model | Combo | (inherit from client) | Model override for this call (optional). Choose a model from the list, or inherit the connected client's model. Without a client, inherit means the Claude API client's default model |
 
 ## Output
 
