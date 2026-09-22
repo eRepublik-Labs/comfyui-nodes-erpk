@@ -49,6 +49,18 @@ Same capabilities as V4.5 with higher minimum resolution (1440px) at a lower pri
 | **Seedream V5.0 Lite Edit** | Image editing at higher resolution | 1440-4096px (step 8) | Up to 10, IMAGE batch or URLs | Single image | $0.035/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite-edit) |
 | **Seedream V5.0 Lite Edit Sequential** | Multi-image editing at higher resolution | 1440-4096px (step 8) | Up to 10, IMAGE batch or URLs (optional) | 1-15 images | $0.035/image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5-0-lite-edit-sequential) |
 
+### ByteDance Seedream V5.0 Pro Models
+
+Sized by an aspect ratio (15 options) plus a 1k/1.5k/2k resolution tier instead of width and height. The endpoints take no seed. Both image nodes offer jpeg or png output and a standard or fast prompt rewrite.
+
+| Node | Description | Size | Input Images | Output | Pricing | API Docs |
+|------|-------------|------|--------------|--------|---------|----------|
+| **Seedream V5.0 Pro** | Text-to-image | Aspect ratio + 1k/1.5k/2k | N/A | Single image | $0.045 (1k, 1.5k), $0.09 (2k) | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5.0-pro) |
+| **Seedream V5.0 Pro Edit** | Image editing; aspect ratio can follow the first image | Aspect ratio or auto + 1k/1.5k/2k | Up to 10, IMAGE batch or URLs | Single image | As above, +$0.003 per extra input image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5.0-pro-edit) |
+| **Seedream V5.0 Pro Layers** | Splits an image into a clean base plus one layer and mask per object | 1k/1.5k/2k | Exactly 1, IMAGE or URL | Base image + layer and mask lists | $0.765 (1k, 1.5k), $1.53 (2k) | [Link](https://wavespeed.ai/docs/docs-api/bytedance/bytedance-seedream-v5.0-pro-layer-decomposition) |
+
+Pro Layers outputs its layers and masks as lists rather than batches, because each layer comes back cropped to its object at its own size. No positions are returned, so layers cannot be placed back on the base automatically.
+
 ### Qwen Image Models
 
 | Node | Models | Description | Dimensions | Input Images | Language | Output | Pricing | API Docs |
@@ -524,7 +536,7 @@ pip install -r requirements.txt
 ```
 [ERPK] Loaded <N> V3 nodes
 ```
-The WaveSpeed module alone contributes 61 nodes.
+The WaveSpeed module alone contributes 64 nodes.
 
 ### Common Issues
 
@@ -541,7 +553,7 @@ All WaveSpeed nodes are located under the **ERPK/WaveSpeedAI** category:
 3. Navigate to: **ERPK → WaveSpeedAI**
 4. Select your desired node
 
-**Available nodes (51 total):**
+**Available nodes (64 total):**
 
 Client & I/O:
 - WaveSpeed Client
@@ -553,6 +565,7 @@ Image (ByteDance Seedream):
 - Bytedance Seedream V4 / V4 Sequential / V4 Edit / V4 Edit Sequential
 - Bytedance Seedream V4.5 / V4.5 Sequential / V4.5 Edit / V4.5 Edit Sequential
 - Bytedance Seedream V5.0 Lite / V5.0 Lite Sequential / V5.0 Lite Edit / V5.0 Lite Edit Sequential
+- Bytedance Seedream V5.0 Pro / V5.0 Pro Edit / V5.0 Pro Layers
 
 Image (Qwen):
 - Qwen Image 2.0 Text-to-Image

@@ -1,5 +1,5 @@
 # ABOUTME: WaveSpeed AI provider package for ComfyUI V3.
-# ABOUTME: Exports flat NODES list of all 56 WaveSpeed node classes for ERPKExtension.
+# ABOUTME: Exports flat NODES list of all 64 WaveSpeed node classes for ERPKExtension.
 
 from .nodes import WaveSpeedAIAPIClient, PreviewVideo, SaveAudio, UploadImage
 from .seedream_v4 import SeedreamV4Node
@@ -24,6 +24,9 @@ from .seedream_v5_lite import SeedreamV5LiteNode
 from .seedream_v5_lite_edit import SeedreamV5LiteEditNode
 from .seedream_v5_lite_sequential import SeedreamV5LiteSequentialNode
 from .seedream_v5_lite_edit_sequential import SeedreamV5LiteEditSequentialNode
+from .seedream_v5_pro import SeedreamV5ProNode
+from .seedream_v5_pro_edit import SeedreamV5ProEditNode
+from .seedream_v5_pro_layers import SeedreamV5ProLayersNode
 from .qwen_image_max import QwenImageMaxNode
 from .qwen_image_max_edit import QwenImageMaxEditNode
 from .jibmix_qwen_image import JibMixQwenImageNode
@@ -87,6 +90,9 @@ NODES = [
     SeedreamV5LiteEditNode,
     SeedreamV5LiteSequentialNode,
     SeedreamV5LiteEditSequentialNode,
+    SeedreamV5ProNode,
+    SeedreamV5ProEditNode,
+    SeedreamV5ProLayersNode,
     QwenImageMaxNode,
     QwenImageMaxEditNode,
     JibMixQwenImageNode,
