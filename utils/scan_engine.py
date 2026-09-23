@@ -245,16 +245,19 @@ def _segmenter_family(model_id):
 def _is_cached(model_id):
     """True when a model's weights are already in the local HF hub cache.
 
-    Best-effort UI hint — a False only means "first use downloads". Honors
-    HF_HUB_CACHE / HF_HOME, defaulting to ~/.cache/huggingface/hub.
+    Best-effort UI hint — a False only means "first use downloads". The cache
+    path comes from huggingface_hub, which transformers downloads through, so
+    it honors HF_HUB_CACHE / HF_HOME without this package reading the
+    environment (the Registry scan flags any env read). No huggingface_hub
+    means no transformers either, so nothing can be cached.
     """
     import os
-    cache = os.environ.get("HF_HUB_CACHE")
-    if not cache:
-        home = os.environ.get(
-            "HF_HOME", os.path.join(os.path.expanduser("~"), ".cache", "huggingface"))
-        cache = os.path.join(home, "hub")
+    try:
+        from huggingface_hub import constants
+    except ImportError:
+        return False
     folder = "models--" + model_id.replace("/", "--")
+    cache = constants.HF_HUB_CACHE
     return os.path.isdir(os.path.join(cache, folder))
 
 

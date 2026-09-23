@@ -713,6 +713,22 @@ class TestAvailableSegmenters:
         for s in available_segmenters(tf=tf):
             assert "downloaded" in s and isinstance(s["downloaded"], bool)
 
+    def test_downloaded_reflects_the_hf_hub_cache(self, monkeypatch, tmp_path):
+        # The cache location comes from huggingface_hub, the same place
+        # transformers downloads to, so HF_HUB_CACHE / HF_HOME still apply.
+        import huggingface_hub.constants as hf_constants
+        from utils.scan_engine import available_segmenters
+        monkeypatch.setattr(hf_constants, "HF_HUB_CACHE", str(tmp_path))
+        tf = self._fake_tf(["SamModel", "SamProcessor"])
+        specs = available_segmenters(tf=tf)
+        assert specs and not any(s["downloaded"] for s in specs)
+
+        cached = specs[0]["id"]
+        (tmp_path / ("models--" + cached.replace("/", "--"))).mkdir()
+        flags = {s["id"]: s["downloaded"] for s in available_segmenters(tf=tf)}
+        assert flags[cached] is True
+        assert not any(v for k, v in flags.items() if k != cached)
+
     def test_no_transformers_yields_empty(self, monkeypatch):
         from utils import scan_engine
         import builtins
