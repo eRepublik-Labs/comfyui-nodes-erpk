@@ -12,7 +12,7 @@ Analyzes images using Claude's multimodal vision capabilities. Supports single o
 | image | IMAGE | (required) | Primary image to analyze (ComfyUI tensor) |
 | question | String (multiline) | Describe this image in detail. | Question or instruction about the image(s) |
 | client | CLAUDE_API_CLIENT | (none) | Claude API client (optional if API key is configured in Settings) |
-| model | Combo | (inherit from client) | Override the client's model for this vision call (optional). Options: (inherit from client), claude-sonnet-5, claude-opus-5, claude-opus-4-8, claude-fable-5, claude-opus-4-7, claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929 |
+| model | Combo | (inherit from client) | Override the client's model for this vision call (optional). Options: (inherit from client), claude-sonnet-5, claude-opus-5-5, claude-opus-5, claude-opus-4-8, claude-fable-5-1, claude-fable-5, claude-opus-4-7, claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929 |
 | additional_images | IMAGE | (none) | Additional images to analyze, up to 19 more for 20 total (optional) |
 | detail_level | Combo | high | Level of detail in analysis (optional). Options: low, medium, high |
 | max_tokens | Int | 2048 | Maximum length of analysis (optional). Min: 256, Max: 4096, Step: 128 |

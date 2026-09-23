@@ -8,7 +8,7 @@ Complete xAI Grok integration providing text generation, multi-turn chat, image 
 
 ## Features
 
-- **Text Generation** — One-shot prompt → text via `grok-4.6` and other Grok models
+- **Text Generation** — One-shot prompt → text via `grok-4.7` and other Grok models
 - **Multi-turn Chat** — Persistent conversation threading via the `GROK_CHAT_SESSION` custom type
 - **Image Generation** — Text-to-image via `grok-imagine-image-quality` (1k/2k, 8 aspect ratios)
 - **Image Editing** — Single or multi-image editing (up to 3 source images; xAI's documented cap)
@@ -83,10 +83,11 @@ Complete xAI Grok integration providing text generation, multi-turn chat, image 
 
 | Model ID | Used by | Notes |
 |---|---|---|
-| `grok-4.6` | Text Generation, Chat (default) | Current Grok flagship (500k context, image input) |
+| `grok-4.7` | Text Generation, Chat (default) | Current Grok flagship (500k context, image input) |
+| `grok-4.6` | Text Generation, Chat | Previous flagship (500k context, image input), same price as 4.7 |
 | `grok-4.5` | Text Generation, Chat | Previous flagship |
 | `grok-4.3` | Text Generation, Chat | Migration target for the retired grok-3 / grok-4 IDs |
-| `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning` | Text Generation, Chat | 1M context (vs 500k on grok-4.6 / grok-4.5); no reasoning_effort control |
+| `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning` | Text Generation, Chat | 1M context (vs 500k on grok-4.7 / 4.6 / 4.5); no reasoning_effort control |
 | `grok-4.20-multi-agent-0309` | Text Generation, Chat | 1M context; tighter rate limits (9 rps / 450 rpm) than its siblings |
 | `grok-build-0.1` | Text Generation, Chat | Coding model (replaces the retired grok-code-fast-1) |
 | `grok-imagine-image`, `grok-imagine-image-2.0`, `grok-imagine-image-quality` | Image Generation, Image Edit | image = standard ($0.02); 2.0 = current generation ($0.04); quality = premium tier ($0.05) |

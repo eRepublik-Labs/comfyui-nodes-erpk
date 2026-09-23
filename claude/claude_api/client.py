@@ -55,6 +55,7 @@ class ClaudeClient:
     # thinking={"type": "adaptive"}. Anthropic returns 400 if sampling params
     # are present or if thinking uses the legacy {"type": "enabled", ...} form.
     THINKING_ONLY_MODELS = {
+        "claude-opus-5-5",
         "claude-opus-5",
         "claude-sonnet-5",
         "claude-opus-4-8",

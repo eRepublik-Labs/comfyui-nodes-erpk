@@ -23,6 +23,7 @@ from claude.vision_analysis import ClaudeVisionAnalysis
 
 
 OPUS_5 = "claude-opus-5"
+OPUS_5_5 = "claude-opus-5-5"
 FABLE_5 = "claude-fable-5"
 FABLE_5_1 = "claude-fable-5-1"
 OPUS_4_7 = "claude-opus-4-7"
@@ -102,6 +103,45 @@ def test_fable_5_1_has_1m_context():
 
 def test_fable_5_1_rejects_sampling_params():
     assert FABLE_5_1 in ClaudeClient.THINKING_ONLY_MODELS
+
+
+def test_opus_5_5_offered_in_every_dropdown():
+    for node in (ClaudeAPIClient, ClaudeTokenCounter, ClaudeVisionAnalysis):
+        assert OPUS_5_5 in _combo_options(node)
+
+
+def test_opus_5_5_priced_at_published_rate():
+    # https://platform.claude.com/docs/en/about-claude/pricing — $4 / $20 per
+    # MTok; cache hits are 0.05x base on Opus 5.5 ($0.20), not the usual 0.1x.
+    entry = _pricing()[OPUS_5_5]
+    assert entry["input_price_per_mtok"] == 4.0
+    assert entry["output_price_per_mtok"] == 20.0
+    assert entry["cache_read_price_per_mtok"] == 0.2
+
+
+def test_token_counter_fallback_prices_every_offered_model(monkeypatch):
+    # When pricing.json cannot be read the counter falls back to a hardcoded
+    # table; a model missing there reports $0 instead of its real cost.
+    import claude.token_counter as token_counter
+    from claude.models import TEXT_MODELS
+
+    def unreadable(*args, **kwargs):
+        raise OSError("pricing.json unreadable")
+
+    monkeypatch.setattr(token_counter, "open", unreadable, raising=False)
+    pricing, _ = ClaudeTokenCounter.load_pricing()
+    assert set(TEXT_MODELS) <= set(pricing)
+    assert pricing[OPUS_5_5] == {"input": 4.0, "output": 20.0}
+
+
+def test_opus_5_5_has_1m_context():
+    assert TokenManager.CONTEXT_WINDOWS[OPUS_5_5] == 1_000_000
+
+
+def test_opus_5_5_rejects_sampling_params():
+    # Measured 2026-09-23: temperature=0.7 returns 400
+    # "`temperature` is deprecated for this model."
+    assert OPUS_5_5 in ClaudeClient.THINKING_ONLY_MODELS
 
 
 # --- Defects in the existing model metadata ---------------------------------

@@ -122,7 +122,7 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 
 #### Nodes
 
-- **Claude API Client** - Initialize Claude API connection with model selection (Opus 4.7, Sonnet 4.6, Opus 4.6, Haiku 4.5) and configuration. Optional if API key is configured in ComfyUI Settings or config.ini -- Claude nodes can run standalone.
+- **Claude API Client** - Initialize Claude API connection with model selection (Sonnet 5, Opus 5.5, Opus 5, Fable 5.1, Haiku 4.5 and more) and configuration. Optional if API key is configured in ComfyUI Settings or config.ini -- Claude nodes can run standalone.
 - **Claude Prompt Enhancer** - Transform simple prompts into detailed descriptions with 51 artistic styles (photorealistic, cinematic, fantasy, cyberpunk, anime, oil painting, watercolor, and more)
 - **Claude Vision Analysis** - Analyze images with Claude's multimodal capabilities (up to 20 images simultaneously). Optional per-node `model` override lets you use Opus 4.7 (2576px image resolution) for vision even when your client is configured with a different model.
 - **Claude Text Generation** - General-purpose text completion and generation
@@ -223,7 +223,7 @@ xAI Grok integration — text, multi-turn chat, image generation/editing (up to 
 #### Text & Chat Nodes
 
 - **Grok API Client** - Initialize the xAI client (optional for downstream nodes)
-- **Grok Text Generation** - One-shot text completion via `grok-4.6` / `grok-4.5` / `grok-4.3` / the `grok-4.20` family / `grok-build-0.1`
+- **Grok Text Generation** - One-shot text completion via `grok-4.7` / `grok-4.6` / `grok-4.5` / `grok-4.3` / the `grok-4.20` family / `grok-build-0.1`
 - **Grok Chat** - Multi-turn conversation threaded via `GROK_CHAT_SESSION`
 
 #### Image Nodes

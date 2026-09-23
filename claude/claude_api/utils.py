@@ -88,6 +88,7 @@ class TokenManager:
     # beta header, no long-context premium. The 4.5 family is capped at 200K.
     CONTEXT_WINDOWS = {
         "claude-sonnet-5": 1_000_000,
+        "claude-opus-5-5": 1_000_000,
         "claude-opus-5": 1_000_000,
         "claude-opus-4-8": 1_000_000,
         "claude-fable-5-1": 1_000_000,

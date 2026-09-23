@@ -19,7 +19,7 @@ class GrokClient:
     config.ini.
     """
 
-    DEFAULT_TEXT_MODEL = "grok-4.6"
+    DEFAULT_TEXT_MODEL = "grok-4.7"
     DEFAULT_IMAGE_MODEL = "grok-imagine-image"
     DEFAULT_VIDEO_MODEL = "grok-imagine-video"
     VIDEO_MODELS = ["grok-imagine-video", "grok-imagine-video-1.5"]

@@ -83,16 +83,27 @@ class TestOpenAIModels:
         assert "gpt-5.6-sol" in OpenAIClient.VERBOSITY_MODELS
 
     def test_gpt_6_astra_offered_as_reasoning_model(self):
-        """gpt-6-astra: Chat Completions supported, reasoning.effort low..max,
-        max_completion_tokens family. verbosity is undocumented for it, so it
-        must stay out of VERBOSITY_MODELS (omission drops the param; a wrong
-        inclusion is a 400 on every non-default selection)."""
+        """gpt-6-astra: Chat Completions supported, reasoning.effort
+        low/medium/high/xhigh, max_completion_tokens family. verbosity=low
+        returned 200 on chat.completions (measured 2026-09-23), so the
+        node's verbosity choice must reach it rather than being dropped."""
         from openai.openai_api.client import OpenAIClient
         assert "gpt-6-astra" in OpenAIClient.MODELS
         assert "gpt-6-astra" in OpenAIClient.REASONING_MODELS
         assert "gpt-6-astra" in OpenAIClient.NEW_TOKEN_PARAM_MODELS
-        assert "gpt-6-astra" not in OpenAIClient.VERBOSITY_MODELS
+        assert "gpt-6-astra" in OpenAIClient.VERBOSITY_MODELS
         assert OpenAIClient.DEFAULT_MODEL == "gpt-5.6-sol"
+
+    def test_gpt_6_sol_and_luna_offered_as_reasoning_models(self):
+        """gpt-6-sol / gpt-6-luna, measured on chat.completions 2026-09-23:
+        reasoning_effort none/low/medium/high/xhigh accepted, verbosity=low
+        accepted, temperature=0.7 rejected (reasoning models omit it)."""
+        from openai.openai_api.client import OpenAIClient
+        for m in ("gpt-6-sol", "gpt-6-luna"):
+            assert m in OpenAIClient.MODELS, m
+            assert m in OpenAIClient.REASONING_MODELS, m
+            assert m in OpenAIClient.NEW_TOKEN_PARAM_MODELS, m
+            assert m in OpenAIClient.VERBOSITY_MODELS, m
 
 
 class TestGptImage25:
@@ -130,12 +141,15 @@ class TestReasoningEffortClamp:
     rather than earning a 400."""
 
     def test_minimal_clamps_to_low_on_56_and_6(self):
-        for m in ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-6-astra"):
+        for m in ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+                  "gpt-6-astra", "gpt-6-sol", "gpt-6-luna"):
             assert OpenAIClient._effort_for(m, "minimal") == "low", m
 
     def test_none_clamps_only_on_gpt_6(self):
         assert OpenAIClient._effort_for("gpt-6-astra", "none") == "low"
         assert OpenAIClient._effort_for("gpt-5.6-sol", "none") == "none"
+        assert OpenAIClient._effort_for("gpt-6-sol", "none") == "none"
+        assert OpenAIClient._effort_for("gpt-6-luna", "none") == "none"
 
     def test_documented_values_pass_through(self):
         assert OpenAIClient._effort_for("gpt-6-astra", "xhigh") == "xhigh"

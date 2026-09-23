@@ -11,7 +11,7 @@ Multi-turn conversation with OpenAI models. Preserves message history across tur
 |-----------|------|---------|-------------|
 | prompt | String | (empty) | Your message in the conversation |
 | client | OPENAI_API_CLIENT | — | OpenAI API client (optional if API key is in Settings) |
-| model | Combo | gpt-5.6-sol | Model to use (optional). Options include gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-6-astra, gpt-5.5, gpt-5.5-pro, gpt-5.4 family, gpt-5.2, gpt-5.1, gpt-5, gpt-4.1, gpt-4o, o3, o4-mini |
+| model | Combo | gpt-5.6-sol | Model to use (optional). Options include gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4 family, gpt-5.2, gpt-5.1, gpt-5, gpt-4.1, gpt-4o, o3, o4-mini |
 | chat_session | OPENAI_CHAT_SESSION | — | Previous chat session to continue (optional). Connect from previous chat node |
 | reset_conversation | Boolean | False | Start a new conversation, discarding history (optional) |
 | temperature | Float | 0.7 | Creativity level, 0.0–2.0 (optional). Ignored by reasoning models |

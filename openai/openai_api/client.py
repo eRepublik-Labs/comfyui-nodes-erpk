@@ -25,6 +25,8 @@ class OpenAIClient:
         "gpt-5.6-terra": "GPT-5.6 Terra (Balanced GPT-5.6 tier)",
         "gpt-5.6-luna": "GPT-5.6 Luna (Fast, cost-efficient GPT-5.6 tier)",
         "gpt-6-astra": "GPT-6 Astra (Top tier above Sol, 1.05M context, $10/$50 per MTok)",
+        "gpt-6-sol": "GPT-6 Sol (1.05M context, $2/$10 per MTok)",
+        "gpt-6-luna": "GPT-6 Luna (Most efficient GPT-6 tier, 1.05M context, $0.10/$0.50 per MTok)",
         "gpt-5.5": "GPT-5.5 (Premium flagship, 1.05M context, highest reasoning tier)",
         "gpt-5.5-pro": "GPT-5.5 Pro (Extended compute, no streaming, $30/$180 per MTok)",
         "gpt-5.4": "GPT-5.4 (Recommended default, 1M context)",
@@ -91,14 +93,17 @@ class OpenAIClient:
     MAX_RETRIES = 3
     INITIAL_RETRY_DELAY = 1.0
 
-    # reasoning_effort values a model's page does not list. gpt-5.6 Sol/Terra/
-    # Luna document none/low/medium/high/xhigh/max; gpt-6-astra documents
-    # low/medium/high/xhigh/max. Unlisted values clamp to low.
+    # reasoning_effort values the API rejects for a model. gpt-5.6 Sol/Terra/
+    # Luna and gpt-6 Sol/Luna accept none/low/medium/high/xhigh; gpt-6-astra
+    # accepts low/medium/high/xhigh (measured 2026-09-23). Rejected values
+    # clamp to low.
     UNSUPPORTED_EFFORT = {
         "gpt-5.6-sol": {"minimal"},
         "gpt-5.6-terra": {"minimal"},
         "gpt-5.6-luna": {"minimal"},
         "gpt-6-astra": {"minimal", "none"},
+        "gpt-6-sol": {"minimal"},
+        "gpt-6-luna": {"minimal"},
     }
 
     # Codes the API uses to refuse on safety grounds. The images endpoints
@@ -168,7 +173,7 @@ class OpenAIClient:
 
     # Models that use max_completion_tokens instead of max_tokens
     NEW_TOKEN_PARAM_MODELS = {
-        "gpt-6-astra",
+        "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
         "gpt-5.5", "gpt-5.5-pro",
         "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
@@ -179,18 +184,19 @@ class OpenAIClient:
 
     # Reasoning models that support reasoning_effort parameter
     REASONING_MODELS = {
-        "gpt-6-astra",
+        "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
         "gpt-5.5", "gpt-5.5-pro",
         "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
         "o3", "o3-mini", "o3-pro", "o4-mini",
     }
 
-    # Models that accept the `verbosity` parameter (gpt-5.x family).
+    # Models that accept the `verbosity` parameter (gpt-5.x and gpt-6 families).
     # When the user selects "default", we omit the param so the model picks its
     # own default. Sending verbosity to a model that doesn't support it returns
     # 400, so we silently drop it for older families.
     VERBOSITY_MODELS = {
+        "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
         "gpt-5.5", "gpt-5.5-pro",
         "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",

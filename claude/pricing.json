@@ -1,6 +1,6 @@
 {
   "_comment": "Claude API Pricing - Update from https://www.anthropic.com/pricing",
-  "_last_updated": "2026-09-16",
+  "_last_updated": "2026-09-23",
   "_version": "1.0",
 
   "models": {
@@ -8,6 +8,12 @@
       "name": "Claude Sonnet 5",
       "input_price_per_mtok": 2.0,
       "output_price_per_mtok": 10.0,
+      "cache_read_price_per_mtok": 0.2
+    },
+    "claude-opus-5-5": {
+      "name": "Claude Opus 5.5",
+      "input_price_per_mtok": 4.0,
+      "output_price_per_mtok": 20.0,
       "cache_read_price_per_mtok": 0.2
     },
     "claude-opus-5": {

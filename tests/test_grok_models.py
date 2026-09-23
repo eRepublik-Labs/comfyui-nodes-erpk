@@ -1,14 +1,15 @@
 # ABOUTME: Tests Grok model currency: retired IDs removed, current flagships present.
-# ABOUTME: grok-4.6 default, grok-build-0.1 replaces grok-code-fast-1, quality de-aliased.
+# ABOUTME: grok-4.7 default, grok-build-0.1 replaces grok-code-fast-1, quality de-aliased.
 
 from erpk.grok.grok_api.client import GrokClient
 from erpk.grok.nodes import TEXT_MODELS
 
 
-def test_grok_46_is_default_and_present():
-    # docs.x.ai/docs/models: "Recommended defaults: code and chat use Grok 4.6."
-    assert GrokClient.DEFAULT_TEXT_MODEL == "grok-4.6"
-    assert TEXT_MODELS[0] == "grok-4.6"
+def test_grok_47_is_default_and_present():
+    # docs.x.ai/docs/models: "For everything else, including code, use Grok 4.7."
+    assert GrokClient.DEFAULT_TEXT_MODEL == "grok-4.7"
+    assert TEXT_MODELS[0] == "grok-4.7"
+    assert "grok-4.6" in TEXT_MODELS
     assert "grok-4.5" in TEXT_MODELS
 
 
