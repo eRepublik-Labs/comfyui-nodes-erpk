@@ -16,39 +16,19 @@ class OpenAIClient:
     - Multi-source API key management (input -> env -> config)
     - All GPT models support
     - Text generation and vision capabilities
-    - Image generation with DALL-E and GPT-Image models
+    - Image generation and editing with GPT Image models
     """
 
     # Available text/vision models
     MODELS = {
+        "gpt-6.1-sol": "GPT-6.1 Sol (Default, 1.05M context, 128K output, $2/$10 per MTok)",
         "gpt-5.6-sol": "GPT-5.6 Sol (Current flagship, highest capability tier)",
         "gpt-5.6-terra": "GPT-5.6 Terra (Balanced GPT-5.6 tier)",
         "gpt-5.6-luna": "GPT-5.6 Luna (Fast, cost-efficient GPT-5.6 tier)",
         "gpt-6-astra": "GPT-6 Astra (Top tier above Sol, 1.05M context, $10/$50 per MTok)",
         "gpt-6-sol": "GPT-6 Sol (1.05M context, $2/$10 per MTok)",
         "gpt-6-luna": "GPT-6 Luna (Most efficient GPT-6 tier, 1.05M context, $0.10/$0.50 per MTok)",
-        "gpt-5.5": "GPT-5.5 (Premium flagship, 1.05M context, highest reasoning tier)",
-        "gpt-5.5-pro": "GPT-5.5 Pro (Extended compute, no streaming, $30/$180 per MTok)",
-        "gpt-5.4": "GPT-5.4 (Recommended default, 1M context)",
-        "gpt-5.4-pro": "GPT-5.4 Pro (Extended compute, Responses API)",
-        "gpt-5.4-mini": "GPT-5.4 Mini (Fast, cost-efficient, 400K context)",
-        "gpt-5.4-nano": "GPT-5.4 Nano (Fastest, lowest cost, 400K context)",
-        "gpt-5.2": "GPT-5.2 (Latest flagship, best for coding/agents)",
-        "gpt-5.2-pro": "GPT-5.2 Pro (Smarter, more precise responses)",
-        "gpt-5.1": "GPT-5.1 (Coding/agents with configurable reasoning)",
-        "gpt-5": "GPT-5 (Reasoning model for coding/agents)",
-        "gpt-5-mini": "GPT-5 Mini (Fast, cost-efficient)",
-        "gpt-5-nano": "GPT-5 Nano (Fastest, lowest cost)",
         "chat-latest": "ChatGPT Instant (Non-reasoning, 400K context, $5/$30 per MTok)",
-        "gpt-4.1": "GPT-4.1 (Smartest non-reasoning model)",
-        "gpt-4.1-mini": "GPT-4.1 Mini (Fast, cost-effective)",
-        "gpt-4.1-nano": "GPT-4.1 Nano (Fastest, lowest cost GPT-4.1)",
-        "gpt-4o": "GPT-4o (Multimodal, vision)",
-        "gpt-4o-mini": "GPT-4o Mini (Fast multimodal)",
-        "o4-mini": "o4-mini (Fast reasoning model)",
-        "o3": "o3 (Advanced reasoning)",
-        "o3-mini": "o3-mini (Cost-efficient reasoning)",
-        "o3-pro": "o3-pro (Most powerful reasoning)",
     }
 
     # Available image generation models
@@ -56,17 +36,20 @@ class OpenAIClient:
         "gpt-image-2.5-sunburst": "GPT Image 2.5 Sunburst (Highest quality, xhigh/max quality tiers)",
         "gpt-image-2.5-flare": "GPT Image 2.5 Flare (Fastest 2.5 tier, xhigh/max quality tiers)",
         "gpt-image-2": "GPT Image 2 (Latest flagship, 4K, multilingual text)",
-        "gpt-image-1.5": "GPT Image 1.5 (Previous flagship, 2K)",
-        "gpt-image-1": "GPT Image 1 (High quality, editing support)",
-        "gpt-image-1-mini": "GPT Image 1 Mini (Cost-efficient)",
     }
 
     # Image models on the GPT Image family — share parameter conventions
-    # (quality + background). dall-e-2/3 use different parameter rules.
+    # (quality + background). Any other model ID takes the legacy
+    # response_format path.
     GPT_IMAGE_MODELS = {
         "gpt-image-2.5-sunburst", "gpt-image-2.5-flare",
-        "gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini",
+        "gpt-image-2",
     }
+
+    # Models that accept background="transparent". gpt-image-2 returns 400
+    # "Transparent background is not supported for this model." (measured
+    # 2026-10-01); both 2.5 models returned RGBA PNGs with real alpha.
+    TRANSPARENT_BACKGROUND_MODELS = {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare"}
 
     # gpt-image-2 and the 2.5 models always process at high fidelity, reject
     # the input_fidelity param (400 invalid_input_fidelity_model, measured
@@ -87,7 +70,7 @@ class OpenAIClient:
     GPT_IMAGE_2_MAX_EDGE = 3840
 
     # Default configuration
-    DEFAULT_MODEL = "gpt-5.6-sol"
+    DEFAULT_MODEL = "gpt-6.1-sol"
     DEFAULT_MAX_TOKENS = 4096
     DEFAULT_TEMPERATURE = 0.7
     MAX_RETRIES = 3
@@ -95,9 +78,10 @@ class OpenAIClient:
 
     # reasoning_effort values the API rejects for a model. gpt-5.6 Sol/Terra/
     # Luna and gpt-6 Sol/Luna accept none/low/medium/high/xhigh; gpt-6-astra
-    # accepts low/medium/high/xhigh (measured 2026-09-23). Rejected values
-    # clamp to low.
+    # accepts low/medium/high/xhigh (measured 2026-09-23), as does gpt-6.1-sol
+    # (measured 2026-10-01). Rejected values clamp to low.
     UNSUPPORTED_EFFORT = {
+        "gpt-6.1-sol": {"minimal", "none"},
         "gpt-5.6-sol": {"minimal"},
         "gpt-5.6-terra": {"minimal"},
         "gpt-5.6-luna": {"minimal"},
@@ -171,24 +155,44 @@ class OpenAIClient:
             return "high"
         return quality
 
+    @staticmethod
+    def _output_format_params(output_format: str, output_compression: int) -> Dict[str, Any]:
+        """images.generate / images.edit params for the output file format.
+
+        png is the API default and takes no compression, so it sends nothing;
+        output_compression applies only to jpeg and webp.
+        """
+        if output_format in ("jpeg", "webp"):
+            return {"output_format": output_format, "output_compression": output_compression}
+        return {}
+
     # Models that use max_completion_tokens instead of max_tokens
     NEW_TOKEN_PARAM_MODELS = {
+        "gpt-6.1-sol",
         "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-        "gpt-5.5", "gpt-5.5-pro",
-        "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
-        "gpt-5.2", "gpt-5.2-pro", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano",
-        "o3", "o3-mini", "o3-pro", "o4-mini",
         "chat-latest",
     }
 
     # Reasoning models that support reasoning_effort parameter
     REASONING_MODELS = {
+        "gpt-6.1-sol",
         "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-        "gpt-5.5", "gpt-5.5-pro",
-        "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
-        "o3", "o3-mini", "o3-pro", "o4-mini",
+    }
+
+    # Models that reject temperature, top_p and stop on chat.completions.
+    # temperature other than 1 400s ("Only the default (1) value is
+    # supported") and top_p/stop 400 as unsupported_parameter (measured on
+    # gpt-6.1-sol and chat-latest 2026-10-01, gpt-6 tiers 2026-09-23; the
+    # gpt-5.6 tiers have never been sent them).
+    # chat-latest is here but not in REASONING_MODELS: it rejects sampling
+    # params yet takes no reasoning_effort either.
+    NO_SAMPLING_MODELS = {
+        "gpt-6.1-sol",
+        "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
+        "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+        "chat-latest",
     }
 
     # Models that accept the `verbosity` parameter (gpt-5.x and gpt-6 families).
@@ -196,12 +200,9 @@ class OpenAIClient:
     # own default. Sending verbosity to a model that doesn't support it returns
     # 400, so we silently drop it for older families.
     VERBOSITY_MODELS = {
+        "gpt-6.1-sol",
         "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
-        "gpt-5.5", "gpt-5.5-pro",
-        "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
-        "gpt-5.2", "gpt-5.2-pro", "gpt-5.1",
-        "gpt-5", "gpt-5-mini", "gpt-5-nano",
     }
 
     def __init__(
@@ -351,10 +352,9 @@ class OpenAIClient:
         else:
             params["max_tokens"] = max_tokens
 
-        # Reasoning models don't support temperature, top_p, or stop
         is_reasoning = model_to_use in self.REASONING_MODELS
 
-        if not is_reasoning:
+        if model_to_use not in self.NO_SAMPLING_MODELS:
             params["temperature"] = temperature
             if top_p is not None:
                 params["top_p"] = top_p
@@ -527,10 +527,9 @@ class OpenAIClient:
         else:
             params["max_tokens"] = max_tokens
 
-        # Reasoning models don't support temperature, top_p, or stop
         is_reasoning = model_to_use in self.REASONING_MODELS
 
-        if not is_reasoning:
+        if model_to_use not in self.NO_SAMPLING_MODELS:
             params["temperature"] = temperature
             if top_p is not None:
                 params["top_p"] = top_p
@@ -623,15 +622,27 @@ class OpenAIClient:
             seed=seed, reasoning_effort=reasoning_effort, verbosity=verbosity, **kwargs
         )
 
+    @classmethod
+    def _check_background(cls, model: str, background: str) -> None:
+        """Raise before the call when a model would reject the background (400)."""
+        if background == "transparent" and model not in cls.TRANSPARENT_BACKGROUND_MODELS:
+            supported = ", ".join(sorted(cls.TRANSPARENT_BACKGROUND_MODELS))
+            raise ValueError(
+                f"{model} does not support background='transparent'. "
+                f"Use {supported}, or set background to auto or opaque."
+            )
+
     def _generate_image_sync(
         self,
         prompt: str,
-        model: str = "gpt-image-1",
+        model: str = "gpt-image-2",
         size: str = "1024x1024",
         quality: str = "auto",
         background: str = "auto",
         moderation: str = "auto",
         n: int = 1,
+        output_format: str = "png",
+        output_compression: int = 100,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -639,9 +650,9 @@ class OpenAIClient:
 
         Args:
             prompt: Text description of image to generate
-            model: Image model (gpt-image-2, gpt-image-1.5, gpt-image-1, gpt-image-1-mini)
+            model: Image model (gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-2)
             size: Image size (1024x1024, 1024x1536, 1536x1024, etc.)
-            quality: Image quality (auto, low, medium, high - gpt-image-1 only)
+            quality: Image quality (auto, low, medium, high; xhigh/max on GPT Image 2.5)
             background: Background type (auto, transparent, opaque - GPT Image models only)
             n: Number of images to generate
             **kwargs: Additional parameters
@@ -667,9 +678,11 @@ class OpenAIClient:
             if quality != "auto":
                 params["quality"] = self._quality_for(model, quality)
             if background != "auto":
+                self._check_background(model, background)
                 params["background"] = background
             if moderation != "auto":
                 params["moderation"] = moderation
+            params.update(self._output_format_params(output_format, output_compression))
             # GPT Image models always return base64, do not accept response_format
         else:
             params["response_format"] = "b64_json"
@@ -702,12 +715,14 @@ class OpenAIClient:
     async def generate_image(
         self,
         prompt: str,
-        model: str = "gpt-image-1",
+        model: str = "gpt-image-2",
         size: str = "1024x1024",
         quality: str = "auto",
         background: str = "auto",
         moderation: str = "auto",
         n: int = 1,
+        output_format: str = "png",
+        output_compression: int = 100,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -715,9 +730,9 @@ class OpenAIClient:
 
         Args:
             prompt: Text description of image to generate
-            model: Image model (gpt-image-2, gpt-image-1.5, gpt-image-1, gpt-image-1-mini)
+            model: Image model (gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-2)
             size: Image size (1024x1024, 1024x1536, 1536x1024, etc.)
-            quality: Image quality (auto, low, medium, high - gpt-image-1 only)
+            quality: Image quality (auto, low, medium, high; xhigh/max on GPT Image 2.5)
             background: Background type (auto, transparent, opaque - GPT Image models only)
             n: Number of images to generate
             **kwargs: Additional parameters
@@ -728,7 +743,8 @@ class OpenAIClient:
         return await asyncio.to_thread(
             self._generate_image_sync, prompt,
             model=model, size=size, quality=quality,
-            background=background, moderation=moderation, n=n, **kwargs
+            background=background, moderation=moderation, n=n,
+            output_format=output_format, output_compression=output_compression, **kwargs
         )
 
     def _validate_size_for_gpt_image_2(self, size: str, model: str = "gpt-image-2"):
@@ -781,7 +797,7 @@ class OpenAIClient:
     def _generate_image_via_responses_sync(
         self,
         prompt: str,
-        mainline_model: str = "gpt-5.5",
+        mainline_model: str = DEFAULT_MODEL,
         image_model: str = "gpt-image-2",
         reasoning_effort: str = "none",
         size: str = "auto",
@@ -819,12 +835,13 @@ class OpenAIClient:
         if size and size != "auto":
             image_tool["size"] = size
         if quality != "auto":
-            image_tool["quality"] = quality
+            image_tool["quality"] = self._quality_for(image_model, quality)
         if output_format and output_format != "png":
             image_tool["output_format"] = output_format
         if moderation != "auto":
             image_tool["moderation"] = moderation
         if background != "auto":
+            self._check_background(image_model, background)
             image_tool["background"] = background
 
         tools = [image_tool]
@@ -843,9 +860,9 @@ class OpenAIClient:
         if self.system_instruction and self.system_instruction.strip():
             request_params["instructions"] = self.system_instruction
 
-        if reasoning_effort and reasoning_effort != "none":
+        if reasoning_effort and reasoning_effort != "none" and mainline_model in self.REASONING_MODELS:
             request_params["reasoning"] = {
-                "effort": reasoning_effort,
+                "effort": self._effort_for(mainline_model, reasoning_effort),
                 "summary": "auto",
             }
 
@@ -899,7 +916,7 @@ class OpenAIClient:
     async def generate_image_via_responses(
         self,
         prompt: str,
-        mainline_model: str = "gpt-5.5",
+        mainline_model: str = DEFAULT_MODEL,
         image_model: str = "gpt-image-2",
         reasoning_effort: str = "none",
         size: str = "auto",
@@ -943,6 +960,8 @@ class OpenAIClient:
         n: int = 1,
         background: str = "auto",
         input_fidelity: str = "auto",
+        output_format: str = "png",
+        output_compression: int = 100,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -1013,10 +1032,12 @@ class OpenAIClient:
             if moderation != "auto":
                 params["moderation"] = moderation
             if background and background != "auto":
+                self._check_background(model, background)
                 params["background"] = background
             # gpt-image-2 always processes at high fidelity and rejects input_fidelity.
             if input_fidelity and input_fidelity != "auto" and model not in self.GPT_IMAGE_2_MODELS:
                 params["input_fidelity"] = input_fidelity
+            params.update(self._output_format_params(output_format, output_compression))
         else:
             params["response_format"] = "b64_json"
 
@@ -1054,6 +1075,8 @@ class OpenAIClient:
         n: int = 1,
         background: str = "auto",
         input_fidelity: str = "auto",
+        output_format: str = "png",
+        output_compression: int = 100,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -1080,5 +1103,6 @@ class OpenAIClient:
             self._edit_image_sync, image_data, prompt,
             mask_data=mask_data, model=model, size=size, quality=quality,
             moderation=moderation, n=n, background=background,
-            input_fidelity=input_fidelity, **kwargs
+            input_fidelity=input_fidelity, output_format=output_format,
+            output_compression=output_compression, **kwargs
         )

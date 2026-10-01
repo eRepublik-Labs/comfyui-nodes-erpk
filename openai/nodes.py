@@ -9,16 +9,17 @@ VISION_MODELS = [m for m in TEXT_MODELS if not m.startswith("o")]
 
 REASONING_EFFORT_OPTIONS = ["none", "minimal", "low", "medium", "high", "xhigh"]
 REASONING_EFFORT_TOOLTIP = (
-    "Reasoning depth for o-series and gpt-5.x reasoning models. "
-    "Ignored by non-reasoning models."
+    "Reasoning depth for the gpt-5.6 and gpt-6.x models. 'none' sends no effort "
+    "(the model uses its own default). 'minimal' is rejected by every current "
+    "model and is sent as 'low'. Ignored by chat-latest."
 )
 
 VERBOSITY_OPTIONS = ["default", "low", "medium", "high"]
 VERBOSITY_TOOLTIP = (
-    "Output verbosity for gpt-5.x models. 'low' produces terse responses, "
+    "Output verbosity for the gpt-5.6 and gpt-6.x models. 'low' produces terse responses, "
     "'high' produces more detailed ones. Distinct from max_tokens — shapes "
     "style, not the hard length cap. 'default' lets the model choose. "
-    "Silently ignored by older models that do not accept verbosity."
+    "Ignored by chat-latest, which does not accept verbosity."
 )
 
 
@@ -90,13 +91,13 @@ class OpenAITextGeneration(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level (0.0=focused, 2.0=very creative)",
+                    tooltip="Creativity level (0.0=focused, 2.0=very creative). Ignored by every current model, which accepts only the default.",
                 ),
                 IO.Int.Input(
                     "max_tokens",
                     default=4096,
                     min=256,
-                    max=16384,
+                    max=128000,
                     step=128,
                     optional=True,
                     tooltip="Maximum length of response",
@@ -108,14 +109,14 @@ class OpenAITextGeneration(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (1.0=disabled)",
+                    tooltip="Nucleus sampling - cumulative probability threshold (1.0=disabled). Ignored by every current model.",
                 ),
                 IO.String.Input(
                     "stop_sequences",
                     default="",
                     multiline=True,
                     optional=True,
-                    tooltip="Stop generation at these sequences (one per line, leave empty to disable)",
+                    tooltip="Stop generation at these sequences (one per line, leave empty to disable). Ignored by every current model.",
                 ),
                 IO.Combo.Input(
                     "response_format",
@@ -268,13 +269,13 @@ class OpenAIChat(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level",
+                    tooltip="Creativity level. Ignored by every current model, which accepts only the default.",
                 ),
                 IO.Int.Input(
                     "max_tokens",
                     default=4096,
                     min=256,
-                    max=16384,
+                    max=128000,
                     step=128,
                     optional=True,
                     tooltip="Maximum length of response",
@@ -286,14 +287,14 @@ class OpenAIChat(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (1.0=disabled)",
+                    tooltip="Nucleus sampling - cumulative probability threshold (1.0=disabled). Ignored by every current model.",
                 ),
                 IO.String.Input(
                     "stop_sequences",
                     default="",
                     multiline=True,
                     optional=True,
-                    tooltip="Stop generation at these sequences (one per line, leave empty to disable)",
+                    tooltip="Stop generation at these sequences (one per line, leave empty to disable). Ignored by every current model.",
                 ),
                 IO.Combo.Input(
                     "response_format",
@@ -442,7 +443,7 @@ class OpenAIVision(IO.ComfyNode):
                 IO.Combo.Input(
                     "model",
                     options=VISION_MODELS,
-                    default="gpt-5.5",
+                    default=OpenAIClient.DEFAULT_MODEL,
                     optional=True,
                     tooltip="OpenAI model to use for vision analysis",
                 ),
@@ -457,7 +458,7 @@ class OpenAIVision(IO.ComfyNode):
                     "max_tokens",
                     default=4096,
                     min=256,
-                    max=16384,
+                    max=128000,
                     step=128,
                     optional=True,
                     tooltip="Maximum length of analysis",
@@ -469,7 +470,7 @@ class OpenAIVision(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level (lower=more factual)",
+                    tooltip="Creativity level (lower=more factual). Ignored by every current model, which accepts only the default.",
                 ),
                 IO.Combo.Input(
                     "reasoning_effort",

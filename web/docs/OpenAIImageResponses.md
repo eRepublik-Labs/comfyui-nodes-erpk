@@ -21,14 +21,14 @@ Use **OpenAI Image Generation (Responses)** when you want:
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `prompt` | String (multiline) | — | Image description. The mainline model may auto-revise before handing to the image model. |
-| `client` | OPENAI_API_CLIENT (optional) | — | Provided by an OpenAI API Config node. Optional if API key is in ComfyUI Settings / env / config.ini. |
-| `mainline_model` | Combo | `gpt-5.6-sol` | Text/reasoning model that drives the call. Options: gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-mini/nano, gpt-5.2, gpt-5, gpt-5-mini/nano, gpt-4.1, gpt-4.1-mini, gpt-4o, gpt-4o-mini, o3, o4-mini. |
-| `image_model` | Combo | `gpt-image-2` | GPT Image model used for pixel generation inside the tool. Options: gpt-image-2, gpt-image-1.5, gpt-image-1, gpt-image-1-mini. |
-| `reasoning_effort` | Combo | `none` | Mainline-model reasoning depth: none / minimal / low / medium / high / xhigh. Only supported on reasoning-capable mainline models. |
-| `verbosity` | Combo | `default` | Mainline-model output verbosity for gpt-5.x: default / low / medium / high. Shapes how chatty the model is independent of token caps. Silently dropped for older mainlines. |
-| `size` | Combo | `1024x1024` | Image size. gpt-image-2 requires at least 655,360 pixels — small sizes like 512x512 are rejected at preflight. 3840x2160 / 2160x3840 are experimental per OpenAI. |
-| `quality` | Combo | `auto` | Image quality tier (auto / low / medium / high). |
-| `background` | Combo | `auto` | Background: auto / transparent / opaque. gpt-image-2 rejects transparent and auto-coerces to opaque with a warning. |
+| `client` | OPENAI_API_CLIENT (optional) | — | Provided by an OpenAI API Config node. Optional if API key is in ComfyUI Settings or config.ini. |
+| `mainline_model` | Combo | `gpt-6.1-sol` | Text/reasoning model that drives the call. Options: gpt-6.1-sol, gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna. Each accepted the image_generation tool on 2026-10-01. |
+| `image_model` | Combo | `gpt-image-2` | GPT Image model used for pixel generation inside the tool. Options: gpt-image-2, gpt-image-2.5-sunburst, gpt-image-2.5-flare. |
+| `reasoning_effort` | Combo | `none` | Mainline-model reasoning depth: none / minimal / low / medium / high / xhigh. `none` sends no effort, so the model uses its own default. `minimal` is rejected alongside the image tool (measured 2026-10-01) and is sent as `low`. |
+| `verbosity` | Combo | `default` | Mainline-model output verbosity: default / low / medium / high. Shapes how chatty the model is independent of token caps. |
+| `size` | Combo | `1024x1024` | Image size: 1024x1024, 1024x1536, 1536x1024, 1792x1024, 1024x1792, 2048x2048, 2048x1152, 2560x1440, 3840x2160, 2160x3840. Every image model needs at least 655,360 pixels, so 512x512 and 256x256 were removed on 2026-10-01. 3840x2160 / 2160x3840 are experimental per OpenAI. |
+| `quality` | Combo | `auto` | Image quality tier: auto / low / medium / high / xhigh / max. xhigh/max on GPT Image 2.5 only (clamped to high on gpt-image-2). |
+| `background` | Combo | `auto` | Background: auto / transparent / opaque, sent as chosen. Transparent works on GPT Image 2.5 only; gpt-image-2 rejects it, and the node stops before the call; it needs png or webp output. |
 | `output_format` | Combo | `png` | Output image format: png, jpeg, webp. |
 | `moderation` | Combo | `auto` | Content moderation: auto (default safety) or low (relaxed). |
 | `enable_web_search` | Boolean | `false` | Add the web_search tool alongside image_generation. Mainline model decides whether to invoke it. Adds $10/1000 calls when used. |

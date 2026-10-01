@@ -1,38 +1,30 @@
 # ABOUTME: ComfyUI V3 nodes for OpenAI image generation and editing
-# ABOUTME: Provides image generation with DALL-E and GPT-Image models
+# ABOUTME: Provides image generation and editing with GPT Image models
 
 from comfy_api.latest import IO
 from .openai_api.client import OpenAIClient
 
 IMAGE_MODELS = list(OpenAIClient.IMAGE_MODELS.keys())
-EDIT_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
+EDIT_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"]
 
-# Mainline (text/reasoning) models accepted by Responses API when the
-# image_generation tool is attached. Full list per OpenAI's tools page.
+# Mainline (text/reasoning) models for the Responses API call. Each returned
+# 200 on responses.create with the image_generation tool attached (measured
+# 2026-10-01). The first entry is the node default.
 RESPONSES_MAINLINE_MODELS = [
-    "gpt-5.5",
-    "gpt-5.5-pro",
-    "gpt-5.4",
-    "gpt-5.4-mini",
-    "gpt-5.4-nano",
-    "gpt-5.2",
-    "gpt-5",
-    "gpt-5-mini",
-    "gpt-5-nano",
-    "gpt-4.1",
-    "gpt-4.1-mini",
-    "gpt-4o",
-    "gpt-4o-mini",
-    "o3",
-    "o4-mini",
+    "gpt-6.1-sol",
+    "gpt-6-astra",
+    "gpt-6-sol",
+    "gpt-6-luna",
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
 ]
 
 # Image models valid inside the Responses-API image_generation tool config.
 RESPONSES_IMAGE_MODELS = [
     "gpt-image-2",
-    "gpt-image-1.5",
-    "gpt-image-1",
-    "gpt-image-1-mini",
+    "gpt-image-2.5-sunburst",
+    "gpt-image-2.5-flare",
 ]
 
 REASONING_EFFORT_LEVELS = ["none", "minimal", "low", "medium", "high", "xhigh"]
@@ -90,8 +82,7 @@ def size_inputs(model_hint):
 
 GEN_SIZES = [
     "1024x1024", "1024x1536", "1536x1024",
-    "512x512", "256x256", "1792x1024", "1024x1792",
-    # gpt-image-2 4K options (older GPT image models will 400 on these);
+    "1792x1024", "1024x1792",
     # OpenAI marks resolutions above 2560x1440 as experimental
     "2048x2048", "2048x1152", "2560x1440", "3840x2160", "2160x3840",
 ]
@@ -127,22 +118,19 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     tooltip=(
                         "Image generation model. "
                         "gpt-image-2.5-sunburst / -flare: newest, add xhigh/max quality and transparent background. "
-                        "gpt-image-2: flagship, 4K output, multilingual text. "
-                        "gpt-image-1.5: previous flagship, supports transparent background."
+                        "gpt-image-2: 4K output, multilingual text; transparent background in preview."
                     ),
                 ),
                 *size_inputs(
                     "gpt-image-2 and 2.5 accept any size with both edges divisible by 16, "
-                    "aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels and max edge 3840; "
-                    "GPT Image 1.x accept the 1024-series and auto; DALL-E 3 takes 1024x1024, "
-                    "1792x1024, 1024x1792; DALL-E 2 takes 256x256, 512x512, 1024x1024."
+                    "aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels and max edge 3840."
                 ),
                 IO.Combo.Input(
                     "quality",
-                    options=["auto", "low", "medium", "high", "xhigh", "max", "hd", "standard"],
+                    options=["auto", "low", "medium", "high", "xhigh", "max"],
                     default="auto",
                     optional=True,
-                    tooltip="Image quality. auto/low/medium/high for the GPT Image family; xhigh/max only on GPT Image 2.5 (clamped to high elsewhere); hd/standard are legacy DALL-E values, kept for compatibility.",
+                    tooltip="Image quality. auto/low/medium/high on every model; xhigh/max only on GPT Image 2.5 (clamped to high on gpt-image-2).",
                 ),
                 IO.Combo.Input(
                     "background",
@@ -151,8 +139,8 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Background type for the generated output (GPT Image models only). "
-                        "'transparent' requires an output format that supports transparency "
-                        "(png or webp)."
+                        "'transparent' works on GPT Image 2.5 only (gpt-image-2 rejects it) and "
+                        "needs png or webp output."
                     ),
                 ),
                 IO.Combo.Input(
@@ -186,6 +174,21 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     control_after_generate="randomize",
                     tooltip="Seed for reproducible outputs (best-effort). Randomizes by default.",
                 ),
+                IO.Combo.Input(
+                    "output_format",
+                    options=["png", "jpeg", "webp"],
+                    default="png",
+                    optional=True,
+                    tooltip="Output file format. 'transparent' background needs png or webp.",
+                ),
+                IO.Int.Input(
+                    "output_compression",
+                    default=100,
+                    min=0,
+                    max=100,
+                    optional=True,
+                    tooltip="Compression level 0-100 (100 = least compression). Applied only to jpeg and webp.",
+                ),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -213,6 +216,8 @@ class OpenAIImageGeneration(IO.ComfyNode):
         background = kwargs.get("background", "auto")
         moderation = kwargs.get("moderation", "auto")
         n = kwargs.get("n", 1)
+        output_format = kwargs.get("output_format", "png")
+        output_compression = kwargs.get("output_compression", 100)
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -240,6 +245,8 @@ class OpenAIImageGeneration(IO.ComfyNode):
                 background=background,
                 moderation=moderation,
                 n=n,
+                output_format=output_format,
+                output_compression=output_compression,
             )
 
             if response.get("blocked", False):
@@ -306,14 +313,14 @@ class OpenAIImageResponses(IO.ComfyNode):
                 IO.Combo.Input(
                     "mainline_model",
                     options=RESPONSES_MAINLINE_MODELS,
-                    default="gpt-5.5",
+                    default=RESPONSES_MAINLINE_MODELS[0],
                     optional=True,
                     tooltip=(
                         "Text/reasoning model that drives the Responses API call. "
                         "Not the image model — this picks prompt interpretation, "
-                        "reasoning, and (optionally) web search. gpt-5.5 is the "
-                        "current premium flagship with the highest reasoning tier; "
-                        "gpt-5.4 is a cheaper alternative for cost-sensitive workflows."
+                        "reasoning, and (optionally) web search. gpt-6.1-sol is the "
+                        "default; gpt-6-astra is the top tier; gpt-6-luna and "
+                        "gpt-5.6-luna are the cheapest."
                     ),
                 ),
                 IO.Combo.Input(
@@ -329,9 +336,10 @@ class OpenAIImageResponses(IO.ComfyNode):
                     default="none",
                     optional=True,
                     tooltip=(
-                        "Mainline-model reasoning depth. 'none' skips reasoning (cheapest, fastest). "
-                        "'low' to 'xhigh' increase prompt-interpretation quality at token cost. "
-                        "Only supported by reasoning-capable mainline models (gpt-5.x, o3, o4-mini). "
+                        "Mainline-model reasoning depth. 'none' sends no effort, so the model uses "
+                        "its own default. 'low' to 'xhigh' increase prompt-interpretation quality "
+                        "at token cost. 'minimal' is rejected alongside the image tool and is sent "
+                        "as 'low'. "
                         "Note: when enabled, reasoning_summary output contains the model's raw "
                         "chain-of-thought, which often includes orchestration-level thinking "
                         "(output channels, response format) rather than only creative rationale."
@@ -343,7 +351,7 @@ class OpenAIImageResponses(IO.ComfyNode):
                     default="default",
                     optional=True,
                     tooltip=(
-                        "Mainline-model output verbosity (gpt-5.x family). Shapes how chatty "
+                        "Mainline-model output verbosity. Shapes how chatty "
                         "the response is independent of max_tokens. 'default' lets the model "
                         "pick. Silently dropped for older mainlines."
                     ),
@@ -357,10 +365,10 @@ class OpenAIImageResponses(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "quality",
-                    options=["auto", "low", "medium", "high"],
+                    options=["auto", "low", "medium", "high", "xhigh", "max"],
                     default="auto",
                     optional=True,
-                    tooltip="Image quality tier.",
+                    tooltip="Image quality tier. xhigh/max only on GPT Image 2.5 (clamped to high on gpt-image-2).",
                 ),
                 IO.Combo.Input(
                     "background",
@@ -368,8 +376,8 @@ class OpenAIImageResponses(IO.ComfyNode):
                     default="auto",
                     optional=True,
                     tooltip=(
-                        "Background type. gpt-image-2 rejects 'transparent' — "
-                        "auto-coerced to 'opaque' with a warning log."
+                        "Background type. 'transparent' works on GPT Image 2.5 only (gpt-image-2 "
+                        "rejects it) and needs png or webp output."
                     ),
                 ),
                 IO.Combo.Input(
@@ -422,7 +430,7 @@ class OpenAIImageResponses(IO.ComfyNode):
         from .openai_api.utils import ImageConverter
 
         client = kwargs.get("client")
-        mainline_model = kwargs.get("mainline_model", "gpt-5.5")
+        mainline_model = kwargs.get("mainline_model", RESPONSES_MAINLINE_MODELS[0])
         image_model = kwargs.get("image_model", "gpt-image-2")
         reasoning_effort = kwargs.get("reasoning_effort", "none")
         verbosity = kwargs.get("verbosity", "default")
@@ -540,13 +548,11 @@ class OpenAIImageEdit(IO.ComfyNode):
                     default="gpt-image-2",
                     optional=True,
                     tooltip=(
-                        "Image editing model. gpt-image-2 is the latest flagship "
-                        "(multilingual text, character continuity across edits). "
-                        "gpt-image-1.5 / gpt-image-1 / gpt-image-1-mini remain available."
+                        "Image editing model. gpt-image-2.5-sunburst / -flare add xhigh/max quality; "
+                        "gpt-image-2 offers multilingual text and character continuity across edits."
                     ),
                 ),
                 *size_inputs(
-                    "gpt-image-1.5 / 1 / 1-mini accept only the 1024-series and auto; "
                     "gpt-image-2 and 2.5 accept any size with both edges divisible by 16, "
                     "aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels and max edge 3840."
                 ),
@@ -585,7 +591,8 @@ class OpenAIImageEdit(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Background type for the edited output (GPT Image models only). "
-                        "'transparent' requires an output format that supports transparency."
+                        "'transparent' works on GPT Image 2.5 only (gpt-image-2 rejects it) and "
+                        "needs png or webp output."
                     ),
                 ),
                 IO.Combo.Input(
@@ -606,6 +613,21 @@ class OpenAIImageEdit(IO.ComfyNode):
                     max=2**31 - 1,
                     control_after_generate="randomize",
                     tooltip="Seed for reproducible outputs (best-effort). Randomizes by default.",
+                ),
+                IO.Combo.Input(
+                    "output_format",
+                    options=["png", "jpeg", "webp"],
+                    default="png",
+                    optional=True,
+                    tooltip="Output file format. 'transparent' background needs png or webp.",
+                ),
+                IO.Int.Input(
+                    "output_compression",
+                    default=100,
+                    min=0,
+                    max=100,
+                    optional=True,
+                    tooltip="Compression level 0-100 (100 = least compression). Applied only to jpeg and webp.",
                 ),
             ],
             outputs=[
@@ -635,6 +657,8 @@ class OpenAIImageEdit(IO.ComfyNode):
         n = kwargs.get("n", 1)
         background = kwargs.get("background", "auto")
         input_fidelity = kwargs.get("input_fidelity", "auto")
+        output_format = kwargs.get("output_format", "png")
+        output_compression = kwargs.get("output_compression", 100)
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -722,6 +746,8 @@ class OpenAIImageEdit(IO.ComfyNode):
                 n=n,
                 background=background,
                 input_fidelity=input_fidelity,
+                output_format=output_format,
+                output_compression=output_compression,
             )
 
             if response.get("blocked", False):

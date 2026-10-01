@@ -7,9 +7,9 @@ Complete OpenAI API integration providing text generation, vision analysis, mult
 
 ## Features
 
-- **Text Generation** - Use all GPT models (GPT-5.5 + GPT-5.5 Pro premium flagships, GPT-5.4 family, GPT-5.2, GPT-4.1, GPT-4o, o3, o3-mini, o3-pro, o4-mini)
-- **Vision Analysis** - Analyze images with GPT-4o / GPT-5 vision capabilities
-- **Image Generation** - Generate images with GPT Image 2 (flagship), GPT Image 1.5, and GPT Image 1 / Mini
+- **Text Generation** - GPT-6.1 Sol (default), the GPT-6 Astra/Sol/Luna and GPT-5.6 Sol/Terra/Luna tiers, and chat-latest
+- **Vision Analysis** - Analyze images with any of the text models (all accept image input)
+- **Image Generation** - Generate images with GPT Image 2 and GPT Image 2.5 Sunburst / Flare
 - **Image Generation (Responses API)** - Orchestrated image generation via a mainline reasoning model with optional web-search grounding
 - **Image Editing** - Edit and inpaint images with natural language prompts
 - **Multi-turn Conversations** - Maintain chat history across requests
@@ -86,14 +86,14 @@ General-purpose text generation and completion.
 **Inputs:**
 - `client`: OpenAI API client
 - `prompt`: Text prompt
-- `model`: gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini, chat-latest, o4-mini, o3, o3-mini, o3-pro
-- `temperature`: 0.0-2.0 (creativity level, default: 0.7)
-- `max_tokens`: 256-16384 (output length, default: 4096)
-- `top_p`: 0.0-1.0 (nucleus sampling, default: 1.0, set <1.0 to enable)
-- `stop_sequences`: Newline-separated sequences where generation stops
+- `model`: gpt-6.1-sol (default), gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, chat-latest
+- `temperature`: 0.0-2.0 (creativity level, default: 0.7; ignored by every current model, which accepts only the default)
+- `max_tokens`: 256-128000 (output length, default: 4096)
+- `top_p`: 0.0-1.0 (nucleus sampling, default: 1.0; ignored by every current model, which accepts only the default)
+- `stop_sequences`: Newline-separated sequences where generation stops (ignored by every current model, which accepts only the default)
 - `response_format`: Output format - "default" or "json_object"
-- `reasoning_effort`: Reasoning depth for reasoning-capable models (gpt-5.5, gpt-5.5-pro, gpt-5.4 family, o3, o4-mini) — none, minimal, low, medium, high, xhigh
-- `verbosity`: Output verbosity for gpt-5.x models (gpt-5.5, gpt-5.5-pro, gpt-5.4 family, gpt-5.x family) — default, low, medium, high. Shapes how chatty the response is independently of `max_tokens`. 'default' lets the model pick. Silently dropped for older models.
+- `reasoning_effort`: Reasoning depth for the gpt-6.x and gpt-5.6 models — none, minimal, low, medium, high, xhigh. `none` sends no effort (model default); `minimal` is rejected by every current model and is sent as `low`. Dropped for chat-latest
+- `verbosity`: Output verbosity for the gpt-6.x and gpt-5.6 models — default, low, medium, high. Shapes how chatty the response is independently of `max_tokens`. 'default' lets the model pick. Dropped for chat-latest.
 
 **Outputs:**
 - `response`: Generated text
@@ -113,15 +113,15 @@ Multi-turn conversation with message history preservation.
 **Inputs:**
 - `client`: OpenAI API client
 - `prompt`: Your message
-- `model`: gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-5-nano, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini, chat-latest, o4-mini, o3, o3-mini, o3-pro
+- `model`: gpt-6.1-sol (default), gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, chat-latest
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
-- `temperature`: 0.0-2.0 (default: 0.7)
-- `max_tokens`: 256-16384 (default: 4096)
-- `top_p`: 0.0-1.0 (nucleus sampling, default: 1.0, set <1.0 to enable)
-- `stop_sequences`: Newline-separated sequences where generation stops
+- `temperature`: 0.0-2.0 (default: 0.7; ignored by every current model, which accepts only the default)
+- `max_tokens`: 256-128000 (default: 4096)
+- `top_p`: 0.0-1.0 (nucleus sampling, default: 1.0; ignored by every current model, which accepts only the default)
+- `stop_sequences`: Newline-separated sequences where generation stops (ignored by every current model, which accepts only the default)
 - `response_format`: Output format - "default" or "json_object"
-- `reasoning_effort`: Reasoning depth for reasoning-capable models — none, minimal, low, medium, high, xhigh
+- `reasoning_effort`: Reasoning depth for the gpt-6.x and gpt-5.6 models — none, minimal, low, medium, high, xhigh (`minimal` is sent as `low`)
 
 **Outputs:**
 - `response`: Chat response
@@ -142,10 +142,10 @@ Analyze images with questions or instructions.
 - `client`: OpenAI API client
 - `image`: ComfyUI image tensor (supports batches)
 - `prompt`: Question or instruction about the image(s)
-- `model`: gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.5-pro, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, gpt-5-mini, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, gpt-4o, gpt-4o-mini
+- `model`: gpt-6.1-sol (default), gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, chat-latest
 - `detail`: Image analysis detail level - "auto" (default), "low" (faster/cheaper), "high" (more detailed)
-- `max_tokens`: 256-16384 (default: 4096)
-- `temperature`: 0.0-2.0 (default: 0.4, lower for more factual)
+- `max_tokens`: 256-128000 (default: 4096)
+- `temperature`: 0.0-2.0 (default: 0.4; ignored by every current model, which accepts only the default)
 
 **Outputs:**
 - `analysis`: Text analysis of the image(s)
@@ -187,12 +187,16 @@ Generate images from text descriptions using OpenAI's image generation models.
 **Inputs:**
 - `prompt`: Text description of the image to generate
 - `client`: Optional OpenAI API client (from OpenAI API Config node)
-- `model`: gpt-image-2 (default), gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-1.5, gpt-image-1, gpt-image-1-mini
+- `model`: gpt-image-2 (default), gpt-image-2.5-sunburst, gpt-image-2.5-flare
 - `size`: Preset (auto, 1024x1024, 1024x1536, 1536x1024, 2048x2048, 2048x1152, 1152x2048, 3840x2160, 2160x3840) or Custom
-- `custom_width` / `custom_height`: Used when size is Custom (256 to 3840, step 16). Each model has its own supported sizes; the API rejects unsupported values.
-- `quality`: Image quality - auto (default), low, medium, high (GPT Image family)
-- `background`: Background type - auto, transparent, opaque (GPT Image family)
+- `custom_width` / `custom_height`: Used when size is Custom (256 to 3840, step 16). Sizes outside the gpt-image-2 envelope below are rejected before the request is sent.
+- `quality`: Image quality - auto (default), low, medium, high, xhigh, max (xhigh/max on GPT Image 2.5 only, clamped to high on gpt-image-2)
+- `background`: Background type - auto, transparent, opaque (transparent: GPT Image 2.5 only; gpt-image-2 rejects it)
+- `moderation`: auto (default) / low
 - `n`: Number of images (1-10)
+- `seed`: Cache control only, not sent to the API (-1 randomizes)
+- `output_format`: png (default), jpeg, webp
+- `output_compression`: 0-100 (default 100), sent only with jpeg or webp
 
 **Outputs:**
 - `image`: Generated image batch (ComfyUI IMAGE tensor; when n>1, all images are stacked into a batch)
@@ -201,11 +205,11 @@ Generate images from text descriptions using OpenAI's image generation models.
 **Features:**
 - Credentials resolved from ComfyUI Settings, the node input, or config.ini
 - Direct image output compatible with all ComfyUI image nodes
-- Transparent background support with gpt-image-2.5-sunburst / gpt-image-2.5-flare / gpt-image-1.5 / gpt-image-1 / gpt-image-1-mini
+- Transparent background support on gpt-image-2.5-sunburst / gpt-image-2.5-flare (in preview on gpt-image-2)
 - n>1 returns a batched IMAGE tensor — no images are dropped
 - Size presets plus a Custom width/height pair (validated against the model's supported sizes by the API)
 
-**gpt-image-2 constraints** (enforced client-side as defense-in-depth):
+**gpt-image-2 and 2.5 constraints** (enforced client-side as defense-in-depth):
 - Max edge ≤ 3840px, both edges multiples of 16
 - Total pixels between 655,360 and 8,294,400
 - Aspect ratio (long:short) ≤ 3:1
@@ -224,11 +228,11 @@ Generate images via the OpenAI Responses API with a mainline reasoning model dri
 **Inputs:**
 - `prompt`: Image description (the mainline model may auto-revise before dispatch)
 - `client`: Optional OpenAI API client
-- `mainline_model`: Text/reasoning model that orchestrates the call — gpt-5.6-sol (default), gpt-5.6-terra, gpt-5.6-luna, gpt-5.5 (premium tier), gpt-5.5-pro (extended-compute), gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5, o3, o4-mini, etc.
-- `image_model`: Underlying GPT Image model — gpt-image-2 (default), gpt-image-1.5, gpt-image-1, gpt-image-1-mini
-- `reasoning_effort`: none (default), minimal, low, medium, high, xhigh (only reasoning-capable mainlines use this)
+- `mainline_model`: Text/reasoning model that orchestrates the call — gpt-6.1-sol (default), gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna
+- `image_model`: Underlying GPT Image model — gpt-image-2 (default), gpt-image-2.5-sunburst, gpt-image-2.5-flare
+- `reasoning_effort`: none (default), minimal, low, medium, high, xhigh (`minimal` is rejected alongside the image tool and is sent as `low`)
 - `size`: 1024x1024 (default) and common variants
-- `quality`: auto / low / medium / high
+- `quality`: auto / low / medium / high / xhigh / max (xhigh/max on GPT Image 2.5 only)
 - `background`: auto / transparent / opaque
 - `output_format`: png (default), jpeg, webp
 - `moderation`: auto (default) or low
@@ -254,14 +258,17 @@ Edit and modify existing images using text prompts with optional masking.
 - `prompt`: Text description of how to modify the image
 - `client`: Optional OpenAI API client (from OpenAI API Config node)
 - `mask`: Optional mask (ComfyUI MASK tensor) - white areas will be edited
-- `model`: gpt-image-2 (default), gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-1.5, gpt-image-1, gpt-image-1-mini
-- `size`: Preset (auto, 1024x1024, 1024x1536, 1536x1024, 2048x2048, 2048x1152, 1152x2048, 3840x2160, 2160x3840) or Custom. gpt-image-1.5 / 1 / 1-mini accept only the 1024-series and auto; gpt-image-2 and the 2.5 models accept any Custom size within the gpt-image-2 constraints listed under OpenAI Image Generation
+- `model`: gpt-image-2 (default), gpt-image-2.5-sunburst, gpt-image-2.5-flare
+- `size`: Preset (auto, 1024x1024, 1024x1536, 1536x1024, 2048x2048, 2048x1152, 1152x2048, 3840x2160, 2160x3840) or Custom. Every model accepts any Custom size within the gpt-image-2 constraints listed under OpenAI Image Generation
 - `custom_width` / `custom_height`: Used when size is Custom (256 to 3840, step 16)
 - `quality`: Image quality - auto (default), low, medium, high, xhigh, max (xhigh/max on GPT Image 2.5 only)
 - `moderation`: auto (default) / low
-- `background`: auto / transparent / opaque (GPT Image family)
-- `input_fidelity`: auto / high / low (gpt-image-1.5 / gpt-image-1 / mini; gpt-image-2 and the 2.5 models reject the param, so it is dropped there)
+- `background`: auto / transparent / opaque (transparent: GPT Image 2.5 only; gpt-image-2 rejects it)
+- `input_fidelity`: auto / high / low (ignored by every current model: gpt-image-2 and the 2.5 models reject the param, so it is never sent)
 - `n`: Number of variations (1-10)
+- `seed`: Cache control only, not sent to the API (-1 randomizes)
+- `output_format`: png (default), jpeg, webp
+- `output_compression`: 0-100 (default 100), sent only with jpeg or webp
 
 **Outputs:**
 - `image`: Edited image (ComfyUI IMAGE tensor)
@@ -277,7 +284,7 @@ Edit and modify existing images using text prompts with optional masking.
 - "Remove the person and fill with background"
 - "Add raindrops to the window"
 
-**Note:** gpt-image-1.5 provides the best editing results. gpt-image-1 also works well.
+**Note:** gpt-image-2.5-sunburst is the highest-quality editing tier; gpt-image-2.5-flare is the fastest.
 
 ---
 
@@ -287,30 +294,16 @@ Edit and modify existing images using text prompts with optional masking.
 
 | Model | Best For | Context Window | Notes |
 |-------|----------|----------------|-------|
-| **gpt-5.6-sol** | Current flagship — most complex professional work | — | **Node default**, highest GPT-5.6 capability tier |
+| **gpt-6.1-sol** | Current flagship | 1.05M tokens | **Node default**; 128K output; $2/$10 per MTok ($0.10 cached input) |
+| **gpt-6-astra** | Top tier | 1.05M tokens | $10/$50 per MTok |
+| **gpt-6-sol** | GPT-6 flagship tier | 1.05M tokens | $2/$10 per MTok |
+| **gpt-6-luna** | Most efficient GPT-6 tier | 1.05M tokens | $0.10/$0.50 per MTok |
+| **gpt-5.6-sol** | Highest GPT-5.6 capability tier | — | |
 | **gpt-5.6-terra** | Balanced GPT-5.6 tier | — | Mid capability/cost |
 | **gpt-5.6-luna** | Fast, cost-efficient GPT-5.6 tier | — | Lowest GPT-5.6 cost |
-| **gpt-5.5** | Previous premium flagship | 1.05M tokens | $5/$30 per MTok (2x of 5.4); highest reasoning tier; sessions over 272K input billed at 2x input / 1.5x output |
-| **gpt-5.5-pro** | Extended-compute premium tier | 1.05M tokens | $30/$180 per MTok (no streaming, no cached input discount); slowest; recommend background mode for long requests |
-| **gpt-5.4** | Cost-sensitive flagship alternative | 1M tokens | $2.50/$15 per MTok; configurable reasoning_effort |
-| **gpt-5.4-pro** | Extended compute | 1M tokens | Responses API only; highest quality |
-| **gpt-5.4-mini** | Fast reasoning | 400K tokens | Cost-efficient flagship tier |
-| **gpt-5.4-nano** | Fastest GPT-5.4 | 400K tokens | Lowest cost in flagship family |
-| **gpt-5.2** | Coding/agents | 400K tokens | Previous-gen; still strong for engineering |
-| **gpt-5.2-pro** | Precision tasks | 400K tokens | Smarter, more precise responses |
-| **gpt-5.1** | Coding/agents | 400K tokens | Configurable reasoning effort |
-| **gpt-5** | Reasoning | 400K tokens | Earlier flagship reasoning model |
-| **gpt-5-mini** | Fast, cost-efficient | 400K tokens | Good balance |
-| **gpt-5-nano** | Fastest, lowest cost | 400K tokens | Simple tasks |
-| **gpt-4.1** | Non-reasoning tasks | 1M tokens | Smartest non-reasoning model |
-| **gpt-4.1-mini** | Fast, cost-effective | 1M tokens | Budget option |
-| **gpt-4.1-nano** | Fastest GPT-4.1 | 1M tokens | Lowest cost GPT-4.1 |
-| **gpt-4o** | Multimodal (text + vision) | 128K tokens | Cheap, vision-capable fallback |
-| **gpt-4o-mini** | Fast multimodal | 128K tokens | Budget vision |
-| **o4-mini** | Fast reasoning | 200K tokens | STEM and technical |
-| **o3** | Advanced reasoning | 200K tokens | Complex problems |
-| **o3-mini** | Cost-efficient reasoning | 200K tokens | Budget STEM |
-| **o3-pro** | Most powerful reasoning | 200K tokens | Hardest problems |
+| **chat-latest** | ChatGPT Instant, non-reasoning | 400K tokens | $5/$30 per MTok; no reasoning_effort or verbosity |
+
+Removed on 2026-10-01: gpt-5.5, gpt-5.5-pro, gpt-5.4 / -pro / -mini / -nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5 / -mini / -nano, gpt-4.1 / -mini / -nano, gpt-4o, gpt-4o-mini, o4-mini, o3, o3-mini, o3-pro. gpt-5.2-pro, gpt-5.4-pro and gpt-5.5-pro never worked here: they 404 on chat.completions. Every kept model rejects temperature, top_p and stop, so the node no longer sends them.
 
 ### Image Generation Models
 
@@ -318,10 +311,9 @@ Edit and modify existing images using text prompts with optional masking.
 |-------|----------|-------|
 | **gpt-image-2.5-sunburst** | Highest quality | 4K output, `xhigh`/`max` quality tiers, transparent background |
 | **gpt-image-2.5-flare** | Fastest 2.5 tier | 4K output, `xhigh`/`max` quality tiers, transparent background |
-| **gpt-image-2** | Latest flagship | **Default**, 4K output, multilingual text, no transparent background |
-| **gpt-image-1.5** | Previous flagship | 2K output, transparent background support |
-| **gpt-image-1** | High quality | Editing, transparent backgrounds |
-| **gpt-image-1-mini** | Cost-efficient | Budget image generation |
+| **gpt-image-2** | 4K, multilingual text | **Default**, 4K output, multilingual text, transparent background in preview |
+
+gpt-image-1.5, gpt-image-1 and gpt-image-1-mini were removed on 2026-10-01, along with the DALL-E-only quality values hd / standard.
 
 ## Example Workflows
 
@@ -399,7 +391,7 @@ https://openai.com/pricing
 ### Image generation fails
 - Check your API quota and billing status
 - Some sizes are only available for certain models
-- Transparent backgrounds are supported by the GPT Image family. Pass-through values: any of `auto`, `transparent`, `opaque` go to the API as-is.
+- Transparent backgrounds are supported on GPT Image 2.5 and in preview on gpt-image-2. Pass-through values: any of `auto`, `transparent`, `opaque` go to the API as-is. Transparent needs png or webp output.
 - gpt-image-2 enforces min 655,360 total pixels and max-edge 3840 — pick Custom and type a size your chosen model supports
 
 ### Rate limiting

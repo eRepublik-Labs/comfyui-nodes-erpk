@@ -58,7 +58,7 @@ def test_generate_content_runs_two_calls_concurrently():
             }
 
         client = OpenAIClient.__new__(OpenAIClient)
-        client.model_name = "gpt-4o"
+        client.model_name = "chat-latest"
         client.system_instruction = None
         client._generate_content_sync = fake_sync
 

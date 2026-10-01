@@ -17,7 +17,7 @@ if not hasattr(_local_openai, "APIError"):
 from openai.openai_api.client import OpenAIClient
 
 
-GPT_IMAGE_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"]
+GPT_IMAGE_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"]
 DALLE_MODELS = ["dall-e-3", "dall-e-2"]
 
 
@@ -59,26 +59,35 @@ class TestGenerateImageParams:
 
 
 class TestGptImage2Background:
-    """Background param passes through unchanged to gpt-image-2 (no client-side coercion)."""
+    """gpt-image-2 rejects transparent; the 2.5 models take it."""
 
-    def test_transparent_passes_through_for_gpt_image_2(self):
+    # Measured 2026-10-01: images.generate gpt-image-2 background=transparent ->
+    # 400 "Transparent background is not supported for this model."; both 2.5
+    # models returned RGBA PNGs with real alpha.
+    def test_transparent_rejected_before_the_call_for_gpt_image_2(self):
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError, match="gpt-image-2 does not support background='transparent'"):
+            asyncio.run(client.generate_image(
+                prompt="a cat", model="gpt-image-2", background="transparent"
+            ))
+        mock.images.generate.assert_not_called()
+
+    def test_edit_transparent_rejected_before_the_call_for_gpt_image_2(self):
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError, match="gpt-image-2 does not support background='transparent'"):
+            asyncio.run(client.edit_image(
+                b"png-bytes", "add a hat", model="gpt-image-2", background="transparent"
+            ))
+        mock.images.edit.assert_not_called()
+
+    def test_transparent_preserved_for_gpt_image_2_5(self):
         client, mock = _make_client_with_mock()
         asyncio.run(client.generate_image(
-            prompt="a cat", model="gpt-image-2", background="transparent"
+            prompt="a cat", model="gpt-image-2.5-sunburst", background="transparent"
         ))
         params = mock.images.generate.call_args[1]
         assert params.get("background") == "transparent", (
-            "background must be forwarded unchanged; OpenAI now controls model-specific support"
-        )
-
-    def test_transparent_preserved_for_gpt_image_1_5(self):
-        client, mock = _make_client_with_mock()
-        asyncio.run(client.generate_image(
-            prompt="a cat", model="gpt-image-1.5", background="transparent"
-        ))
-        params = mock.images.generate.call_args[1]
-        assert params.get("background") == "transparent", (
-            "gpt-image-1.5 supports transparent — must not be coerced"
+            "gpt-image-2.5 supports transparent — must not be coerced"
         )
 
     def test_opaque_passes_through_unchanged_for_gpt_image_2(self):
@@ -113,7 +122,7 @@ class TestGptImage2ModelPresence:
 class TestModeration:
     """moderation parameter: pass-through for GPT Image models, skipped for others."""
 
-    @pytest.mark.parametrize("model", ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"])
+    @pytest.mark.parametrize("model", GPT_IMAGE_MODELS)
     def test_moderation_low_sent_for_gpt_image_models(self, model):
         client, mock = _make_client_with_mock()
         asyncio.run(client.generate_image(
@@ -164,8 +173,7 @@ class TestModeration:
 class TestNValidation:
     """GPT Image models accept n=1-10."""
 
-    @pytest.mark.parametrize("model", ["gpt-image-2", "gpt-image-1.5", "gpt-image-1",
-                                       "gpt-image-1-mini"])
+    @pytest.mark.parametrize("model", GPT_IMAGE_MODELS)
     def test_models_accept_n_up_to_10(self, model):
         client, mock = _make_client_with_mock()
         # gpt-image-2 needs a valid size (n validation happens after size validation)
@@ -237,11 +245,6 @@ class TestGptImage2SizeValidation:
         asyncio.run(client.edit_image(image_data=b"fakepng", prompt="x", model="gpt-image-2", size="1536x864"))
         assert mock.images.edit.call_args[1]["size"] == "1536x864"
 
-    def test_edit_does_not_preflight_older_gpt_image_sizes(self):
-        client, mock = _make_client_with_mock()
-        asyncio.run(client.edit_image(image_data=b"fakepng", prompt="x", model="gpt-image-1.5", size="512x512"))
-        assert mock.images.edit.called
-
     def test_edit_min_pixel_floor_matches_api(self):
         # Measured live 2026-09-21 on gpt-image-2 and gpt-image-2.5-flare:
         # 816x800 (652,800 px) 400s, 1024x640 (655,360 px) is accepted.
@@ -265,30 +268,12 @@ class TestEditInputFidelity:
         ))
         assert "input_fidelity" not in mock.images.edit.call_args[1]
 
-    def test_sent_for_gpt_image_1_5(self):
-        client, mock = _make_client_with_mock()
-        asyncio.run(client.edit_image(
-            image_data=b"fakepng", prompt="x", model="gpt-image-1.5", input_fidelity="high",
-        ))
-        assert mock.images.edit.call_args[1]["input_fidelity"] == "high"
-
     def test_malformed_size_skips_validation(self):
         """Malformed strings fall through to the API, which returns its own
         error message. We don't try to second-guess the parser."""
         client, mock = _make_client_with_mock()
         asyncio.run(client.generate_image(prompt="x", model="gpt-image-2", size="notasize"))
         assert mock.images.generate.called
-
-    def test_other_models_skip_validation(self):
-        """Small sizes are fine on gpt-image-1 / gpt-image-1.5 / dall-e-2 — the
-        gpt-image-2 validator must not reject them when a different model is chosen."""
-        client, mock = _make_client_with_mock()
-        asyncio.run(client.generate_image(prompt="x", model="gpt-image-1", size="512x512"))
-        asyncio.run(client.generate_image(prompt="x", model="gpt-image-1.5", size="512x512"))
-        asyncio.run(client.generate_image(prompt="x", model="dall-e-2", size="512x512"))
-        # Three calls, no exceptions
-        assert mock.images.generate.call_count == 3
-
 
 class TestEditImageParams:
     """Verify edit_image builds correct params per model."""
@@ -364,3 +349,81 @@ class TestEditImageMultiImage:
         # image is still the multi-image array
         assert isinstance(params["image"], list)
         assert len(params["image"]) == 2
+
+
+class TestOutputFormat:
+    """images.generate and images.edit take output_format (png/jpeg/webp) and
+    output_compression (0-100, jpeg/webp only) for GPT Image models, per the
+    images API reference."""
+
+    WIDGETS_BEFORE = {
+        "OpenAIImageGeneration": [
+            "prompt", "model", "size", "custom_width", "custom_height",
+            "quality", "background", "moderation", "n", "seed",
+        ],
+        "OpenAIImageEdit": [
+            "prompt", "model", "size", "custom_width", "custom_height",
+            "quality", "moderation", "n", "background", "input_fidelity", "seed",
+        ],
+    }
+
+    @pytest.mark.parametrize("class_name", sorted(WIDGETS_BEFORE))
+    def test_new_widgets_are_appended_last(self, class_name):
+        # widgets_values is positional: existing widgets keep their slots.
+        import importlib
+        cls = getattr(importlib.import_module("openai.image_nodes"), class_name)
+        inputs = cls.define_schema().inputs
+        widget_ids = [i.id for i in inputs
+                      if i.io_type in ("STRING", "INT", "FLOAT", "BOOLEAN", "COMBO")]
+        assert widget_ids == self.WIDGETS_BEFORE[class_name] + ["output_format", "output_compression"]
+        fmt = next(i for i in inputs if i.id == "output_format")
+        assert fmt.options == ["png", "jpeg", "webp"] and fmt.default == "png"
+        comp = next(i for i in inputs if i.id == "output_compression")
+        assert (comp.min, comp.max, comp.default) == (0, 100, 100)
+
+    @pytest.mark.parametrize("fmt", ["jpeg", "webp"])
+    def test_lossy_format_sends_format_and_compression(self, fmt):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.generate_image(prompt="x", model="gpt-image-2", output_format=fmt, output_compression=60))
+        params = mock.images.generate.call_args[1]
+        assert params["output_format"] == fmt
+        assert params["output_compression"] == 60
+
+    def test_png_sends_neither(self):
+        # png is the API default and takes no compression.
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.generate_image(prompt="x", model="gpt-image-2", output_format="png", output_compression=60))
+        params = mock.images.generate.call_args[1]
+        assert "output_format" not in params
+        assert "output_compression" not in params
+
+    def test_edit_sends_format_and_compression(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.edit_image(image_data=b"fakepng", prompt="x", model="gpt-image-2",
+                                      output_format="webp", output_compression=40))
+        params = mock.images.edit.call_args[1]
+        assert params["output_format"] == "webp"
+        assert params["output_compression"] == 40
+
+    def test_edit_png_sends_neither(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.edit_image(image_data=b"fakepng", prompt="x", model="gpt-image-2",
+                                      output_format="png", output_compression=40))
+        params = mock.images.edit.call_args[1]
+        assert "output_format" not in params
+        assert "output_compression" not in params
+
+    def test_generation_node_forwards_widgets(self):
+        from openai.image_nodes import OpenAIImageGeneration
+        seen = {}
+
+        class RecordingClient:
+            async def generate_image(self, **kwargs):
+                seen.update(kwargs)
+                return {"blocked": True, "error": "stop here"}
+
+        with pytest.raises(ValueError, match="stop here"):
+            asyncio.run(OpenAIImageGeneration.execute(
+                "a cat", client=RecordingClient(), output_format="jpeg", output_compression=70,
+            ))
+        assert (seen["output_format"], seen["output_compression"]) == ("jpeg", 70)

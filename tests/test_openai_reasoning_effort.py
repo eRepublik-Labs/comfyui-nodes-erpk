@@ -1,4 +1,4 @@
-# ABOUTME: Tests for OpenAI reasoning_effort parameter and gpt-5.4 family models
+# ABOUTME: Tests for the OpenAI reasoning_effort and verbosity parameters
 # ABOUTME: Validates schema inputs, SDK pass-through for reasoning models, and drop for non-reasoning
 
 import asyncio
@@ -30,80 +30,11 @@ def _import_node(module_name, class_name):
     return getattr(mod, class_name)
 
 
-class TestGPT54FamilyInModels:
-    """gpt-5.4 family is present in OpenAIClient.MODELS and related sets."""
-
-    @pytest.mark.parametrize("model_id", [
-        "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
-    ])
-    def test_gpt_5_4_family_in_models(self, model_id):
-        assert model_id in OpenAIClient.MODELS, (
-            f"{model_id} must be present in OpenAIClient.MODELS"
-        )
-
-    @pytest.mark.parametrize("model_id", [
-        "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
-    ])
-    def test_gpt_5_4_family_uses_max_completion_tokens(self, model_id):
-        assert model_id in OpenAIClient.NEW_TOKEN_PARAM_MODELS, (
-            f"{model_id} should use max_completion_tokens"
-        )
-
-    @pytest.mark.parametrize("model_id", [
-        "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
-    ])
-    def test_gpt_5_4_family_supports_reasoning(self, model_id):
-        assert model_id in OpenAIClient.REASONING_MODELS, (
-            f"{model_id} should support reasoning_effort"
-        )
-
-
-class TestGPT55FamilyInModels:
-    """gpt-5.5 family (gpt-5.5 + gpt-5.5-pro) is wired into all relevant sets.
-
-    Released 2026-04-23. The base gpt-5.5 is the premium flagship; gpt-5.5-pro
-    is an extended-compute Responses API variant at $30/$180 per MTok with no
-    streaming support. Both use max_completion_tokens and support reasoning_effort.
-    """
-
-    @pytest.mark.parametrize("model_id", ["gpt-5.5", "gpt-5.5-pro"])
-    def test_gpt_5_5_family_in_models(self, model_id):
-        assert model_id in OpenAIClient.MODELS, (
-            f"{model_id} must be present in OpenAIClient.MODELS"
-        )
-
-    @pytest.mark.parametrize("model_id", ["gpt-5.5", "gpt-5.5-pro"])
-    def test_gpt_5_5_family_uses_max_completion_tokens(self, model_id):
-        assert model_id in OpenAIClient.NEW_TOKEN_PARAM_MODELS, (
-            f"{model_id} should use max_completion_tokens like the rest of the gpt-5 family"
-        )
-
-    @pytest.mark.parametrize("model_id", ["gpt-5.5", "gpt-5.5-pro"])
-    def test_gpt_5_5_family_supports_reasoning(self, model_id):
-        assert model_id in OpenAIClient.REASONING_MODELS, (
-            f"{model_id} must support reasoning_effort"
-        )
-
-    @pytest.mark.parametrize("model_id", ["gpt-5.5", "gpt-5.5-pro"])
-    def test_gpt_5_5_family_in_responses_mainline_models(self, model_id):
-        from openai.image_nodes import RESPONSES_MAINLINE_MODELS
-        assert model_id in RESPONSES_MAINLINE_MODELS, (
-            f"{model_id} must be selectable as a mainline model on the Image Responses node"
-        )
-
-    def test_flagship_appears_first_in_dropdown(self):
-        """gpt-5.6-sol is the current flagship — should be first in the model dropdown."""
+class TestDropdownOrder:
+    def test_default_model_appears_first_in_dropdown(self):
+        """The default text model leads the model dropdown."""
         from openai.nodes import TEXT_MODELS
-        assert TEXT_MODELS[0] == "gpt-5.6-sol", (
-            f"gpt-5.6-sol should be the first option in TEXT_MODELS, got {TEXT_MODELS[0]}"
-        )
-
-    def test_flagship_terra_appears_second_in_dropdown(self):
-        """gpt-5.6-terra is the balanced GPT-5.6 tier — should sit right after Sol."""
-        from openai.nodes import TEXT_MODELS
-        assert TEXT_MODELS[1] == "gpt-5.6-terra", (
-            f"gpt-5.6-terra should be the second option in TEXT_MODELS, got {TEXT_MODELS[1]}"
-        )
+        assert TEXT_MODELS[0] == OpenAIClient.DEFAULT_MODEL
 
 
 class TestVisionModelsDerivedFromModels:
@@ -195,30 +126,25 @@ class TestVerbosityModelsSet:
     """VERBOSITY_MODELS controls which models receive the verbosity param."""
 
     @pytest.mark.parametrize("model_id", [
-        "gpt-5.5", "gpt-5.5-pro",
-        "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano",
-        "gpt-5.2", "gpt-5.2-pro", "gpt-5.1",
-        "gpt-5", "gpt-5-mini", "gpt-5-nano",
+        # verbosity=low returned 200 on chat.completions: gpt-6 tiers
+        # 2026-09-23, gpt-6.1-sol 2026-10-01.
+        "gpt-6.1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
+        "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     ])
-    def test_gpt_5_x_in_verbosity_models(self, model_id):
+    def test_reasoning_tiers_in_verbosity_models(self, model_id):
         assert model_id in OpenAIClient.VERBOSITY_MODELS, (
             f"{model_id} should accept the verbosity parameter"
         )
 
-    @pytest.mark.parametrize("model_id", [
-        "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
-        "o3", "o3-mini", "o3-pro", "o4-mini",
-    ])
-    def test_non_gpt_5_x_excluded_from_verbosity(self, model_id):
-        assert model_id not in OpenAIClient.VERBOSITY_MODELS, (
-            f"{model_id} should NOT be in VERBOSITY_MODELS — verbosity is a gpt-5.x parameter"
-        )
+    def test_chat_latest_excluded_from_verbosity(self):
+        # chat-latest's model page does not list verbosity.
+        assert "chat-latest" not in OpenAIClient.VERBOSITY_MODELS
 
 
 def _make_client_with_mock_sdk():
     """Build an OpenAIClient instance with the SDK mocked out (no __init__)."""
     client = OpenAIClient.__new__(OpenAIClient)
-    client.model_name = "gpt-4o"
+    client.model_name = "chat-latest"
     client.system_instruction = None
 
     mock_sdk = MagicMock()
@@ -242,7 +168,7 @@ class TestReasoningEffortPassThrough:
 
         asyncio.run(client.generate_content(
             prompt="hello",
-            model="gpt-5.4",
+            model="gpt-6.1-sol",
             reasoning_effort="high",
         ))
 
@@ -254,19 +180,19 @@ class TestReasoningEffortPassThrough:
 
         asyncio.run(client.generate_content(
             prompt="hello",
-            model="gpt-4o",
+            model="chat-latest",
             reasoning_effort="high",
         ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert "reasoning_effort" not in kwargs
 
-    def test_reasoning_effort_passed_for_o3(self):
+    def test_reasoning_effort_passed_for_gpt_6_luna(self):
         client, mock_sdk = _make_client_with_mock_sdk()
 
         asyncio.run(client.generate_content(
             prompt="hello",
-            model="o3",
+            model="gpt-6-luna",
             reasoning_effort="medium",
         ))
 
@@ -279,7 +205,7 @@ class TestReasoningEffortPassThrough:
 
         asyncio.run(client.generate_content(
             prompt="hello",
-            model="gpt-5.4",
+            model="gpt-6.1-sol",
         ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
@@ -291,7 +217,7 @@ class TestReasoningEffortPassThrough:
 
         asyncio.run(client.chat(
             messages=[{"role": "user", "content": "hi"}],
-            model="gpt-5.4-pro",
+            model="gpt-6.1-sol",
             reasoning_effort="xhigh",
         ))
 
@@ -303,7 +229,7 @@ class TestReasoningEffortPassThrough:
 
         asyncio.run(client.chat(
             messages=[{"role": "user", "content": "hi"}],
-            model="gpt-4o",
+            model="chat-latest",
             reasoning_effort="low",
         ))
 
@@ -314,24 +240,24 @@ class TestReasoningEffortPassThrough:
 class TestVerbosityPassThrough:
     """verbosity is forwarded only when (a) value != 'default' and (b) model in VERBOSITY_MODELS."""
 
-    def test_verbosity_passed_for_gpt_5_5(self):
+    def test_verbosity_passed_for_gpt_6_1_sol(self):
         client, mock_sdk = _make_client_with_mock_sdk()
 
         asyncio.run(client.generate_content(
             prompt="hello",
-            model="gpt-5.5",
+            model="gpt-6.1-sol",
             verbosity="low",
         ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert kwargs.get("verbosity") == "low"
 
-    def test_verbosity_passed_for_gpt_5_5_pro(self):
+    def test_verbosity_passed_for_gpt_6_astra(self):
         client, mock_sdk = _make_client_with_mock_sdk()
 
         asyncio.run(client.generate_content(
             prompt="hello",
-            model="gpt-5.5-pro",
+            model="gpt-6-astra",
             verbosity="high",
         ))
 
@@ -344,7 +270,7 @@ class TestVerbosityPassThrough:
 
         asyncio.run(client.generate_content(
             prompt="hello",
-            model="gpt-5.5",
+            model="gpt-6.1-sol",
             verbosity="default",
         ))
 
@@ -354,32 +280,19 @@ class TestVerbosityPassThrough:
     def test_verbosity_dropped_when_omitted(self):
         client, mock_sdk = _make_client_with_mock_sdk()
 
-        asyncio.run(client.generate_content(prompt="hello", model="gpt-5.5"))
+        asyncio.run(client.generate_content(prompt="hello", model="gpt-6.1-sol"))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
         assert "verbosity" not in kwargs
 
     def test_verbosity_dropped_for_unsupported_model(self):
-        """gpt-4o doesn't accept verbosity — silently drop."""
+        """chat-latest doesn't accept verbosity — silently drop."""
         client, mock_sdk = _make_client_with_mock_sdk()
 
         asyncio.run(client.generate_content(
             prompt="hello",
-            model="gpt-4o",
+            model="chat-latest",
             verbosity="medium",
-        ))
-
-        kwargs = mock_sdk.chat.completions.create.call_args.kwargs
-        assert "verbosity" not in kwargs
-
-    def test_verbosity_dropped_for_o3(self):
-        """o-series reasoning models also don't take verbosity."""
-        client, mock_sdk = _make_client_with_mock_sdk()
-
-        asyncio.run(client.generate_content(
-            prompt="hello",
-            model="o3",
-            verbosity="high",
         ))
 
         kwargs = mock_sdk.chat.completions.create.call_args.kwargs
@@ -391,7 +304,7 @@ class TestVerbosityPassThrough:
 
         asyncio.run(client.chat(
             messages=[{"role": "user", "content": "hi"}],
-            model="gpt-5.5",
+            model="gpt-6.1-sol",
             verbosity="medium",
         ))
 
@@ -403,7 +316,7 @@ class TestVerbosityPassThrough:
 
         asyncio.run(client.chat(
             messages=[{"role": "user", "content": "hi"}],
-            model="gpt-4o",
+            model="chat-latest",
             verbosity="low",
         ))
 
@@ -422,8 +335,53 @@ class TestImageGenerationModelTooltip:
         tooltip = model_inputs[0].tooltip or ""
         assert "gpt-image" in tooltip.lower()
 
-    def test_gpt_image_1_mini_in_options(self):
-        cls = _import_node("image_nodes", "OpenAIImageGeneration")
-        schema = cls.define_schema()
-        model_inputs = [i for i in schema.inputs if i.id == "model"]
-        assert "gpt-image-1-mini" in model_inputs[0].options
+
+class TestSamplingParamsNeverSent:
+    """Every offered text model rejects sampling params on chat.completions
+    (measured: temperature 0.7 -> 400 "Only the default (1) value is
+    supported" on gpt-6.1-sol and chat-latest; top_p and stop -> 400
+    unsupported_parameter on gpt-6.1-sol). The node's temperature, top_p and
+    stop_sequences widgets stay for saved-workflow positions, so the client
+    must drop their values rather than earn a 400."""
+
+    @pytest.mark.parametrize("model_id", sorted(OpenAIClient.MODELS))
+    def test_generate_content_drops_sampling_params(self, model_id):
+        client, mock_sdk = _make_client_with_mock_sdk()
+        asyncio.run(client.generate_content(
+            prompt="hello", model=model_id,
+            temperature=0.7, top_p=0.5, stop_sequences=["x"],
+        ))
+        kwargs = mock_sdk.chat.completions.create.call_args.kwargs
+        for param in ("temperature", "top_p", "stop"):
+            assert param not in kwargs, f"{param} sent to {model_id}"
+
+    @pytest.mark.parametrize("model_id", sorted(OpenAIClient.MODELS))
+    def test_chat_drops_sampling_params(self, model_id):
+        client, mock_sdk = _make_client_with_mock_sdk()
+        asyncio.run(client.chat(
+            messages=[{"role": "user", "content": "hi"}], model=model_id,
+            temperature=0.7, top_p=0.5, stop_sequences=["x"],
+        ))
+        kwargs = mock_sdk.chat.completions.create.call_args.kwargs
+        for param in ("temperature", "top_p", "stop"):
+            assert param not in kwargs, f"{param} sent to {model_id}"
+
+    def test_chat_latest_gets_no_reasoning_effort(self):
+        client, mock_sdk = _make_client_with_mock_sdk()
+        asyncio.run(client.generate_content(
+            prompt="hello", model="chat-latest", reasoning_effort="minimal",
+        ))
+        assert "reasoning_effort" not in mock_sdk.chat.completions.create.call_args.kwargs
+
+
+class TestMinimalEffortClamp:
+    """'minimal' 400s on every kept reasoning model (gpt-5.6 and gpt-6.x,
+    measured 2026-09-23 and 2026-10-01), so the client sends 'low'."""
+
+    @pytest.mark.parametrize("model_id", sorted(OpenAIClient.REASONING_MODELS))
+    def test_minimal_reaches_api_as_low(self, model_id):
+        client, mock_sdk = _make_client_with_mock_sdk()
+        asyncio.run(client.generate_content(
+            prompt="hello", model=model_id, reasoning_effort="minimal",
+        ))
+        assert mock_sdk.chat.completions.create.call_args.kwargs["reasoning_effort"] == "low"

@@ -8,33 +8,23 @@ const ALL_PRESETS = [
     "2048x2048", "2048x1152", "1152x2048", "3840x2160", "2160x3840",
     "Custom",
 ];
-const SERIES_1024 = ["auto", "1024x1024", "1024x1536", "1536x1024", "Custom"];
 
 // Valid sizes per model for OpenAIImageGeneration. "Custom" is always offered
-// because the arbitrary-size envelope and the DALL-E sizes both go through it.
-// The client-side _validate_size_for_gpt_image_2 in openai_api/client.py is
-// the authoritative safety net for gpt-image-2 and 2.5.
+// because the arbitrary-size envelope goes through it. The client-side
+// _validate_size_for_gpt_image_2 in openai_api/client.py is the
+// authoritative safety net for gpt-image-2 and 2.5.
 const GEN_SIZE_MAP = {
     "gpt-image-2.5-sunburst": ALL_PRESETS,
     "gpt-image-2.5-flare": ALL_PRESETS,
     "gpt-image-2": ALL_PRESETS,
-    "gpt-image-1.5": ["auto", "1024x1024", "1024x1536", "1536x1024", "2048x2048", "Custom"],
-    "gpt-image-1": SERIES_1024,
-    "gpt-image-1-mini": SERIES_1024,
-    "dall-e-3": ["1024x1024", "Custom"],
-    "dall-e-2": ["1024x1024", "Custom"],
 };
 
-// Valid sizes per model for OpenAIImageEdit (measured live 2026-09-21: the 1.x
-// models take only the 1024-series and auto; gpt-image-2 and 2.5 take any size
-// in the gpt-image-2 envelope).
+// Valid sizes per model for OpenAIImageEdit (measured live 2026-09-21:
+// gpt-image-2 and 2.5 take any size in the gpt-image-2 envelope).
 const EDIT_SIZE_MAP = {
     "gpt-image-2.5-sunburst": ALL_PRESETS,
     "gpt-image-2.5-flare": ALL_PRESETS,
     "gpt-image-2": ALL_PRESETS,
-    "gpt-image-1.5": SERIES_1024,
-    "gpt-image-1": SERIES_1024,
-    "gpt-image-1-mini": SERIES_1024,
 };
 
 // Fallback when the selected model isn't in the map (e.g. a new model ID we
@@ -51,7 +41,11 @@ export function migrateSizeValues(node, info) {
     if (!Array.isArray(values) || !node.widgets) return;
     const sizeIndex = node.widgets.findIndex((w) => w.name === "size");
     if (sizeIndex < 0) return;
-    if (values.length !== node.widgets.length - 2) return;
+    // Tell the layouts apart by shape, not count: widgets appended later
+    // (output_format, output_compression) also shorten older saves. In the
+    // old layout the slot after size holds the quality string; in every later
+    // one it holds custom_width, a number.
+    if (values.length <= sizeIndex + 1 || typeof values[sizeIndex + 1] === "number") return;
 
     const saved = values[sizeIndex];
     const match = typeof saved === "string" && saved.match(/^(\d+)x(\d+)$/);

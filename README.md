@@ -193,20 +193,20 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 #### Nodes
 
 - **OpenAI API Config** - Initialize OpenAI API connection (API key configuration). Optional if API key is configured in ComfyUI Settings or config.ini -- OpenAI nodes can run standalone.
-- **OpenAI Text Generation** - General-purpose text generation with model selection (GPT-5.5, GPT-5.5 Pro, GPT-5.4 family, GPT-5.2, GPT-4o, GPT-4.1, o3, o3-mini, o3-pro, o4-mini) and optional `reasoning_effort` and `verbosity` controls
-- **OpenAI Chat** - Multi-turn conversations with automatic context preservation, plus reasoning_effort and verbosity control on gpt-5.x models
-- **OpenAI Vision** - Analyze images with GPT-5.5 / GPT-5.4 / GPT-4o vision capabilities
+- **OpenAI Text Generation** - General-purpose text generation with model selection (GPT-6.1 Sol default, GPT-6 Astra/Sol/Luna, GPT-5.6 Sol/Terra/Luna, chat-latest) and optional `reasoning_effort` and `verbosity` controls
+- **OpenAI Chat** - Multi-turn conversations with automatic context preservation, plus reasoning_effort and verbosity control on the gpt-6.x and gpt-5.6 models
+- **OpenAI Vision** - Analyze images with any OpenAI text model (GPT-6.1 Sol default)
 - **OpenAI System Instruction** - Set persistent system-level instructions to guide model behavior
-- **OpenAI Image Generation** - Generate images with GPT-Image-2 (default), GPT-Image-1.5, GPT-Image-1, GPT-Image-1-Mini (DALL-E 3 deprecated 2026-05-12)
-- **OpenAI Image Generation (Responses)** - Generate images via the Responses API with a mainline reasoning model (gpt-5.5 default) driving the `image_generation` hosted tool. Adds optional web search grounding and prompt revision.
+- **OpenAI Image Generation** - Generate images with GPT-Image-2 (default), GPT-Image-2.5 Sunburst and Flare, with png / jpeg / webp output
+- **OpenAI Image Generation (Responses)** - Generate images via the Responses API with a mainline reasoning model (gpt-6.1-sol default) driving the `image_generation` hosted tool. Adds optional web search grounding and prompt revision.
 - **OpenAI Image Edit** - Edit and inpaint images with natural language prompts
 
 **Key Benefits:**
-- Support for latest GPT-5.5 (premium flagship, 1.05M context, $5/$30 per MTok), GPT-5.5 Pro (extended-compute, $30/$180 per MTok, no streaming), GPT-5.4 family (flagship, pro, mini, nano), GPT-5.2, GPT-4.1, GPT-4o, and o-series reasoning models
-- `reasoning_effort` parameter (none/minimal/low/medium/high/xhigh) for reasoning-capable models; ignored silently by non-reasoning models
-- `verbosity` parameter (default/low/medium/high) for gpt-5.x models — shapes how chatty the response is independently of `max_tokens`; silently dropped for older models
-- Image generation with GPT-Image-2 (latest flagship: 4K output, multilingual text, rebuilt architecture), GPT-Image-1.5 (still available, supports transparent background), GPT-Image-1, and GPT-Image-1-Mini (cost tier)
-- DALL-E 3 shuts down 2026-05-12 — migrate to GPT-Image models
+- Support for GPT-6.1 Sol (default: 1.05M context, 128K output, $2/$10 per MTok), the GPT-6 Astra/Sol/Luna and GPT-5.6 Sol/Terra/Luna tiers, and chat-latest. The GPT-5.5 and older text models were removed on 2026-10-01
+- `reasoning_effort` parameter (none/minimal/low/medium/high/xhigh) for the reasoning models; `minimal` is sent as `low`, and chat-latest drops it
+- `verbosity` parameter (default/low/medium/high) — shapes how chatty the response is independently of `max_tokens`; dropped for chat-latest
+- Every current model rejects temperature, top_p and stop, so those widgets are kept for saved workflows but not sent
+- Image generation with GPT-Image-2 (4K output, multilingual text) and GPT-Image-2.5 Sunburst / Flare (xhigh/max quality, transparent background). GPT-Image-1.5, 1 and 1-Mini were removed on 2026-10-01
 - Image editing with optional mask support for inpainting
 - Multi-turn conversation with session management
 - Automatic retry with exponential backoff

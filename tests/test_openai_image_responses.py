@@ -66,12 +66,12 @@ class TestRequestShape:
         client, sdk = _make_client_with_mock_response([_image_call()])
         asyncio.run(client.generate_image_via_responses(
             prompt="a red apple",
-            mainline_model="gpt-5.4",
+            mainline_model="gpt-6-sol",
             image_model="gpt-image-2",
             size="1024x1024",
         ))
         args = sdk.responses.create.call_args.kwargs
-        assert args["model"] == "gpt-5.4"
+        assert args["model"] == "gpt-6-sol"
         assert args["input"] == "a red apple"
         assert isinstance(args["tools"], list)
         assert args["tools"][0]["type"] == "image_generation"
@@ -152,6 +152,41 @@ class TestRequestShape:
         assert "output_format" not in tool
 
 
+class TestEffortAndQualityClamps:
+    """Measured 2026-10-01 on responses.create with the image_generation tool:
+    reasoning.effort 'minimal' 400s on every model ("cannot be used with
+    reasoning.effort 'minimal': image_gen") and 'none' 400s on gpt-6.1-sol.
+    The images reference gives xhigh/max only to GPT Image 2.5."""
+
+    def test_minimal_effort_clamps_to_low(self):
+        client, sdk = _make_client_with_mock_response([_image_call()])
+        asyncio.run(client.generate_image_via_responses(
+            prompt="x", mainline_model="gpt-6.1-sol", reasoning_effort="minimal",
+        ))
+        assert sdk.responses.create.call_args.kwargs["reasoning"]["effort"] == "low"
+
+    def test_effort_omitted_for_non_reasoning_mainline(self):
+        client, sdk = _make_client_with_mock_response([_image_call()])
+        asyncio.run(client.generate_image_via_responses(
+            prompt="x", mainline_model="chat-latest", reasoning_effort="high",
+        ))
+        assert "reasoning" not in sdk.responses.create.call_args.kwargs
+
+    def test_extended_quality_reaches_2_5(self):
+        client, sdk = _make_client_with_mock_response([_image_call()])
+        asyncio.run(client.generate_image_via_responses(
+            prompt="x", image_model="gpt-image-2.5-sunburst", quality="max",
+        ))
+        assert sdk.responses.create.call_args.kwargs["tools"][0]["quality"] == "max"
+
+    def test_extended_quality_clamps_on_gpt_image_2(self):
+        client, sdk = _make_client_with_mock_response([_image_call()])
+        asyncio.run(client.generate_image_via_responses(
+            prompt="x", image_model="gpt-image-2", quality="xhigh",
+        ))
+        assert sdk.responses.create.call_args.kwargs["tools"][0]["quality"] == "high"
+
+
 class TestGptImage2SizeValidation:
     """Size preflight runs for gpt-image-2 in the Responses path."""
 
@@ -163,30 +198,24 @@ class TestGptImage2SizeValidation:
             ))
         assert not sdk.responses.create.called, "API must not be called when preflight fails"
 
-    def test_validation_skipped_for_gpt_image_1_5(self):
-        client, sdk = _make_client_with_mock_response([_image_call()])
-        asyncio.run(client.generate_image_via_responses(
-            prompt="x", image_model="gpt-image-1.5", size="512x512",
-        ))
-        assert sdk.responses.create.called
 
 
 class TestBackgroundPassThrough:
-    """Background param passes through unchanged (no client-side coercion)."""
+    """gpt-image-2 rejects transparent (400, measured 2026-10-01); 2.5 takes it."""
 
-    def test_transparent_passes_through_on_gpt_image_2(self):
+    def test_transparent_rejected_before_the_call_on_gpt_image_2(self):
+        client, sdk = _make_client_with_mock_response([_image_call()])
+        with pytest.raises(ValueError, match="gpt-image-2 does not support background='transparent'"):
+            asyncio.run(client.generate_image_via_responses(
+                prompt="x", image_model="gpt-image-2",
+                size="1024x1024", background="transparent",
+            ))
+        sdk.responses.create.assert_not_called()
+
+    def test_transparent_preserved_for_gpt_image_2_5(self):
         client, sdk = _make_client_with_mock_response([_image_call()])
         asyncio.run(client.generate_image_via_responses(
-            prompt="x", image_model="gpt-image-2",
-            size="1024x1024", background="transparent",
-        ))
-        tool = sdk.responses.create.call_args.kwargs["tools"][0]
-        assert tool["background"] == "transparent"
-
-    def test_transparent_preserved_for_gpt_image_1_5(self):
-        client, sdk = _make_client_with_mock_response([_image_call()])
-        asyncio.run(client.generate_image_via_responses(
-            prompt="x", image_model="gpt-image-1.5", background="transparent",
+            prompt="x", image_model="gpt-image-2.5-flare", background="transparent",
         ))
         tool = sdk.responses.create.call_args.kwargs["tools"][0]
         assert tool["background"] == "transparent"
@@ -260,16 +289,25 @@ class TestNodeSchema:
     def test_has_mainline_model_input(self, schema):
         inp = next((i for i in schema.inputs if i.id == "mainline_model"), None)
         assert inp is not None
-        assert "gpt-5.5" in inp.options
-        assert "gpt-5.5-pro" in inp.options
-        assert "gpt-5.4" in inp.options
-        assert inp.default == "gpt-5.5"
+        # Each returned 200 on responses.create with the image_generation tool
+        # attached (tool_choice="none", measured 2026-10-01).
+        assert set(inp.options) == {
+            "gpt-6.1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
+            "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+        }
+        assert inp.default == "gpt-6.1-sol"
 
     def test_has_image_model_input(self, schema):
         inp = next((i for i in schema.inputs if i.id == "image_model"), None)
         assert inp is not None
-        assert "gpt-image-2" in inp.options
+        # The 2.5 model pages: "Select it directly in the Image API or as the
+        # model of the Responses API image generation tool."
+        assert set(inp.options) == {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"}
         assert inp.default == "gpt-image-2"
+
+    def test_quality_offers_extended_tiers(self, schema):
+        inp = next(i for i in schema.inputs if i.id == "quality")
+        assert inp.options == ["auto", "low", "medium", "high", "xhigh", "max"]
 
     def test_has_reasoning_effort_input(self, schema):
         inp = next((i for i in schema.inputs if i.id == "reasoning_effort"), None)
