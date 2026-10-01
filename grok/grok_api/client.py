@@ -20,31 +20,50 @@ class GrokClient:
     """
 
     DEFAULT_TEXT_MODEL = "grok-4.7"
-    DEFAULT_IMAGE_MODEL = "grok-imagine-image"
+    DEFAULT_IMAGE_MODEL = "grok-imagine-image-2.0"
     DEFAULT_VIDEO_MODEL = "grok-imagine-video"
     VIDEO_MODELS = ["grok-imagine-video", "grok-imagine-video-1.5"]
+    # Video edit and extend take a source video; grok-imagine-video-1.5 has no
+    # video input (docs.x.ai model page and /v1/video-generation-models).
+    VIDEO_INPUT_MODELS = ["grok-imagine-video"]
 
-    # Current Grok image models per docs.x.ai. grok-imagine-image-quality is a
-    # distinct premium tier (the successor grok-imagine-image-pro redirected to),
-    # not an alias, so it is sent to the API unchanged. grok-imagine-image-pro
-    # was retired and is dropped.
-    IMAGE_MODELS = [
-        "grok-imagine-image",
-        "grok-imagine-image-2.0",
-        "grok-imagine-image-quality",
-    ]
+    # Current Grok image model per docs.x.ai. grok-imagine-image (v1) and
+    # grok-imagine-image-quality were dropped on 2026-10-01; -quality retires on
+    # 2026-11-02 and redirects to 2.0 with quality=low.
+    IMAGE_MODELS = ["grok-imagine-image-2.0"]
 
     # Retired-ID remaps applied at execute time. Empty today; kept so a future
     # retired ID can map to its canonical successor while staying selectable in
     # saved workflows (ComfyUI validates Combo values before execute).
     IMAGE_MODEL_ALIASES = {}
-    IMAGE_ASPECT_RATIOS = ["1:1", "16:9", "9:16", "4:3", "3:4", "2:1", "1:2", "auto"]
+    # Every ratio the xai-sdk ImageAspectRatio literal can express, plus "auto"
+    # (sent as unset). New values are appended so saved workflows keep theirs.
+    # 21:9 and 5:2 exist for 2.0 on REST only (no SDK literal or proto enum).
+    IMAGE_ASPECT_RATIOS = [
+        "1:1", "16:9", "9:16", "4:3", "3:4", "2:1", "1:2", "auto",
+        "3:2", "2:3", "19.5:9", "9:19.5", "20:9", "9:20",
+    ]
+    # SDK ImageQuality literal is low/medium; "auto" leaves the field unset.
+    IMAGE_QUALITIES = ["auto", "low", "medium"]
+    MAX_IMAGES_PER_REQUEST = 10  # n range 1-10 per docs.x.ai images/generation
     IMAGE_RESOLUTIONS = ["1k", "2k"]
 
     VIDEO_ASPECT_RATIOS = ["16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3"]
     VIDEO_RESOLUTIONS = ["480p", "720p"]
 
-    MAX_EDIT_IMAGES = 3  # xAI multi-image edit cap per docs
+    MAX_EDIT_IMAGES = 5  # grok-imagine-image-2.0 multi-image edit cap (docs.x.ai)
+    MAX_REFERENCE_IMAGES = 3  # reference-to-video images we send (API max undocumented)
+
+    # reasoning_effort per model, from live gRPC probes on xai-sdk 1.20
+    # (2026-10-01). grok-4.7 accepts low..xhigh and returns 400 on "none".
+    # grok-4.20-0309-non-reasoning, grok-4.20-multi-agent-0309 and
+    # grok-build-0.1 return 400 "does not support parameter reasoningEffort",
+    # so any model missing from this dict never receives the field.
+    REASONING_EFFORTS_BY_MODEL = {
+        "grok-4.7": ["low", "medium", "high", "xhigh"],
+    }
+    REASONING_EFFORT_OPTIONS = ["(model default)", "none", "low", "medium", "high", "xhigh"]
+    REASONING_EFFORT_MODEL_DEFAULT = "(model default)"
 
     def __init__(self, api_key: Optional[str] = None, config_path: Optional[str] = None):
         self.api_key = self._resolve_api_key(api_key, config_path)
@@ -97,7 +116,7 @@ class GrokClient:
             return self._client
         if self._xai_sdk is None:
             raise ImportError(
-                "xai-sdk is required. Install with: pip install xai-sdk>=1.14.0"
+                "xai-sdk is required. Install with: pip install xai-sdk>=1.20.0"
             )
         self._client = self._xai_sdk.Client(api_key=self.api_key, timeout=3600)
         return self._client
@@ -105,6 +124,19 @@ class GrokClient:
     # ------------------------------------------------------------------
     # Text generation
     # ------------------------------------------------------------------
+
+    @classmethod
+    def resolve_reasoning_effort(cls, model: str, effort: Optional[str]) -> Optional[str]:
+        """Return the reasoning_effort to send for `model`, or None to omit it.
+
+        Omitted for "(model default)" and for models that reject the field.
+        A value the model rejects is clamped to its lowest accepted effort
+        (grok-4.7 + "none" -> "low").
+        """
+        accepted = cls.REASONING_EFFORTS_BY_MODEL.get(model)
+        if not accepted or not effort or effort == cls.REASONING_EFFORT_MODEL_DEFAULT:
+            return None
+        return effort if effort in accepted else accepted[0]
 
     def _generate_text_sync(
         self,
@@ -116,6 +148,8 @@ class GrokClient:
     ) -> Dict[str, Any]:
         """One-shot chat completion. Returns {'text', 'model', 'response_id', 'usage'}."""
         client = self._ensure_client()
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
         chat = client.chat.create(model=model, temperature=temperature, **kwargs)
         for m in messages:
             role = m.get("role", "user")
@@ -182,6 +216,27 @@ class GrokClient:
         """Translate deprecated model aliases to the SDK's canonical IDs."""
         return self.IMAGE_MODEL_ALIASES.get(model, model)
 
+    @staticmethod
+    def _image_request_kwargs(
+        aspect_ratio: Optional[str] = None,
+        resolution: Optional[str] = None,
+        quality: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """SDK kwargs for image.sample / sample_batch.
+
+        "auto" has no SDK literal for aspect_ratio, resolution or quality
+        (xai_sdk raises ValueError on it), so it is omitted and the API applies
+        its default.
+        """
+        kwargs: Dict[str, Any] = {}
+        if aspect_ratio and aspect_ratio != "auto":
+            kwargs["aspect_ratio"] = aspect_ratio
+        if resolution and resolution != "auto":
+            kwargs["resolution"] = resolution
+        if quality and quality != "auto":
+            kwargs["quality"] = quality
+        return kwargs
+
     def _generate_image_sync(
         self,
         prompt: str,
@@ -189,29 +244,21 @@ class GrokClient:
         aspect_ratio: str = "1:1",
         resolution: str = "1k",
         n: int = 1,
+        quality: Optional[str] = None,
         **kwargs,
     ) -> List[str]:
         """Returns a list of image URLs (length n)."""
         client = self._ensure_client()
         model = self._resolve_image_model(model)
+        call_kwargs = self._image_request_kwargs(
+            aspect_ratio=aspect_ratio, resolution=resolution, quality=quality
+        )
+        call_kwargs.update(kwargs)
         if n <= 1:
-            response = client.image.sample(
-                prompt,
-                model,
-                aspect_ratio=aspect_ratio,
-                resolution=resolution,
-                **kwargs,
-            )
+            response = client.image.sample(prompt, model, **call_kwargs)
             return [response.url] if getattr(response, "url", None) else []
         # n > 1 uses the batch endpoint; returns a sequence of ImageResponse.
-        responses = client.image.sample_batch(
-            prompt,
-            model,
-            n,
-            aspect_ratio=aspect_ratio,
-            resolution=resolution,
-            **kwargs,
-        )
+        responses = client.image.sample_batch(prompt, model, n, **call_kwargs)
         return [r.url for r in responses if getattr(r, "url", None)]
 
     async def generate_image(self, prompt: str, **kwargs) -> List[str]:
@@ -223,11 +270,15 @@ class GrokClient:
         image_urls: List[str],
         model: str = DEFAULT_IMAGE_MODEL,
         aspect_ratio: Optional[str] = None,
+        resolution: Optional[str] = None,
+        quality: Optional[str] = None,
+        n: int = 1,
         **kwargs,
     ) -> List[str]:
-        """Edit one or more source images. SDK takes `image_url` (singular) for
-        one source and `image_urls` (plural) for multi-image edit — mutually
-        exclusive. Cap: MAX_EDIT_IMAGES sources."""
+        """Edit one or more source images; returns a list of image URLs (length n).
+
+        SDK takes `image_url` (singular) for one source and `image_urls` (plural)
+        for multi-image edit — mutually exclusive. Cap: MAX_EDIT_IMAGES sources."""
         if not image_urls:
             raise ValueError("edit_image requires at least one source image URL or data URI")
         client = self._ensure_client()
@@ -237,11 +288,15 @@ class GrokClient:
             call_kwargs["image_url"] = image_urls[0]
         else:
             call_kwargs["image_urls"] = image_urls[: self.MAX_EDIT_IMAGES]
-        if aspect_ratio:
-            call_kwargs["aspect_ratio"] = aspect_ratio
+        call_kwargs.update(self._image_request_kwargs(
+            aspect_ratio=aspect_ratio, resolution=resolution, quality=quality
+        ))
         call_kwargs.update(kwargs)
-        response = client.image.sample(prompt, model, **call_kwargs)
-        return [response.url] if getattr(response, "url", None) else []
+        if n <= 1:
+            response = client.image.sample(prompt, model, **call_kwargs)
+            return [response.url] if getattr(response, "url", None) else []
+        responses = client.image.sample_batch(prompt, model, n, **call_kwargs)
+        return [r.url for r in responses if getattr(r, "url", None)]
 
     async def edit_image(self, prompt: str, image_urls: List[str], **kwargs) -> List[str]:
         return await asyncio.to_thread(self._edit_image_sync, prompt, image_urls, **kwargs)

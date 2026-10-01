@@ -330,12 +330,14 @@ class TestGrokVideoExtend:
         assert inp.optional
 
     def test_duration_bounds(self):
+        # docs.x.ai videos REST reference: extension duration is 2-10 seconds.
         cls = _get_video_node("GrokVideoExtend")
         schema = cls.define_schema()
         inp = _schema_input(schema, "duration")
         assert inp is not None
-        assert inp.min == 1
-        assert inp.max == 15
+        assert inp.min == 2
+        assert inp.max == 10
+        assert inp.default == 5
 
     def test_model_default_matches_client_constant(self):
         from erpk.grok.grok_api.client import GrokClient

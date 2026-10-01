@@ -38,24 +38,29 @@ def tensor_to_pil(image) -> Optional["PILImage.Image"]:
     return PILImage.fromarray(arr)
 
 
-# xAI's image-edit endpoint goes through gRPC, which has a 4 MB
-# (4_194_304-byte) default max message size. PNG + base64 blows past this for
-# any reasonably-detailed source image (a 3 MB PNG becomes 4 MB+ after base64,
-# plus the rest of the gRPC envelope). Encode as JPEG to stay well under, and
-# cap the longest edge so high-res inputs don't slip through.
+# xAI's image endpoints go through gRPC; xai-sdk 1.20 caps a sent message at
+# 20 MiB (grpc.max_send_message_length in xai_sdk/client.py). PNG + base64 is
+# far too large for multi-image requests, so images are encoded as JPEG with
+# the longest edge capped.
 _JPEG_QUALITY = 90
 _MAX_EDGE = 2048
-# Leave headroom for the rest of the gRPC message (prompt, model, metadata).
+# Per-image raw JPEG budget.
 _PAYLOAD_BUDGET_BYTES = 3_500_000
+# Raw JPEG budget shared by all images in one request. Base64 adds 4/3, so
+# 14.5 MB raw is about 18.4 MiB on the wire, leaving room for the prompt and
+# envelope under the 20 MiB cap. Five 2048px edit sources need this split.
+_REQUEST_BUDGET_BYTES = 14_500_000
+# Below this edge a reference stops being useful; fail instead of sending mush.
+_MIN_EDGE = 256
 
 
-def image_to_data_uri(image) -> Optional[str]:
+def image_to_data_uri(image, budget_bytes: int = _PAYLOAD_BUDGET_BYTES) -> Optional[str]:
     """Convert a ComfyUI IMAGE tensor or PIL Image to a `data:image/jpeg;base64,...` URI.
 
     Used wherever xAI's image-edit / reference-to-video / video-edit APIs accept
-    an image as base64 data URI alongside HTTPS URLs. Encoded as JPEG to stay
-    under xAI's 4 MB gRPC message limit; quality is dropped progressively if the
-    first encode exceeds the per-image payload budget.
+    an image as base64 data URI alongside HTTPS URLs. JPEG quality is dropped
+    progressively, then the image is downscaled, until the encode fits
+    `budget_bytes`. Raises ValueError if it cannot fit above _MIN_EDGE.
     """
     if image is None:
         return None
@@ -79,15 +84,24 @@ def image_to_data_uri(image) -> Optional[str]:
         else:
             pil = pil.convert("RGB")
 
-    # Encode at the configured quality; if the result is still over budget,
-    # step down quality before giving up. 4 MB is a hard wall; 60 quality is
-    # the floor before visible artifacts get distracting for edit references.
-    for quality in (_JPEG_QUALITY, 80, 70, 60):
-        buf = io.BytesIO()
-        pil.save(buf, format="JPEG", quality=quality, optimize=True)
-        data = buf.getvalue()
-        if len(data) <= _PAYLOAD_BUDGET_BYTES:
+    # Step quality down first (60 is the floor before artifacts get distracting
+    # for edit references), then shrink the image and try again.
+    while True:
+        for quality in (_JPEG_QUALITY, 80, 70, 60):
+            buf = io.BytesIO()
+            pil.save(buf, format="JPEG", quality=quality, optimize=True)
+            data = buf.getvalue()
+            if len(data) <= budget_bytes:
+                break
+        if len(data) <= budget_bytes:
             break
+        smaller = (int(pil.size[0] * 0.8), int(pil.size[1] * 0.8))
+        if min(smaller) < _MIN_EDGE:
+            raise ValueError(
+                f"Image does not fit the {budget_bytes}-byte request budget even at "
+                f"{pil.size[0]}x{pil.size[1]}, JPEG quality 60."
+            )
+        pil = pil.resize(smaller, PILImage.LANCZOS)
     b64 = base64.b64encode(data).decode("ascii")
     return f"data:image/jpeg;base64,{b64}"
 
@@ -95,8 +109,9 @@ def image_to_data_uri(image) -> Optional[str]:
 def images_to_data_uris(images, max_count: int = 3) -> List[str]:
     """Convert a batch IMAGE tensor or list of images to a list of data URIs.
 
-    xAI multi-image edit accepts up to 3 source images. Caller is responsible
-    for enforcing the count cap appropriate to its endpoint.
+    The caller passes the count cap for its endpoint (GrokClient.MAX_EDIT_IMAGES
+    or MAX_REFERENCE_IMAGES). All images share _REQUEST_BUDGET_BYTES so the
+    request stays under the SDK's 20 MiB gRPC send limit.
     """
     if images is None:
         return []
@@ -104,19 +119,22 @@ def images_to_data_uris(images, max_count: int = 3) -> List[str]:
     # Batch tensor: iterate slices
     if hasattr(images, "shape") and len(images.shape) == 4 and torch is not None:
         n = min(images.shape[0], max_count)
+        budget = min(_PAYLOAD_BUDGET_BYTES, _REQUEST_BUDGET_BYTES // max(n, 1))
         for i in range(n):
-            uri = image_to_data_uri(images[i:i + 1])
+            uri = image_to_data_uri(images[i:i + 1], budget)
             if uri:
                 out.append(uri)
         return out
     # List of images / URLs / PIL
     if isinstance(images, (list, tuple)):
-        for img in images[:max_count]:
+        selected = images[:max_count]
+        budget = min(_PAYLOAD_BUDGET_BYTES, _REQUEST_BUDGET_BYTES // max(len(selected), 1))
+        for img in selected:
             if isinstance(img, str):
                 # Already a URL or data URI
                 out.append(img)
             else:
-                uri = image_to_data_uri(img)
+                uri = image_to_data_uri(img, budget)
                 if uri:
                     out.append(uri)
         return out

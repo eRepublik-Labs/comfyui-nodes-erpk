@@ -124,7 +124,7 @@ class GrokTextToVideo(IO.ComfyNode):
 
 class GrokRefToVideo(IO.ComfyNode):
     """Generates a video guided by reference images and a text prompt using xAI Grok.
-    Prompt may reference images via <IMAGE_1>/<IMAGE_2>/<IMAGE_3> tokens."""
+    Prompt may reference images via <IMAGE_0>/<IMAGE_1>/<IMAGE_2> tokens."""
 
     @classmethod
     def define_schema(cls):
@@ -134,7 +134,7 @@ class GrokRefToVideo(IO.ComfyNode):
             category="ERPK/Grok/Video",
             description=(
                 "Generate a video from reference images and a text prompt using xAI Grok. "
-                "Up to 3 images; prompt may use <IMAGE_1>, <IMAGE_2>, <IMAGE_3> tokens."
+                "Up to 3 images; prompt may use <IMAGE_0>, <IMAGE_1>, <IMAGE_2> tokens."
             ),
             not_idempotent=True,
             inputs=[
@@ -152,8 +152,8 @@ class GrokRefToVideo(IO.ComfyNode):
                     multiline=True,
                     default="",
                     tooltip=(
-                        "Text description of the video. Use <IMAGE_1>, <IMAGE_2>, <IMAGE_3> "
-                        "tokens to reference the connected images."
+                        "Text description of the video. Use <IMAGE_0>, <IMAGE_1>, <IMAGE_2> "
+                        "tokens to reference the connected images (first image is <IMAGE_0>)."
                     ),
                 ),
                 IO.Image.Input(
@@ -232,7 +232,7 @@ class GrokRefToVideo(IO.ComfyNode):
         if reference_images is None:
             raise ValueError("reference_images is required for reference-to-video")
 
-        data_uris = images_to_data_uris(reference_images, max_count=GrokClient.MAX_EDIT_IMAGES)
+        data_uris = images_to_data_uris(reference_images, max_count=GrokClient.MAX_REFERENCE_IMAGES)
         if not data_uris:
             raise ValueError("Could not convert reference_images to data URIs")
 
@@ -267,7 +267,8 @@ class GrokVideoEdit(IO.ComfyNode):
             category="ERPK/Grok/Video",
             description=(
                 "Edit an existing video with a text prompt using xAI Grok. "
-                "The source video must be a public HTTPS URL."
+                "The source video is a public URL or a base64 data URI; the edit keeps "
+                "its duration, capped at 8.7 s."
             ),
             not_idempotent=True,
             inputs=[
@@ -289,14 +290,17 @@ class GrokVideoEdit(IO.ComfyNode):
                 IO.String.Input(
                     "video_url",
                     default="",
-                    tooltip="Public HTTPS URL of the source video to edit.",
+                    tooltip=(
+                        "Source video to edit: a public URL or a base64 data URI. "
+                        "The edit keeps its duration, capped at 8.7 s, and its resolution, capped at 720p."
+                    ),
                 ),
                 IO.Combo.Input(
                     "model",
-                    options=GrokClient.VIDEO_MODELS,
+                    options=GrokClient.VIDEO_INPUT_MODELS,
                     default=GrokClient.DEFAULT_VIDEO_MODEL,
                     optional=True,
-                    tooltip="xAI video model.",
+                    tooltip="xAI video model. grok-imagine-video-1.5 takes no video input, so it is not offered here.",
                 ),
                 IO.Int.Input(
                     "seed",
@@ -359,7 +363,7 @@ class GrokVideoExtend(IO.ComfyNode):
             category="ERPK/Grok/Video",
             description=(
                 "Extend an existing video by appending new content using xAI Grok. "
-                "The source video must be a public HTTPS URL."
+                "The source video is a public URL or a base64 data URI."
             ),
             not_idempotent=True,
             inputs=[
@@ -375,14 +379,14 @@ class GrokVideoExtend(IO.ComfyNode):
                 IO.String.Input(
                     "video_url",
                     default="",
-                    tooltip="Public HTTPS URL of the source video to extend.",
+                    tooltip="Source video to extend: a public URL or a base64 data URI.",
                 ),
                 IO.Int.Input(
                     "duration",
                     default=5,
-                    min=1,
-                    max=15,
-                    tooltip="Duration in seconds to append (1–15).",
+                    min=2,
+                    max=10,
+                    tooltip="Duration in seconds to append (2–10).",
                 ),
                 IO.String.Input(
                     "prompt",
@@ -393,10 +397,10 @@ class GrokVideoExtend(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "model",
-                    options=GrokClient.VIDEO_MODELS,
+                    options=GrokClient.VIDEO_INPUT_MODELS,
                     default=GrokClient.DEFAULT_VIDEO_MODEL,
                     optional=True,
-                    tooltip="xAI video model.",
+                    tooltip="xAI video model. grok-imagine-video-1.5 takes no video input, so it is not offered here.",
                 ),
                 IO.Int.Input(
                     "seed",

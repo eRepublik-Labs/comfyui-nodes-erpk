@@ -11,11 +11,12 @@ Maintains a multi-turn conversation by threading message history between Grok Ch
 |-----------|------|---------|-------------|
 | prompt | String | (empty) | Your message in the conversation |
 | client | GROK_API_CLIENT | — | Grok API client (optional if API key is in Settings) |
-| model | Combo | grok-4.7 | Grok model (optional) |
+| model | Combo | grok-4.7 | Grok model. Options: grok-4.7, grok-4.20-0309-non-reasoning, grok-4.20-multi-agent-0309, grok-build-0.1 (optional) |
 | chat_session | GROK_CHAT_SESSION | — | Previous chat session output (optional). Leave disconnected to start fresh |
 | reset_conversation | Boolean | false | Discard `chat_session` and start a new conversation (optional) |
 | temperature | Float | 0.7 | Creativity. Range: 0.0–2.0 (optional) |
-| max_tokens | Int | 4096 | Maximum response tokens. Range: 256–16384 (optional) |
+| max_tokens | Int | 4096 | Maximum visible response tokens; reasoning tokens are not counted. Range: 256–128000. grok-4.20-multi-agent-0309 does not honour it (optional) |
+| reasoning_effort | Combo | (model default) | Options: (model default), none, low, medium, high, xhigh. Only grok-4.7 receives it (low to xhigh; `none` is sent as `low` because grok-4.7 rejects it). The other models reject the field, so it is not sent to them. (model default) sends nothing (optional) |
 
 ## Output
 

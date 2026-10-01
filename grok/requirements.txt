@@ -1,2 +1,2 @@
-xai-sdk>=1.14.0
+xai-sdk>=1.20.0
 Pillow>=12.3.0

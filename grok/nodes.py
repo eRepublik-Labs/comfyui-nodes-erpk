@@ -13,19 +13,15 @@ from ..utils.safe_fetch import fetch_remote_bytes
 # Current Grok chat/code models per the catalog embedded in docs.x.ai/docs/models.
 # grok-4.7 is the recommended flagship (500k context, image input);
 # grok-build-0.1 is the coding model that replaced grok-code-fast-1. The
-# grok-4.20 family carries a 1M context (vs 500k on grok-4.7 / 4.6 / 4.5) and
-# exposes no reasoning_effort control — on the multi-agent
-# variant, effort selects agent count (4 or 16) rather than reasoning depth.
+# grok-4.20 variants carry a 1M context. Only grok-4.7 accepts reasoning_effort
+# (see GrokClient.REASONING_EFFORTS_BY_MODEL); on the multi-agent variant the
+# agent count (4 or 16) replaces reasoning depth.
 #
 # Listed under their canonical catalog names rather than the short aliases
-# (grok-4.20, grok-4.20-reasoning, ...) so a saved workflow keeps resolving to
-# the same model if an alias is later repointed.
+# (grok-4.20, grok-4.20-non-reasoning, ...) so a saved workflow keeps resolving
+# to the same model if an alias is later repointed.
 TEXT_MODELS = [
     "grok-4.7",
-    "grok-4.6",
-    "grok-4.5",
-    "grok-4.3",
-    "grok-4.20-0309-reasoning",
     "grok-4.20-0309-non-reasoning",
     "grok-4.20-multi-agent-0309",
     "grok-build-0.1",
@@ -158,10 +154,23 @@ class GrokTextGeneration(IO.ComfyNode):
                     "max_tokens",
                     default=4096,
                     min=256,
-                    max=16384,
+                    max=128000,
                     step=128,
                     optional=True,
-                    tooltip="Maximum number of tokens in the response.",
+                    tooltip=(
+                        "Maximum number of visible tokens in the response (reasoning tokens "
+                        "are not counted). grok-4.20-multi-agent-0309 does not honour it."
+                    ),
+                ),
+                IO.Combo.Input(
+                    "reasoning_effort",
+                    options=GrokClient.REASONING_EFFORT_OPTIONS,
+                    default=GrokClient.REASONING_EFFORT_MODEL_DEFAULT,
+                    optional=True,
+                    tooltip=(
+                        "Reasoning depth. Only grok-4.7 accepts it (low to xhigh; 'none' is sent "
+                        "as 'low'). Ignored for the other models. '(model default)' sends nothing."
+                    ),
                 ),
             ],
             outputs=[
@@ -175,6 +184,9 @@ class GrokTextGeneration(IO.ComfyNode):
         model = kwargs.get("model") or GrokClient.DEFAULT_TEXT_MODEL
         temperature = kwargs.get("temperature", 0.7)
         max_tokens = kwargs.get("max_tokens", 4096)
+        reasoning_effort = GrokClient.resolve_reasoning_effort(
+            model, kwargs.get("reasoning_effort", GrokClient.REASONING_EFFORT_MODEL_DEFAULT)
+        )
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty.")
@@ -188,6 +200,7 @@ class GrokTextGeneration(IO.ComfyNode):
                 model=model,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                reasoning_effort=reasoning_effort,
             )
             text = result.get("text", "")
             print(f"[Grok] Text generated ({len(text)} chars) via {model}")
@@ -249,10 +262,23 @@ class GrokChat(IO.ComfyNode):
                     "max_tokens",
                     default=4096,
                     min=256,
-                    max=16384,
+                    max=128000,
                     step=128,
                     optional=True,
-                    tooltip="Maximum number of tokens in the response.",
+                    tooltip=(
+                        "Maximum number of visible tokens in the response (reasoning tokens "
+                        "are not counted). grok-4.20-multi-agent-0309 does not honour it."
+                    ),
+                ),
+                IO.Combo.Input(
+                    "reasoning_effort",
+                    options=GrokClient.REASONING_EFFORT_OPTIONS,
+                    default=GrokClient.REASONING_EFFORT_MODEL_DEFAULT,
+                    optional=True,
+                    tooltip=(
+                        "Reasoning depth. Only grok-4.7 accepts it (low to xhigh; 'none' is sent "
+                        "as 'low'). Ignored for the other models. '(model default)' sends nothing."
+                    ),
                 ),
             ],
             outputs=[
@@ -269,6 +295,9 @@ class GrokChat(IO.ComfyNode):
         reset_conversation = kwargs.get("reset_conversation", False)
         temperature = kwargs.get("temperature", 0.7)
         max_tokens = kwargs.get("max_tokens", 4096)
+        reasoning_effort = GrokClient.resolve_reasoning_effort(
+            model, kwargs.get("reasoning_effort", GrokClient.REASONING_EFFORT_MODEL_DEFAULT)
+        )
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty.")
@@ -289,6 +318,7 @@ class GrokChat(IO.ComfyNode):
                 model=model,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                reasoning_effort=reasoning_effort,
             )
             text = result.get("text", "")
             messages.append({"role": "assistant", "content": text})
@@ -345,9 +375,19 @@ class GrokImageGeneration(IO.ComfyNode):
                     "n",
                     default=1,
                     min=1,
-                    max=4,
+                    max=GrokClient.MAX_IMAGES_PER_REQUEST,
                     optional=True,
-                    tooltip="Number of images to generate.",
+                    tooltip="Number of images to generate (1-10).",
+                ),
+                IO.Combo.Input(
+                    "quality",
+                    options=GrokClient.IMAGE_QUALITIES,
+                    default="auto",
+                    optional=True,
+                    tooltip=(
+                        "Generation quality: low or medium. 'auto' sends nothing and lets xAI "
+                        "pick (xAI's docs and SDK disagree on whether that is low or medium)."
+                    ),
                 ),
             ],
             outputs=[
@@ -362,6 +402,7 @@ class GrokImageGeneration(IO.ComfyNode):
         aspect_ratio = kwargs.get("aspect_ratio", "1:1")
         resolution = kwargs.get("resolution", "1k")
         n = kwargs.get("n", 1)
+        quality = kwargs.get("quality", "auto")
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty.")
@@ -377,6 +418,7 @@ class GrokImageGeneration(IO.ComfyNode):
                 aspect_ratio=aspect_ratio,
                 resolution=resolution,
                 n=n,
+                quality=quality,
             )
             if not urls:
                 raise ValueError("No image URLs returned from Grok.")
@@ -425,10 +467,32 @@ class GrokImageEdit(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "aspect_ratio",
-                    options=["auto"] + GrokClient.IMAGE_ASPECT_RATIOS,
+                    options=GrokClient.IMAGE_ASPECT_RATIOS,
                     default="auto",
                     optional=True,
                     tooltip="Output aspect ratio. 'auto' preserves the source image ratio.",
+                ),
+                IO.Combo.Input(
+                    "resolution",
+                    options=["auto"] + GrokClient.IMAGE_RESOLUTIONS,
+                    default="auto",
+                    optional=True,
+                    tooltip="Output resolution: 1k (~1024px) or 2k (~2048px). 'auto' sends nothing and lets xAI choose.",
+                ),
+                IO.Int.Input(
+                    "n",
+                    default=1,
+                    min=1,
+                    max=GrokClient.MAX_IMAGES_PER_REQUEST,
+                    optional=True,
+                    tooltip=f"Number of edited variations to return (1-{GrokClient.MAX_IMAGES_PER_REQUEST}). Each one is billed.",
+                ),
+                IO.Combo.Input(
+                    "quality",
+                    options=GrokClient.IMAGE_QUALITIES,
+                    default="auto",
+                    optional=True,
+                    tooltip="Edit quality: low or medium. 'auto' sends nothing and lets xAI choose.",
                 ),
             ],
             outputs=[
@@ -443,6 +507,9 @@ class GrokImageEdit(IO.ComfyNode):
         client_dict = kwargs.get("client")
         model = kwargs.get("model") or GrokClient.DEFAULT_IMAGE_MODEL
         aspect_ratio = kwargs.get("aspect_ratio", "auto")
+        resolution = kwargs.get("resolution", "auto")
+        n = kwargs.get("n", 1)
+        quality = kwargs.get("quality", "auto")
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty.")
@@ -454,7 +521,6 @@ class GrokImageEdit(IO.ComfyNode):
         if not image_uris:
             raise ValueError("Could not convert input image to a data URI.")
 
-        resolved_ratio = aspect_ratio if aspect_ratio != "auto" else None
         print(f"[Grok] Editing {len(image_uris)} image(s) via {model}")
         print(f"[Grok] Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
 
@@ -464,7 +530,10 @@ class GrokImageEdit(IO.ComfyNode):
                 prompt.strip(),
                 image_urls=image_uris,
                 model=model,
-                aspect_ratio=resolved_ratio,
+                aspect_ratio=aspect_ratio,
+                resolution=resolution,
+                quality=quality,
+                n=n,
             )
             if not urls:
                 raise ValueError("No image URLs returned from Grok.")
