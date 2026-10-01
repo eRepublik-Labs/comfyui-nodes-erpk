@@ -2,11 +2,10 @@
 # ABOUTME: Guards the three hand-copied dropdowns against drift from the canonical model list.
 
 """
-Every Claude model has four pieces of metadata spread across separate files:
-the dropdown options, pricing.json, TokenManager.CONTEXT_WINDOWS, and
-ClaudeClient.THINKING_ONLY_MODELS. A model missing from any one of them is a
-silent defect — a wrong price under-reports cost, a missing THINKING_ONLY entry
-sends `temperature` and earns a 400.
+Every Claude model has three pieces of metadata spread across separate files:
+the dropdown options, pricing.json and TokenManager.CONTEXT_WINDOWS. A model
+missing from any one of them is a silent defect: a wrong price under-reports
+cost, a missing context window trims conversations against the wrong limit.
 
 Expected values come from Anthropic's published pricing and model-overview
 tables, not from the repo's own dicts, so these are independent assertions.
@@ -26,9 +25,18 @@ OPUS_5 = "claude-opus-5"
 OPUS_5_5 = "claude-opus-5-5"
 FABLE_5 = "claude-fable-5"
 FABLE_5_1 = "claude-fable-5-1"
-OPUS_4_7 = "claude-opus-4-7"
-SONNET_4_6 = "claude-sonnet-4-6"
-OPUS_4_6 = "claude-opus-4-6"
+SONNET_5_5 = "claude-sonnet-5-5"
+SONNET_5 = "claude-sonnet-5"
+
+# Withdrawn 2026-10-01 (Alex's call): every remaining model is Claude 5 or later.
+REMOVED = (
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+    "claude-sonnet-4-6",
+    "claude-opus-4-6",
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-5-20250929",
+)
 
 
 def _pricing():
@@ -73,9 +81,6 @@ def test_opus_5_has_1m_context():
     assert TokenManager.CONTEXT_WINDOWS[OPUS_5] == 1_000_000
 
 
-def test_opus_5_rejects_sampling_params():
-    # Claude 4.7 and later 400 on a non-default temperature/top_p/top_k.
-    assert OPUS_5 in ClaudeClient.THINKING_ONLY_MODELS
 
 
 def test_fable_5_1_offered_in_every_dropdown():
@@ -101,8 +106,6 @@ def test_fable_5_1_has_1m_context():
     assert TokenManager.CONTEXT_WINDOWS[FABLE_5_1] == 1_000_000
 
 
-def test_fable_5_1_rejects_sampling_params():
-    assert FABLE_5_1 in ClaudeClient.THINKING_ONLY_MODELS
 
 
 def test_opus_5_5_offered_in_every_dropdown():
@@ -138,41 +141,93 @@ def test_opus_5_5_has_1m_context():
     assert TokenManager.CONTEXT_WINDOWS[OPUS_5_5] == 1_000_000
 
 
-def test_opus_5_5_rejects_sampling_params():
-    # Measured 2026-09-23: temperature=0.7 returns 400
-    # "`temperature` is deprecated for this model."
-    assert OPUS_5_5 in ClaudeClient.THINKING_ONLY_MODELS
 
 
-# --- Defects in the existing model metadata ---------------------------------
+# --- Sonnet 5.5 is the default ----------------------------------------------
 
 
-def test_fable_5_rejects_sampling_params():
-    # Fable 5 is a Claude 4.7-and-later model: sending temperature returns 400.
-    assert FABLE_5 in ClaudeClient.THINKING_ONLY_MODELS
+def test_sonnet_5_5_is_the_default_everywhere():
+    from claude.models import DEFAULT_TEXT_MODEL
+    from claude.token_counter import ClaudeTokenCounter as Counter
+    assert DEFAULT_TEXT_MODEL == SONNET_5_5
+    assert ClaudeClient.DEFAULT_MODEL == SONNET_5_5
+    assert TokenManager().model == SONNET_5_5
+    for node in (ClaudeAPIClient, Counter):
+        spec = next(i for i in node.define_schema().inputs if i.id == "model")
+        assert spec.default == SONNET_5_5
 
 
-def test_opus_4_7_priced_at_published_rate():
-    # Published rate is $5 / $25 per MTok. $15 / $75 is Opus 4.1's rate.
-    entry = _pricing()[OPUS_4_7]
-    assert entry["input_price_per_mtok"] == 5.0
-    assert entry["output_price_per_mtok"] == 25.0
-    assert entry["cache_read_price_per_mtok"] == 0.5
+def test_sonnet_5_5_offered_in_every_dropdown():
+    for node in (ClaudeAPIClient, ClaudeTokenCounter, ClaudeVisionAnalysis):
+        assert SONNET_5_5 in _combo_options(node)
 
 
-def test_4_6_family_has_1m_context():
-    # "Claude 4.6 and later models include the full 1M token context window at
-    # standard pricing" — no beta header, no long-context premium.
-    assert TokenManager.CONTEXT_WINDOWS[SONNET_4_6] == 1_000_000
-    assert TokenManager.CONTEXT_WINDOWS[OPUS_4_6] == 1_000_000
+def test_sonnet_5_5_priced_at_published_rate():
+    # https://platform.claude.com/docs/en/about-claude/pricing and the Sonnet 5.5
+    # model page: $2 / $10 per MTok, cache hits $0.20 (0.1x).
+    entry = _pricing()[SONNET_5_5]
+    assert entry["input_price_per_mtok"] == 2.0
+    assert entry["output_price_per_mtok"] == 10.0
+    assert entry["cache_read_price_per_mtok"] == 0.2
 
 
-def test_only_4_5_family_is_capped_at_200k():
-    capped = {m for m, w in TokenManager.CONTEXT_WINDOWS.items() if w == 200_000}
-    assert capped == {"claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929"}
+def test_sonnet_5_5_has_1m_context():
+    # GET /v1/models/claude-sonnet-5-5 reports max_input_tokens 1000000.
+    assert TokenManager.CONTEXT_WINDOWS[SONNET_5_5] == 1_000_000
 
 
-# --- Drift guards: the four metadata sources must agree ----------------------
+# --- Withdrawn models are gone from every metadata source -------------------
+
+
+def test_removed_models_are_not_offered():
+    for node in (ClaudeAPIClient, ClaudeTokenCounter, ClaudeVisionAnalysis):
+        assert not set(REMOVED) & set(_combo_options(node)), node.__name__
+
+
+def test_removed_models_have_no_metadata_left():
+    for model in REMOVED:
+        assert model not in _pricing(), model
+        assert model not in TokenManager.CONTEXT_WINDOWS, model
+
+
+def test_removed_models_absent_from_pricing_fallback(monkeypatch):
+    import claude.token_counter as token_counter
+
+    def unreadable(*args, **kwargs):
+        raise OSError("pricing.json unreadable")
+
+    monkeypatch.setattr(token_counter, "open", unreadable, raising=False)
+    pricing, _ = ClaudeTokenCounter.load_pricing()
+    assert not set(REMOVED) & set(pricing)
+
+
+# --- Sonnet 5 and Fable 5 --------------------------------------------------
+
+
+def test_sonnet_5_and_fable_5_priced_at_published_rate():
+    # https://platform.claude.com/docs/en/about-claude/pricing
+    models = _pricing()
+    assert models[SONNET_5]["input_price_per_mtok"] == 2.0
+    assert models[SONNET_5]["output_price_per_mtok"] == 10.0
+    assert models[FABLE_5]["input_price_per_mtok"] == 10.0
+    assert models[FABLE_5]["output_price_per_mtok"] == 50.0
+
+
+def test_sonnet_5_and_fable_5_have_1m_context():
+    assert TokenManager.CONTEXT_WINDOWS[SONNET_5] == 1_000_000
+    assert TokenManager.CONTEXT_WINDOWS[FABLE_5] == 1_000_000
+
+
+
+
+
+
+
+
+
+
+
+# --- Drift guards: the three metadata sources must agree ----------------------
 
 
 def test_every_dropdown_offers_the_same_models():
@@ -199,3 +254,15 @@ def test_pricing_fallback_matches_pricing_json():
     for model, prices in published.items():
         assert fallback[model]["input"] == prices["input_price_per_mtok"], model
         assert fallback[model]["output"] == prices["output_price_per_mtok"], model
+
+
+def test_every_offered_model_has_a_published_5m_cache_write_price():
+    # https://platform.claude.com/docs/en/about-claude/pricing "5m cache writes"
+    # column, read 2026-10-01. ClaudeUsageStats bills cache creation at this rate.
+    published = {
+        SONNET_5_5: 2.5, SONNET_5: 2.5, OPUS_5_5: 5.0, OPUS_5: 6.25, FABLE_5_1: 12.5, FABLE_5: 12.5,
+    }
+    pricing = _pricing()
+    assert set(published) == set(_combo_options(ClaudeAPIClient))
+    for model, price in published.items():
+        assert pricing[model]["cache_write_5m_price_per_mtok"] == price, model

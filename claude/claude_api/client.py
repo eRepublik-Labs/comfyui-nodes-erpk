@@ -11,12 +11,24 @@ while releasing the event loop during network I/O.
 """
 
 import asyncio
+import functools
+import json
 import os
 import threading
 import time
 from typing import Dict, Any, Generator, Optional
-from anthropic import Anthropic, AnthropicError, APIError, RateLimitError, APIConnectionError
+from anthropic import Anthropic, APIError, RateLimitError, APIConnectionError
 import configparser
+
+from ..models import DEFAULT_TEXT_MODEL
+
+
+@functools.lru_cache(maxsize=1)
+def model_prices() -> Dict[str, Dict[str, float]]:
+    """Per-MTok USD prices from pricing.json, keyed by model ID."""
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "pricing.json")
+    with open(path) as f:
+        return json.load(f)["models"]
 
 
 def response_text(response) -> str:
@@ -37,32 +49,23 @@ class ClaudeClient:
     Client for interacting with Claude API.
 
     Features:
-    - Multi-source API key management (input → env → config)
-    - Streaming support with fallback to synchronous
-    - Error handling with exponential backoff
-    - Prompt caching configuration
+    - API key resolution (ComfyUI Settings → api_key → config.ini)
+    - Streaming and non-streaming requests
+    - Retry with exponential backoff on 429, connection errors and 5xx
+    - Automatic prompt caching (top-level cache_control)
     - Token usage tracking
     """
 
     # Default configuration
-    DEFAULT_MODEL = "claude-sonnet-5"
+    DEFAULT_MODEL = DEFAULT_TEXT_MODEL
     DEFAULT_MAX_TOKENS = 1024
-    DEFAULT_TEMPERATURE = 0.7
     MAX_RETRIES = 3
     INITIAL_RETRY_DELAY = 1.0  # seconds
 
-    # Models that reject sampling params (temperature/top_p/top_k) and require
-    # thinking={"type": "adaptive"}. Anthropic returns 400 if sampling params
-    # are present or if thinking uses the legacy {"type": "enabled", ...} form.
-    THINKING_ONLY_MODELS = {
-        "claude-opus-5-5",
-        "claude-opus-5",
-        "claude-sonnet-5",
-        "claude-opus-4-8",
-        "claude-fable-5-1",
-        "claude-fable-5",
-        "claude-opus-4-7",
-    }
+    # Every offered model (Claude 5 and later) runs adaptive thinking and returns
+    # 400 on a non-default temperature/top_p/top_k, so none are ever sent.
+    # "summarized" surfaces the thinking text; the API default is "omitted".
+    THINKING = {"type": "adaptive", "display": "summarized"}
 
     def __init__(
         self,
@@ -76,10 +79,10 @@ class ClaudeClient:
         Initialize Claude API client.
 
         Args:
-            api_key: Anthropic API key (optional, will check env/config)
+            api_key: Anthropic API key (optional, will check settings/config)
             model: Claude model to use
             enable_streaming: Enable streaming responses
-            enable_caching: Enable prompt caching for cost optimization
+            enable_caching: Send automatic prompt caching (top-level cache_control)
             config_path: Path to config.ini file
         """
         self.model = model
@@ -89,27 +92,13 @@ class ClaudeClient:
         # Resolve API key from multiple sources
         self.api_key = self._resolve_api_key(api_key, config_path)
 
-        # Initialize Anthropic client with optional beta headers
-        client_kwargs = {"api_key": self.api_key}
-        if enable_caching:
-            try:
-                # Try to enable prompt caching beta feature
-                client_kwargs["default_headers"] = {
-                    "anthropic-beta": "prompt-caching-2024-07-31"
-                }
-            except Exception as e:
-                print(f"[Claude] Warning: Could not enable prompt caching: {e}")
-
-        self.client = Anthropic(**client_kwargs)
+        self.client = Anthropic(api_key=self.api_key)
 
         # Track usage statistics. When one client is shared across concurrent
         # nodes these counters are updated from asyncio.to_thread worker threads,
         # so guard the non-atomic += with a lock to avoid lost increments.
         self._usage_lock = threading.Lock()
-        self.total_input_tokens = 0
-        self.total_output_tokens = 0
-        self.cache_read_tokens = 0
-        self.cache_creation_tokens = 0
+        self.reset_usage_stats()
 
     def _resolve_api_key(self, api_key: Optional[str], config_path: Optional[str]) -> str:
         """
@@ -160,122 +149,129 @@ class ClaudeClient:
             "3. config.ini file in claude/ directory"
         )
 
+    def _build_params(
+        self,
+        messages: list,
+        system: Optional[str],
+        max_tokens: Optional[int],
+        model: Optional[str],
+        effort: Optional[str],
+        kwargs: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        params = {
+            "model": model or self.model,
+            "max_tokens": max_tokens or self.DEFAULT_MAX_TOKENS,
+            "messages": messages,
+            "thinking": self.THINKING,
+        }
+        if system:
+            params["system"] = system
+        if self.enable_caching:
+            # Automatic caching: the API places the breakpoint on the last
+            # cacheable block. Prompts below the model's minimum are not cached.
+            params["cache_control"] = {"type": "ephemeral"}
+        params.update(kwargs)
+        if effort:
+            params["output_config"] = {**params.get("output_config", {}), "effort": effort}
+        return params
+
+    def _record_usage(self, message) -> None:
+        """Add a response's tokens and cost, priced by the model that answered.
+
+        usage.input_tokens excludes cached tokens, which are billed separately:
+        cache reads at the hit price, cache creation at the 5-minute write price
+        (automatic caching uses the 5-minute TTL).
+        """
+        usage = message.usage
+        tokens = {
+            "input": usage.input_tokens,
+            "output": usage.output_tokens,
+            "cache_read": getattr(usage, "cache_read_input_tokens", None) or 0,
+            "cache_write": getattr(usage, "cache_creation_input_tokens", None) or 0,
+        }
+        prices = model_prices().get(message.model)
+        with self._usage_lock:
+            self.total_input_tokens += tokens["input"]
+            self.total_output_tokens += tokens["output"]
+            self.cache_read_tokens += tokens["cache_read"]
+            self.cache_creation_tokens += tokens["cache_write"]
+            if prices is None:
+                print(f"[Claude] Warning: no price for model {message.model!r}; its usage is not costed")
+                self.unpriced_models.add(message.model)
+                return
+            per_mtok = {
+                "input": prices["input_price_per_mtok"],
+                "output": prices["output_price_per_mtok"],
+                "cache_read": prices["cache_read_price_per_mtok"],
+                "cache_write": prices["cache_write_5m_price_per_mtok"],
+            }
+            for kind, count in tokens.items():
+                self.costs_usd[kind] += count / 1_000_000 * per_mtok[kind]
+            self.cache_savings_usd += tokens["cache_read"] / 1_000_000 * (per_mtok["input"] - per_mtok["cache_read"])
+
     def _send_request_sync(
         self,
         messages: list,
         system: Optional[str] = None,
         max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
         model: Optional[str] = None,
+        effort: Optional[str] = None,
         **kwargs
-    ) -> Dict[str, Any]:
-        model = model or self.model
-        max_tokens = max_tokens or self.DEFAULT_MAX_TOKENS
-        temperature = temperature if temperature is not None else self.DEFAULT_TEMPERATURE
-
-        # Build request parameters
-        params = {
-            "model": model,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "messages": messages,
-        }
-
-        if system:
-            params["system"] = system
-
-        # Merge additional kwargs
-        params.update(kwargs)
-
-        # Note: Prompt caching is enabled via client initialization headers
-
-        # Thinking-only models reject sampling params and require adaptive thinking.
-        if model in self.THINKING_ONLY_MODELS:
-            params.pop("temperature", None)
-            params.pop("top_p", None)
-            params.pop("top_k", None)
-            params["thinking"] = {"type": "adaptive", "display": "summarized"}
+    ):
+        params = self._build_params(messages, system, max_tokens, model, effort, kwargs)
 
         # Retry logic with exponential backoff
         retry_delay = self.INITIAL_RETRY_DELAY
-        last_exception = None
-
         for attempt in range(self.MAX_RETRIES):
             try:
                 response = self.client.messages.create(**params)
-
-                # Track token usage (guarded: client may be shared across threads)
-                usage = response.usage
-                with self._usage_lock:
-                    self.total_input_tokens += usage.input_tokens
-                    self.total_output_tokens += usage.output_tokens
-                    if hasattr(usage, 'cache_read_input_tokens'):
-                        self.cache_read_tokens += usage.cache_read_input_tokens or 0
-                    if hasattr(usage, 'cache_creation_input_tokens'):
-                        self.cache_creation_tokens += usage.cache_creation_input_tokens or 0
-
+                self._record_usage(response)
                 return response
 
-            except RateLimitError as e:
-                last_exception = e
-                if attempt < self.MAX_RETRIES - 1:
-                    print(f"[Claude] Rate limit hit, retrying in {retry_delay}s... (attempt {attempt + 1}/{self.MAX_RETRIES})")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
-
-            except APIConnectionError as e:
-                last_exception = e
-                if attempt < self.MAX_RETRIES - 1:
-                    print(f"[Claude] Connection error, retrying in {retry_delay}s... (attempt {attempt + 1}/{self.MAX_RETRIES})")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2
-
             except APIError as e:
-                # Don't retry on client errors (4xx except 429)
-                if hasattr(e, 'status_code') and 400 <= e.status_code < 500 and e.status_code != 429:
+                retryable = isinstance(e, (RateLimitError, APIConnectionError)) or not (
+                    400 <= getattr(e, "status_code", 500) < 500
+                )
+                if not retryable or attempt == self.MAX_RETRIES - 1:
                     raise
-                last_exception = e
-                if attempt < self.MAX_RETRIES - 1:
-                    print(f"[Claude] API error, retrying in {retry_delay}s... (attempt {attempt + 1}/{self.MAX_RETRIES})")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2
-
-        # All retries exhausted
-        raise APIError(f"Request failed after {self.MAX_RETRIES} attempts") from last_exception
+                print(f"[Claude] {type(e).__name__}, retrying in {retry_delay}s... (attempt {attempt + 1}/{self.MAX_RETRIES})")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
 
     async def send_request(
         self,
         messages: list,
         system: Optional[str] = None,
         max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
         model: Optional[str] = None,
+        effort: Optional[str] = None,
         **kwargs
-    ) -> Dict[str, Any]:
+    ):
         """
         Send a request to Claude API with retry logic.
 
         Args:
             messages: List of message dicts with 'role' and 'content'
             system: Optional system prompt
-            max_tokens: Maximum tokens to generate
-            temperature: Sampling temperature (0.0-1.0)
+            max_tokens: Maximum tokens to generate (thinking counts toward it)
             model: Override default model
-            **kwargs: Additional parameters for the API
+            effort: output_config.effort level; None leaves the model default
+            **kwargs: Additional Messages API parameters
 
         Returns:
-            API response dict with 'content', 'usage', etc.
+            The SDK's Message object
 
         Raises:
-            APIError: If request fails after retries
+            anthropic.APIError: The SDK's own error, once retries are exhausted
+                or immediately for a non-retryable 4xx
         """
         return await asyncio.to_thread(
             self._send_request_sync,
             messages,
             system=system,
             max_tokens=max_tokens,
-            temperature=temperature,
             model=model,
+            effort=effort,
             **kwargs,
         )
 
@@ -284,76 +280,29 @@ class ClaudeClient:
         messages: list,
         system: Optional[str] = None,
         max_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
         model: Optional[str] = None,
+        effort: Optional[str] = None,
         **kwargs
     ) -> Generator[str, None, None]:
         """
         Send a streaming request to Claude API.
 
-        Args:
-            messages: List of message dicts with 'role' and 'content'
-            system: Optional system prompt
-            max_tokens: Maximum tokens to generate
-            temperature: Sampling temperature (0.0-1.0)
-            model: Override default model
-            **kwargs: Additional parameters for the API
+        Takes the same arguments as send_request.
 
         Yields:
-            Text chunks as they arrive
+            Text chunks as they arrive (thinking deltas are not yielded)
 
         Raises:
-            APIError: If streaming fails
+            anthropic.APIError: The SDK's own error
         """
-        model = model or self.model
-        max_tokens = max_tokens or self.DEFAULT_MAX_TOKENS
-        temperature = temperature if temperature is not None else self.DEFAULT_TEMPERATURE
-
-        # Build request parameters
-        params = {
-            "model": model,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "messages": messages,
-        }
-
-        if system:
-            params["system"] = system
-
-        # Merge additional kwargs
-        params.update(kwargs)
-
-        # Note: Prompt caching is enabled via client initialization headers
-
-        # Thinking-only models reject sampling params and require adaptive thinking.
-        if model in self.THINKING_ONLY_MODELS:
-            params.pop("temperature", None)
-            params.pop("top_p", None)
-            params.pop("top_k", None)
-            params["thinking"] = {"type": "adaptive", "display": "summarized"}
-
-        try:
-            with self.client.messages.stream(**params) as stream:
-                for text in stream.text_stream:
-                    yield text
-
-                # Get final message for usage tracking
-                final_message = stream.get_final_message()
-                usage = final_message.usage
-                with self._usage_lock:
-                    self.total_input_tokens += usage.input_tokens
-                    self.total_output_tokens += usage.output_tokens
-                    if hasattr(usage, 'cache_read_input_tokens'):
-                        self.cache_read_tokens += usage.cache_read_input_tokens or 0
-                    if hasattr(usage, 'cache_creation_input_tokens'):
-                        self.cache_creation_tokens += usage.cache_creation_input_tokens or 0
-
-        except AnthropicError as e:
-            raise APIError(f"Streaming request failed: {str(e)}") from e
+        params = self._build_params(messages, system, max_tokens, model, effort, kwargs)
+        with self.client.messages.stream(**params) as stream:
+            for text in stream.text_stream:
+                yield text
+            self._record_usage(stream.get_final_message())
 
     def _count_tokens_sync(self, messages: list, system: Optional[str] = None) -> int:
         try:
-            # Use Anthropic's beta token counting API
             params = {
                 "model": self.model,
                 "messages": messages
@@ -361,7 +310,7 @@ class ClaudeClient:
             if system:
                 params["system"] = system
 
-            response = self.client.beta.messages.count_tokens(**params)
+            response = self.client.messages.count_tokens(**params)
             return response.input_tokens
 
         except Exception as e:
@@ -394,39 +343,37 @@ class ClaudeClient:
         """
         return await asyncio.to_thread(self._count_tokens_sync, messages, system)
 
-    def get_usage_stats(self) -> Dict[str, int]:
+    def get_usage_stats(self) -> Dict[str, Any]:
         """
-        Get cumulative token usage statistics.
+        Get cumulative token usage and cost, each response priced by its own model.
 
         Returns:
-            Dict with token usage counts and cost estimates
+            Dict with token counts, USD costs (rounded to 4 places) and any
+            models that answered but have no entry in pricing.json
         """
-        # Pricing for Claude Sonnet 4.6 (per million tokens)
-        # Updated: February 2026
-        # Source: https://www.anthropic.com/pricing
-        INPUT_PRICE = 3.0
-        OUTPUT_PRICE = 15.0
-        CACHE_READ_PRICE = 0.3  # 0.1x of input price
-
-        input_cost = (self.total_input_tokens / 1_000_000) * INPUT_PRICE
-        output_cost = (self.total_output_tokens / 1_000_000) * OUTPUT_PRICE
-        cache_read_cost = (self.cache_read_tokens / 1_000_000) * CACHE_READ_PRICE
-        total_cost = input_cost + output_cost + cache_read_cost
-
-        return {
-            "input_tokens": self.total_input_tokens,
-            "output_tokens": self.total_output_tokens,
-            "cache_read_tokens": self.cache_read_tokens,
-            "cache_creation_tokens": self.cache_creation_tokens,
-            "total_cost_usd": round(total_cost, 4),
-            "input_cost_usd": round(input_cost, 4),
-            "output_cost_usd": round(output_cost, 4),
-            "cache_savings_usd": round((self.cache_read_tokens / 1_000_000) * (INPUT_PRICE - CACHE_READ_PRICE), 4)
-        }
+        with self._usage_lock:
+            costs = dict(self.costs_usd)
+            return {
+                "input_tokens": self.total_input_tokens,
+                "output_tokens": self.total_output_tokens,
+                "cache_read_tokens": self.cache_read_tokens,
+                "cache_creation_tokens": self.cache_creation_tokens,
+                "input_cost_usd": round(costs["input"], 4),
+                "output_cost_usd": round(costs["output"], 4),
+                "cache_read_cost_usd": round(costs["cache_read"], 4),
+                "cache_write_cost_usd": round(costs["cache_write"], 4),
+                "total_cost_usd": round(sum(costs.values()), 4),
+                "cache_savings_usd": round(self.cache_savings_usd, 4),
+                "unpriced_models": sorted(self.unpriced_models),
+            }
 
     def reset_usage_stats(self):
         """Reset token usage statistics."""
-        self.total_input_tokens = 0
-        self.total_output_tokens = 0
-        self.cache_read_tokens = 0
-        self.cache_creation_tokens = 0
+        with self._usage_lock:
+            self.total_input_tokens = 0
+            self.total_output_tokens = 0
+            self.cache_read_tokens = 0
+            self.cache_creation_tokens = 0
+            self.costs_usd = {"input": 0.0, "output": 0.0, "cache_read": 0.0, "cache_write": 0.0}
+            self.cache_savings_usd = 0.0
+            self.unpriced_models = set()

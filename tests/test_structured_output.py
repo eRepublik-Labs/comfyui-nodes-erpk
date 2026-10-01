@@ -1,42 +1,9 @@
-# ABOUTME: Tests for ClaudeStructuredOutput node — JSON extraction from forced tool use.
-# ABOUTME: Uses mocked API responses to test extraction logic without real API calls.
+# ABOUTME: Tests for ClaudeStructuredOutput input validation, error propagation and schema contract.
+# ABOUTME: The request/response behaviour is covered over the real SDK in test_claude_node_requests.py.
 
 import asyncio
-import json
 import pytest
 from unittest.mock import AsyncMock, Mock
-
-
-def _make_tool_use_block(name="extract", input_data=None):
-    """Create a mock ToolUseBlock."""
-    block = Mock()
-    block.type = "tool_use"
-    block.id = "toolu_test123"
-    block.name = name
-    block.input = input_data or {"key": "value"}
-    return block
-
-
-def _make_text_block(text="Thinking about the request..."):
-    """Create a mock TextBlock."""
-    block = Mock()
-    block.type = "text"
-    block.text = text
-    return block
-
-
-def _make_response(content_blocks, stop_reason="tool_use"):
-    """Create a mock API response."""
-    response = Mock()
-    response.content = content_blocks
-    response.stop_reason = stop_reason
-    response.usage = Mock(
-        input_tokens=100,
-        output_tokens=50,
-        cache_read_input_tokens=0,
-        cache_creation_input_tokens=0,
-    )
-    return response
 
 
 def _make_tool_list(name="extract"):
@@ -51,103 +18,6 @@ def _make_tool_list(name="extract"):
             },
         }
     ]
-
-
-class TestStructuredOutputExtraction:
-    """Happy-path tests for JSON extraction from forced tool use responses."""
-
-    def test_extracts_json_from_tool_use_response(self):
-        from claude.structured_output import ClaudeStructuredOutput
-
-        client = Mock()
-        tool_data = {"name": "Alice", "age": 30}
-        client.send_request = AsyncMock(return_value=_make_response(
-            [_make_tool_use_block("extract", tool_data)]
-        ))
-
-        result = asyncio.run(ClaudeStructuredOutput.execute(
-            client=client,
-            prompt="Extract the person info",
-            tool=_make_tool_list("extract"),
-        ))
-
-        parsed = json.loads(result[0])
-        assert parsed == {"name": "Alice", "age": 30}
-
-    def test_extracts_thinking_text(self):
-        from claude.structured_output import ClaudeStructuredOutput
-
-        client = Mock()
-        client.send_request = AsyncMock(return_value=_make_response([
-            _make_text_block("Let me analyze this..."),
-            _make_text_block("The text mentions a person."),
-            _make_tool_use_block("extract", {"name": "Bob"}),
-        ]))
-
-        result = asyncio.run(ClaudeStructuredOutput.execute(
-            client=client,
-            prompt="Extract person",
-            tool=_make_tool_list("extract"),
-        ))
-
-        thinking = result[1]
-        assert "Let me analyze this..." in thinking
-        assert "The text mentions a person." in thinking
-
-    def test_passes_tools_and_tool_choice_to_client(self):
-        from claude.structured_output import ClaudeStructuredOutput
-
-        client = Mock()
-        client.send_request = AsyncMock(return_value=_make_response(
-            [_make_tool_use_block("extract", {"x": 1})]
-        ))
-        tools = _make_tool_list("extract")
-
-        asyncio.run(ClaudeStructuredOutput.execute(
-            client=client, prompt="Test prompt", tool=tools
-        ))
-
-        call_kwargs = client.send_request.call_args
-        assert call_kwargs.kwargs["tools"] == tools
-        assert call_kwargs.kwargs["tool_choice"] == {"type": "tool", "name": "extract"}
-
-    def test_passes_optional_parameters(self):
-        from claude.structured_output import ClaudeStructuredOutput
-
-        client = Mock()
-        client.send_request = AsyncMock(return_value=_make_response(
-            [_make_tool_use_block("extract", {"x": 1})]
-        ))
-
-        asyncio.run(ClaudeStructuredOutput.execute(
-            client=client,
-            prompt="Test",
-            tool=_make_tool_list("extract"),
-            system_prompt="You are a parser",
-            temperature=0.2,
-            max_tokens=2048,
-        ))
-
-        call_kwargs = client.send_request.call_args.kwargs
-        assert call_kwargs["system"] == "You are a parser"
-        assert call_kwargs["temperature"] == 0.2
-        assert call_kwargs["max_tokens"] == 2048
-
-    def test_empty_thinking_when_no_text_blocks(self):
-        from claude.structured_output import ClaudeStructuredOutput
-
-        client = Mock()
-        client.send_request = AsyncMock(return_value=_make_response(
-            [_make_tool_use_block("extract", {"result": True})]
-        ))
-
-        result = asyncio.run(ClaudeStructuredOutput.execute(
-            client=client,
-            prompt="Test",
-            tool=_make_tool_list("extract"),
-        ))
-
-        assert result[1] == ""
 
 
 class TestStructuredOutputValidation:

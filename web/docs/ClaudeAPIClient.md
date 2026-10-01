@@ -9,10 +9,10 @@ Initializes a Claude API client for use by other nodes. Optional if your API key
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| model | Combo | claude-sonnet-5 | Claude model to use. Options: claude-sonnet-5, claude-opus-5-5, claude-opus-5, claude-opus-4-8, claude-fable-5-1, claude-fable-5, claude-opus-4-7, claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929 |
+| model | Combo | claude-sonnet-5-5 | Claude model to use. Options: claude-sonnet-5-5, claude-sonnet-5, claude-opus-5-5, claude-opus-5, claude-fable-5-1, claude-fable-5 |
 | api_key | String | (empty) | Anthropic API key (optional). If empty, uses Settings or config.ini |
 | enable_streaming | Boolean | False | Enable streaming responses (optional). ComfyUI may not display streaming in real-time |
-| enable_caching | Boolean | True | Enable prompt caching for cost optimization (optional). Up to 90% savings on repeated prompts |
+| enable_caching | Boolean | True | Send automatic prompt caching (optional). The first call writes the prompt prefix at 1.25x the input price; repeats within 5 minutes read it at the cache-read price (0.1x input on most models). Prompts below the model's minimum cacheable length are not cached |
 
 ## Output
 
@@ -23,7 +23,8 @@ Initializes a Claude API client for use by other nodes. Optional if your API key
 ## Notes
 
 - API key resolution order: ComfyUI Settings > node widget > config.ini
-- Sonnet 5 is the default and offers the best balance of performance and cost
-- Haiku 4.5 is fastest and cheapest; Opus 4.8 is most capable
-- Sonnet 5, Opus 4.8, and Opus 4.7 reject temperature/top_p/top_k (the client omits them automatically); Fable 5 accepts them
-- Prompt caching is enabled by default and significantly reduces costs for repeated system prompts
+- Sonnet 5.5 is the default general-purpose model; Opus 5.5 is the highest-capability tier
+- Every offered model uses adaptive thinking and rejects temperature/top_p/top_k, so the client never sends them
+- Fable 5 and Fable 5.1 need an organization with data retention enabled; other organizations get a 404 or a "data retention" 400
+- Prompt caching is enabled by default; Usage Stats shows the cache reads and writes it produced
+- Requires anthropic>=1.11.0

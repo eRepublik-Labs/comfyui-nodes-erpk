@@ -12,7 +12,7 @@ class _FakeStreamingClient:
         self.enable_streaming = True
         self.stream_thread = None
 
-    def send_request_streaming(self, messages, system, temperature, max_tokens):
+    def send_request_streaming(self, messages, **kwargs):
         self.stream_thread = threading.current_thread()
         yield "hello"
 

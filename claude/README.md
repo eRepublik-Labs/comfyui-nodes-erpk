@@ -12,8 +12,8 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 - **Text Generation** - General-purpose text completion and generation
 - **Conversations** - Multi-turn dialogues with context preservation
 - **Token Management** - Count tokens, estimate costs, automatic context trimming
-- **Structured Output** - Guaranteed JSON output via forced tool use
-- **Cost Optimization** - Prompt caching (up to 90% savings), streaming support
+- **Structured Output** - Schema-constrained JSON via structured outputs
+- **Cost Optimization** - Prompt caching, effort control, per-model cost tracking
 - **Full ComfyUI Integration** - Native node types, workflow compatibility
 
 ## Installation
@@ -21,7 +21,8 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 ### Prerequisites
 
 - ComfyUI installed and running
-- Python 3.8 or higher
+- Python 3.10 or higher
+- `anthropic>=1.11.0` (installed by `claude/requirements.txt`; an existing install on an older SDK must upgrade with `pip install -U -r claude/requirements.txt`)
 - Anthropic API key ([get one here](https://console.anthropic.com/settings/keys))
 
 ### Steps
@@ -75,10 +76,10 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 Initializes the Claude API client. Optional if API key is configured in ComfyUI Settings — generation nodes can run standalone.
 
 **Inputs:**
-- `model`: claude-sonnet-5 (default), claude-opus-5-5, claude-opus-5, claude-opus-4-8, claude-fable-5-1, claude-fable-5, claude-opus-4-7, claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929 (legacy)
+- `model`: claude-sonnet-5-5 (default), claude-sonnet-5, claude-opus-5-5, claude-opus-5, claude-fable-5-1, claude-fable-5
 - `api_key`: Optional API key (uses Settings/config if empty)
 - `enable_streaming`: Enable streaming responses
-- `enable_caching`: Enable prompt caching for cost savings
+- `enable_caching`: Send automatic prompt caching (see [Prompt Caching](#prompt-caching))
 
 **Outputs:**
 - `client`: Claude API client instance
@@ -91,10 +92,11 @@ Initializes the Claude API client. Optional if API key is configured in ComfyUI 
 - `prompt`: Simple prompt (e.g., "a cat")
 - `style`: 51 styles (photorealistic, cinematic, fantasy, cyberpunk, anime, etc.)
 - `detail_level`: minimal, moderate, detailed, ultra-detailed
-- `temperature`: 0.0-1.0 (creativity level)
-- `max_tokens`: 256-4096 (output length)
+- `temperature`: Ignored. Current Claude models reject it, so it is never sent; kept so saved workflows load
+- `max_tokens`: 256-128000 (output length; thinking counts toward it)
 - `use_streaming`: Enable streaming
 - `model`: Model override for this call, or inherit the client's model (default)
+- `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
 
 **Outputs:**
 - `enhanced_prompt`: Detailed, styled prompt
@@ -115,7 +117,9 @@ Analyzes images using Claude's multimodal capabilities.
 - `question`: Question or instruction about the image
 - `additional_images`: Optional (up to 19 more images)
 - `detail_level`: low, medium, high
-- `max_tokens`: Output length
+- `max_tokens`: 256-128000 (output length; thinking counts toward it)
+- `model`: Model override for this call, or inherit the client's model (default)
+- `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
 
 **Outputs:**
 - `analysis`: Detailed image analysis text
@@ -135,10 +139,11 @@ General-purpose text generation.
 - `client`: Claude API client (optional)
 - `prompt`: User prompt
 - `system_prompt`: Optional system prompt
-- `temperature`: Creativity level
-- `max_tokens`: Output length
+- `temperature`: Ignored. Current Claude models reject it, so it is never sent; kept so saved workflows load
+- `max_tokens`: 256-128000 (output length; thinking counts toward it)
 - `use_streaming`: Enable streaming
 - `model`: Model override for this call, or inherit the client's model (default)
+- `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
 
 **Outputs:**
 - `response`: Generated text
@@ -153,10 +158,12 @@ Multi-turn conversations with message history.
 - `prompt`: Your message
 - `conversation_history`: Previous conversation state (connect from previous node)
 - `system_prompt`: Optional (only for new conversations)
-- `auto_trim`: Auto-trim old messages to fit context window
+- `auto_trim`: Auto-trim old messages to fit the context window of the model this node calls
 - `reset_conversation`: Start fresh conversation
-- `temperature`, `max_tokens`: Generation parameters
+- `temperature`: Ignored. Current Claude models reject it, so it is never sent; kept so saved workflows load
+- `max_tokens`: 256-128000 (output length; thinking counts toward it)
 - `model`: Model override for this call, or inherit the client's model (default)
+- `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
 
 **Outputs:**
 - `response`: Claude's response
@@ -193,7 +200,7 @@ Display cumulative token usage and costs for a client.
 - `reset_stats`: Reset stats after displaying
 
 **Outputs:**
-- `stats`: Formatted usage statistics
+- `stats`: Formatted usage statistics. Each response is priced by the model that answered it (input, output, cache reads, 5-minute cache writes); a model missing from `pricing.json` is listed as not costed
 
 ### Tool Use Nodes
 
@@ -228,29 +235,33 @@ Builds an Anthropic tool definition for use with structured output. Chainable �
 ```
 
 #### Claude Structured Output
-Forces Claude to respond with structured JSON matching your tool schema. Uses Anthropic's forced tool use — the model is guaranteed to produce valid JSON conforming to your schema.
+Gets JSON from Claude that matches your tool's schema. Uses Anthropic's structured outputs (`output_config.format` with the tool's `input_schema` as a JSON Schema), which constrains the reply to the schema. Earlier versions forced tool use, which Sonnet 5.5, Opus 5.5 and Fable 5.1 reject.
 
 **Inputs:**
 - `client`: Claude API client (optional)
 - `prompt`: What to extract or generate
 - `tool`: Tool definition (exactly 1 tool from Tool Definition node)
 - `system_prompt`: Optional system prompt
-- `temperature`: 0.0-1.0 (default 0.0 — low for consistency)
-- `max_tokens`: 256-8192 (default 4096)
+- `temperature`: Ignored. Current Claude models reject it, so it is never sent; kept so saved workflows load
+- `max_tokens`: 256-128000 (default 4096; thinking counts toward it)
+- `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
 
 **Outputs:**
-- `json_output`: Extracted JSON string (pretty-printed)
-- `thinking`: Any text blocks Claude produced before the tool use block. Usually empty at low temperature. This captures optional reasoning text from the response, not Anthropic's extended thinking feature (which is a separate API capability).
+- `json_output`: The JSON reply (pretty-printed)
+- `thinking`: Claude's summarized thinking for this reply; empty when it answered without thinking
 
 **Notes:**
 - The `tool` input must contain exactly 1 tool — connecting a chain of multiple tools will raise an error
+- The tool's name and description are added to the system prompt so Claude knows what the JSON is for
+- Structured outputs require `"additionalProperties": false` on every object. The node adds it where the schema leaves it out and rejects a schema that sets it to anything else
+- A reply cut off at `max_tokens` raises an error rather than returning partial JSON
 - Empty or whitespace-only prompts are rejected at queue time
 
 **Use Cases:**
 - Extract structured data from unstructured text
 - Generate structured content (e.g. metadata, tags, classifications)
 - Parse and normalize data into a consistent schema
-- Guaranteed JSON output without regex parsing
+- Schema-matching JSON without regex parsing
 
 ## Prompt Enhancement Styles
 
@@ -284,17 +295,22 @@ Each style has custom system prompts that guide Claude to generate appropriate d
 ## Cost Optimization
 
 ### Prompt Caching
-Enabled by default. Caches system prompts to reduce costs by up to 90% for repeated requests.
+Enabled by default (`enable_caching` on Claude API Client). Each request carries a top-level `cache_control: {"type": "ephemeral"}`, Anthropic's automatic caching: the API caches the longest reusable prompt prefix (system prompt, then messages).
 
 **How it works:**
-- System prompts are marked for caching
-- Subsequent requests with same system prompt read from cache
-- Cache read tokens cost 0.1x of regular input tokens
+- The first request writes the prefix to a 5-minute cache, billed at 1.25x the input price
+- A repeat within 5 minutes reads it at the cache-read price: 0.1x input on most models, 0.05x on Opus 5.5, 0.025x on Fable 5.1
+- Prompts below the model's minimum cacheable length are not cached
+- Measured 2026-10-01 on Sonnet 5.5: a 7,226-token system prompt sent twice wrote 7,226 cache tokens on the first call and read 7,226 on the second
 
-**Pricing (Claude Sonnet 5):**
-- Input: $2 / million tokens (intro through 2026-08-31; then $3)
-- Output: $10 / million tokens (intro; then $15)
-- Cache Read: $0.20 / million tokens (90% savings)
+**Pricing (Claude Sonnet 5.5, per million tokens):**
+- Input: $2
+- Output: $10
+- 5-minute cache write: $2.50
+- Cache read: $0.20
+
+### Effort
+Text Generation, Conversation, Prompt Enhancer, Vision Analysis and Structured Output have an `effort` widget (low, medium, high, xhigh, max). Lower effort spends fewer thinking and output tokens. `(model default)` sends nothing, so each model keeps its own default (high; medium on Opus 5.5)
 
 ### Token Management
 - Use Token Counter node to check prompt lengths before generation
@@ -302,14 +318,15 @@ Enabled by default. Caches system prompts to reduce costs by up to 90% for repea
 - Monitor usage with Usage Stats node
 
 ### Model Selection
-- **Claude Sonnet 5**: $2/1M in, $10/1M out (intro through 2026-08-31) - Best balance (default), 1M context; rejects sampling params (temperature omitted automatically)
-- **Claude Opus 4.8**: $5/1M in, $25/1M out - Current flagship, reasoning-first, 1M context; rejects sampling params
-- **Claude Fable 5.1**: $10/1M in, $50/1M out - Most capable model, 1M context, adaptive thinking always on; rejects temperature
-- **Claude Fable 5**: $10/1M in, $50/1M out - Previous Fable generation, 1M context; rejects temperature
-- **Claude Haiku 4.5**: $1/1M in, $5/1M out - Fastest, cheapest for simple tasks
-- **Claude Sonnet 4.6**: $3/1M in, $15/1M out - Previous Sonnet
-- **Claude Opus 4.6**: $5/1M in, $25/1M out - Previous-gen flagship
-- **Claude Opus 4.7**: previous flagship; reasoning-first, rejects sampling params
+Every offered model has a 1M-token context window, up to 128K output tokens, adaptive thinking, and rejects temperature/top_p/top_k (the client never sends them).
+- **Claude Sonnet 5.5** (default): $2/1M in, $10/1M out - Newest Sonnet, the general-purpose choice
+- **Claude Sonnet 5**: $2/1M in, $10/1M out - Previous Sonnet
+- **Claude Opus 5.5**: $4/1M in, $20/1M out - Highest-capability Opus; cache reads at 0.05x
+- **Claude Opus 5**: $5/1M in, $25/1M out - Previous Opus
+- **Claude Fable 5.1**: $10/1M in, $50/1M out - Most capable model; needs an organization with data retention enabled
+- **Claude Fable 5**: $10/1M in, $50/1M out - Previous Fable; same access requirement
+
+Removed 2026-10-01: claude-opus-4-8, claude-opus-4-7, claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929. A saved workflow that selects one fails validation until you pick a current model.
 
 ## Workflow Examples
 
@@ -356,6 +373,14 @@ Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**)
 3. Check terminal for error messages
 4. Verify dependencies installed: `pip list | grep anthropic`
 
+### "data retention enabled" (400) or "model: claude-fable-5" (404)
+**Cause:** Fable models are only available to organizations with data retention enabled.
+**Solution:** Pick another model, or enable data retention for your organization in the Anthropic Console.
+
+### "unexpected keyword argument" TypeError
+**Cause:** The installed `anthropic` SDK is older than 1.11.0.
+**Solution:** `pip install -U -r claude/requirements.txt` in ComfyUI's Python environment, then restart ComfyUI.
+
 ### "Context window exceeded" Error
 **Solution:**
 - Enable `auto_trim` in Conversation nodes
@@ -387,15 +412,14 @@ Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**)
 - `CLAUDE_TOOLS`: List of Anthropic tool definitions (for structured output)
 
 ### Context Window
-- Most models: 200,000 tokens
-- Claude Opus 4.7: 1,000,000 tokens (1M context, reasoning-first mainline)
-- Auto-trimming reserves 20,000 tokens for responses
+- Every offered model: 1,000,000 tokens
+- Auto-trimming in Conversation reserves `max_tokens` + 1,000 tokens for the response and always keeps the 4 most recent messages
 - Oldest messages removed first when trimming
 
 ### Caching Behavior
-- System prompts cached automatically
-- Cache duration: Ephemeral (session-based)
-- Cache hits tracked in Usage Stats
+- Automatic caching via top-level `cache_control` when `enable_caching` is on
+- Cache duration: 5 minutes, refreshed on each hit
+- Cache reads and writes tracked and costed in Usage Stats
 
 ## API Reference
 

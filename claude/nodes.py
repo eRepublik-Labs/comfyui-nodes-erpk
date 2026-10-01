@@ -21,7 +21,7 @@ class ClaudeAPIClient(IO.ComfyNode):
                     "model",
                     options=TEXT_MODELS,
                     default=DEFAULT_TEXT_MODEL,
-                    tooltip="Claude model to use. Sonnet 5 offers the best balance of performance and cost; Opus 5 is the highest-capability tier.",
+                    tooltip="Claude model to use. Sonnet 5.5 (default) offers the best balance of performance and cost; Opus 5.5 is the highest-capability tier. Fable access depends on your organization's data-retention settings.",
                 ),
                 IO.String.Input(
                     "api_key",
@@ -39,7 +39,7 @@ class ClaudeAPIClient(IO.ComfyNode):
                     "enable_caching",
                     default=True,
                     optional=True,
-                    tooltip="Enable prompt caching for cost optimization (up to 90% savings on repeated prompts).",
+                    tooltip="Send automatic prompt caching. A repeated prompt prefix above the model's minimum length is billed at the cache-read price (0.1x input on most models) after a first call billed at 1.25x.",
                 ),
             ],
             outputs=[
@@ -51,7 +51,7 @@ class ClaudeAPIClient(IO.ComfyNode):
     def execute(cls, **kwargs) -> IO.NodeOutput:
         from .claude_api.client import ClaudeClient
 
-        model = kwargs.get("model", "claude-sonnet-5")
+        model = kwargs.get("model", DEFAULT_TEXT_MODEL)
         api_key = kwargs.get("api_key", "")
         enable_streaming = kwargs.get("enable_streaming", False)
         enable_caching = kwargs.get("enable_caching", True)
@@ -120,13 +120,17 @@ Token Usage:
   Cache Read Tokens:      {stats['cache_read_tokens']:,}
   Cache Creation Tokens:  {stats['cache_creation_tokens']:,}
 
-Cost (USD):
+Cost (USD, priced per answering model):
   Input Cost:       ${stats['input_cost_usd']:.4f}
   Output Cost:      ${stats['output_cost_usd']:.4f}
+  Cache Read Cost:  ${stats['cache_read_cost_usd']:.4f}
+  Cache Write Cost: ${stats['cache_write_cost_usd']:.4f}
   Cache Savings:    ${stats['cache_savings_usd']:.4f}
   ─────────────────────────────────
   Total Cost:       ${stats['total_cost_usd']:.4f}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
+            if stats["unpriced_models"]:
+                stats_str += f"\nNot costed (no price in pricing.json): {', '.join(stats['unpriced_models'])}"
 
             print(f"\n{stats_str}\n")
 

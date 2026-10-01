@@ -24,12 +24,12 @@ NODES = [
 
 
 @pytest.mark.parametrize("module,name", NODES)
-def test_model_combo_is_last_widget_and_inherits_by_default(module, name):
+def test_model_combo_precedes_effort_and_inherits_by_default(module, name):
     inputs = _node(module, name).define_schema().inputs
     widgets = [i for i in inputs if i.io_type in WIDGET_TYPES]
-    assert widgets[-1].id == "model"
-    assert widgets[-1].default == INHERIT_FROM_CLIENT
-    assert list(widgets[-1].options) == [INHERIT_FROM_CLIENT] + TEXT_MODELS
+    assert [w.id for w in widgets[-2:]] == ["model", "effort"]
+    assert widgets[-2].default == INHERIT_FROM_CLIENT
+    assert list(widgets[-2].options) == [INHERIT_FROM_CLIENT] + TEXT_MODELS
 
 
 def _client():
@@ -44,8 +44,8 @@ def _client():
 def test_text_generation_forwards_explicit_model():
     node = _node("text_generation", "ClaudeTextGeneration")
     client = _client()
-    asyncio.run(node.execute(prompt="hi", client=client, model="claude-opus-4-7"))
-    assert client.send_request.call_args.kwargs["model"] == "claude-opus-4-7"
+    asyncio.run(node.execute(prompt="hi", client=client, model="claude-opus-5"))
+    assert client.send_request.call_args.kwargs["model"] == "claude-opus-5"
 
 
 def test_text_generation_inherit_sends_no_model():
@@ -58,12 +58,12 @@ def test_text_generation_inherit_sends_no_model():
 def test_prompt_enhancer_forwards_explicit_model():
     node = _node("prompt_enhancer", "ClaudePromptEnhancer")
     client = _client()
-    asyncio.run(node.execute(prompt="a cat", client=client, model="claude-opus-4-7"))
-    assert client.send_request.call_args.kwargs["model"] == "claude-opus-4-7"
+    asyncio.run(node.execute(prompt="a cat", client=client, model="claude-opus-5"))
+    assert client.send_request.call_args.kwargs["model"] == "claude-opus-5"
 
 
 def test_conversation_forwards_explicit_model():
     node = _node("conversation", "ClaudeConversation")
     client = _client()
-    asyncio.run(node.execute(prompt="hi", client=client, model="claude-opus-4-7"))
-    assert client.send_request.call_args.kwargs["model"] == "claude-opus-4-7"
+    asyncio.run(node.execute(prompt="hi", client=client, model="claude-opus-5"))
+    assert client.send_request.call_args.kwargs["model"] == "claude-opus-5"

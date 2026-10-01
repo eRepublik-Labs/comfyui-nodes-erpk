@@ -1,7 +1,7 @@
 # Claude API Integration Requirements
 
 # Core API client (includes token counting API)
-anthropic>=0.96.0
+anthropic>=1.11.0
 
 # Data validation and serialization
 pydantic>=2.0.0

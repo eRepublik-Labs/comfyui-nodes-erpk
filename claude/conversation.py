@@ -2,7 +2,7 @@
 # ABOUTME: ClaudeConversation manages chat state; ClaudeConversationInfo displays conversation details.
 
 from comfy_api.latest import IO
-from .models import INHERIT_FROM_CLIENT, TEXT_MODELS
+from .models import INHERIT_FROM_CLIENT, TEXT_MODELS, effort_input, effort_kwargs
 
 
 class ClaudeConversation(IO.ComfyNode):
@@ -59,16 +59,16 @@ class ClaudeConversation(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level",
+                    tooltip="Ignored: current Claude models reject temperature (kept so saved workflows load).",
                 ),
                 IO.Int.Input(
                     "max_tokens",
                     default=2048,
                     min=256,
-                    max=4096,
+                    max=128000,
                     step=128,
                     optional=True,
-                    tooltip="Maximum length of response",
+                    tooltip="Maximum length of response. Thinking counts toward this limit. Current Claude models allow up to 128K.",
                 ),
                 IO.Int.Input(
                     "seed",
@@ -85,6 +85,7 @@ class ClaudeConversation(IO.ComfyNode):
                     optional=True,
                     tooltip="Override the client's model for this call. Without a client the default is the Claude API client's default model.",
                 ),
+                effort_input(),
             ],
             outputs=[
                 IO.String.Output("response"),
@@ -108,10 +109,10 @@ class ClaudeConversation(IO.ComfyNode):
         system_prompt = kwargs.get("system_prompt", "")
         auto_trim = kwargs.get("auto_trim", True)
         reset_conversation = kwargs.get("reset_conversation", False)
-        temperature = kwargs.get("temperature", 0.7)
         max_tokens = kwargs.get("max_tokens", 2048)
         model = kwargs.get("model", INHERIT_FROM_CLIENT)
-        model_kwargs = {} if model == INHERIT_FROM_CLIENT else {"model": model}
+        request_kwargs = {} if model == INHERIT_FROM_CLIENT else {"model": model}
+        request_kwargs.update(effort_kwargs(kwargs.get("effort")))
 
         if client is None:
             client = ClaudeClient(api_key=None)
@@ -131,8 +132,10 @@ class ClaudeConversation(IO.ComfyNode):
 
             messages.append({"role": "user", "content": prompt.strip()})
 
+            # Trim against the model this call actually uses, not the client's.
+            token_manager = TokenManager(model=request_kwargs.get("model", client.model))
+
             if auto_trim:
-                token_manager = TokenManager(model=client.model)
                 messages, removed_count = token_manager.trim_messages_to_fit(
                     messages=messages,
                     system=system,
@@ -141,7 +144,6 @@ class ClaudeConversation(IO.ComfyNode):
                 if removed_count > 0:
                     print(f"[Claude] Trimmed {removed_count} old messages to fit context window")
 
-            token_manager = TokenManager(model=client.model)
             messages = token_manager.consolidate_consecutive_messages(messages)
 
             if not token_manager.validate_message_roles(messages):
@@ -153,9 +155,8 @@ class ClaudeConversation(IO.ComfyNode):
             response = await client.send_request(
                 messages=messages,
                 system=system,
-                temperature=temperature,
                 max_tokens=max_tokens,
-                **model_kwargs,
+                **request_kwargs,
             )
 
             reply = response_text(response)
@@ -231,7 +232,7 @@ Estimated Tokens:
   ~{total_tokens:,} tokens
 
 Context Usage:
-  ~{(total_tokens / 200000) * 100:.1f}% of 200k window
+  ~{(total_tokens / token_manager.context_window) * 100:.1f}% of {token_manager.context_window:,}-token window
 ━━━━━━━━━━━━━━━━━━━━━━━━"""
 
             print(f"\n{info_str}\n")

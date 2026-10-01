@@ -1,10 +1,10 @@
 # ABOUTME: ComfyUI V3 node for general-purpose text generation using Claude models.
-# ABOUTME: Supports standard and streaming modes with configurable temperature and tokens.
+# ABOUTME: Supports standard and streaming modes with configurable max tokens and effort.
 
 import asyncio
 
 from comfy_api.latest import IO
-from .models import INHERIT_FROM_CLIENT, TEXT_MODELS
+from .models import INHERIT_FROM_CLIENT, TEXT_MODELS, effort_input, effort_kwargs
 
 
 class ClaudeTextGeneration(IO.ComfyNode):
@@ -44,16 +44,16 @@ class ClaudeTextGeneration(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level (0.0=focused, 1.0=creative)",
+                    tooltip="Ignored: current Claude models reject temperature (kept so saved workflows load).",
                 ),
                 IO.Int.Input(
                     "max_tokens",
                     default=1024,
                     min=256,
-                    max=8192,
+                    max=128000,
                     step=128,
                     optional=True,
-                    tooltip="Maximum length of response",
+                    tooltip="Maximum length of response. Thinking counts toward this limit. Current Claude models allow up to 128K.",
                 ),
                 IO.Boolean.Input(
                     "use_streaming",
@@ -76,6 +76,7 @@ class ClaudeTextGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip="Override the client's model for this call. Without a client the default is the Claude API client's default model.",
                 ),
+                effort_input(),
             ],
             outputs=[
                 IO.String.Output("response"),
@@ -94,11 +95,11 @@ class ClaudeTextGeneration(IO.ComfyNode):
         prompt = kwargs.get("prompt", "")
         client = kwargs.get("client")
         system_prompt = kwargs.get("system_prompt", "")
-        temperature = kwargs.get("temperature", 0.7)
         max_tokens = kwargs.get("max_tokens", 1024)
         use_streaming = kwargs.get("use_streaming", False)
         model = kwargs.get("model", INHERIT_FROM_CLIENT)
-        model_kwargs = {} if model == INHERIT_FROM_CLIENT else {"model": model}
+        request_kwargs = {} if model == INHERIT_FROM_CLIENT else {"model": model}
+        request_kwargs.update(effort_kwargs(kwargs.get("effort")))
 
         if client is None:
             client = ClaudeClient(api_key=None)
@@ -112,10 +113,10 @@ class ClaudeTextGeneration(IO.ComfyNode):
 
             if use_streaming and client.enable_streaming:
                 response_text = await asyncio.to_thread(
-                    cls._generate_streaming, client, messages, system, temperature, max_tokens, model_kwargs
+                    cls._generate_streaming, client, messages, system, max_tokens, request_kwargs
                 )
             else:
-                response_text = await cls._generate_standard(client, messages, system, temperature, max_tokens, model_kwargs)
+                response_text = await cls._generate_standard(client, messages, system, max_tokens, request_kwargs)
 
             print(f"[Claude] Text generated successfully ({len(response_text)} characters)")
             return IO.NodeOutput(response_text)
@@ -126,29 +127,27 @@ class ClaudeTextGeneration(IO.ComfyNode):
             raise ValueError(error_msg)
 
     @classmethod
-    async def _generate_standard(cls, client, messages, system, temperature, max_tokens, model_kwargs):
+    async def _generate_standard(cls, client, messages, system, max_tokens, request_kwargs):
         """Generate using standard (non-streaming) mode."""
         from .claude_api.client import response_text
 
         response = await client.send_request(
             messages=messages,
             system=system,
-            temperature=temperature,
             max_tokens=max_tokens,
-            **model_kwargs,
+            **request_kwargs,
         )
         return response_text(response)
 
     @classmethod
-    def _generate_streaming(cls, client, messages, system, temperature, max_tokens, model_kwargs):
+    def _generate_streaming(cls, client, messages, system, max_tokens, request_kwargs):
         """Generate using streaming mode."""
         chunks = []
         for chunk in client.send_request_streaming(
             messages=messages,
             system=system,
-            temperature=temperature,
             max_tokens=max_tokens,
-            **model_kwargs,
+            **request_kwargs,
         ):
             chunks.append(chunk)
         return "".join(chunks)

@@ -1,12 +1,46 @@
-# ABOUTME: ComfyUI V3 node that uses forced tool use to get guaranteed structured JSON from Claude.
-# ABOUTME: Accepts a single CLAUDE_TOOLS definition and returns the extracted JSON plus any thinking text.
+# ABOUTME: ComfyUI V3 node that gets schema-constrained JSON from Claude via structured outputs.
+# ABOUTME: Uses a single CLAUDE_TOOLS definition's input_schema; returns the JSON plus Claude's thinking summary.
 
+import copy
 import json
 from comfy_api.latest import IO
 
+from .models import effort_input, effort_kwargs
+
+
+def strict_object_schema(schema):
+    """Return a copy of a JSON Schema with additionalProperties: false on every object.
+
+    Structured outputs reject any object schema that does not set it explicitly
+    (400 "For 'object' type, 'additionalProperties' must be explicitly set to
+    false"), and ClaudeToolDefinition's default schema leaves it out.
+    """
+    schema = copy.deepcopy(schema)
+
+    def visit(node):
+        if isinstance(node, list):
+            for item in node:
+                visit(item)
+            return
+        if not isinstance(node, dict):
+            return
+        node_type = node.get("type")
+        if node_type == "object" or (isinstance(node_type, list) and "object" in node_type):
+            if node.get("additionalProperties", False) is not False:
+                raise ValueError(
+                    "Structured outputs require \"additionalProperties\": false on every object; "
+                    "remove it from the tool's parameters_json or set it to false"
+                )
+            node["additionalProperties"] = False
+        for value in node.values():
+            visit(value)
+
+    visit(schema)
+    return schema
+
 
 class ClaudeStructuredOutput(IO.ComfyNode):
-    """Forces Claude to respond with structured JSON via the tool use API."""
+    """Constrains Claude's answer to a tool definition's JSON Schema."""
 
     @classmethod
     def define_schema(cls):
@@ -14,7 +48,7 @@ class ClaudeStructuredOutput(IO.ComfyNode):
             node_id="ClaudeStructuredOutput",
             display_name="Claude Structured Output",
             category="ERPK/Claude/Tools",
-            description="Force Claude to respond with structured JSON via tool use.",
+            description="Get JSON from Claude that matches a tool definition's schema (structured outputs).",
             not_idempotent=True,
             inputs=[
                 IO.String.Input(
@@ -46,16 +80,16 @@ class ClaudeStructuredOutput(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Low values for consistent output (0.0 recommended)",
+                    tooltip="Ignored: current Claude models reject temperature (kept so saved workflows load).",
                 ),
                 IO.Int.Input(
                     "max_tokens",
                     default=4096,
                     min=256,
-                    max=8192,
+                    max=128000,
                     step=128,
                     optional=True,
-                    tooltip="Maximum tokens for the response",
+                    tooltip="Maximum tokens for the response. Thinking counts toward this limit. Current Claude models allow up to 128K.",
                 ),
                 IO.Int.Input(
                     "seed",
@@ -65,6 +99,7 @@ class ClaudeStructuredOutput(IO.ComfyNode):
                     control_after_generate="randomize",
                     tooltip="Seed for cache control. Randomizes by default to ensure fresh results each run.",
                 ),
+                effort_input(),
             ],
             outputs=[
                 IO.String.Output("json_output"),
@@ -83,7 +118,6 @@ class ClaudeStructuredOutput(IO.ComfyNode):
         tool = kwargs.get("tool")
         client = kwargs.get("client")
         system_prompt = kwargs.get("system_prompt", "")
-        temperature = kwargs.get("temperature", 0.0)
         max_tokens = kwargs.get("max_tokens", 4096)
 
         if client is None:
@@ -99,34 +133,31 @@ class ClaudeStructuredOutput(IO.ComfyNode):
             )
 
         tool_def = tool[0]
-        tool_name = tool_def["name"]
-
-        system = system_prompt.strip() if system_prompt and system_prompt.strip() else None
+        schema = strict_object_schema(tool_def["input_schema"])
+        purpose = f"The JSON you return is {tool_def['name']}: {tool_def['description']}" if tool_def.get("description") else None
+        system = "\n\n".join(part for part in (system_prompt.strip() if system_prompt else "", purpose) if part) or None
 
         response = await client.send_request(
             messages=[{"role": "user", "content": prompt.strip()}],
             system=system,
-            temperature=temperature,
             max_tokens=max_tokens,
-            tools=tool,
-            tool_choice={"type": "tool", "name": tool_name},
+            output_config={"format": {"type": "json_schema", "schema": schema}},
+            **effort_kwargs(kwargs.get("effort")),
         )
 
-        # Extract thinking text and tool use result from response content blocks
-        thinking_parts = []
-        tool_input = None
+        if response.stop_reason == "max_tokens":
+            raise ValueError(
+                f"Claude's JSON was cut off at max_tokens={max_tokens} (thinking counts toward it); raise max_tokens"
+            )
 
-        for block in response.content:
-            if block.type == "text":
-                thinking_parts.append(block.text)
-            elif block.type == "tool_use":
-                tool_input = block.input
+        from .claude_api.client import response_text
+        try:
+            parsed = json.loads(response_text(response))
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Claude returned text that is not valid JSON: {e}") from e
 
-        if tool_input is None:
-            raise ValueError("No tool_use block found in response")
-
-        json_output = json.dumps(tool_input, indent=2)
-        thinking = "\n".join(thinking_parts)
+        json_output = json.dumps(parsed, indent=2)
+        thinking = "\n".join(block.thinking for block in response.content if block.type == "thinking")
 
         print(f"[Claude] Structured output extracted ({len(json_output)} chars JSON)")
 

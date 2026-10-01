@@ -12,6 +12,8 @@ from typing import List, Dict, Any, Optional, Tuple
 from PIL import Image
 import numpy as np
 
+from ..models import DEFAULT_TEXT_MODEL
+
 
 class BaseRequest(ABC):
     """
@@ -83,27 +85,21 @@ class TokenManager:
     - Reserve tokens for responses
     """
 
-    # Context window sizes for different Claude models
-    # Claude 4.6 and later carry the full 1M window at standard pricing — no
-    # beta header, no long-context premium. The 4.5 family is capped at 200K.
+    # Context window sizes for different Claude models. Every offered model
+    # carries the full 1M window at standard pricing (no beta header).
     CONTEXT_WINDOWS = {
+        "claude-sonnet-5-5": 1_000_000,
         "claude-sonnet-5": 1_000_000,
         "claude-opus-5-5": 1_000_000,
         "claude-opus-5": 1_000_000,
-        "claude-opus-4-8": 1_000_000,
         "claude-fable-5-1": 1_000_000,
         "claude-fable-5": 1_000_000,
-        "claude-opus-4-7": 1_000_000,
-        "claude-sonnet-4-6": 1_000_000,
-        "claude-opus-4-6": 1_000_000,
-        "claude-haiku-4-5-20251001": 200_000,
-        "claude-sonnet-4-5-20250929": 200_000,
     }
 
     # Default reserve tokens for response generation
     DEFAULT_RESERVE_TOKENS = 20_000
 
-    def __init__(self, model: str = "claude-sonnet-5"):
+    def __init__(self, model: str = DEFAULT_TEXT_MODEL):
         """
         Initialize token manager.
 

@@ -10,7 +10,7 @@ urllib3>=2.7.0
 cryptography>=48.0.1
 
 # Claude API integration
-anthropic>=0.96.0
+anthropic>=1.11.0
 
 # Google Gemini API integration
 google-genai>=2.2.0

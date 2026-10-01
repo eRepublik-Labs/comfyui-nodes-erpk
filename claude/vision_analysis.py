@@ -3,7 +3,7 @@
 
 from comfy_api.latest import IO
 
-from .models import INHERIT_FROM_CLIENT, TEXT_MODELS
+from .models import INHERIT_FROM_CLIENT, TEXT_MODELS, effort_input, effort_kwargs
 
 
 class ClaudeVisionAnalysis(IO.ComfyNode):
@@ -38,7 +38,7 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
                     options=[INHERIT_FROM_CLIENT] + TEXT_MODELS,
                     default=INHERIT_FROM_CLIENT,
                     optional=True,
-                    tooltip="Override the client's model for this vision call. Opus 4.7 supports 2576px image resolution (vs 1568px on prior models).",
+                    tooltip="Override the client's model for this vision call.",
                 ),
                 IO.Image.Input(
                     "additional_images",
@@ -56,10 +56,10 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
                     "max_tokens",
                     default=2048,
                     min=256,
-                    max=4096,
+                    max=128000,
                     step=128,
                     optional=True,
-                    tooltip="Maximum length of analysis",
+                    tooltip="Maximum length of analysis. Thinking counts toward this limit. Current Claude models allow up to 128K.",
                 ),
                 IO.Int.Input(
                     "seed",
@@ -69,6 +69,7 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
                     control_after_generate="randomize",
                     tooltip="Seed for cache control. Randomizes by default to ensure fresh results each run.",
                 ),
+                effort_input(),
             ],
             outputs=[
                 IO.String.Output("analysis"),
@@ -111,7 +112,7 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
                 "messages": messages,
                 "system": system,
                 "max_tokens": max_tokens,
-                "temperature": 0.7,
+                **effort_kwargs(kwargs.get("effort")),
             }
             if model and model != "(inherit from client)":
                 send_kwargs["model"] = model

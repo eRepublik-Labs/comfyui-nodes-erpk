@@ -1,79 +1,55 @@
 {
   "_comment": "Claude API Pricing - Update from https://www.anthropic.com/pricing",
-  "_last_updated": "2026-09-23",
+  "_last_updated": "2026-10-01",
   "_version": "1.0",
 
   "models": {
+    "claude-sonnet-5-5": {
+      "name": "Claude Sonnet 5.5",
+      "input_price_per_mtok": 2.0,
+      "output_price_per_mtok": 10.0,
+      "cache_read_price_per_mtok": 0.2,
+      "cache_write_5m_price_per_mtok": 2.5
+    },
     "claude-sonnet-5": {
       "name": "Claude Sonnet 5",
       "input_price_per_mtok": 2.0,
       "output_price_per_mtok": 10.0,
-      "cache_read_price_per_mtok": 0.2
+      "cache_read_price_per_mtok": 0.2,
+      "cache_write_5m_price_per_mtok": 2.5
     },
     "claude-opus-5-5": {
       "name": "Claude Opus 5.5",
       "input_price_per_mtok": 4.0,
       "output_price_per_mtok": 20.0,
-      "cache_read_price_per_mtok": 0.2
+      "cache_read_price_per_mtok": 0.2,
+      "cache_write_5m_price_per_mtok": 5.0
     },
     "claude-opus-5": {
       "name": "Claude Opus 5",
       "input_price_per_mtok": 5.0,
       "output_price_per_mtok": 25.0,
-      "cache_read_price_per_mtok": 0.5
-    },
-    "claude-opus-4-8": {
-      "name": "Claude Opus 4.8",
-      "input_price_per_mtok": 5.0,
-      "output_price_per_mtok": 25.0,
-      "cache_read_price_per_mtok": 0.5
+      "cache_read_price_per_mtok": 0.5,
+      "cache_write_5m_price_per_mtok": 6.25
     },
     "claude-fable-5-1": {
       "name": "Claude Fable 5.1",
       "input_price_per_mtok": 10.0,
       "output_price_per_mtok": 50.0,
-      "cache_read_price_per_mtok": 0.25
+      "cache_read_price_per_mtok": 0.25,
+      "cache_write_5m_price_per_mtok": 12.5
     },
     "claude-fable-5": {
       "name": "Claude Fable 5",
       "input_price_per_mtok": 10.0,
       "output_price_per_mtok": 50.0,
-      "cache_read_price_per_mtok": 1.0
-    },
-    "claude-sonnet-4-6": {
-      "name": "Claude Sonnet 4.6",
-      "input_price_per_mtok": 3.0,
-      "output_price_per_mtok": 15.0,
-      "cache_read_price_per_mtok": 0.3
-    },
-    "claude-opus-4-7": {
-      "name": "Claude Opus 4.7",
-      "input_price_per_mtok": 5.0,
-      "output_price_per_mtok": 25.0,
-      "cache_read_price_per_mtok": 0.5
-    },
-    "claude-opus-4-6": {
-      "name": "Claude Opus 4.6",
-      "input_price_per_mtok": 5.0,
-      "output_price_per_mtok": 25.0,
-      "cache_read_price_per_mtok": 0.5
-    },
-    "claude-haiku-4-5-20251001": {
-      "name": "Claude Haiku 4.5",
-      "input_price_per_mtok": 1.0,
-      "output_price_per_mtok": 5.0,
-      "cache_read_price_per_mtok": 0.1
-    },
-    "claude-sonnet-4-5-20250929": {
-      "name": "Claude Sonnet 4.5",
-      "input_price_per_mtok": 3.0,
-      "output_price_per_mtok": 15.0,
-      "cache_read_price_per_mtok": 0.3
+      "cache_read_price_per_mtok": 1.0,
+      "cache_write_5m_price_per_mtok": 12.5
     }
   },
 
   "notes": {
-    "cache_multiplier": "Cache read prices are 0.1x of input prices",
+    "cache_multiplier": "Cache read prices are usually 0.1x of input prices (0.05x on Opus 5.5, 0.025x on Fable 5.1); 5-minute cache writes are 1.25x",
     "pricing_page": "https://www.anthropic.com/pricing",
     "currency": "USD"
   }

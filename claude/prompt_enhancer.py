@@ -4,7 +4,7 @@
 import asyncio
 
 from comfy_api.latest import IO
-from .models import INHERIT_FROM_CLIENT, TEXT_MODELS
+from .models import INHERIT_FROM_CLIENT, TEXT_MODELS, effort_input, effort_kwargs
 
 
 class ClaudePromptEnhancer(IO.ComfyNode):
@@ -258,16 +258,16 @@ Emphasize architectural beauty and structural design."""
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level (0.0=focused, 1.0=creative)",
+                    tooltip="Ignored: current Claude models reject temperature (kept so saved workflows load).",
                 ),
                 IO.Int.Input(
                     "max_tokens",
                     default=1024,
                     min=256,
-                    max=4096,
+                    max=128000,
                     step=128,
                     optional=True,
-                    tooltip="Maximum length of enhanced prompt",
+                    tooltip="Maximum length of enhanced prompt. Thinking counts toward this limit. Current Claude models allow up to 128K.",
                 ),
                 IO.Boolean.Input(
                     "use_streaming",
@@ -290,6 +290,7 @@ Emphasize architectural beauty and structural design."""
                     optional=True,
                     tooltip="Override the client's model for this call. Without a client the default is the Claude API client's default model.",
                 ),
+                effort_input(),
             ],
             outputs=[
                 IO.String.Output("enhanced_prompt"),
@@ -309,11 +310,11 @@ Emphasize architectural beauty and structural design."""
         style = kwargs.get("style", "photorealistic")
         detail_level = kwargs.get("detail_level", "detailed")
         client = kwargs.get("client")
-        temperature = kwargs.get("temperature", 0.7)
         max_tokens = kwargs.get("max_tokens", 1024)
         use_streaming = kwargs.get("use_streaming", False)
         model = kwargs.get("model", INHERIT_FROM_CLIENT)
-        model_kwargs = {} if model == INHERIT_FROM_CLIENT else {"model": model}
+        request_kwargs = {} if model == INHERIT_FROM_CLIENT else {"model": model}
+        request_kwargs.update(effort_kwargs(kwargs.get("effort")))
 
         if client is None:
             client = ClaudeClient(api_key=None)
@@ -328,10 +329,10 @@ Emphasize architectural beauty and structural design."""
 
             if use_streaming and client.enable_streaming:
                 enhanced = await asyncio.to_thread(
-                    cls._generate_streaming, client, messages, system_prompt, temperature, max_tokens
+                    cls._generate_streaming, client, messages, system_prompt, max_tokens, request_kwargs
                 )
             else:
-                enhanced = await cls._generate_standard(client, messages, system_prompt, temperature, max_tokens, model_kwargs)
+                enhanced = await cls._generate_standard(client, messages, system_prompt, max_tokens, request_kwargs)
 
             print(f"[Claude] Prompt enhanced successfully")
             print(f"[Claude] Original: {prompt[:100]}...")
@@ -370,29 +371,27 @@ Guidelines:
 - Output ONLY the enhanced prompt, no explanation or preamble"""
 
     @classmethod
-    async def _generate_standard(cls, client, messages, system, temperature, max_tokens, model_kwargs):
+    async def _generate_standard(cls, client, messages, system, max_tokens, request_kwargs):
         """Generate using standard (non-streaming) mode."""
         from .claude_api.client import response_text
 
         response = await client.send_request(
             messages=messages,
             system=system,
-            temperature=temperature,
             max_tokens=max_tokens,
-            **model_kwargs,
+            **request_kwargs,
         )
         return response_text(response)
 
     @classmethod
-    def _generate_streaming(cls, client, messages, system, temperature, max_tokens, model_kwargs):
+    def _generate_streaming(cls, client, messages, system, max_tokens, request_kwargs):
         """Generate using streaming mode."""
         chunks = []
         for chunk in client.send_request_streaming(
             messages=messages,
             system=system,
-            temperature=temperature,
             max_tokens=max_tokens,
-            **model_kwargs,
+            **request_kwargs,
         ):
             chunks.append(chunk)
         return "".join(chunks)

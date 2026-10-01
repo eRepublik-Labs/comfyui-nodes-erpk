@@ -37,9 +37,9 @@ def test_vision_model_options_include_all_claude_models():
     schema = ClaudeVisionAnalysis.define_schema()
     model_input = next(i for i in schema.inputs if i.id == "model")
     assert INHERIT_SENTINEL in model_input.options
-    assert "claude-opus-4-7" in model_input.options
-    assert "claude-sonnet-4-6" in model_input.options
-    assert "claude-opus-4-6" in model_input.options
+    assert "claude-sonnet-5-5" in model_input.options
+    assert "claude-opus-5-5" in model_input.options
+    assert "claude-opus-5" in model_input.options
 
 
 def _mock_image_tensor():
@@ -99,8 +99,8 @@ def test_vision_explicit_model_is_passed_to_client():
             image=_mock_image_tensor(),
             question="test",
             client=client,
-            model="claude-opus-4-7",
+            model="claude-opus-5",
         ))
 
     call_kwargs = client.send_request.call_args.kwargs
-    assert call_kwargs.get("model") == "claude-opus-4-7"
+    assert call_kwargs.get("model") == "claude-opus-5"

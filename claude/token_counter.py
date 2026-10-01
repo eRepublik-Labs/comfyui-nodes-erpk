@@ -63,25 +63,20 @@ class ClaudeTokenCounter(IO.ComfyNode):
         except Exception as e:
             print(f"[Claude] Warning: Could not load pricing.json, using fallback: {e}")
             return {
+                "claude-sonnet-5-5": {"input": 2.0, "output": 10.0},
                 "claude-sonnet-5": {"input": 2.0, "output": 10.0},
                 "claude-opus-5-5": {"input": 4.0, "output": 20.0},
                 "claude-opus-5": {"input": 5.0, "output": 25.0},
-                "claude-opus-4-8": {"input": 5.0, "output": 25.0},
                 "claude-fable-5-1": {"input": 10.0, "output": 50.0},
                 "claude-fable-5": {"input": 10.0, "output": 50.0},
-                "claude-opus-4-7": {"input": 5.0, "output": 25.0},
-                "claude-sonnet-4-6": {"input": 3.0, "output": 15.0},
-                "claude-opus-4-6": {"input": 5.0, "output": 25.0},
-                "claude-haiku-4-5-20251001": {"input": 1.0, "output": 5.0},
-                "claude-sonnet-4-5-20250929": {"input": 3.0, "output": 15.0},
-            }, "2026-09-23"
+            }, "2026-10-01"
 
     @classmethod
     async def execute(cls, **kwargs) -> IO.NodeOutput:
         from .claude_api.utils import TokenManager
 
         text = kwargs.get("text", "")
-        model = kwargs.get("model", "claude-sonnet-5")
+        model = kwargs.get("model", DEFAULT_TEXT_MODEL)
         client = kwargs.get("client")
 
         if not text:
@@ -102,7 +97,7 @@ class ClaudeTokenCounter(IO.ComfyNode):
             context_percentage = (token_count / context_window) * 100
 
             pricing_data, last_updated = cls.load_pricing()
-            pricing = pricing_data.get(model, pricing_data.get("claude-sonnet-5", {"input": 2.0, "output": 10.0}))
+            pricing = pricing_data.get(model, pricing_data.get(DEFAULT_TEXT_MODEL, {"input": 2.0, "output": 10.0}))
 
             input_cost_per_1k = (token_count / 1_000_000) * pricing["input"]
             output_cost_per_1k = (token_count / 1_000_000) * pricing["output"]

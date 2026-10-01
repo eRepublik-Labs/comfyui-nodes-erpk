@@ -13,10 +13,11 @@ Transforms simple prompts into detailed, styled descriptions for image generatio
 | style | Combo | photorealistic | Enhancement style to apply. 51 options including photorealistic, cinematic, anime, cyberpunk, oil_painting, etc. |
 | detail_level | Combo | detailed | How much detail to add. Options: minimal, moderate, detailed, ultra-detailed |
 | client | CLAUDE_API_CLIENT | (none) | Claude API client (optional if API key is configured in Settings) |
-| temperature | Float | 0.7 | Creativity level: 0.0 = focused, 1.0 = creative (optional). Min: 0.0, Max: 1.0, Step: 0.05 |
-| max_tokens | Int | 1024 | Maximum length of enhanced prompt (optional). Min: 256, Max: 4096, Step: 128 |
+| temperature | Float | 0.7 | Ignored (optional). Current Claude models return an error for any temperature, so it is never sent; the widget stays so saved workflows load |
+| max_tokens | Int | 1024 | Maximum length of enhanced prompt; thinking counts toward it (optional). Min: 256, Max: 128000, Step: 128 |
 | use_streaming | Boolean | False | Enable streaming (optional). May not display in real-time in ComfyUI |
 | model | Combo | (inherit from client) | Model override for this call (optional). Choose a model from the list, or inherit the connected client's model. Without a client, inherit means the Claude API client's default model |
+| effort | Combo | (model default) | How much effort Claude spends: thinking depth, tool calls and answer length (optional). Options: (model default), low, medium, high, xhigh, max. (model default) sends nothing, so the model keeps its own default (high; medium on Opus 5.5). Higher levels cost more tokens and time |
 
 ## Output
 

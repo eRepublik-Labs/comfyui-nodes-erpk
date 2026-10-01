@@ -20,7 +20,7 @@ Displays information about a conversation's state, including message counts and 
 ## Notes
 
 - Shows user message count, assistant message count, and total messages
-- Estimates total tokens and displays context window usage as a percentage of 200k
+- Estimates total tokens and displays context window usage as a percentage of the 1M-token window every offered model has
 - Indicates whether a system prompt is active
 - This is an output node — it prints info to the ComfyUI console as well
 - Connect to any Conversation node's conversation_history output to inspect its state

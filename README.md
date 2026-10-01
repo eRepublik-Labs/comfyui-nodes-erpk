@@ -122,21 +122,22 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 
 #### Nodes
 
-- **Claude API Client** - Initialize Claude API connection with model selection (Sonnet 5, Opus 5.5, Opus 5, Fable 5.1, Haiku 4.5 and more) and configuration. Optional if API key is configured in ComfyUI Settings or config.ini -- Claude nodes can run standalone.
+- **Claude API Client** - Initialize Claude API connection with model selection (Sonnet 5.5 by default, Sonnet 5, Opus 5.5, Opus 5, Fable 5.1, Fable 5) and configuration. Optional if API key is configured in ComfyUI Settings or config.ini -- Claude nodes can run standalone.
 - **Claude Prompt Enhancer** - Transform simple prompts into detailed descriptions with 51 artistic styles (photorealistic, cinematic, fantasy, cyberpunk, anime, oil painting, watercolor, and more)
-- **Claude Vision Analysis** - Analyze images with Claude's multimodal capabilities (up to 20 images simultaneously). Optional per-node `model` override lets you use Opus 4.7 (2576px image resolution) for vision even when your client is configured with a different model.
+- **Claude Vision Analysis** - Analyze images with Claude's multimodal capabilities (up to 20 images simultaneously). Optional per-node `model` override lets you use a different model for vision than the one your client is configured with.
 - **Claude Text Generation** - General-purpose text completion and generation
 - **Claude Conversation** - Multi-turn dialogues with context preservation and automatic memory management
 - **Claude Conversation Info** - Display conversation statistics and token usage
 - **Claude Tool Definition** - Build Anthropic tool definitions for structured output (chainable)
-- **Claude Structured Output** - Force Claude to respond with structured JSON matching a tool schema
+- **Claude Structured Output** - Get JSON matching a tool schema via Anthropic structured outputs
 - **Claude Token Counter** - Count tokens and estimate API costs before making requests
 - **Claude Usage Stats** - Track cumulative token usage and costs across all Claude nodes
 
 **Key Benefits:**
 - 51 artistic styles for prompt enhancement (photorealistic, cinematic, fantasy, anime, oil painting, impressionist, cyberpunk, and more)
-- Claude Opus 4.7 support with adaptive thinking (1M context, automatic sampling-param handling)
-- Prompt caching (up to 90% cost savings)
+- Claude 5-generation models only: 1M context, up to 128K output, adaptive thinking, and an `effort` widget on every generation node
+- Automatic prompt caching (cache reads at 0.1x input on most models)
+- Usage Stats priced per answering model, including cache reads and writes
 - Streaming support for real-time responses
 - Automatic context window management
 - Multi-image analysis capabilities

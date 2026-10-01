@@ -21,6 +21,8 @@ Displays cumulative token usage and cost statistics for a Claude API client sess
 ## Notes
 
 - Shows input tokens, output tokens, cache read tokens, and cache creation tokens
-- Displays cost breakdown in USD with cache savings
+- Each response is priced at the rates in pricing.json for the model that answered it, so nodes that override the model are costed correctly
+- Cost breakdown in USD: input, output, cache reads, 5-minute cache writes, and the savings cache reads gave over full-price input
+- A model with no entry in pricing.json is listed as not costed rather than priced at a guess
 - This is an output node — it prints stats to the ComfyUI console as well
 - Connect at the end of your workflow to monitor cumulative API costs
