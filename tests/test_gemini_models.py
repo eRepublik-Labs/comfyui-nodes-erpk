@@ -26,25 +26,24 @@ class TestModelsDict:
         desc = GeminiClient.MODELS["gemini-3.5-flash"]
         assert "intelligence" in desc.lower() or "fast" in desc.lower() or "speed" in desc.lower()
 
-    def test_gemini_31_flash_lite_in_models(self):
-        assert "gemini-3.1-flash-lite" in GeminiClient.MODELS
-
-    def test_gemini_31_flash_lite_description_mentions_speed_or_cost(self):
-        desc = GeminiClient.MODELS["gemini-3.1-flash-lite"]
-        assert "fast" in desc.lower() or "cost" in desc.lower() or "efficient" in desc.lower()
-
-    def test_all_current_models_present(self):
-        expected = [
+    def test_offered_text_models_are_exactly_the_current_set(self):
+        # Alex's 2026-10-01 ruling: the 2.5 family, 3 Flash Preview and
+        # 3.1 Flash-Lite are withdrawn; these six remain.
+        assert set(GeminiClient.MODELS) == {
             "gemini-3.1-pro-preview",
+            "gemini-3.8-flash",
+            "gemini-3.7-flash",
+            "gemini-3.6-flash",
             "gemini-3.5-flash",
-            "gemini-3-flash-preview",
-            "gemini-3.1-flash-lite",
-            "gemini-2.5-pro",
-            "gemini-2.5-flash",
-            "gemini-2.5-flash-lite",
-        ]
-        for model_id in expected:
-            assert model_id in GeminiClient.MODELS, f"{model_id} missing from MODELS"
+            "gemini-3.5-flash-lite",
+        }
+
+    def test_withdrawn_models_removed(self):
+        # gemini-2.5-pro 404s "no longer available to new users" (probed
+        # 2026-10-01); the rest are superseded and withdrawn by Alex's ruling.
+        for gone in ("gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite",
+                     "gemini-3-flash-preview", "gemini-3.1-flash-lite"):
+            assert gone not in GeminiClient.MODELS, f"{gone} was withdrawn; remove it"
 
     def test_dead_preview_models_removed(self):
         # Past their Google shutdown date; must not be selectable.

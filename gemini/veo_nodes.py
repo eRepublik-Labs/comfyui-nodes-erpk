@@ -37,12 +37,12 @@ def _veo_valid_durations(model):
     return {4, 6, 8}
 
 
-def _validate_veo_config(model, duration, resolution, has_reference_images=False):
+def _validate_veo_config(model, duration, resolution):
     """Normalize duration / resolution against per-model rules.
 
-    Returns (duration, resolution_or_None, warnings). `has_reference_images` is
-    used by the 8s gate on Veo 3.1 family + Lite, where 8s requires either an
-    upscaled resolution or reference images.
+    Returns (duration, resolution, warnings). Per the Veo parameter table,
+    1080p and 4k only support 8s, so a shorter duration at those resolutions
+    is raised to 8s. 720p is valid at every duration and is never upscaled.
     """
     warnings = []
     valid_durations = _veo_valid_durations(model)
@@ -58,31 +58,26 @@ def _validate_veo_config(model, duration, resolution, has_reference_images=False
         warnings.append(f"{model} does not support 4k output; clamping to 1080p")
         resolution = "1080p"
 
-    # 8s gate per Veo API docs: 8s requires resolution >= 1080p OR reference_images.
-    # Applies uniformly across the Veo 3.1 family.
-    if duration == 8:
-        if resolution == "720p" and not has_reference_images:
-            warnings.append(
-                f"{model} requires resolution >= 1080p (or reference_images) for 8s output; "
-                f"bumping resolution from 720p to 1080p"
-            )
-            resolution = "1080p"
+    if resolution in ("1080p", "4k") and duration != 8:
+        warnings.append(
+            f"{resolution} only supports 8s output; using 8s instead of {duration}s"
+        )
+        duration = 8
 
     return duration, resolution, warnings
 
 
 def _veo_valid_person_generation(model, is_image_to_video):
-    """Allowed person_generation values per the Gemini Developer API.
+    """Allowed person_generation values per https://ai.google.dev/gemini-api/docs/veo.
 
-    Veo 3.x image-to-video rejects allow_all server-side; only allow_adult and
-    dont_allow are accepted. Text-to-video paths accept the full enum. The API
-    returns 400 INVALID_ARGUMENT with the message
-    "allow_all for personGeneration is currently not supported" when violated.
+    Image-to-video (including interpolation and reference images) accepts
+    allow_adult only. Text-to-video accepts allow_all only, except in EU, UK,
+    CH and MENA locations, where allow_adult is the only allowed value, so
+    both are let through. dont_allow is accepted by neither mode.
     """
-    veo_3x_models = _VEO_31_FAMILY | {_VEO_LITE}
-    if is_image_to_video and model in veo_3x_models:
-        return {"allow_adult", "dont_allow"}
-    return set(VEO_PERSON_GENERATION_OPTIONS)
+    if is_image_to_video:
+        return {"allow_adult"}
+    return {"allow_all", "allow_adult"}
 
 
 def _validate_person_generation(model, person_generation, is_image_to_video):
@@ -111,8 +106,9 @@ def _validate_interpolation_constraints(has_last_frame, has_reference_images, du
     - reference_images is mutually exclusive with image/last_frame (the API rejects
       requests that mix them).
 
-    None of these are in Google's parameter table — they're docs gaps confirmed by
-    Google staff and developers in the linked forum threads.
+    Google's parameter table documents only the reference_images 8s rule; the
+    others are docs gaps confirmed by Google staff and developers in the linked
+    forum threads.
     """
     if has_last_frame and duration != 8:
         raise ValueError(
@@ -259,7 +255,7 @@ class VeoTextToVideo(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Up to 3 reference images (batched IMAGE) for style/content guidance. "
-                        "Only supported on Veo 3.1 and Veo 3.1 Fast. Ignored on Lite, Veo 3, Veo 2."
+                        "Only supported on Veo 3.1 and Veo 3.1 Fast. Ignored on Lite."
                     ),
                 ),
                 IO.Combo.Input(
@@ -269,7 +265,7 @@ class VeoTextToVideo(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Veo model. Lite is cheapest (no 4k, no extension, no reference images). "
-                        "Veo 3.1 / 3.1 Fast support reference images. Veo 2 has no resolution control."
+                        "Veo 3.1 / 3.1 Fast support reference images."
                     ),
                 ),
                 IO.Combo.Input(
@@ -286,8 +282,7 @@ class VeoTextToVideo(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Output resolution. 4k is Veo 3.1 / Fast only. Lite caps at 1080p. "
-                        "8s output requires 1080p (or 4k where supported) or reference_images. "
-                        "Veo 2 ignores this parameter (always 720p)."
+                        "1080p and 4k only support 8s: a shorter duration is raised to 8s."
                     ),
                 ),
                 IO.Combo.Input(
@@ -296,9 +291,8 @@ class VeoTextToVideo(IO.ComfyNode):
                     default="8",
                     optional=True,
                     tooltip=(
-                        "Video duration. Veo 3.x (all variants): 4/6/8s. Veo 2: 5/6/8s. "
-                        "8s output requires 1080p (or 4k where supported) or reference_images. "
-                        "Mismatched values are auto-clamped to the nearest valid choice."
+                        "Video duration: 4, 6 or 8s. 5 is kept only so older workflows load; it "
+                        "is sent as the nearest valid value. 1080p and 4k only support 8s."
                     ),
                 ),
                 IO.Combo.Input(
@@ -307,8 +301,8 @@ class VeoTextToVideo(IO.ComfyNode):
                     default="allow_adult",
                     optional=True,
                     tooltip=(
-                        "Person generation safety. EU/UK/CH/MENA: Veo 3.x limited to allow_adult. "
-                        "Veo 3.x text-to-video only accepts allow_all."
+                        "Person generation safety. Text-to-video accepts allow_all, or allow_adult "
+                        "in EU/UK/CH/MENA where that is the only allowed value. dont_allow is rejected."
                     ),
                 ),
                 IO.Int.Input(
@@ -364,13 +358,18 @@ class VeoTextToVideo(IO.ComfyNode):
             print(f"[Veo] Warning: Prompt exceeds 2500 characters, truncating")
             prompt = prompt[:2500]
 
-        has_refs = reference_images is not None and model in _MODELS_WITH_REFERENCE_IMAGES
         duration_seconds, resolution, warnings = _validate_veo_config(
-            model, duration_seconds, resolution, has_reference_images=has_refs
+            model, duration_seconds, resolution
         )
         for w in warnings:
             print(f"[Veo] {w}")
         _validate_person_generation(model, person_generation, is_image_to_video=False)
+        _validate_interpolation_constraints(
+            has_last_frame=False,
+            has_reference_images=reference_images is not None and model in _MODELS_WITH_REFERENCE_IMAGES,
+            duration=duration_seconds,
+            aspect_ratio=aspect_ratio,
+        )
 
         temp_paths_to_clean = []
 
@@ -474,7 +473,7 @@ class VeoImageToVideo(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Optional last frame for first-to-last interpolation. "
-                        "Supported on all Veo 3.x models including Lite, and Veo 2. "
+                        "Supported on all Veo 3.1 models including Lite. "
                         "REQUIRES duration_seconds=8 — the API rejects 4s/6s interpolation "
                         "with an opaque 'use case not supported' 400 after running generation."
                     ),
@@ -506,7 +505,7 @@ class VeoImageToVideo(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Veo model. Lite is cheapest (no 4k, no reference images). "
-                        "Veo 3.1 / 3.1 Fast support reference images. Veo 2 has no resolution control."
+                        "Veo 3.1 / 3.1 Fast support reference images."
                     ),
                 ),
                 IO.Combo.Input(
@@ -523,18 +522,17 @@ class VeoImageToVideo(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Output resolution. 1080p and 4k require duration=8s. "
-                        "Lite caps at 1080p. Veo 2 ignores this parameter."
+                        "Lite caps at 1080p. A shorter duration is raised to 8s."
                     ),
                 ),
                 IO.Combo.Input(
                     "duration_seconds",
                     options=VEO_DURATIONS,
-                    default=8,
+                    default="8",
                     optional=True,
                     tooltip=(
-                        "Video duration. Veo 3.x (all variants): 4/6/8s. Veo 2: 5/6/8s. "
-                        "8s output requires 1080p (or 4k where supported) or reference_images. "
-                        "Mismatched values are auto-clamped to the nearest valid choice."
+                        "Video duration: 4, 6 or 8s. 5 is kept only so older workflows load; it "
+                        "is sent as the nearest valid value. 1080p and 4k only support 8s."
                     ),
                 ),
                 IO.Combo.Input(
@@ -543,8 +541,8 @@ class VeoImageToVideo(IO.ComfyNode):
                     default="allow_adult",
                     optional=True,
                     tooltip=(
-                        "Person generation safety. EU/UK/CH/MENA: Veo 3.x limited to allow_adult. "
-                        "Veo 3.x image-to-video rejects allow_all; use allow_adult or dont_allow."
+                        "Person generation safety. Image-to-video accepts allow_adult only; "
+                        "allow_all and dont_allow are rejected."
                     ),
                 ),
                 IO.Int.Input(
@@ -597,9 +595,8 @@ class VeoImageToVideo(IO.ComfyNode):
         person_generation = kwargs.get("person_generation", "allow_adult")
         output_directory = kwargs.get("output_directory", "")
 
-        has_refs = reference_images is not None and model in _MODELS_WITH_REFERENCE_IMAGES
         duration_seconds, resolution, warnings = _validate_veo_config(
-            model, duration_seconds, resolution, has_reference_images=has_refs
+            model, duration_seconds, resolution
         )
         for w in warnings:
             print(f"[Veo] {w}")

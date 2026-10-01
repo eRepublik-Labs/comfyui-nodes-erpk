@@ -123,7 +123,7 @@ class GeminiOmniVideoGeneration(IO.ComfyNode):
                 ),
                 IO.Int.Input(
                     "seed",
-                    default=0,
+                    default=-1,
                     min=-1,
                     max=0xffffffff,
                     optional=True,

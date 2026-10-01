@@ -11,12 +11,12 @@ Generates images from text descriptions using Gemini's image generation models. 
 |-----------|------|---------|-------------|
 | prompt | String | "" | Description of the image to generate |
 | client | GEMINI_API_CLIENT | - | Gemini API client (optional, uses API key from config) |
-| model | Combo | gemini-3.1-flash-image | Image model: gemini-3.1-flash-image, gemini-3.1-flash-lite-image, gemini-3-pro-image, gemini-2.5-flash-image (optional) |
+| model | Combo | gemini-3.1-flash-image | Image model: gemini-3.1-flash-image, gemini-3.1-flash-lite-image, gemini-3-pro-image (optional) |
 | temperature | Float | 1.0 | Creativity level, 0.0-2.0 (optional) |
-| aspect_ratio | Combo | default | Image aspect ratio: default, 1:1, 1:4, 1:8, 2:3, 3:2, 3:4, 4:1, 4:3, 4:5, 5:4, 8:1, 9:16, 16:9, 21:9 (optional) |
-| image_size | Combo | default | Resolution: default, 1K, 2K, 4K. 1K-4K for 3.1 Flash and 3 Pro, 2.5 Flash fixed at 1024px (optional) |
+| aspect_ratio | Combo | default | Image aspect ratio: default, 1:1, 1:4, 1:8, 2:3, 3:2, 3:4, 4:1, 4:3, 4:5, 5:4, 8:1, 9:16, 16:9, 21:9. 3.1 Flash Lite has no 1:4, 4:1, 1:8 or 8:1 and uses the closest supported ratio (optional) |
+| image_size | Combo | default | Resolution: default, 0.5K, 1K, 2K, 4K. 3.1 Flash takes 0.5K-4K, 3 Pro 1K-4K, 3.1 Flash Lite 1K only; an unsupported size uses the model's smallest size (optional) |
 | response_modalities | Combo | IMAGE | IMAGE (image only) or TEXT+IMAGE (image + text description) (optional) |
-| enable_google_search | Boolean | false | Enable Google Search grounding, Gemini 3 models only (optional) |
+| enable_google_search | Boolean | false | Enable Google Search grounding on 3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it (optional) |
 
 ## Output
 
@@ -27,7 +27,7 @@ Generates images from text descriptions using Gemini's image generation models. 
 
 ## Notes
 
-- 3.1 Flash supports all 14 aspect ratios and resolutions from 1K to 4K
-- 3 Pro supports 10 aspect ratios and resolutions from 1K to 4K
-- 2.5 Flash is fixed at 1024px resolution and does not support Google Search grounding
+- 3.1 Flash supports all 14 aspect ratios and resolutions from 0.5K to 4K
+- 3 Pro supports resolutions from 1K to 4K
+- 3.1 Flash Lite outputs 1K only, has 10 aspect ratios (no 1:4, 4:1, 1:8, 8:1) and no Google Search grounding
 - API key resolved from ComfyUI Settings or config.ini — connect a `client` from Gemini API Config only when you need shared safety/system-instruction state across nodes

@@ -1,5 +1,5 @@
 # ABOUTME: Tests for Veo per-model validation rules (duration / resolution gating).
-# ABOUTME: Pure-Python tests for _validate_veo_config; no torch / comfy required.
+# ABOUTME: Pure-Python tests for the Veo validators; no torch / comfy required.
 
 import os
 import sys
@@ -42,41 +42,31 @@ def test_lite_4k_clamps_to_1080p():
     assert any("4k" in w and "1080p" in w for w in warnings)
 
 
-def test_6s_at_1080p_does_not_bump_duration():
-    # 1080p does not require 8s; the constraint runs the other way.
-    dur, res, warnings = veo._validate_veo_config("veo-3.1-generate-preview", 6, "1080p")
-    assert dur == 6
+def test_upscaled_resolutions_force_8s():
+    # docs/veo parameter table: durationSeconds "Must be "8" when using ...
+    # 1080p and 4k resolutions"; resolution "1080p (only supports 8s duration)".
+    for res in ("1080p", "4k"):
+        for short in (4, 6):
+            dur, out_res, warnings = veo._validate_veo_config("veo-3.1-generate-preview", short, res)
+            assert dur == 8
+            assert out_res == res
+            assert any("8s" in w for w in warnings)
+
+
+def test_lite_4k_at_4s_becomes_1080p_at_8s():
+    # Lite has no 4k; the 1080p it falls back to still needs 8s.
+    dur, res, warnings = veo._validate_veo_config("veo-3.1-lite-generate-preview", 4, "4k")
     assert res == "1080p"
-    assert warnings == []
-
-
-def test_8s_at_720p_no_refs_bumps_resolution_to_1080p():
-    # 8s on Veo 3.1 family requires resolution >= 1080p OR reference_images.
-    dur, res, warnings = veo._validate_veo_config(
-        "veo-3.1-generate-preview", 8, "720p", has_reference_images=False
-    )
     assert dur == 8
-    assert res == "1080p"
-    assert any("1080p" in w and "720p" in w for w in warnings)
 
 
-def test_8s_at_720p_with_refs_stays_at_720p():
-    # Reference images unlock 8s at 720p — no resolution bump.
-    dur, res, warnings = veo._validate_veo_config(
-        "veo-3.1-generate-preview", 8, "720p", has_reference_images=True
-    )
-    assert dur == 8
-    assert res == "720p"
-    assert warnings == []
-
-
-def test_lite_8s_at_720p_bumps_resolution():
-    # Lite has no 4k path, so the gate uplifts to 1080p only.
-    dur, res, warnings = veo._validate_veo_config(
-        "veo-3.1-lite-generate-preview", 8, "720p", has_reference_images=False
-    )
-    assert dur == 8
-    assert res == "1080p"
+def test_720p_keeps_every_duration_and_resolution():
+    # 720p is valid at 4, 6 and 8s; nothing is upscaled (1080p/4k cost more).
+    for model in ("veo-3.1-generate-preview", "veo-3.1-fast-generate-preview",
+                  "veo-3.1-lite-generate-preview"):
+        for d in (4, 6, 8):
+            dur, res, warnings = veo._validate_veo_config(model, d, "720p")
+            assert (dur, res, warnings) == (d, "720p", [])
 
 
 def test_veo_3_x_rejects_5s_clamps_to_nearest():
@@ -108,24 +98,29 @@ def test_reference_image_capable_models():
     assert "veo-3.1-lite-generate-preview" not in veo._MODELS_WITH_REFERENCE_IMAGES
 
 
-def test_veo_3x_i2v_rejects_allow_all():
+VEO_MODELS_ALL = ("veo-3.1-generate-preview", "veo-3.1-fast-generate-preview",
+                  "veo-3.1-lite-generate-preview")
+
+
+def test_veo_i2v_accepts_only_allow_adult():
+    # docs/veo: "Image-to-video, Interpolation, & Reference images: allow_adult only".
     import pytest
-    for model in ("veo-3.1-generate-preview", "veo-3.1-fast-generate-preview",
-                  "veo-3.1-lite-generate-preview"):
-        with pytest.raises(ValueError, match="allow_all"):
-            veo._validate_person_generation(model, "allow_all", is_image_to_video=True)
-
-
-def test_veo_3x_i2v_accepts_allow_adult_and_dont_allow():
-    for model in ("veo-3.1-generate-preview", "veo-3.1-lite-generate-preview"):
+    for model in VEO_MODELS_ALL:
         veo._validate_person_generation(model, "allow_adult", is_image_to_video=True)
-        veo._validate_person_generation(model, "dont_allow", is_image_to_video=True)
+        for bad in ("allow_all", "dont_allow"):
+            with pytest.raises(ValueError, match=bad):
+                veo._validate_person_generation(model, bad, is_image_to_video=True)
 
 
-def test_veo_3x_t2v_accepts_allow_all():
-    veo._validate_person_generation(
-        "veo-3.1-generate-preview", "allow_all", is_image_to_video=False
-    )
+def test_veo_t2v_accepts_allow_all_and_regional_allow_adult():
+    # docs/veo: "Text-to-video: allow_all only", and "In EU, UK, CH, MENA
+    # locations, allow_adult is the only allowed value".
+    import pytest
+    for model in VEO_MODELS_ALL:
+        veo._validate_person_generation(model, "allow_all", is_image_to_video=False)
+        veo._validate_person_generation(model, "allow_adult", is_image_to_video=False)
+        with pytest.raises(ValueError, match="dont_allow"):
+            veo._validate_person_generation(model, "dont_allow", is_image_to_video=False)
 
 
 def test_last_frame_requires_8s_duration():
@@ -186,3 +181,22 @@ def test_reference_images_happy_path():
         has_last_frame=False, has_reference_images=True,
         duration=8, aspect_ratio="16:9",
     )
+
+
+def test_text_to_video_reference_images_require_8s_before_any_api_call():
+    # Veo parameter table: reference_images only support 8s. Text-to-video
+    # must reject a shorter duration before the client is touched.
+    import asyncio
+    import pytest
+
+    class NoCallClient:
+        def __getattr__(self, name):
+            raise AssertionError(f"client.{name} used before validation")
+
+    with pytest.raises(ValueError, match="duration_seconds=8"):
+        asyncio.run(veo.VeoTextToVideo.execute(
+            client=NoCallClient(), prompt="a boat", reference_images=object(),
+            model="veo-3.1-generate-preview", duration_seconds="6",
+            resolution="720p", aspect_ratio="16:9", person_generation="allow_adult",
+        ))
+

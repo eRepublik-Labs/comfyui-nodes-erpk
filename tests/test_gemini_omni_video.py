@@ -91,6 +91,12 @@ def test_node_has_a_seed_for_cache_control():
     assert _input("seed") is not None
 
 
+def test_seed_defaults_to_randomize():
+    # Matches every other seeded node: a fresh node generates on each queue
+    # until the author fixes a seed (Alex's 2026-10-01 ruling).
+    assert _input("seed").default == -1
+
+
 def test_fingerprint_is_seed_gated():
     # A fixed seed reuses the paid result; -1 (randomize) re-runs every queue.
     import math

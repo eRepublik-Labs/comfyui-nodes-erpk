@@ -7,9 +7,6 @@ const VEO_DURATIONS_BY_MODEL = {
     "veo-3.1-generate-preview":      ["4", "6", "8"],
     "veo-3.1-fast-generate-preview": ["4", "6", "8"],
     "veo-3.1-lite-generate-preview": ["4", "6", "8"],
-    "veo-3.0-generate-001":          ["4", "6", "8"],
-    "veo-3.0-fast-generate-001":     ["4", "6", "8"],
-    "veo-2.0-generate-001":          ["5", "6", "8"],
 };
 const FALLBACK_DURATIONS = ["4", "6", "8"];
 const VEO_NODES = new Set(["VeoTextToVideo", "VeoImageToVideo"]);

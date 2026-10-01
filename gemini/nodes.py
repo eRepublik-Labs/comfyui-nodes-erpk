@@ -33,43 +33,82 @@ def _parse_stop_sequences(text):
     return sequences
 
 
-def _is_gemini_3x(model: str) -> bool:
-    """Return True when the model string belongs to the Gemini 3.x generation."""
-    return model.startswith("gemini-3")
+# Gemini 3.x models that reject thinking_level=minimal with a 400 (3.7/3.8 Flash
+# per their reference pages; 3.1 Pro Preview probed 2026-10-01). The node clamps
+# minimal up to low for them.
+_NO_MINIMAL_THINKING = {"gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.1-pro-preview"}
 
 
-# Gemini 3.x models whose reference page says "`minimal` is not supported and
-# returns an error"; the node clamps minimal up to low for them.
-_NO_MINIMAL_THINKING = {"gemini-3.7-flash", "gemini-3.8-flash"}
-
-
-# Output resolutions each image model accepts. A model absent from this map is
-# assumed to accept the full 1K/2K/4K range. An empty set means the model emits
-# a fixed resolution and rejects the image_size field entirely.
+# Output resolutions each image model accepts, smallest first, per
+# https://ai.google.dev/gemini-api/docs/image-generation. A model absent from
+# this map gets the requested size unchanged.
 _IMAGE_SIZES = {
-    "gemini-2.5-flash-image": set(),          # fixed 1024px
-    "gemini-3.1-flash-lite-image": {"1K"},    # Nano Banana 2 Lite emits 1K only
+    "gemini-3.1-flash-image": ["0.5K", "1K", "2K", "4K"],
+    "gemini-3.1-flash-lite-image": ["1K"],    # Nano Banana 2 Lite emits 1K only
+    "gemini-3-pro-image": ["1K", "2K", "4K"],
 }
+
+
+# Widget labels whose wire value differs. The docs say "0.5K", but the API
+# rejects it: 400 "Supported values are: 1K, 2K, 4K, 512, 512P, 512PX"
+# (gemini-3.1-flash-image, probed 2026-10-01).
+_IMAGE_SIZE_WIRE_VALUES = {"0.5K": "512"}
 
 
 def _resolve_image_size(model, image_size):
     """Return the image_size to send for this model, or None to omit the field.
 
-    A request above a model's ceiling is clamped rather than rejected: the user
-    finds out at queue time either way, and clamping still returns an image.
+    A request the model does not support is clamped to its smallest size rather
+    than rejected: the user finds out at queue time either way, and clamping
+    still returns an image.
     """
     if image_size == "default":
         return None
     allowed = _IMAGE_SIZES.get(model)
-    if allowed is None:
-        return image_size
-    if not allowed:
+    if allowed is not None and image_size not in allowed:
+        clamped = allowed[0]
+        print(f"[Gemini] {model} supports {allowed} only; using {clamped} instead of {image_size}")
+        image_size = clamped
+    return _IMAGE_SIZE_WIRE_VALUES.get(image_size, image_size)
+
+
+# Aspect ratios for models that do not take the full 14-ratio list. The
+# 1:4/4:1/1:8/8:1 ratios are Gemini 3.1 Flash Image additions; the lite model
+# page lists only these ten.
+_ASPECT_RATIOS = {
+    "gemini-3.1-flash-lite-image": ["1:1", "2:3", "3:2", "3:4", "4:3",
+                                    "4:5", "5:4", "9:16", "16:9", "21:9"],
+}
+
+
+def _ratio_log(ratio):
+    width, height = ratio.split(":")
+    return math.log(int(width) / int(height))
+
+
+def _resolve_aspect_ratio(model, aspect_ratio):
+    """Return the aspect_ratio to send for this model, or None to omit the field.
+
+    An unsupported ratio is clamped to the supported one closest in shape.
+    """
+    if aspect_ratio == "default":
         return None
-    if image_size in allowed:
-        return image_size
-    clamped = sorted(allowed)[0]
-    print(f"[Gemini] {model} supports {sorted(allowed)} only; using {clamped} instead of {image_size}")
+    allowed = _ASPECT_RATIOS.get(model)
+    if allowed is None or aspect_ratio in allowed:
+        return aspect_ratio
+    target = _ratio_log(aspect_ratio)
+    clamped = min(allowed, key=lambda r: abs(_ratio_log(r) - target))
+    print(f"[Gemini] {model} does not support aspect ratio {aspect_ratio}; using {clamped}")
     return clamped
+
+
+# Image models without Google Search grounding (lite model page: "Search
+# grounding: Not supported").
+_NO_GOOGLE_SEARCH = {"gemini-3.1-flash-lite-image"}
+
+
+def _google_search_supported(model):
+    return model not in _NO_GOOGLE_SEARCH
 
 
 _FINISH_REASON_HINTS = {
@@ -126,11 +165,10 @@ def _dump_response_payload(response, label="response"):
 
 
 def _build_thinking_config(thinking_level, model):
-    """Build a ThinkingConfig tailored to the model's generation.
+    """Build a ThinkingConfig for a Gemini 3.x model, or None for "none".
 
-    Gemini 3.x accepts the semantic enum (thinking_level). Gemini 2.5 expects
-    an integer thinking_budget, so the enum is mapped to an approximate budget.
-    Pro 2.5 cannot disable thinking, so minimal is clamped up to a 128 minimum.
+    "none" sends no thinking config, so the model uses its own default
+    thinking level; it does not switch thinking off.
     """
     if thinking_level == "none":
         return None
@@ -138,15 +176,9 @@ def _build_thinking_config(thinking_level, model):
     if not hasattr(genai_types, 'ThinkingConfig'):
         print("[Gemini] Warning: ThinkingConfig not supported by SDK, ignoring")
         return None
-    if _is_gemini_3x(model):
-        if thinking_level == "minimal" and model in _NO_MINIMAL_THINKING:
-            thinking_level = "low"
-        return genai_types.ThinkingConfig(thinking_level=thinking_level.upper())
-    budget_map = {"minimal": 0, "low": 512, "medium": 4096, "high": 16384}
-    budget = budget_map.get(thinking_level, 0)
-    if model == "gemini-2.5-pro" and budget < 128:
-        budget = 128
-    return genai_types.ThinkingConfig(thinking_budget=budget)
+    if thinking_level == "minimal" and model in _NO_MINIMAL_THINKING:
+        thinking_level = "low"
+    return genai_types.ThinkingConfig(thinking_level=thinking_level.upper())
 
 
 # --- Model lists for COMBO inputs ---
@@ -358,7 +390,9 @@ class GeminiTextGeneration(IO.ComfyNode):
                     options=["none", "minimal", "low", "medium", "high"],
                     default="none",
                     optional=True,
-                    tooltip="Reasoning depth. Works on Gemini 2.5 and 3.x; the node translates to thinking_budget (2.5) or thinking_level enum (3.x) automatically.",
+                    tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
+                             "default level (it does not turn thinking off). minimal is raised to low on "
+                             "models that reject it: 3.1 Pro Preview, 3.7 Flash, 3.8 Flash."),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -550,7 +584,9 @@ class GeminiChat(IO.ComfyNode):
                     options=["none", "minimal", "low", "medium", "high"],
                     default="none",
                     optional=True,
-                    tooltip="Reasoning depth. Works on Gemini 2.5 and 3.x; the node translates to thinking_budget (2.5) or thinking_level enum (3.x) automatically.",
+                    tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
+                             "default level (it does not turn thinking off). minimal is raised to low on "
+                             "models that reject it: 3.1 Pro Preview, 3.7 Flash, 3.8 Flash."),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -752,7 +788,9 @@ class GeminiVision(IO.ComfyNode):
                     options=["none", "minimal", "low", "medium", "high"],
                     default="none",
                     optional=True,
-                    tooltip="Reasoning depth. Works on Gemini 2.5 and 3.x; the node translates to thinking_budget (2.5) or thinking_level enum (3.x) automatically.",
+                    tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
+                             "default level (it does not turn thinking off). minimal is raised to low on "
+                             "models that reject it: 3.1 Pro Preview, 3.7 Flash, 3.8 Flash."),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -1155,14 +1193,14 @@ class GeminiImageGeneration(IO.ComfyNode):
                              "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"],
                     default="default",
                     optional=True,
-                    tooltip="Image aspect ratio (all 14 ratios for 3.1 Flash; 10 for 3 Pro and 2.5 Flash)",
+                    tooltip="Image aspect ratio. 3.1 Flash takes all 14; 3.1 Flash Lite has no 1:4, 4:1, 1:8 or 8:1 and uses the closest supported ratio instead.",
                 ),
                 IO.Combo.Input(
                     "image_size",
-                    options=["default", "1K", "2K", "4K"],
+                    options=["default", "0.5K", "1K", "2K", "4K"],
                     default="default",
                     optional=True,
-                    tooltip="Image resolution (1K-4K for 3.1 Flash and 3 Pro; 2.5 Flash fixed at 1024px)",
+                    tooltip="Image resolution. 3.1 Flash: 0.5K-4K. 3 Pro: 1K-4K. 3.1 Flash Lite: 1K only. Unsupported sizes use the model's smallest size.",
                 ),
                 IO.Combo.Input(
                     "response_modalities",
@@ -1175,7 +1213,7 @@ class GeminiImageGeneration(IO.ComfyNode):
                     "enable_google_search",
                     default=False,
                     optional=True,
-                    tooltip="Enable Google Search grounding (Gemini 3 models only, not 2.5 Flash)",
+                    tooltip="Enable Google Search grounding (3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it)",
                 ),
                 IO.Int.Input(
                     "seed",
@@ -1249,15 +1287,19 @@ class GeminiImageGeneration(IO.ComfyNode):
             else:
                 config.response_modalities = ["IMAGE"]
 
-            if enable_google_search and model != "gemini-2.5-flash-image":
+            use_search = enable_google_search and _google_search_supported(model)
+            if enable_google_search and not use_search:
+                print(f"[Gemini] {model} does not support Google Search grounding; ignoring enable_google_search")
+            if use_search:
                 config.tools = [{"google_search": {}}]
                 print(f"[Gemini] Google Search grounding enabled")
             else:
                 config.automatic_function_calling = types.AutomaticFunctionCallingConfig(disable=True)
 
             image_config_params = {}
-            if aspect_ratio != "default":
-                image_config_params["aspect_ratio"] = aspect_ratio
+            resolved_ratio = _resolve_aspect_ratio(model, aspect_ratio)
+            if resolved_ratio is not None:
+                image_config_params["aspect_ratio"] = resolved_ratio
             resolved_size = _resolve_image_size(model, image_size)
             if resolved_size is not None:
                 if "image_size" in types.ImageConfig.model_fields:
@@ -1393,14 +1435,14 @@ class GeminiImageEdit(IO.ComfyNode):
                              "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"],
                     default="default",
                     optional=True,
-                    tooltip="Image aspect ratio (all 14 ratios for 3.1 Flash; 10 for 3 Pro and 2.5 Flash)",
+                    tooltip="Image aspect ratio. 3.1 Flash takes all 14; 3.1 Flash Lite has no 1:4, 4:1, 1:8 or 8:1 and uses the closest supported ratio instead.",
                 ),
                 IO.Combo.Input(
                     "image_size",
-                    options=["default", "1K", "2K", "4K"],
+                    options=["default", "0.5K", "1K", "2K", "4K"],
                     default="default",
                     optional=True,
-                    tooltip="Image resolution (1K-4K for 3.1 Flash and 3 Pro; 2.5 Flash fixed at 1024px)",
+                    tooltip="Image resolution. 3.1 Flash: 0.5K-4K. 3 Pro: 1K-4K. 3.1 Flash Lite: 1K only. Unsupported sizes use the model's smallest size.",
                 ),
                 IO.Combo.Input(
                     "response_modalities",
@@ -1413,7 +1455,7 @@ class GeminiImageEdit(IO.ComfyNode):
                     "enable_google_search",
                     default=False,
                     optional=True,
-                    tooltip="Enable Google Search grounding (Gemini 3 models only, not 2.5 Flash)",
+                    tooltip="Enable Google Search grounding (3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it)",
                 ),
                 IO.Image.Input(
                     "additional_images",
@@ -1515,15 +1557,19 @@ class GeminiImageEdit(IO.ComfyNode):
             else:
                 config.response_modalities = ["IMAGE"]
 
-            if enable_google_search and model != "gemini-2.5-flash-image":
+            use_search = enable_google_search and _google_search_supported(model)
+            if enable_google_search and not use_search:
+                print(f"[Gemini] {model} does not support Google Search grounding; ignoring enable_google_search")
+            if use_search:
                 config.tools = [{"google_search": {}}]
                 print(f"[Gemini] Google Search grounding enabled")
             else:
                 config.automatic_function_calling = types.AutomaticFunctionCallingConfig(disable=True)
 
             image_config_params = {}
-            if aspect_ratio != "default":
-                image_config_params["aspect_ratio"] = aspect_ratio
+            resolved_ratio = _resolve_aspect_ratio(model, aspect_ratio)
+            if resolved_ratio is not None:
+                image_config_params["aspect_ratio"] = resolved_ratio
             resolved_size = _resolve_image_size(model, image_size)
             if resolved_size is not None:
                 if "image_size" in types.ImageConfig.model_fields:

@@ -154,28 +154,28 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 #### Nodes
 
 - **Gemini API Config** - Initialize Gemini API connection (API key configuration). Optional if API key is configured in ComfyUI Settings or config.ini -- Gemini nodes can run standalone.
-- **Gemini Text Generation** - General-purpose text generation with model selection (Gemini 3.1 Pro, 3 Pro, 3 Flash, 2.5 Pro, 2.5 Flash, 2.5 Flash-Lite)
+- **Gemini Text Generation** - General-purpose text generation with model selection (Gemini 3.1 Pro Preview, 3.8/3.7/3.6/3.5 Flash, 3.5 Flash-Lite)
 - **Gemini Chat** - Multi-turn conversations with automatic context preservation
 - **Gemini Vision** - Analyze images with multimodal capabilities
 - **Gemini Detect** - Open-vocabulary object detection: name objects (or leave empty to detect everything prominent) and get normalized regions on an `ERPK_REGIONS` output that wires into the Regional Prompt Builder's `regions` input
-- **Gemini Image Generation** - Generate images from text descriptions (3.1 Flash, 3 Pro, 2.5 Flash models; up to 4K resolution, 14 aspect ratios, Google Search grounding)
+- **Gemini Image Generation** - Generate images from text descriptions (3.1 Flash, 3.1 Flash Lite, 3 Pro; 0.5K to 4K resolution, up to 14 aspect ratios, Google Search grounding on 3.1 Flash and 3 Pro)
 - **Gemini Image Edit** - Edit and modify images with natural language prompts (up to 14 reference images, same model and resolution options)
 - **Gemini System Instruction** - Set persistent system-level instructions to guide model behavior
 - **Gemini Safety Settings** - Configure content safety filters (strict/balanced/permissive presets or custom)
 
 #### Veo Video Generation Nodes
 
-- **Veo Text to Video** - Generate videos from text prompts using Google's Veo models (Veo 3 includes synchronized audio)
+- **Veo Text to Video** - Generate videos from text prompts using Google's Veo 3.1 models (with synchronized audio; Google shuts these down on 2026-10-22)
 - **Veo Image to Video** - Generate videos from an input image and optional text prompt
 - **Gemini Omni Video Generation** - Generate 3-10s 720p video from a prompt or start image via Gemini Omni Flash (returns in one call, no polling)
 
 **Key Benefits:**
-- Support for Gemini 3.1 Pro, 3 Pro, 3 Flash, 3.1 Flash-Lite, and Gemini 2.5 models
-- **Thinking level** control across all models (none/minimal/low/medium/high) with automatic parameter translation — Gemini 3.x uses `thinking_level` enum, Gemini 2.5 uses `thinking_budget` integer behind the same UI
-- **Veo video generation** with text-to-video and image-to-video (Veo 3 includes audio)
+- Support for Gemini 3.1 Pro Preview, 3.8, 3.7, 3.6 and 3.5 Flash, and 3.5 Flash-Lite
+- **Thinking level** control across all models (none/minimal/low/medium/high). `none` keeps the model's default thinking; `minimal` is raised to `low` on models that reject it
+- **Veo video generation** with text-to-video and image-to-video (Veo 3.1 includes audio)
 - Each node selects its own model for maximum flexibility
-- State-of-the-art reasoning with Gemini 3.1 Pro and 2.5 Pro
-- Image generation with Gemini 3.1 Flash (recommended), 3 Pro, and 2.5 Flash models (1K to 4K resolution)
+- State-of-the-art reasoning with Gemini 3.1 Pro Preview
+- Image generation with Gemini 3.1 Flash (recommended), 3.1 Flash Lite, and 3 Pro (0.5K to 4K resolution, model-dependent)
 - Image editing with natural language instructions (up to 14 reference images)
 - Simple, straightforward API integration
 - Vision capabilities with batch image support
@@ -453,7 +453,7 @@ curl -X POST http://localhost:8188/prompt \
         "inputs": {
           "client": ["1", 0],
           "prompt": "Write a haiku about ComfyUI",
-          "model": "gemini-2.5-flash",
+          "model": "gemini-3.5-flash",
           "temperature": 0.7,
           "max_tokens": 256
         }

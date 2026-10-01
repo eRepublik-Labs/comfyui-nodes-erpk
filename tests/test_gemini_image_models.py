@@ -13,14 +13,13 @@ class TestImageModelsConstant:
     def test_image_models_exists_on_client(self):
         assert hasattr(GeminiClient, "IMAGE_MODELS")
 
-    def test_image_models_contains_expected_models(self):
-        expected = [
+    def test_image_models_are_exactly_the_current_set(self):
+        # gemini-2.5-flash-image shuts down 2026-10-02 (ai.google.dev deprecations).
+        assert set(GeminiClient.IMAGE_MODELS) == {
             "gemini-3.1-flash-image",
+            "gemini-3.1-flash-lite-image",
             "gemini-3-pro-image",
-            "gemini-2.5-flash-image",
-        ]
-        for model in expected:
-            assert model in GeminiClient.IMAGE_MODELS
+        }
 
     def test_dead_preview_image_models_removed(self):
         # Past their Google shutdown date (2026-06-25); must not be selectable.
@@ -63,7 +62,7 @@ class TestImageSchemaOptions:
         "default", "1:1", "1:4", "1:8", "2:3", "3:2", "3:4",
         "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9",
     ]
-    EXPECTED_IMAGE_SIZES = ["default", "1K", "2K", "4K"]
+    EXPECTED_IMAGE_SIZES = ["default", "0.5K", "1K", "2K", "4K"]
 
     def test_generate_image_aspect_ratios(self):
         schema = GeminiImageGeneration.define_schema()

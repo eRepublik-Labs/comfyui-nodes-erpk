@@ -7,9 +7,6 @@ const VEO_RESOLUTIONS_BY_MODEL = {
     "veo-3.1-generate-preview":      ["720p", "1080p", "4k"],
     "veo-3.1-fast-generate-preview": ["720p", "1080p", "4k"],
     "veo-3.1-lite-generate-preview": ["720p", "1080p"],
-    "veo-3.0-generate-001":          ["720p", "1080p"],
-    "veo-3.0-fast-generate-001":     ["720p", "1080p"],
-    "veo-2.0-generate-001":          ["720p"],
 };
 const FALLBACK_RESOLUTIONS = ["720p", "1080p", "4k"];
 const VEO_NODES = new Set(["VeoTextToVideo", "VeoImageToVideo"]);

@@ -63,25 +63,15 @@ class TestThinkingLevelConfig:
                 print("[Gemini] Warning: thinking_level not supported by SDK, ignoring")
 
 
-class TestIsGemini3xClassifier:
-    """Verify the _is_gemini_3x helper correctly distinguishes generations."""
+class TestBuildThinkingConfig:
+    """Every offered text model is Gemini 3.x and takes the thinking_level enum."""
 
-    def test_is_gemini_3x_classifier(self):
-        from gemini.nodes import _is_gemini_3x
-        assert _is_gemini_3x("gemini-3-flash-preview") is True
-        assert _is_gemini_3x("gemini-2.5-pro") is False
-        assert _is_gemini_3x("gemini-3.1-pro-preview") is True
-        assert _is_gemini_3x("gemini-3.5-flash") is True
-
-
-class TestBuildThinkingConfigGeneration:
-    """Verify _build_thinking_config branches correctly by model generation."""
-
-    def test_minimal_on_gemini_3_flash_uses_level(self):
+    def test_minimal_on_gemini_3_6_flash_uses_level(self):
         from gemini.nodes import _build_thinking_config
-        result = _build_thinking_config("minimal", "gemini-3-flash-preview")
+        result = _build_thinking_config("minimal", "gemini-3.6-flash")
         assert result is not None
         assert result.thinking_level == "MINIMAL"
+        assert result.thinking_budget is None
 
     def test_high_on_gemini_35_flash_uses_level(self):
         from gemini.nodes import _build_thinking_config
@@ -89,27 +79,14 @@ class TestBuildThinkingConfigGeneration:
         assert result is not None
         assert result.thinking_level == "HIGH"
 
-    def test_minimal_on_gemini_2_5_flash_uses_budget_zero(self):
+    def test_minimal_on_gemini_3_1_pro_clamps_to_low(self):
+        # Probed 2026-10-01: gemini-3.1-pro-preview + MINIMAL returns 400
+        # "Thinking level MINIMAL is not supported for this model"; LOW returns 200.
         from gemini.nodes import _build_thinking_config
-        result = _build_thinking_config("minimal", "gemini-2.5-flash")
-        assert result is not None
-        assert result.thinking_budget == 0
+        assert _build_thinking_config("minimal", "gemini-3.1-pro-preview").thinking_level == "LOW"
+        assert _build_thinking_config("low", "gemini-3.1-pro-preview").thinking_level == "LOW"
 
-    def test_low_on_gemini_2_5_pro_enforces_minimum_128(self):
-        """low=512 is above the 128 minimum for Pro; no clamping applied."""
+    def test_none_sends_no_thinking_config(self):
         from gemini.nodes import _build_thinking_config
-        result = _build_thinking_config("low", "gemini-2.5-pro")
-        assert result is not None
-        assert result.thinking_budget == 512
-
-    def test_minimal_on_gemini_2_5_pro_enforces_minimum_128(self):
-        """minimal maps to 0, but Pro can't disable thinking, so clamp up to 128."""
-        from gemini.nodes import _build_thinking_config
-        result = _build_thinking_config("minimal", "gemini-2.5-pro")
-        assert result is not None
-        assert result.thinking_budget == 128
-
-    def test_none_returns_none_for_both_generations(self):
-        from gemini.nodes import _build_thinking_config
-        assert _build_thinking_config("none", "gemini-3-flash-preview") is None
-        assert _build_thinking_config("none", "gemini-2.5-flash") is None
+        assert _build_thinking_config("none", "gemini-3.5-flash") is None
+        assert _build_thinking_config("none", "gemini-3.1-pro-preview") is None

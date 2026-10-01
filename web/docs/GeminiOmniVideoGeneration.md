@@ -16,7 +16,7 @@ Unlike the Veo nodes, this model is reached through Google's Interactions API an
 | image | Image | - | Optional start image. Connecting one switches the model to image-to-video (optional) |
 | aspect_ratio | Combo | 16:9 | Video aspect ratio: 16:9 (landscape) or 9:16 (portrait) (optional) |
 | output_directory | String | "" | Directory to save video. Empty uses ComfyUI output folder (optional) |
-| seed | Int | 0 | Cache control only — never sent to the API. Range: -1 to 4294967295 (optional) |
+| seed | Int | -1 | Cache control only — never sent to the API. Range: -1 to 4294967295 (optional) |
 
 ## Output
 

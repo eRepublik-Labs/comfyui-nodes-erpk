@@ -8,7 +8,7 @@ Complete Google Gemini API integration providing text generation, vision analysi
 
 ## Features
 
-- **Text Generation** - Use all Gemini models (3.1 Pro, 3 Pro, 3.5 Flash, 3 Flash, 2.5 Pro, 2.5 Flash)
+- **Text Generation** - Gemini 3.1 Pro Preview, 3.8, 3.7, 3.6 and 3.5 Flash, and 3.5 Flash-Lite
 - **Vision Analysis** - Analyze images with Gemini's multimodal capabilities
 - **Image Generation** - Generate images from text descriptions
 - **Image Editing** - Edit and modify images with natural language prompts (up to 14 reference images)
@@ -88,7 +88,7 @@ General-purpose text generation and completion.
 **Inputs:**
 - `client`: Gemini API client (optional)
 - `prompt`: Text prompt
-- `model`: gemini-3.5-flash (default), gemini-3.1-pro-preview, gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3-flash-preview, gemini-3.1-flash-lite, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+- `model`: gemini-3.5-flash (default), gemini-3.1-pro-preview, gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash-lite
 - `temperature`: 0.0-2.0 (creativity level, default: 0.7)
 - `max_tokens`: 256-65536 (output length, default: 8192)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
@@ -96,7 +96,7 @@ General-purpose text generation and completion.
 - `stop_sequences`: Newline-separated sequences where generation stops (max 5)
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
-- `thinking_level`: Reasoning depth - "none" (default), "low", "medium", "high" (Gemini 3+ only)
+- `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. "minimal" is raised to "low" on 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it
 
 **Outputs:**
 - `response`: Generated text
@@ -117,7 +117,7 @@ Multi-turn conversation with message history preservation.
 **Inputs:**
 - `client`: Gemini API client (optional)
 - `prompt`: Your message
-- `model`: gemini-3.5-flash (default), gemini-3.1-pro-preview, gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3-flash-preview, gemini-3.1-flash-lite, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+- `model`: gemini-3.5-flash (default), gemini-3.1-pro-preview, gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash-lite
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
 - `temperature`: 0.0-2.0 (default: 0.7)
@@ -127,7 +127,7 @@ Multi-turn conversation with message history preservation.
 - `stop_sequences`: Newline-separated sequences where generation stops (max 5)
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
-- `thinking_level`: Reasoning depth - "none" (default), "low", "medium", "high" (Gemini 3+ only)
+- `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. "minimal" is raised to "low" on 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it
 
 **Outputs:**
 - `response`: Chat response
@@ -148,7 +148,7 @@ Analyze images with questions or instructions.
 - `client`: Gemini API client (optional)
 - `image`: ComfyUI image tensor (supports batches)
 - `prompt`: Question or instruction about the image(s)
-- `model`: gemini-3.5-flash (default), gemini-3.1-pro-preview, gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3-flash-preview, gemini-3.1-flash-lite, gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+- `model`: gemini-3.5-flash (default), gemini-3.1-pro-preview, gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash-lite
 - `max_tokens`: 256-65536 (default: 8192)
 - `temperature`: 0.0-2.0 (default: 0.4, lower for more factual)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
@@ -156,7 +156,7 @@ Analyze images with questions or instructions.
 - `stop_sequences`: Newline-separated sequences where generation stops (max 5)
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
-- `thinking_level`: Reasoning depth - "none" (default), "low", "medium", "high" (Gemini 3+ only)
+- `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. "minimal" is raised to "low" on 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it
 
 **Outputs:**
 - `analysis`: Text analysis of the image(s)
@@ -177,12 +177,12 @@ Generate images from text descriptions using Gemini's image generation models.
 **Inputs:**
 - `prompt`: Text description of the image to generate
 - `client`: Optional Gemini API client (from Gemini API Config node)
-- `model`: gemini-3.1-flash-image (default, recommended), gemini-3.1-flash-lite-image (Nano Banana 2 Lite, 1K only), gemini-3-pro-image (professional), or gemini-2.5-flash-image (fast)
+- `model`: gemini-3.1-flash-image (default, recommended), gemini-3.1-flash-lite-image (Nano Banana 2 Lite, 1K only), or gemini-3-pro-image (professional)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
-- `aspect_ratio`: Image dimensions - 14 ratios for 3.1 Flash (including 1:4, 4:1, 1:8, 8:1), 10 ratios for others
-- `image_size`: Resolution - "default", "1K", "2K", "4K" (1K-4K for 3.1 Flash and 3 Pro; 2.5 Flash fixed at 1024px)
+- `aspect_ratio`: Image dimensions - 14 ratios for 3.1 Flash (including 1:4, 4:1, 1:8, 8:1). 3.1 Flash Lite has no 1:4, 4:1, 1:8 or 8:1 and uses the closest supported ratio instead
+- `image_size`: Resolution - "default", "0.5K", "1K", "2K", "4K". 3.1 Flash takes 0.5K-4K, 3 Pro 1K-4K, 3.1 Flash Lite 1K only; an unsupported size uses the model's smallest size
 - `response_modalities`: "IMAGE" (image only) or "TEXT+IMAGE" (image + text description)
-- `enable_google_search`: Enable Google Search grounding (Gemini 3 models only)
+- `enable_google_search`: Enable Google Search grounding (3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it)
 
 **Outputs:**
 - `image`: Generated image (ComfyUI IMAGE tensor)
@@ -191,10 +191,10 @@ Generate images from text descriptions using Gemini's image generation models.
 **Features:**
 - Credentials resolved from ComfyUI Settings or config.ini
 - Direct image output compatible with all ComfyUI image nodes
-- Three image models: 3.1 Flash (best balance), 3 Pro (professional quality), 2.5 Flash (speed)
+- Three image models: 3.1 Flash (best balance), 3.1 Flash Lite (fastest, cheapest), 3 Pro (professional quality)
 - Configurable creativity with temperature
 - Full aspect ratio support (up to 14 options)
-- Resolution control from 1K to 4K
+- Resolution control from 0.5K to 4K
 - Google Search grounding for factually accurate images
 
 **Example Prompts:**
@@ -213,12 +213,12 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 - `image`: Input image(s) to edit (up to 14 reference images). Use ComfyUI's **Batch Images** node to combine multiple images.
 - `prompt`: Text description of how to modify the image(s)
 - `client`: Optional Gemini API client (from Gemini API Config node)
-- `model`: gemini-3.1-flash-image (default, recommended), gemini-3.1-flash-lite-image (Nano Banana 2 Lite, 1K only), gemini-3-pro-image (professional), or gemini-2.5-flash-image (fast)
+- `model`: gemini-3.1-flash-image (default, recommended), gemini-3.1-flash-lite-image (Nano Banana 2 Lite, 1K only), or gemini-3-pro-image (professional)
 - `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
-- `aspect_ratio`: Image dimensions - 14 ratios for 3.1 Flash (including 1:4, 4:1, 1:8, 8:1), 10 ratios for others
-- `image_size`: Resolution - "default", "1K", "2K", "4K" (1K-4K for 3.1 Flash and 3 Pro; 2.5 Flash fixed at 1024px)
+- `aspect_ratio`: Image dimensions - 14 ratios for 3.1 Flash (including 1:4, 4:1, 1:8, 8:1). 3.1 Flash Lite has no 1:4, 4:1, 1:8 or 8:1 and uses the closest supported ratio instead
+- `image_size`: Resolution - "default", "0.5K", "1K", "2K", "4K". 3.1 Flash takes 0.5K-4K, 3 Pro 1K-4K, 3.1 Flash Lite 1K only; an unsupported size uses the model's smallest size
 - `response_modalities`: "IMAGE" (image only) or "TEXT+IMAGE" (image + text description)
-- `enable_google_search`: Enable Google Search grounding (Gemini 3 models only)
+- `enable_google_search`: Enable Google Search grounding (3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it)
 - `additional_images`: Optional additional reference images (combined with primary image input, up to 14 total)
 
 **Outputs:**
@@ -231,7 +231,7 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 - Image-to-image editing with natural language instructions
 - Compatible with all ComfyUI image nodes
 - Full aspect ratio support (up to 14 options)
-- Resolution control from 1K to 4K
+- Resolution control from 0.5K to 4K
 - Google Search grounding for factual accuracy in edits
 
 **Example Use Cases:**
@@ -330,20 +330,20 @@ Generate videos from text prompts using Google's Veo models.
 **Inputs:**
 - `client`: Gemini API client (from Gemini API Config node)
 - `prompt`: Text description of the video to generate (max 2500 characters)
+- `reference_images`: Up to 3 reference images (Veo 3.1 and 3.1 Fast only)
 - `model`: veo-3.1-generate-preview (default, includes audio), veo-3.1-fast-generate-preview, or veo-3.1-lite-generate-preview
 - `aspect_ratio`: 16:9 (landscape) or 9:16 (portrait)
-- `duration_seconds`: 5, 6, 7, or 8 seconds (Veo 3+ defaults to 8)
-- `person_generation`: Safety setting - allow_adult (default), dont_allow, or allow_all
-- `enhance_prompt`: Let the model enhance your prompt (default: true)
-- `negative_prompt`: Elements to exclude from the video
-- `seed`: Random seed for reproducibility (-1 for random)
+- `resolution`: 720p (default), 1080p or 4k. Lite has no 4k. 1080p and 4k only support 8s
+- `duration_seconds`: 4, 6 or 8 seconds (default 8). The 5 option only exists so older workflows load
+- `person_generation`: allow_adult (default) or allow_all. dont_allow is rejected (Google's docs list allow_all for text-to-video, and allow_adult as the only value in EU/UK/CH/MENA)
+- `seed`: Cache control only, never sent to the API. A fixed seed reuses the video already generated; -1 generates again on every queue
 - `output_directory`: Where to save the video (default: ComfyUI output folder)
 
 **Outputs:**
 - `video_path`: Path to the generated video file (.mp4)
 
 **Features:**
-- Veo 3 generates videos with synchronized audio
+- Veo 3.1 generates videos with synchronized audio
 - Async generation with automatic polling (may take several minutes)
 - Videos saved directly to disk
 - Configurable aspect ratio and duration
@@ -360,15 +360,16 @@ Generate videos from an input image and optional text prompt.
 
 **Inputs:**
 - `client`: Gemini API client (from Gemini API Config node)
-- `image`: Input image (ComfyUI IMAGE tensor) - used as first frame or style reference
+- `image`: Input image (ComfyUI IMAGE tensor) - used as the first frame
+- `last_frame_image`: Optional last frame for interpolation (requires 8s)
+- `reference_images`: Up to 3 reference images (Veo 3.1 and 3.1 Fast only; requires 8s and 16:9; not with `last_frame_image`)
 - `prompt`: Optional text description to guide the video generation
 - `model`: veo-3.1-generate-preview (default, includes audio), veo-3.1-fast-generate-preview, or veo-3.1-lite-generate-preview
 - `aspect_ratio`: 16:9 (landscape) or 9:16 (portrait)
-- `duration_seconds`: 5, 6, 7, or 8 seconds (Veo 3+ defaults to 8)
-- `person_generation`: Safety setting - allow_adult (default), dont_allow, or allow_all
-- `enhance_prompt`: Let the model enhance your prompt (default: true)
-- `negative_prompt`: Elements to exclude from the video
-- `seed`: Random seed for reproducibility (-1 for random)
+- `resolution`: 720p (default), 1080p or 4k. Lite has no 4k. 1080p and 4k only support 8s
+- `duration_seconds`: 4, 6 or 8 seconds (default 8). The 5 option only exists so older workflows load
+- `person_generation`: allow_adult (default, and the only value Google's docs accept for image-to-video)
+- `seed`: Cache control only, never sent to the API. A fixed seed reuses the video already generated; -1 generates again on every queue
 - `output_directory`: Where to save the video (default: ComfyUI output folder)
 
 **Outputs:**
@@ -388,16 +389,11 @@ Generate videos from an input image and optional text prompt.
 
 | Model | Best For | Context Window | Notes |
 |-------|----------|----------------|-------|
-| **gemini-3.1-pro-preview** | Most advanced reasoning | 1M tokens | Supports thinking levels |
+| **gemini-3.1-pro-preview** | Most advanced reasoning | 1M tokens | `minimal` thinking is clamped to `low` |
 | **gemini-3.8-flash** | Latest Flash generation | 1M tokens | Same price as 3.6/3.7; `minimal` thinking is clamped to `low` |
 | **gemini-3.7-flash** | Previous Flash generation | 1M tokens | `minimal` thinking is clamped to `low` |
 | **gemini-3.6-flash** | Improved token efficiency | 1M tokens | Cheaper than 3.5 Flash |
 | **gemini-3.5-flash** | Frontier intelligence at high speed and low cost | 1M tokens | **Default**, stable, built for multi-step and long-horizon tasks |
-| **gemini-3-flash-preview** | Balanced speed and intelligence | 1M tokens | Balanced model |
-| **gemini-3.1-flash-lite** | High-volume, low-latency tasks | 1M tokens | Fastest, most cost-efficient |
-| **gemini-2.5-pro** | Complex reasoning, thinking | 1M tokens | Stable, production-ready |
-| **gemini-2.5-flash** | Best price-performance | 1M tokens | Stable, production-ready |
-| **gemini-2.5-flash-lite** | High-speed, cost-efficient | 1M tokens | Fastest, lowest cost |
 
 ### Image Generation Models
 
@@ -405,9 +401,9 @@ Generate videos from an input image and optional text prompt.
 |-------|----------|-------|
 | **gemini-3.1-flash-image** | Latest flagship image model | **Default**, Nano Banana 2, 4K output + Image Search Grounding |
 | **gemini-3-pro-image** | Professional quality | Nano Banana Pro, best for character consistency (up to 14 reference images) |
-| **gemini-2.5-flash-image** | Fast image generation | Stable, lowest latency |
+| **gemini-3.1-flash-lite-image** | Fast, low-cost generation | Nano Banana 2 Lite, 1K only, no Google Search grounding |
 
-**Note:** Image generation models output images instead of text. Resolution for `gemini-3.1-flash-image` and `gemini-3-pro-image` ranges from 1K to 4K; `gemini-3.1-flash-lite-image` emits 1K only (higher requests are clamped); `gemini-2.5-flash-image` is fixed at 1024px.
+**Note:** Image generation models output images instead of text. `gemini-3.1-flash-image` outputs 0.5K to 4K, `gemini-3-pro-image` 1K to 4K, and `gemini-3.1-flash-lite-image` 1K only (other requests are clamped).
 
 ### Video Generation Models (Veo)
 
@@ -417,7 +413,9 @@ Generate videos from an input image and optional text prompt.
 | **veo-3.1-fast-generate-preview** | Fast generation with audio | Faster variant of Veo 3.1 |
 | **veo-3.1-lite-generate-preview** | Lightweight, lower cost | No reference-image support |
 
-**Pricing:** Veo 3+ is priced at $0.75 per second of video output.
+**Pricing** (per second of output, with audio): Veo 3.1 $0.40 (720p, 1080p) / $0.60 (4k); Veo 3.1 Fast $0.10 / $0.12 / $0.30; Veo 3.1 Lite $0.05 (720p) / $0.08 (1080p).
+
+**Shutdown:** Google shuts down all three Veo 3.1 preview models on 2026-10-22; the listed replacement is Gemini Omni Flash.
 
 **Note:** Video generation is asynchronous and may take several minutes. Videos are saved as .mp4 files.
 
@@ -425,10 +423,10 @@ Generate videos from an input image and optional text prompt.
 
 Both Veo nodes run client-side validators before submitting the long-running job, to avoid eating a 4-5 minute generation just to see an opaque 400 from the API:
 
-- **Duration normalization** — Veo 3.x accepts `{4, 6, 8}`. Out-of-range values are snapped to the nearest valid duration with a warning.
-- **Resolution gating** — Models that don't accept `4k` (Lite) are clamped to `1080p`. On Veo 3.x, an 8s duration with `720p` and no reference images is auto-bumped to `1080p`.
-- **person_generation** — Veo 3.x image-to-video rejects `allow_all` server-side; the validator raises a `ValueError` early. Text-to-video paths accept the full enum.
-- **i2v feature combos (Veo 3.1)** — `image + last_frame` interpolation requires `duration_seconds=8`; `reference_images` requires `duration_seconds=8` and `aspect_ratio=16:9`; `reference_images` cannot be combined with `image`/`last_frame`. These gates are not documented in Google's parameter table but are confirmed by Google staff in forum threads — see `gemini/veo_nodes.py` for the linked discussions.
+- **Duration normalization** — Veo 3.1 accepts `{4, 6, 8}`. Out-of-range values (including the legacy `5` option, kept so older workflows load) are snapped to the nearest valid duration with a warning.
+- **Resolution gating** — Models that don't accept `4k` (Lite) are clamped to `1080p`. `1080p` and `4k` only support 8s, so a shorter duration is raised to 8s with a warning. `720p` is never upscaled.
+- **person_generation** — Per Google's Veo docs, image-to-video accepts `allow_adult` only, and text-to-video accepts `allow_all`, or `allow_adult` in EU/UK/CH/MENA where that is the only allowed value. Anything else raises a `ValueError` before the API call.
+- **i2v feature combos (Veo 3.1)** — `image + last_frame` interpolation requires `duration_seconds=8`; `reference_images` requires `duration_seconds=8` and `aspect_ratio=16:9`; `reference_images` cannot be combined with `image`/`last_frame`. Apart from the 8s rule for reference images, these gates are not in Google's parameter table but are confirmed by Google staff in forum threads — see `gemini/veo_nodes.py` for the linked discussions.
 
 ## Example Workflows
 
@@ -500,7 +498,7 @@ https://ai.google.dev/pricing
 
 ### Model not available
 - Preview models (like gemini-3.1-pro-preview) may have limited availability
-- Try using gemini-2.5-flash or gemini-2.5-pro as stable alternatives
+- Try gemini-3.5-flash (the default) as a stable alternative
 
 ### Veo video generation timeout
 - Video generation can take 2-10 minutes depending on duration and model
@@ -510,7 +508,6 @@ https://ai.google.dev/pricing
 ### Veo "person generation not approved" error
 - Some Google Cloud projects need approval for generating videos with people
 - Contact your Google account representative for approval
-- Try setting `person_generation` to "dont_allow" as a workaround
 
 ### Cannot save video file
 - Ensure the output directory exists and is writable

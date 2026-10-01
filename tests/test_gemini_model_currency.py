@@ -15,7 +15,13 @@ import json
 import os
 
 from gemini.gemini_api.client import GeminiClient
-from gemini.nodes import IMAGE_MODELS, TEXT_MODELS, _resolve_image_size
+from gemini.nodes import (
+    IMAGE_MODELS,
+    TEXT_MODELS,
+    _google_search_supported,
+    _resolve_aspect_ratio,
+    _resolve_image_size,
+)
 
 
 FLASH_3_6 = "gemini-3.6-flash"
@@ -90,12 +96,6 @@ def test_lite_image_model_clamps_to_1k():
     assert _resolve_image_size(NANO_BANANA_2_LITE, "1K") == "1K"
 
 
-def test_fixed_resolution_model_sends_no_image_size():
-    # gemini-2.5-flash-image is fixed at 1024px and takes no image_size.
-    assert _resolve_image_size("gemini-2.5-flash-image", "2K") is None
-    assert _resolve_image_size("gemini-2.5-flash-image", "default") is None
-
-
 def test_multi_resolution_models_pass_through():
     for model in ("gemini-3.1-flash-image", "gemini-3-pro-image"):
         assert _resolve_image_size(model, "4K") == "4K"
@@ -109,3 +109,44 @@ def test_default_never_sends_image_size():
 
 def test_client_and_node_image_lists_agree():
     assert IMAGE_MODELS == GeminiClient.IMAGE_MODELS
+
+
+# --- Per-model image options (ai.google.dev/gemini-api/docs/image-generation
+# and the per-model pages, read 2026-10-01) -----------------------------------
+
+
+def test_half_k_only_on_3_1_flash_image():
+    # The widget says 0.5K like the docs, but the API rejects that string:
+    # 400 "Unsupported image_size '0.5K'. Supported values are: 1K, 2K, 4K,
+    # 512, 512P, 512PX." (gemini-3.1-flash-image, probed 2026-10-01).
+    assert _resolve_image_size("gemini-3.1-flash-image", "0.5K") == "512"
+    # 3 Pro Image documents 1K/2K/4K; 0.5K is raised to its smallest size.
+    assert _resolve_image_size("gemini-3-pro-image", "0.5K") == "1K"
+    assert _resolve_image_size(NANO_BANANA_2_LITE, "0.5K") == "1K"
+
+
+def test_google_search_not_sent_to_lite_image():
+    # Lite page capability table: "Search grounding: Not supported".
+    assert _google_search_supported(NANO_BANANA_2_LITE) is False
+    assert _google_search_supported("gemini-3.1-flash-image") is True
+    assert _google_search_supported("gemini-3-pro-image") is True
+
+
+def test_lite_image_clamps_extreme_ratios_to_nearest():
+    # The lite page lists 1:1 3:2 2:3 3:4 4:3 4:5 5:4 9:16 16:9 21:9; the
+    # 1:4/4:1/1:8/8:1 ratios are 3.1 Flash Image additions.
+    assert _resolve_aspect_ratio(NANO_BANANA_2_LITE, "1:4") == "9:16"
+    assert _resolve_aspect_ratio(NANO_BANANA_2_LITE, "1:8") == "9:16"
+    assert _resolve_aspect_ratio(NANO_BANANA_2_LITE, "4:1") == "21:9"
+    assert _resolve_aspect_ratio(NANO_BANANA_2_LITE, "8:1") == "21:9"
+    assert _resolve_aspect_ratio(NANO_BANANA_2_LITE, "4:5") == "4:5"
+
+
+def test_3_1_flash_image_keeps_extreme_ratios():
+    for ratio in ("1:4", "4:1", "1:8", "8:1"):
+        assert _resolve_aspect_ratio("gemini-3.1-flash-image", ratio) == ratio
+
+
+def test_default_ratio_sends_nothing():
+    for model in IMAGE_MODELS:
+        assert _resolve_aspect_ratio(model, "default") is None

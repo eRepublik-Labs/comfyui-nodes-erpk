@@ -241,6 +241,16 @@ class TestGeminiCustomTypes:
         assert "GEMINI_API_CLIENT" in input_types
 
 
+    @pytest.mark.parametrize("node_name", ["VeoTextToVideo", "VeoImageToVideo"])
+    def test_veo_duration_default_is_an_offered_option(self, node_name):
+        # ComfyUI rejects a Combo value that is not in its option list, and the
+        # duration options are strings ("4", "5", "6", "8").
+        cls = _import_node("veo_nodes", node_name)
+        schema = cls.define_schema()
+        duration = [i for i in schema.inputs if i.id == "duration_seconds"][0]
+        assert duration.default == "8"
+        assert duration.default in duration.options
+
 class TestGeminiModelOptions:
     """Model COMBO options are correctly sourced from GeminiClient constants."""
 

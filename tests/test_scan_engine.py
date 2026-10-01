@@ -518,11 +518,12 @@ class TestBuildCost:
             {"input_tokens": 1200, "output_tokens": 1500, "total_tokens": 2700},
             {"input_tokens": 1100, "output_tokens": 50, "total_tokens": 1150},
         ]
-        cost = build_cost(usages, "gemini-2.5-flash")
+        cost = build_cost(usages, "gemini-3.5-flash-lite")
         assert cost["input_tokens"] == 2300
         assert cost["output_tokens"] == 1550
         assert cost["calls"] == 2
-        assert cost["model"] == "gemini-2.5-flash"
+        assert cost["model"] == "gemini-3.5-flash-lite"
+        # gemini-3.5-flash-lite: $0.30 in / $2.50 out per 1M (ai.google.dev pricing)
         # 2300/1e6*0.30 + 1550/1e6*2.50
         assert cost["usd"] == pytest.approx(2300 / 1e6 * 0.30 + 1550 / 1e6 * 2.5)
 
@@ -530,18 +531,18 @@ class TestBuildCost:
         from utils.scan_engine import build_cost
         # A call happened but reported no usage -> the total is unknown, so the
         # whole cost is None rather than billing that call as zero tokens.
-        assert build_cost([None], "gemini-2.5-flash") is None
+        assert build_cost([None], "gemini-3.5-flash-lite") is None
 
     def test_any_unreported_usage_is_unknown(self):
         from utils.scan_engine import build_cost
         # One reported call plus one unreported call still reads as unknown: the
         # reported tokens alone would undercount the scan.
         assert build_cost([{"input_tokens": 100, "output_tokens": 0,
-                            "total_tokens": 100}, None], "gemini-2.5-flash") is None
+                            "total_tokens": 100}, None], "gemini-3.5-flash-lite") is None
 
     def test_all_unreported_usage_is_unknown(self):
         from utils.scan_engine import build_cost
-        assert build_cost([None, None], "gemini-2.5-flash") is None
+        assert build_cost([None, None], "gemini-3.5-flash-lite") is None
 
     def test_unknown_model_reports_tokens_but_no_usd(self):
         from utils.scan_engine import build_cost
