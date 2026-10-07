@@ -243,9 +243,19 @@ class NodeOutput:
 
 # --- ComfyNode ---
 
+class Hidden(str, Enum):
+    """Mirrors comfy_api.latest._io.Hidden: hidden variables a node can request."""
+    unique_id = "UNIQUE_ID"
+    prompt = "PROMPT"
+    extra_pnginfo = "EXTRA_PNGINFO"
+    dynprompt = "DYNPROMPT"
+
+
 class ComfyNode(ABC):
     RELATIVE_PYTHON_MODULE = None
     SCHEMA = None
+    # ComfyUI's executor replaces this with a HiddenHolder before execute().
+    hidden = None
 
     @classmethod
     @abstractmethod

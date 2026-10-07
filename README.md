@@ -310,7 +310,7 @@ String manipulation and general utility nodes.
 - **Image dimensions badge** (W × H) overlays the bottom-right of single-image previews
 - Text and markdown stay at a fixed scrollable size (no auto-growth to canvas-swallowing heights); images, video, and audio still auto-fit to their aspect ratio
 - Last rendered content persists across workflow reloads
-- Optional `strip_metadata` toggle re-encodes image URL inputs to remove EXIF / ICC / XMP (GPS, camera info, timestamps) before download. Images only; IMAGE tensor inputs are already metadata-free.
+- IMAGE previews embed the prompt and workflow like ComfyUI's Preview Image, so a downloaded PNG loads back as a workflow. The `strip_metadata` toggle saves them without it, and re-encodes image URL inputs to remove EXIF / ICC / XMP (GPS, camera info, timestamps) before download.
 
 ### Shared Workflows (Multi-User)
 

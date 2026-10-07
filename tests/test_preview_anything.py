@@ -26,6 +26,21 @@ def schema(node_class):
     return node_class.define_schema()
 
 
+@pytest.fixture(autouse=True)
+def comfy_runtime(node_class, monkeypatch):
+    """What ComfyUI provides at execute time: the hidden-input holder the
+    executor sets on the class, and comfy.cli_args. Tests that need a prompt,
+    a workflow or --disable-metadata override these."""
+    import sys, types
+    monkeypatch.setattr(node_class, "hidden",
+                        types.SimpleNamespace(prompt=None, extra_pnginfo=None))
+    cli_args = types.ModuleType("comfy.cli_args")
+    cli_args.args = types.SimpleNamespace(disable_metadata=False)
+    monkeypatch.setitem(sys.modules, "comfy", types.ModuleType("comfy"))
+    monkeypatch.setitem(sys.modules, "comfy.cli_args", cli_args)
+    return cli_args.args
+
+
 class TestPreviewAnythingSchema:
 
     def test_inherits_comfy_node(self, node_class):
@@ -464,3 +479,62 @@ def _find_input(schema, input_id: str):
         if inp.id == input_id:
             return inp
     return None
+
+
+class TestImageTensorWorkflowMetadata:
+    """Saved IMAGE previews carry the prompt and workflow, like ComfyUI's Preview Image."""
+
+    PROMPT = {"3": {"class_type": "KSampler", "inputs": {"seed": 1234}}}
+    WORKFLOW = {"nodes": [{"id": 3, "type": "KSampler"}], "links": []}
+
+    @pytest.fixture
+    def env(self, node_class, comfy_runtime, tmp_path, monkeypatch):
+        import sys, types
+        torch = pytest.importorskip("torch")
+        folder_paths = types.ModuleType("folder_paths")
+        temp_dir = tmp_path / "comfy_temp"
+        temp_dir.mkdir()
+        folder_paths.get_temp_directory = lambda: str(temp_dir)
+        monkeypatch.setitem(sys.modules, "folder_paths", folder_paths)
+        monkeypatch.setattr(node_class, "hidden", types.SimpleNamespace(
+            prompt=self.PROMPT, extra_pnginfo={"workflow": self.WORKFLOW}))
+        return torch, temp_dir, comfy_runtime
+
+    def _saved_text_chunks(self, temp_dir):
+        from PIL import Image
+        files = sorted(temp_dir.glob("*.png"))
+        assert files, "no preview PNG was written"
+        chunks = []
+        for f in files:
+            with Image.open(f) as img:
+                chunks.append(dict(img.text))
+        return chunks
+
+    @pytest.mark.parametrize("batch", [1, 3])
+    def test_prompt_and_workflow_are_embedded(self, node_class, env, batch):
+        import json
+        torch, temp_dir, _ = env
+        node_class.execute(value=torch.zeros((batch, 4, 4, 3)), display_type="auto")
+        chunks = self._saved_text_chunks(temp_dir)
+        assert len(chunks) == batch
+        for text in chunks:
+            assert text == {"prompt": json.dumps(self.PROMPT), "workflow": json.dumps(self.WORKFLOW)}
+
+    @pytest.mark.parametrize("batch", [1, 3])
+    def test_strip_metadata_saves_no_prompt_or_workflow(self, node_class, env, batch):
+        torch, temp_dir, _ = env
+        node_class.execute(value=torch.zeros((batch, 4, 4, 3)), display_type="auto", strip_metadata=True)
+        assert self._saved_text_chunks(temp_dir) == [{}] * batch
+
+    def test_comfyui_disable_metadata_flag_is_honoured(self, node_class, env):
+        torch, temp_dir, args = env
+        args.disable_metadata = True
+        node_class.execute(value=torch.zeros((1, 4, 4, 3)), display_type="auto")
+        assert self._saved_text_chunks(temp_dir) == [{}]
+
+    def test_forced_image_display_type_embeds_too(self, node_class, env):
+        import json
+        torch, temp_dir, _ = env
+        node_class.execute(value=torch.zeros((1, 4, 4, 3)), display_type="image")
+        assert self._saved_text_chunks(temp_dir) == [
+            {"prompt": json.dumps(self.PROMPT), "workflow": json.dumps(self.WORKFLOW)}]

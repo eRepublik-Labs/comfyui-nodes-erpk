@@ -14,13 +14,13 @@ The three settings below live in a collapsible **Options** panel on the node —
 | value | * (any) | — | The value to preview. Connect any output. |
 | display_type | Combo | auto | `auto` detects from the input. Force with `text`, `markdown`, `image`, `gif`, `video`, `audio`. |
 | filename | String | preview | Base filename used when the Download button is clicked. |
-| strip_metadata | Boolean | false | Re-encode image URL inputs to strip EXIF / ICC / XMP (GPS, camera info, timestamps) before download. Images only; IMAGE tensor inputs are already metadata-free. |
+| strip_metadata | Boolean | false | Off: IMAGE previews embed the prompt and workflow, like ComfyUI's Preview Image, so a downloaded PNG loads back as a workflow. On: IMAGE previews are saved without them, and image URL inputs are re-encoded to strip EXIF / ICC / XMP (GPS, camera info, timestamps) before download. ComfyUI's `--disable-metadata` flag also turns embedding off. |
 
 ## How detection works
 
 When `display_type` is `auto`:
 
-- **IMAGE tensor** — saved to temp and displayed as an image.
+- **IMAGE tensor** — saved to temp as a PNG with the prompt and workflow embedded (unless `strip_metadata` is on) and displayed as an image.
 - **AUDIO dict** (has `waveform` + `sample_rate`) — saved as WAV and played.
 - **String that looks like a URL** — detected by file extension:
   - `.png .jpg .jpeg .webp .bmp .tiff .avif` → image

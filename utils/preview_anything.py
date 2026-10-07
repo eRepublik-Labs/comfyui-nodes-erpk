@@ -1,6 +1,7 @@
 # ABOUTME: ComfyUI V3 utility node that previews any input: text, markdown, URLs, images, video, audio.
 # ABOUTME: Detects content type server-side and hands a typed payload to the frontend renderer.
 
+import json
 import os
 import re
 import time
@@ -10,10 +11,11 @@ from comfy_api.latest import IO
 
 
 _STRIP_METADATA_TOOLTIP = (
-    "Re-encode image URL inputs to strip EXIF / ICC / XMP metadata (GPS, "
-    "camera info, timestamps) before download. Only applies to image URLs; "
-    "IMAGE tensor inputs are already metadata-free. Text, video, audio, and "
-    "non-image URLs are unaffected."
+    "Off: IMAGE previews embed the prompt and workflow, like ComfyUI's Preview "
+    "Image, so a downloaded PNG loads back as a workflow. On: IMAGE previews "
+    "are saved without them, and image URL inputs are re-encoded to drop EXIF "
+    "/ ICC / XMP metadata (GPS, camera info, timestamps). Text, video, audio, "
+    "and non-image URLs are unaffected."
 )
 
 
@@ -69,28 +71,49 @@ class PreviewAnything(IO.ComfyNode):
                 ),
             ],
             outputs=[],
+            hidden=[IO.Hidden.prompt, IO.Hidden.extra_pnginfo],
             is_output_node=True,
         )
 
     @classmethod
     def execute(cls, value=None, display_type="auto", filename="preview",
                 strip_metadata=False, **kwargs) -> IO.NodeOutput:
-        payload = _build_payload(value, display_type, filename, strip_metadata)
+        png_text = {}
+        if _is_image_tensor(value) and not strip_metadata:
+            png_text = _workflow_png_text(cls.hidden.prompt, cls.hidden.extra_pnginfo)
+        payload = _build_payload(value, display_type, filename, strip_metadata, png_text)
         return IO.NodeOutput(ui={"preview_anything": [payload]})
 
 
-def _build_payload(value, display_type: str, filename: str, strip_metadata: bool = False) -> dict:
+def _workflow_png_text(prompt, extra_pnginfo) -> dict:
+    """PNG text chunks ComfyUI's Preview Image writes: the prompt plus each
+    extra_pnginfo entry (the workflow), JSON-encoded. Empty under
+    --disable-metadata."""
+    from comfy.cli_args import args
+    if args.disable_metadata:
+        return {}
+    text = {}
+    if prompt is not None:
+        text["prompt"] = json.dumps(prompt)
+    for key, value in (extra_pnginfo or {}).items():
+        text[key] = json.dumps(value)
+    return text
+
+
+def _build_payload(value, display_type: str, filename: str, strip_metadata: bool = False,
+                   png_text: dict = None) -> dict:
+    png_text = png_text or {}
     if display_type and display_type != "auto":
-        return _forced_payload(value, display_type, filename)
+        return _forced_payload(value, display_type, filename, png_text)
 
     if _is_image_tensor(value):
         # Batched IMAGE tensor (N > 1): emit a gallery payload so the frontend
         # can show all N images. Previously only the first image was saved.
         if _is_batched_image(value):
-            urls = _save_image_tensor_batch(value, filename)
+            urls = _save_image_tensor_batch(value, filename, png_text)
             if urls:
                 return {"kind": "image_gallery", "urls": urls, "filename": filename}
-        saved = _save_image_tensor(value, filename)
+        saved = _save_image_tensor(value, filename, png_text)
         if saved is not None:
             return {"kind": "image", "url": saved, "filename": filename}
 
@@ -106,7 +129,7 @@ def _build_payload(value, display_type: str, filename: str, strip_metadata: bool
     return {"kind": "text", "text": text, "filename": filename}
 
 
-def _forced_payload(value, display_type: str, filename: str) -> dict:
+def _forced_payload(value, display_type: str, filename: str, png_text: dict) -> dict:
     if display_type in ("text", "markdown"):
         text = value if isinstance(value, str) else _stringify(value)
         return {"kind": display_type, "text": text, "filename": filename}
@@ -115,7 +138,7 @@ def _forced_payload(value, display_type: str, filename: str) -> dict:
         return {"kind": display_type, "url": value, "filename": filename}
 
     if display_type == "image" and _is_image_tensor(value):
-        saved = _save_image_tensor(value, filename)
+        saved = _save_image_tensor(value, filename, png_text)
         if saved is not None:
             return {"kind": "image", "url": saved, "filename": filename}
 
@@ -400,7 +423,15 @@ def _is_audio_dict(value) -> bool:
     )
 
 
-def _save_image_tensor(tensor, filename: str):
+def _png_info(png_text: dict):
+    from PIL.PngImagePlugin import PngInfo
+    info = PngInfo()
+    for key, value in png_text.items():
+        info.add_text(key, value)
+    return info
+
+
+def _save_image_tensor(tensor, filename: str, png_text: dict):
     try:
         import numpy as np
         from PIL import Image
@@ -419,11 +450,11 @@ def _save_image_tensor(tensor, filename: str):
     os.makedirs(temp_dir, exist_ok=True)
     name = f"{_safe(filename)}_{int(time.time() * 1000)}.png"
     path = os.path.join(temp_dir, name)
-    img.save(path)
+    img.save(path, pnginfo=_png_info(png_text))
     return _view_url(name, "", "temp")
 
 
-def _save_image_tensor_batch(tensor, filename: str):
+def _save_image_tensor_batch(tensor, filename: str, png_text: dict):
     """Save each image in a [N,H,W,C] batch tensor to ComfyUI's temp dir.
 
     Returns a list of /view URLs in batch order, or None on any error.
@@ -452,7 +483,7 @@ def _save_image_tensor_batch(tensor, filename: str):
         img = Image.fromarray(array_all[i])
         name = f"{stem}_{ts}_{i + 1}.png"
         path = os.path.join(temp_dir, name)
-        img.save(path)
+        img.save(path, pnginfo=_png_info(png_text))
         urls.append(_view_url(name, "", "temp"))
     return urls
 
