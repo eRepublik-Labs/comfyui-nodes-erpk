@@ -11,7 +11,8 @@ Image editing with multiple reference images using Qwen Image 2.0 models. Accept
 |-----------|------|---------|-------------|
 | model | Combo | Qwen Image 2.0 | Model variant: Qwen Image 2.0 (standard) or Qwen Image 2.0 Pro (higher quality) |
 | prompt | String | "" | Text description of the desired image modifications (Chinese or English) |
-| images | String | - | Reference images to edit, max 3 (comma-separated URLs or paths) |
+| images | String | "" | Reference image URLs to edit, max 3, separated by commas or newlines. Ignored when `reference_images` is connected |
+| reference_images | IMAGE | - | Reference images as an IMAGE batch, max 3, one image per slice. Takes precedence over `images`; sent inline as base64, no upload (optional) |
 | client | WAVESPEED_AI_API_CLIENT | - | WaveSpeed API client (optional if API key is configured in Settings) |
 | width | Int | 1024 | Image width, 256-1536, step 8 (optional) |
 | height | Int | 1024 | Image height, 256-1536, step 8 (optional) |
@@ -29,6 +30,6 @@ Image editing with multiple reference images using Qwen Image 2.0 models. Accept
 ## Notes
 
 - **API Docs:** [Qwen Image 2.0 Edit](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-2.0-edit)
-- Both prompt and images are required
-- Maximum of 3 reference images; provide as comma-separated URLs
+- A prompt and at least one image (`reference_images` or `images`) are required
+- Maximum of 3 reference images, as an IMAGE batch or as URLs separated by commas or newlines
 - Two model variants: **Qwen Image 2.0** (standard, default) and **Qwen Image 2.0 Pro** (higher quality)

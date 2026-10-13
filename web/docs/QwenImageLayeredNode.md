@@ -9,7 +9,8 @@ Decomposes a single image into 2-8 RGBA layers with transparency. Returns both R
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| image | String | - | The image to decompose into layers (URL or path) |
+| image | String | "" | URL of the image to decompose into layers. Ignored when `input_image` is connected |
+| input_image | IMAGE | - | The image to decompose; only the first image of a batch is sent. Takes precedence over `image`; sent inline as base64, no upload (optional) |
 | prompt | String | "" | Text description to guide layer decomposition (optional) |
 | client | WAVESPEED_AI_API_CLIENT | - | WaveSpeed API client (optional if API key is configured in Settings) |
 | num_layers | Int | 4 | Number of layers to decompose into, 2-8 (optional) |
@@ -27,6 +28,6 @@ Decomposes a single image into 2-8 RGBA layers with transparency. Returns both R
 
 - **Pricing:** $0.025 per layer
 - **API Docs:** [Qwen Image Layered](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-layered)
-- Image is required; prompt is optional
+- An image (`input_image` or `image`) is required; prompt is optional
 - Returns two outputs: RGB layers and their corresponding alpha masks
 - Total cost depends on number of layers (e.g., 4 layers = $0.10)

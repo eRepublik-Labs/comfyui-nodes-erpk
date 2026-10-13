@@ -9,7 +9,8 @@ Transforms reference images by adjusting viewing angle and distance. Supports ho
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| images | String | - | Reference images to transform, max 3 (comma-separated URLs) |
+| images | String | "" | Reference image URLs to transform, max 3, separated by commas or newlines. Ignored when `reference_images` is connected |
+| reference_images | IMAGE | - | Reference images as an IMAGE batch, max 3, one image per slice. Takes precedence over `images`; sent inline as base64, no upload (optional) |
 | prompt | String | "" | Text description to guide the transformation (optional) |
 | client | WAVESPEED_AI_API_CLIENT | - | WaveSpeed API client (optional if API key is configured in Settings) |
 | horizontal_angle | Int | 0 | Horizontal rotation angle, -90 to 90 degrees (optional) |
@@ -32,6 +33,7 @@ Transforms reference images by adjusting viewing angle and distance. Supports ho
 
 - **Pricing:** $0.02 per image
 - **API Docs:** [Qwen Image Multiple Angles](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-2509-multiple-angles)
-- At least 1 reference image is required (up to 3)
+- At least 1 reference image is required (up to 3), from `reference_images` or `images`
+- `images` also accepts the `all_image_urls` list from WaveSpeed Upload Image
 - Angle and distance parameters are only sent when they differ from defaults
 - Prompt is optional for this node

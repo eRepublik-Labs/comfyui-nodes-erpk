@@ -20,8 +20,11 @@ class QwenImageLayeredNode(IO.ComfyNode):
             display_name="Qwen Image Layered",
             category="ERPK/WaveSpeedAI",
             inputs=[
-                IO.String.Input("image",
-                                tooltip="The image to decompose into layers (URL or path)"),
+                IO.String.Input("image", default="",
+                                tooltip="URL of the image to decompose into layers. Ignored when `input_image` is connected."),
+                IO.Image.Input("input_image", optional=True,
+                               tooltip="The image to decompose as a ComfyUI IMAGE. Only the first image of a batch is sent. "
+                                       "Takes precedence over `image`. Sent inline as base64, no upload."),
                 IO.String.Input("prompt", optional=True, multiline=True, default="",
                                 tooltip="Optional text description to guide layer decomposition (Chinese or English)"),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
@@ -50,21 +53,22 @@ class QwenImageLayeredNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    async def execute(cls, image="", prompt="", client=None, num_layers=4,
+    async def execute(cls, image="", input_image=None, prompt="", client=None, num_layers=4,
                 enable_sync_mode=False, enable_base64_output=False, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
-        from .wavespeed_api.utils import imageurl2tensor_rgba
+        from .wavespeed_api.utils import imageurl2tensor_rgba, resolve_image_input
         from .wavespeed_api.requests.qwen_image_layered import QwenImageLayered
 
         if client is None:
             from .nodes import WaveSpeedAIAPIClient
             client = WaveSpeedAIAPIClient.execute()[0]
 
-        if image is None or image == "":
-            raise ValueError("Image must be provided")
+        image_value = resolve_image_input(input_image, image)
+        if not image_value:
+            raise ValueError("Connect input_image or enter an image URL")
 
         request_kwargs = dict(
-            image=image,
+            image=image_value,
             num_layers=num_layers,
             enable_sync_mode=enable_sync_mode,
             enable_base64_output=enable_base64_output,

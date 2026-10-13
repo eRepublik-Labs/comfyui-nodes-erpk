@@ -26,8 +26,12 @@ class QwenImageEditPlusLoraNode(IO.ComfyNode):
                                tooltip="Model variant: Qwen Edit Plus LoRA or Qwen Edit 2511 LoRA (multi-person editing, improved consistency)"),
                 IO.String.Input("prompt", multiline=True, default="",
                                 tooltip="Text description of the desired image modifications (Chinese or English)"),
-                IO.String.Input("images",
-                                tooltip="Reference images to edit. Maximum of 3 images can be provided (comma-separated URLs or paths)"),
+                IO.String.Input("images", default="",
+                                tooltip="Reference image URLs to edit, up to 3, separated by commas or newlines. "
+                                        "Ignored when `reference_images` is connected."),
+                IO.Image.Input("reference_images", optional=True,
+                               tooltip="Reference images as a ComfyUI IMAGE batch, up to 3. Each slice is one image. "
+                                       "Takes precedence over `images`. Sent inline as base64, no upload."),
                 IO.String.Input("lora_1_path",
                                 tooltip="URL to first LoRA model file (required)"),
                 IO.Float.Input("lora_1_scale", default=1.0, min=0.0, max=4.0, step=0.1,
@@ -70,14 +74,14 @@ class QwenImageEditPlusLoraNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    async def execute(cls, model="Qwen Edit Plus LoRA", prompt="", images="",
+    async def execute(cls, model="Qwen Edit Plus LoRA", prompt="", images="", reference_images=None,
                 lora_1_path="", lora_1_scale=1.0,
                 lora_2_path="", lora_2_scale=1.0, lora_3_path="", lora_3_scale=1.0,
                 client=None, width=1024, height=1024, seed=-1,
                 output_format="jpeg", enable_sync_mode=False,
                 enable_base64_output=False, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
-        from .wavespeed_api.utils import imageurl2tensor
+        from .wavespeed_api.utils import imageurl2tensor, input_image_list
         from .wavespeed_api.requests.qwen_image_edit_plus_lora import QwenImageEditPlusLora
         from .wavespeed_api.requests.qwen_image_edit_2511_lora import QwenImageEdit2511Lora
 
@@ -88,21 +92,12 @@ class QwenImageEditPlusLoraNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        if images is None or images == "":
-            raise ValueError("Images must be provided")
+        images_param = input_image_list(reference_images, images, 3, model)
+        if not images_param:
+            raise ValueError("Connect reference_images or enter at least one image URL")
 
         if not lora_1_path or not lora_1_path.strip():
             raise ValueError("At least one LoRA path is required")
-
-        if isinstance(images, str):
-            images_list = [img.strip() for img in images.split(",") if img.strip()]
-        else:
-            images_list = images
-
-        if len(images_list) > 3:
-            raise ValueError("Maximum of 3 reference images can be uploaded")
-
-        images_param = images_list[:3]
 
         loras = [{"path": lora_1_path.strip(), "scale": lora_1_scale}]
         if lora_2_path and lora_2_path.strip():

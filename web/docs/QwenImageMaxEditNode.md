@@ -10,7 +10,8 @@ Premium multi-reference image editing using the Qwen Image Max 20B model. Accept
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | prompt | String | "" | Text description of the desired image modifications |
-| images | String | - | Reference images to edit, max 6 (comma-separated URLs or paths) |
+| images | String | "" | Reference image URLs to edit, max 6, separated by commas or newlines. Ignored when `reference_images` is connected |
+| reference_images | IMAGE | - | Reference images as an IMAGE batch, max 6, one image per slice. Takes precedence over `images`; sent inline as base64, no upload (optional) |
 | client | WAVESPEED_AI_API_CLIENT | - | WaveSpeed API client (optional if API key is configured in Settings) |
 | width | Int | 1024 | Image width, 256-1536, step 8 (optional) |
 | height | Int | 1024 | Image height, 256-1536, step 8 (optional) |
@@ -26,6 +27,6 @@ Premium multi-reference image editing using the Qwen Image Max 20B model. Accept
 
 - **Pricing:** $0.07 per image
 - **API Docs:** [Qwen Image Max Edit](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-max-edit)
-- Both prompt and images are required
+- A prompt and at least one image (`reference_images` or `images`) are required
 - Maximum of 6 reference images (more than other Qwen Edit nodes)
 - Simplified parameter set: no output_format, sync_mode, or base64_output options

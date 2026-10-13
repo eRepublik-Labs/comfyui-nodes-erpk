@@ -25,11 +25,17 @@ class Wan27ImageToVideoNode(IO.ComfyNode):
                 IO.String.Input("prompt", multiline=True, default="",
                                 tooltip="Text description of the video to generate"),
                 IO.String.Input("image", default="",
-                                tooltip="Source image URL (first frame of the video)"),
+                                tooltip="Source image URL (first frame of the video). Ignored when `first_frame` is connected."),
+                IO.Image.Input("first_frame", optional=True,
+                               tooltip="Source image as a ComfyUI IMAGE (first frame of the video). Only the first image of a batch is sent. "
+                                       "Takes precedence over `image`. Sent inline as base64, no upload."),
+                IO.Image.Input("last_frame", optional=True,
+                               tooltip="End-frame image as a ComfyUI IMAGE. Only the first image of a batch is sent. "
+                                       "Takes precedence over `last_image`. Sent inline as base64, no upload."),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
                 IO.String.Input("last_image", optional=True, default="",
-                                tooltip="Optional end-frame image URL for smooth transition"),
+                                tooltip="Optional end-frame image URL for smooth transition. Ignored when `last_frame` is connected."),
                 IO.String.Input("negative_prompt", optional=True, multiline=True, default="",
                                 tooltip="Elements to exclude from the generated video"),
                 IO.String.Input("audio", optional=True, default="",
@@ -57,10 +63,11 @@ class Wan27ImageToVideoNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    async def execute(cls, prompt="", image="", client=None, last_image="", negative_prompt="",
-                audio="", duration=5, resolution="720p",
+    async def execute(cls, prompt="", image="", first_frame=None, last_frame=None, client=None,
+                last_image="", negative_prompt="", audio="", duration=5, resolution="720p",
                 enable_prompt_expansion=False, seed=-1, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
+        from .wavespeed_api.utils import resolve_image_input
         from .wavespeed_api.requests.wan_2_7_image_to_video import Wan27ImageToVideo
 
         if client is None:
@@ -70,13 +77,14 @@ class Wan27ImageToVideoNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        if image is None or image == "":
-            raise ValueError("Image URL is required")
+        image_value = resolve_image_input(first_frame, image)
+        if not image_value:
+            raise ValueError("Connect first_frame or enter an image URL")
 
         request = Wan27ImageToVideo(
             prompt=prompt,
-            image=image,
-            last_image=last_image or None,
+            image=image_value,
+            last_image=resolve_image_input(last_frame, last_image),
             audio=audio or None,
             negative_prompt=negative_prompt or None,
             duration=duration,

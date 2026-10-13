@@ -82,7 +82,7 @@ class SeedreamV5LiteEditSequentialNode(IO.ComfyNode):
         if max_images < 1 or max_images > 15:
             raise ValueError("max_images must be between 1 and 15")
 
-        images_param = input_image_list(images, image_url, MAX_INPUT_IMAGES)
+        images_param = input_image_list(images, image_url, MAX_INPUT_IMAGES, "Seedream")
 
         preset_dims = SEEDREAM_V5_LITE_SIZE_PRESETS.get(size_preset)
         if preset_dims:

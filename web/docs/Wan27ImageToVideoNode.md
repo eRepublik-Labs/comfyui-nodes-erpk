@@ -10,9 +10,11 @@ Animates a source image into a video clip using Alibaba's WAN 2.7 model via the 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | prompt | String | "" | Text description of the video to generate |
-| image | String | "" | Source image URL (first frame of the video) |
+| image | String | "" | Source image URL (first frame of the video). Ignored when `first_frame` is connected |
+| first_frame | IMAGE | - | Source image as an IMAGE; only the first image of a batch is sent. Takes precedence over `image`; sent inline as base64, no upload (optional) |
+| last_frame | IMAGE | - | End-frame image as an IMAGE; only the first image of a batch is sent. Takes precedence over `last_image`; sent inline as base64, no upload (optional) |
 | client | WAVESPEED_AI_API_CLIENT | - | WaveSpeed API client (optional if API key is configured in Settings) |
-| last_image | String | "" | Optional end-frame image URL for smooth transition (optional) |
+| last_image | String | "" | Optional end-frame image URL for smooth transition. Ignored when `last_frame` is connected (optional) |
 | negative_prompt | String | "" | Elements to exclude from the generated video (optional) |
 | audio | String | "" | Optional audio URL used to guide generation (optional) |
 | duration | Int | 5 | Clip length in seconds, 2-15 (optional) |
@@ -29,8 +31,8 @@ Animates a source image into a video clip using Alibaba's WAN 2.7 model via the 
 ## Notes
 
 - **API Docs:** [Alibaba WAN 2.7 Image-to-Video](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-wan-2.7-image-to-video)
-- Both `prompt` and `image` are required
+- A `prompt` and a source image (`first_frame` or `image`) are required
 - Aspect ratio is inferred from the source image; there is no explicit `aspect_ratio` input
 - Video generation can take several minutes; the node polls every 10s with a 900s timeout
 - Pass the `video_url` output into a `WaveSpeed Preview Video` node to download and preview the result
-- Use `WaveSpeed Upload Image` to get a URL for a local image first
+- Connect a local image to `first_frame`; it needs no upload node

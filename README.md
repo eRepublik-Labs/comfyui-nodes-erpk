@@ -89,6 +89,8 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 - **Qwen Image 2.0 Text-to-Image** - Next-gen Qwen with Standard and Pro quality tiers
 - **Qwen Image 2.0 Edit** - Next-gen Qwen editing with up to 3 reference images, Standard and Pro tiers
 
+Every Qwen edit node (Edit, Edit LoRA, Edit Plus, Edit Plus LoRA, Max Edit, 2.0 Edit, Multiple Angles, Layered) takes a ComfyUI IMAGE directly, sent inline as base64, so you don't need WaveSpeed Upload Image. The multi-image nodes take an IMAGE batch on `reference_images`; the single-image nodes take one image on `input_image`. Without a connected image, the node reads the URL text.
+
 #### Video Generation
 
 Video nodes return a STRING URL that works directly with the **Preview Anything** node for preview/download. Polling runs at a 10s interval, timing out after 15 minutes on most video nodes, 20 on MiniMax H3 Reference-to-Video and 30 on the Seedance 2.5 family and MiniMax H3 Video Edit, which run longest.
@@ -99,7 +101,7 @@ Video nodes return a STRING URL that works directly with the **Preview Anything*
 - **MiniMax H3 Text-to-Video** / **Image-to-Video** / **Reference-to-Video** - MiniMax's hosted H3 edition: picture and native stereo audio in one pass at 768p or 2k, 4-15s. Audio is steered by an `Audio:` line in the prompt rather than a toggle. Reference-to-Video takes up to 9 images, 3 videos and 3 audios, each cited in the prompt by bracket tag, supplied as ComfyUI IMAGE / VIDEO / AUDIO inputs or as URLs
 - **MiniMax H3 Video Edit** / **Video Extend** (open-weights edition) - Rewrite a clip's lighting, style or elements, or append a new segment after its last frame. Both take the source as a video URL, so they chain off any video node's output
 - **MiniMax H3 Text-to-Image** / **Image Edit** / **LoRA Stack** - 1k/2k image generation and identity-preserving edits from up to 9 references. The LoRA Stack config node feeds up to 3 LoRA weights into any H3 node, which then calls the endpoint's `-lora` twin
-- **Alibaba WAN 2.7 Text-to-Video** / **Image-to-Video** / **Video Extend** - WAN 2.7 with extension support for continuing existing clips
+- **Alibaba WAN 2.7 Text-to-Video** / **Image-to-Video** / **Video Extend** - WAN 2.7 with extension support for continuing existing clips. Image-to-Video takes its start and end frames as ComfyUI IMAGE inputs (`first_frame`, `last_frame`) or as URLs
 - **WaveSpeed Veo 3.1 Text-to-Video** / **Image-to-Video** - Google Veo 3.1 via WaveSpeed billing (distinct from the Gemini-direct Veo nodes under `ERPK/Gemini/Veo`)
 - **Kling 3.0 Image-to-Video** - Kling v3.0 i2v with Standard and Pro quality tiers
 - **Kling O3 Text-to-Video** / **Image-to-Video** - Kling's flagship O3 with Standard and Pro tiers

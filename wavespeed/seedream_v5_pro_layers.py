@@ -96,7 +96,7 @@ class SeedreamV5ProLayersNode(IO.ComfyNode):
             from .nodes import WaveSpeedAIAPIClient
             client = WaveSpeedAIAPIClient.execute()[0]
 
-        sources = input_image_list(images, image_url, max_count=10)
+        sources = input_image_list(images, image_url, max_count=10, model="Seedream")
         if sources is None:
             raise ValueError("Connect an image or enter an image URL")
         if len(sources) != 1:

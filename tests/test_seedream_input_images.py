@@ -9,12 +9,12 @@ from wavespeed.wavespeed_api.utils import input_image_list
 
 
 def test_single_url_becomes_one_item_list():
-    assert input_image_list(None, "https://example.com/a.png", 10) == ["https://example.com/a.png"]
+    assert input_image_list(None, "https://example.com/a.png", 10, "Seedream") == ["https://example.com/a.png"]
 
 
 def test_several_urls_split_on_newlines_and_commas():
     text = "https://example.com/a.png\n https://example.com/b.png ,https://example.com/c.png\n\n"
-    assert input_image_list(None, text, 10) == [
+    assert input_image_list(None, text, 10, "Seedream") == [
         "https://example.com/a.png",
         "https://example.com/b.png",
         "https://example.com/c.png",
@@ -22,15 +22,15 @@ def test_several_urls_split_on_newlines_and_commas():
 
 
 def test_empty_inputs_give_none():
-    assert input_image_list(None, "", 10) is None
-    assert input_image_list(None, "  \n , ", 10) is None
-    assert input_image_list(None, None, 10) is None
+    assert input_image_list(None, "", 10, "Seedream") is None
+    assert input_image_list(None, "  \n , ", 10, "Seedream") is None
+    assert input_image_list(None, None, 10, "Seedream") is None
 
 
 def test_too_many_urls_is_an_error_not_a_silent_cut():
     text = "\n".join(f"https://example.com/{i}.png" for i in range(11))
     with pytest.raises(ValueError, match="^Seedream accepts at most 10 input images, got 11$"):
-        input_image_list(None, text, 10)
+        input_image_list(None, text, 10, "Seedream")
 
 
 def _batch(n):
@@ -38,20 +38,20 @@ def _batch(n):
 
 
 def test_image_batch_becomes_one_data_uri_per_slice():
-    uris = input_image_list(_batch(3), "", 10)
+    uris = input_image_list(_batch(3), "", 10, "Seedream")
     assert len(uris) == 3
     assert all(u.startswith("data:image/jpeg;base64,") for u in uris)
 
 
 def test_connected_images_win_over_urls():
-    uris = input_image_list(_batch(2), "https://example.com/a.png", 10)
+    uris = input_image_list(_batch(2), "https://example.com/a.png", 10, "Seedream")
     assert len(uris) == 2
     assert all(u.startswith("data:image/jpeg;base64,") for u in uris)
 
 
 def test_too_large_batch_is_an_error():
     with pytest.raises(ValueError, match="^Seedream accepts at most 10 input images, got 12$"):
-        input_image_list(_batch(12), "", 10)
+        input_image_list(_batch(12), "", 10, "Seedream")
 
 
 # ---- node wiring -----------------------------------------------------------

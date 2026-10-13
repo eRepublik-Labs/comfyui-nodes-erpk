@@ -20,8 +20,12 @@ class QwenImageMultipleAnglesNode(IO.ComfyNode):
             display_name="Qwen Image Multiple Angles",
             category="ERPK/WaveSpeedAI",
             inputs=[
-                IO.String.Input("images",
-                                tooltip="Reference images to transform (comma-separated URLs, max 3)"),
+                IO.String.Input("images", default="",
+                                tooltip="Reference image URLs to transform, up to 3, separated by commas or newlines. "
+                                        "Ignored when `reference_images` is connected."),
+                IO.Image.Input("reference_images", optional=True,
+                               tooltip="Reference images as a ComfyUI IMAGE batch, up to 3. Each slice is one image. "
+                                       "Takes precedence over `images`. Sent inline as base64, no upload."),
                 IO.String.Input("prompt", optional=True, multiline=True, default="",
                                 tooltip="Optional text description to guide the transformation (Chinese or English)"),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
@@ -60,33 +64,26 @@ class QwenImageMultipleAnglesNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    async def execute(cls, images="", prompt="", client=None, horizontal_angle=0,
+    async def execute(cls, images="", reference_images=None, prompt="", client=None, horizontal_angle=0,
                 vertical_angle=0, distance=1.0, width=1024, height=1024,
                 seed=-1, output_format="jpeg", enable_sync_mode=False,
                 enable_base64_output=False, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
-        from .wavespeed_api.utils import imageurl2tensor
+        from .wavespeed_api.utils import imageurl2tensor, input_image_list
         from .wavespeed_api.requests.qwen_image_multiple_angles import QwenImageMultipleAngles
 
         if client is None:
             from .nodes import WaveSpeedAIAPIClient
             client = WaveSpeedAIAPIClient.execute()[0]
 
-        if images is None or images == "":
-            raise ValueError("Images must be provided")
-
-        if isinstance(images, str):
-            images_list = [img.strip() for img in images.split(",") if img.strip()]
-        else:
-            images_list = images
-
-        if len(images_list) > 3:
-            raise ValueError("Maximum of 3 reference images can be provided")
+        images_list = input_image_list(reference_images, images, 3, "Qwen Image Multiple Angles")
+        if not images_list:
+            raise ValueError("Connect reference_images or enter at least one image URL")
 
         size = f"{width}*{height}" if width and height else None
 
         request_kwargs = dict(
-            images=images_list[:3],
+            images=images_list,
             size=size,
             seed=seed,
             output_format=output_format,

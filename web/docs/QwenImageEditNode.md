@@ -10,7 +10,8 @@ Edits images based on text prompts. Supports both low-level visual appearance ed
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | prompt | String | "" | Text description of the desired image modifications (Chinese or English) |
-| image | String | - | The image to edit (URL or path) |
+| image | String | "" | URL of the image to edit. Ignored when `input_image` is connected |
+| input_image | IMAGE | - | The image to edit; only the first image of a batch is sent. Takes precedence over `image`; sent inline as base64, no upload (optional) |
 | client | WAVESPEED_AI_API_CLIENT | - | WaveSpeed API client (optional if API key is configured in Settings) |
 | width | Int | 1024 | Image width, 256-1536, step 8 (optional) |
 | height | Int | 1024 | Image height, 256-1536, step 8 (optional) |
@@ -29,5 +30,5 @@ Edits images based on text prompts. Supports both low-level visual appearance ed
 
 - **Pricing:** $0.02 per image
 - **API Docs:** [Qwen Image Edit](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit)
-- Both prompt and image are required
+- A prompt and an image (`input_image` or `image`) are required
 - Use the WaveSpeed Upload Image node to get a URL for local images

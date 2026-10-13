@@ -26,8 +26,12 @@ class QwenImageEditPlusNode(IO.ComfyNode):
                                tooltip="Model variant: Qwen Edit Plus or Qwen Edit 2511 (multi-person editing, improved consistency)"),
                 IO.String.Input("prompt", multiline=True, default="",
                                 tooltip="Text description of the desired image modifications (Chinese or English)"),
-                IO.String.Input("images",
-                                tooltip="Reference images to edit. Maximum of 3 images can be provided (comma-separated URLs or paths)"),
+                IO.String.Input("images", default="",
+                                tooltip="Reference image URLs to edit, up to 3, separated by commas or newlines. "
+                                        "Ignored when `reference_images` is connected."),
+                IO.Image.Input("reference_images", optional=True,
+                               tooltip="Reference images as a ComfyUI IMAGE batch, up to 3. Each slice is one image. "
+                                       "Takes precedence over `images`. Sent inline as base64, no upload."),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
                 IO.Int.Input("width", optional=True, default=1024, min=256, max=1536, step=8,
@@ -58,11 +62,11 @@ class QwenImageEditPlusNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    async def execute(cls, model="Qwen Edit Plus", prompt="", images="", client=None,
-                width=1024, height=1024, seed=-1, output_format="jpeg",
+    async def execute(cls, model="Qwen Edit Plus", prompt="", images="", reference_images=None,
+                client=None, width=1024, height=1024, seed=-1, output_format="jpeg",
                 enable_sync_mode=False, enable_base64_output=False, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
-        from .wavespeed_api.utils import imageurl2tensor
+        from .wavespeed_api.utils import imageurl2tensor, input_image_list
         from .wavespeed_api.requests.qwen_image_edit_plus import QwenImageEditPlus
         from .wavespeed_api.requests.qwen_image_edit_2511 import QwenImageEdit2511
 
@@ -73,18 +77,9 @@ class QwenImageEditPlusNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        if images is None or images == "":
-            raise ValueError("Images must be provided")
-
-        if isinstance(images, str):
-            images_list = [img.strip() for img in images.split(",") if img.strip()]
-        else:
-            images_list = images
-
-        if len(images_list) > 3:
-            raise ValueError("Maximum of 3 reference images can be uploaded")
-
-        images_param = images_list[:3]
+        images_param = input_image_list(reference_images, images, 3, model)
+        if not images_param:
+            raise ValueError("Connect reference_images or enter at least one image URL")
 
         size = f"{width}*{height}" if width and height else None
 

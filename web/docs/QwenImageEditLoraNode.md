@@ -10,7 +10,8 @@ Edits images based on text prompts with up to 3 LoRA model influences. Combines 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | prompt | String | "" | Text description of the desired image modifications (Chinese or English) |
-| image | String | - | The image to edit (URL or path) |
+| image | String | "" | URL of the image to edit. Ignored when `input_image` is connected |
+| input_image | IMAGE | - | The image to edit; only the first image of a batch is sent. Takes precedence over `image`; sent inline as base64, no upload (optional) |
 | lora_1_path | String | - | URL to first LoRA model file (required) |
 | lora_1_scale | Float | 1.0 | Scale factor for first LoRA, 0.0-4.0 |
 | lora_2_path | String | "" | URL to second LoRA model file (optional) |
@@ -35,6 +36,6 @@ Edits images based on text prompts with up to 3 LoRA model influences. Combines 
 
 - **Pricing:** $0.02 per image
 - **API Docs:** [Qwen Image Edit LoRA](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-lora)
-- Prompt, image, and at least one LoRA path are all required
+- Prompt, an image (`input_image` or `image`), and at least one LoRA path are all required
 - Up to 3 LoRAs supported with individual scale factors (0.0-4.0)
-- Use the WaveSpeed Upload Image node to get a URL for local images
+- Connect a local image to `input_image`; it needs no upload node

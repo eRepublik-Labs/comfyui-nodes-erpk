@@ -21,8 +21,12 @@ class QwenImageMaxEditNode(IO.ComfyNode):
             inputs=[
                 IO.String.Input("prompt", multiline=True, default="",
                                 tooltip="Text description of the desired image modifications"),
-                IO.String.Input("images",
-                                tooltip="Reference images to edit. Maximum of 6 images (comma-separated URLs or paths)"),
+                IO.String.Input("images", default="",
+                                tooltip="Reference image URLs to edit, up to 6, separated by commas or newlines. "
+                                        "Ignored when `reference_images` is connected."),
+                IO.Image.Input("reference_images", optional=True,
+                               tooltip="Reference images as a ComfyUI IMAGE batch, up to 6. Each slice is one image. "
+                                       "Takes precedence over `images`. Sent inline as base64, no upload."),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
                 IO.Int.Input("width", optional=True, default=1024, min=256, max=1536, step=8,
@@ -45,10 +49,10 @@ class QwenImageMaxEditNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    async def execute(cls, prompt="", images="", client=None, width=1024, height=1024,
-                seed=-1, **kwargs):
+    async def execute(cls, prompt="", images="", reference_images=None, client=None,
+                width=1024, height=1024, seed=-1, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
-        from .wavespeed_api.utils import imageurl2tensor
+        from .wavespeed_api.utils import imageurl2tensor, input_image_list
         from .wavespeed_api.requests.qwen_image_max_edit import QwenImageMaxEdit
 
         if client is None:
@@ -58,18 +62,9 @@ class QwenImageMaxEditNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        if images is None or images == "":
-            raise ValueError("Images must be provided")
-
-        if isinstance(images, str):
-            images_list = [img.strip() for img in images.split(",") if img.strip()]
-        else:
-            images_list = images
-
-        if len(images_list) > 6:
-            raise ValueError("Maximum of 6 reference images can be uploaded")
-
-        images_param = images_list[:6]
+        images_param = input_image_list(reference_images, images, 6, "Qwen Image Max Edit")
+        if not images_param:
+            raise ValueError("Connect reference_images or enter at least one image URL")
 
         size = f"{width}*{height}" if width and height else None
 

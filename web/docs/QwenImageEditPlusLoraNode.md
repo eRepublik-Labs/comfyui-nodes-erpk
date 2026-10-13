@@ -11,7 +11,8 @@ Advanced image editing with multiple reference images and up to 3 LoRA model inf
 |-----------|------|---------|-------------|
 | model | Combo | Qwen Edit Plus LoRA | Model variant: Qwen Edit Plus LoRA or Qwen Edit 2511 LoRA (multi-person editing, improved consistency) |
 | prompt | String | "" | Text description of the desired image modifications (Chinese or English) |
-| images | String | - | Reference images to edit, max 3 (comma-separated URLs or paths) |
+| images | String | "" | Reference image URLs to edit, max 3, separated by commas or newlines. Ignored when `reference_images` is connected |
+| reference_images | IMAGE | - | Reference images as an IMAGE batch, max 3, one image per slice. Takes precedence over `images`; sent inline as base64, no upload (optional) |
 | lora_1_path | String | - | URL to first LoRA model file (required) |
 | lora_1_scale | Float | 1.0 | Scale factor for first LoRA, 0.0-4.0 |
 | lora_2_path | String | "" | URL to second LoRA model file (optional) |
@@ -36,6 +37,6 @@ Advanced image editing with multiple reference images and up to 3 LoRA model inf
 
 - **Pricing:** $0.02 per image
 - **API Docs:** [Qwen Image Edit Plus LoRA](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-plus-lora)
-- Prompt, images, and at least one LoRA path are all required
+- Prompt, at least one image (`reference_images` or `images`), and at least one LoRA path are all required
 - Maximum of 3 reference images and 3 LoRAs supported
 - Two model variants: **Qwen Edit Plus LoRA** (default) and **Qwen Edit 2511 LoRA** (multi-person editing, improved consistency)

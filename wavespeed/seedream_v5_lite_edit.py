@@ -77,7 +77,7 @@ class SeedreamV5LiteEditNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        images_param = input_image_list(images, image_url, MAX_INPUT_IMAGES)
+        images_param = input_image_list(images, image_url, MAX_INPUT_IMAGES, "Seedream")
         if images_param is None:
             raise ValueError("Connect images or enter at least one image URL")
 
