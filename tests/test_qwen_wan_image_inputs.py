@@ -202,3 +202,15 @@ def test_wan_without_a_first_frame_is_an_error():
     node = _node("wan_2_7_image_to_video", "Wan27ImageToVideoNode")
     with pytest.raises(ValueError, match="^Connect first_frame or enter an image URL$"):
         _run(node, prompt="move")
+
+
+# The 2509 Multiple Angles API takes distance as an integer level: 0 close-up,
+# 1 medium (its default), 2 wide. The node keeps its saved Float widget, so the
+# value it sends is the nearest level, with halves rounding up.
+@pytest.mark.parametrize("widget,level", [(0.0, 0), (0.4, 0), (0.5, 1), (1.4, 1), (1.5, 2), (2.0, 2)])
+def test_multiple_angles_sends_distance_as_a_level(widget, level):
+    node = _node("qwen_image_multiple_angles", "QwenImageMultipleAnglesNode")
+    sent = _run(node, images="https://example.com/a.png", distance=widget)
+    sent_level = 1 if sent["distance"] is None else sent["distance"]
+    assert sent_level == level
+    assert type(sent_level) is int

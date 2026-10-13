@@ -57,12 +57,12 @@ class TestQwenMultipleAnglesRequest:
             images=["http://example.com/img.jpg"],
             horizontal_angle=45,
             vertical_angle=30,
-            distance=1.5,
+            distance=2,
         )
         payload = request.build_payload()
         assert payload["horizontal_angle"] == 45
         assert payload["vertical_angle"] == 30
-        assert payload["distance"] == 1.5
+        assert payload["distance"] == 2
 
     def test_payload_omits_none_values(self):
         cls = _import_request("qwen_image_multiple_angles", "QwenImageMultipleAngles")

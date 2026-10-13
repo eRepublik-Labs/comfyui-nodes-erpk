@@ -35,7 +35,7 @@ class QwenImageMultipleAnglesNode(IO.ComfyNode):
                 IO.Int.Input("vertical_angle", optional=True, default=0, min=-30, max=60,
                              tooltip="Vertical rotation angle (-30 to 60 degrees)"),
                 IO.Float.Input("distance", optional=True, default=1.0, min=0.0, max=2.0, step=0.1,
-                               tooltip="Subject distance factor (0 to 2, default 1)"),
+                               tooltip="Framing, sent as the nearest level: 0 close-up, 1 medium (default), 2 wide"),
                 IO.Int.Input("width", optional=True, default=1024, min=256, max=1536, step=8,
                              tooltip="Image width (256 to 1536)"),
                 IO.Int.Input("height", optional=True, default=1024, min=256, max=1536, step=8,
@@ -97,8 +97,9 @@ class QwenImageMultipleAnglesNode(IO.ComfyNode):
             request_kwargs["horizontal_angle"] = horizontal_angle
         if vertical_angle != 0:
             request_kwargs["vertical_angle"] = vertical_angle
-        if distance != 1.0:
-            request_kwargs["distance"] = distance
+        distance_level = int(distance + 0.5)
+        if distance_level != 1:
+            request_kwargs["distance"] = distance_level
 
         request = QwenImageMultipleAngles(**request_kwargs)
 

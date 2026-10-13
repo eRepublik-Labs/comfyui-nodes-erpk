@@ -15,7 +15,7 @@ Transforms reference images by adjusting viewing angle and distance. Supports ho
 | client | WAVESPEED_AI_API_CLIENT | - | WaveSpeed API client (optional if API key is configured in Settings) |
 | horizontal_angle | Int | 0 | Horizontal rotation angle, -90 to 90 degrees (optional) |
 | vertical_angle | Int | 0 | Vertical rotation angle, -30 to 60 degrees (optional) |
-| distance | Float | 1.0 | Subject distance factor, 0.0 to 2.0 (optional) |
+| distance | Float | 1.0 | Framing, 0.0 to 2.0, sent as the nearest level: 0 close-up, 1 medium, 2 wide; halves round up (optional) |
 | width | Int | 1024 | Image width, 256-1536, step 8 (optional) |
 | height | Int | 1024 | Image height, 256-1536, step 8 (optional) |
 | seed | Int | -1 | Random seed for reproducibility, -1 for random (optional) |

@@ -33,9 +33,9 @@ class QwenImageMultipleAngles(BaseRequest):
         ge=-30,
         le=60,
     )
-    distance: Optional[float] = Field(
+    distance: Optional[int] = Field(
         default=None,
-        description="Subject distance factor (0 to 2, default 1).",
+        description="Framing level: 0 close-up, 1 medium (default), 2 wide.",
         ge=0,
         le=2,
     )

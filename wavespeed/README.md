@@ -360,7 +360,7 @@ Optional if API key is configured via ComfyUI Settings or config.ini — WaveSpe
 1. Add the "WaveSpeedAI Qwen Image Multiple Angles" node to your workflow
 2. Connect your WaveSpeed AI API client
 3. Provide 1-3 reference images (comma-separated URLs or paths)
-4. Adjust angle parameters: horizontal (-90 to 90), vertical (-30 to 60), distance (0 to 2)
+4. Adjust angle parameters: horizontal (-90 to 90), vertical (-30 to 60), distance (0 close-up, 1 medium, 2 wide; fractions round to the nearest)
 5. Optionally enter a text prompt to guide the transformation
 6. Configure dimensions and options (optional)
 7. Execute the workflow to generate angle-adjusted images
