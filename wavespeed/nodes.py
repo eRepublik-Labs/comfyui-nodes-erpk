@@ -58,7 +58,7 @@ class WaveSpeedAIAPIClient(IO.ComfyNode):
         # Priority 1: ComfyUI Settings
         try:
             from ..settings import get_comfy_setting
-            settings_key = get_comfy_setting("ERPK.WAVESPEED_API_KEY")
+            settings_key = (get_comfy_setting("ERPK.WAVESPEED_API_KEY") or "").strip()
             if settings_key:
                 wavespeed_api_key = settings_key
                 print("[WaveSpeed] Using API key from ComfyUI Settings")

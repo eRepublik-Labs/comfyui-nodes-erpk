@@ -49,6 +49,20 @@ def _resolve_interrupt_checker() -> Callable[[], bool]:
         return lambda: False
 
 
+def _api_error_message(response: requests.Response) -> str:
+    """The reason WaveSpeed gave for rejecting a request, or the bare status code.
+
+    WaveSpeed answers a 401 with a `message` that tells a missing key apart from
+    an invalid one, which is the difference that matters when fixing it.
+    """
+    try:
+        body = response.json()
+    except ValueError:
+        body = None
+    message = body.get("message") if isinstance(body, dict) else None
+    return f"{response.status_code} {message}" if message else str(response.status_code)
+
+
 class WaveSpeedClient:
     """
     WaveSpeed AI API Client
@@ -116,7 +130,7 @@ class WaveSpeedClient:
 
             # Check for authentication errors
             if response.status_code == 401:
-                raise Exception("Unauthorized: Invalid API key")
+                raise Exception(f"Unauthorized: {_api_error_message(response)}")
 
             # Check for other HTTP errors
             if response.status_code != 200:
@@ -416,7 +430,7 @@ class WaveSpeedClient:
         )
 
         if response.status_code != 200:
-            raise Exception(f"Upload ticket request failed: {response.status_code}")
+            raise Exception(f"Upload ticket request failed: {_api_error_message(response)}")
 
         response_data = response.json()
         if isinstance(response_data, dict) and 'code' in response_data:
