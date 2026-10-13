@@ -1,5 +1,5 @@
 # ABOUTME: Tests the Qwen Image 3.0 edit/text-to-image nodes and the 96-pose Multiple Angles node.
-# ABOUTME: Checks the endpoint and wire payload each node sends, against the WaveSpeed API schemas.
+# ABOUTME: Checks the endpoint and request payload each node builds, against the WaveSpeed API schemas.
 
 import asyncio
 import importlib
@@ -21,7 +21,7 @@ def _node(module, name):
 
 
 def _send(node, **kwargs):
-    """Runs the node and returns the (api path, wire payload) it would POST."""
+    """Runs the node and returns the (api path, request payload) it hands to the client."""
     sent = {}
 
     async def fake_send(self, request, *args, **kw):
@@ -103,11 +103,6 @@ def test_edit_requires_an_image():
 def test_edit_requires_a_prompt():
     with pytest.raises(ValueError, match="^Prompt is required$"):
         _send(_edit(), model="Qwen Image 3.0", prompt="", reference_images_url=URL_A)
-
-
-def test_edit_rejects_prompt_over_800_characters():
-    with pytest.raises(pydantic.ValidationError, match="at most 800 characters"):
-        _send(_edit(), model="Qwen Image 3.0", prompt="x" * 801, reference_images_url=URL_A)
 
 
 def test_edit_offers_every_api_aspect_ratio_plus_auto():
@@ -207,6 +202,12 @@ def test_angles_request_rejects_an_angle_between_poses():
     from erpk.wavespeed.wavespeed_api.requests.qwen_image_multiple_angles_96 import QwenImageMultipleAngles96
     with pytest.raises(pydantic.ValidationError):
         QwenImageMultipleAngles96(images=[URL_A], horizontal_angle=30)
+
+
+def test_angles_rejects_a_fourth_image():
+    with pytest.raises(ValueError,
+                       match=r"^Qwen Image Multiple Angles \(96 poses\) accepts at most 3 input images, got 4$"):
+        _send(_angles(), reference_images=torch.rand(4, 16, 16, 3))
 
 
 def test_angles_requires_an_image():

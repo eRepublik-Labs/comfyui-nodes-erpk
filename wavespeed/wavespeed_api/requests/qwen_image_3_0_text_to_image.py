@@ -10,8 +10,7 @@ from .qwen_image_3_0_edit import AspectRatio
 class QwenImage30TextToImage(BaseRequest):
     """Qwen Image 3.0 text-to-image model."""
 
-    prompt: str = Field(..., min_length=1, max_length=800,
-                        description="Image description in Chinese or English, up to 800 characters.")
+    prompt: str = Field(..., min_length=1, description="Image description in Chinese or English.")
     aspect_ratio: AspectRatio = Field(default="1:1", description="Output aspect ratio.")
     resolution: Literal["1k", "2k"] = Field(default="1k", description="Output resolution tier.")
     enable_prompt_expansion: bool = Field(default=False, description="Let the model expand the prompt.")

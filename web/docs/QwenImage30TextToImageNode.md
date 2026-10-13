@@ -10,7 +10,7 @@ Generates an image from a Chinese or English prompt using Qwen Image 3.0 or Qwen
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | model | Combo | Qwen Image 3.0 | Qwen Image 3.0 or Qwen Image 3.0 Pro |
-| prompt | String | "" | Image description in Chinese or English, up to 800 characters |
+| prompt | String | "" | Image description in Chinese or English. WaveSpeed recommends at most 800 characters |
 | client | WAVESPEED_AI_API_CLIENT | - | WaveSpeed API client (optional if API key is configured in Settings) |
 | aspect_ratio | Combo | 1:1 | 1:1, 1:2, 2:1, 1:3, 3:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 9:21, 21:9 (optional) |
 | resolution | Combo | 1k | Output resolution tier: 1k or 2k (optional) |

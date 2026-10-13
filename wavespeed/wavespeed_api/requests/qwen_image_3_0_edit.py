@@ -17,8 +17,7 @@ class QwenImage30Edit(BaseRequest):
     follows the first reference image.
     """
 
-    prompt: str = Field(..., min_length=1, max_length=800,
-                        description="Edit instruction in Chinese or English, up to 800 characters.")
+    prompt: str = Field(..., min_length=1, description="Edit instruction in Chinese or English.")
     images: List[str] = Field(..., min_length=1, max_length=3,
                               description="Reference image URLs or data URIs (1-3), 384-2048 px per side.")
     aspect_ratio: Optional[AspectRatio] = Field(

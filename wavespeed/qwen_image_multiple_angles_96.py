@@ -90,7 +90,7 @@ class QwenImageMultipleAngles96Node(IO.ComfyNode):
             client = WaveSpeedAIAPIClient.execute()[0]
 
         images_param = input_image_list(reference_images, reference_images_url, cls.MAX_IMAGES,
-                                        "Qwen Image Multiple Angles")
+                                        "Qwen Image Multiple Angles (96 poses)")
         if not images_param:
             raise ValueError("Connect reference_images or enter at least one image URL")
 

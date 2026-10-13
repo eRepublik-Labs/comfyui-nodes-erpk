@@ -28,7 +28,7 @@ class QwenImage30TextToImageNode(IO.ComfyNode):
                                tooltip="Qwen Image 3.0: $0.03 per image at 1k or 2k. "
                                        "Qwen Image 3.0 Pro: $0.04 at 1k, $0.075 at 2k."),
                 IO.String.Input("prompt", multiline=True, default="",
-                                tooltip="Image description in Chinese or English, up to 800 characters"),
+                                tooltip="Image description in Chinese or English. WaveSpeed recommends at most 800 characters."),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
                 IO.Combo.Input("aspect_ratio", optional=True, options=cls.ASPECT_RATIOS, default="1:1",

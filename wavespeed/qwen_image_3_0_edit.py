@@ -30,7 +30,7 @@ class QwenImage30EditNode(IO.ComfyNode):
                                        "Qwen Image 3.0 Pro: $0.04 at 1k, $0.075 at 2k. "
                                        "Both add $0.003 per reference image."),
                 IO.String.Input("prompt", multiline=True, default="",
-                                tooltip="Edit instruction in Chinese or English, up to 800 characters"),
+                                tooltip="Edit instruction in Chinese or English. WaveSpeed recommends at most 800 characters."),
                 IO.Image.Input("reference_images", optional=True,
                                tooltip="Reference images as a ComfyUI IMAGE batch, up to 3, 384-2048 px per side. "
                                        "Each slice is one image. Takes precedence over `reference_images_url`. "

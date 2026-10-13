@@ -10,7 +10,7 @@ Edits 1 to 3 reference images from a Chinese or English instruction, using Qwen 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | model | Combo | Qwen Image 3.0 | Qwen Image 3.0 or Qwen Image 3.0 Pro |
-| prompt | String | "" | Edit instruction in Chinese or English, up to 800 characters |
+| prompt | String | "" | Edit instruction in Chinese or English. WaveSpeed recommends at most 800 characters |
 | reference_images | IMAGE | - | Reference images as an IMAGE batch, max 3, one image per slice, 384-2048 px per side. Takes precedence over `reference_images_url`; sent inline as base64, no upload (optional) |
 | reference_images_url | String | "" | Reference image URLs, max 3, separated by commas or newlines. Ignored when `reference_images` is connected (optional) |
 | client | WAVESPEED_AI_API_CLIENT | - | WaveSpeed API client (optional if API key is configured in Settings) |
