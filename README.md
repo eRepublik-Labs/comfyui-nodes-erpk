@@ -88,8 +88,11 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 - **Qwen Image Edit Plus** - Advanced editing with up to 3 reference images ($0.02/image)
 - **Qwen Image 2.0 Text-to-Image** - Next-gen Qwen with Standard and Pro quality tiers
 - **Qwen Image 2.0 Edit** - Next-gen Qwen editing with up to 3 reference images, Standard and Pro tiers
+- **Qwen Image 3.0 Text-to-Image** - Qwen Image 3.0 and 3.0 Pro, 1k or 2k at 15 aspect ratios ($0.03-$0.075/image)
+- **Qwen Image 3.0 Edit** - Qwen Image 3.0 and 3.0 Pro editing with up to 3 reference images, 1k or 2k
+- **Qwen Image Multiple Angles (96 poses)** - Re-renders a subject from one of 8 azimuths, 4 elevations and 3 framing distances ($0.025/image)
 
-Every Qwen edit node (Edit, Edit LoRA, Edit Plus, Edit Plus LoRA, Max Edit, 2.0 Edit, Multiple Angles, Layered) takes a ComfyUI IMAGE directly, sent inline as base64, so you don't need WaveSpeed Upload Image. The multi-image nodes take an IMAGE batch on `reference_images`; the single-image nodes take one image on `input_image`. Without a connected image, the node reads the URL text.
+Every Qwen edit node (Edit, Edit LoRA, Edit Plus, Edit Plus LoRA, Max Edit, 2.0 Edit, 3.0 Edit, Multiple Angles, Multiple Angles (96 poses), Layered) takes a ComfyUI IMAGE directly, sent inline as base64, so you don't need WaveSpeed Upload Image. The multi-image nodes take an IMAGE batch on `reference_images`; the single-image nodes take one image on `input_image`. Without a connected image, the node reads the URL text.
 
 #### Video Generation
 

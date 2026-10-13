@@ -77,6 +77,12 @@ WAVESPEED_NODES = [
      "Qwen Image 2.0 Text-to-Image", "ERPK/WaveSpeedAI", True, False),
     ("qwen_image_2_0_edit", "QwenImage20EditNode", "QwenImage20EditNode",
      "Qwen Image 2.0 Edit", "ERPK/WaveSpeedAI", True, False),
+    ("qwen_image_3_0_text_to_image", "QwenImage30TextToImageNode", "QwenImage30TextToImageNode",
+     "Qwen Image 3.0 Text-to-Image", "ERPK/WaveSpeedAI", True, False),
+    ("qwen_image_3_0_edit", "QwenImage30EditNode", "QwenImage30EditNode",
+     "Qwen Image 3.0 Edit", "ERPK/WaveSpeedAI", True, False),
+    ("qwen_image_multiple_angles_96", "QwenImageMultipleAngles96Node", "QwenImageMultipleAngles96Node",
+     "Qwen Image Multiple Angles (96 poses)", "ERPK/WaveSpeedAI", True, False),
     # Seedream V5.0 Lite nodes
     ("seedream_v5_lite", "SeedreamV5LiteNode", "SeedreamV5LiteNode",
      "Bytedance Seedream V5.0 Lite", "ERPK/WaveSpeedAI", True, False),
@@ -304,7 +310,7 @@ class TestWaveSpeedProviderExport:
     def test_nodes_list_has_all_classes(self):
         import importlib
         mod = importlib.import_module("wavespeed")
-        assert len(mod.NODES) == 64, f"Expected 64 WaveSpeed nodes, got {len(mod.NODES)}"
+        assert len(mod.NODES) == 67, f"Expected 67 WaveSpeed nodes, got {len(mod.NODES)}"
 
     def test_nodes_list_all_comfy_nodes(self):
         import importlib

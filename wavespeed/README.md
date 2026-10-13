@@ -14,7 +14,7 @@ Part of the [ERPK Custom Nodes Collection](../../README.md) for ComfyUI.
 ## Qwen Image Nodes
 ![Qwen Nodes Preview](assets/qwen-preview.png)
 
-ComfyUI custom nodes for WaveSpeed AI integration. Covers image generation (ByteDance Seedream V4/V4.5/V5.0 Lite, Qwen Image family, Qwen Image 2.0, Dreamina, JibMix, MiniMax H3) and video generation (Bytedance Seedance 2.0 and 2.5, Alibaba WAN 2.7, Kling 2.5 Turbo / 2.6 / 3.0 / O3 with Kling Elements, Lightricks LTX 2 Pro, WaveSpeed LTX 2.3, MiniMax H3).
+ComfyUI custom nodes for WaveSpeed AI integration. Covers image generation (ByteDance Seedream V4/V4.5/V5.0 Lite, Qwen Image family, Qwen Image 2.0 and 3.0, Dreamina, JibMix, MiniMax H3) and video generation (Bytedance Seedance 2.0 and 2.5, Alibaba WAN 2.7, Kling 2.5 Turbo / 2.6 / 3.0 / O3 with Kling Elements, Lightricks LTX 2 Pro, WaveSpeed LTX 2.3, MiniMax H3).
 
 ## Features
 
@@ -67,10 +67,13 @@ Pro Layers outputs its layers and masks as lists rather than batches, because ea
 |------|--------|-------------|------------|--------------|----------|--------|---------|----------|
 | **Qwen Image 2.0 Text-to-Image** | Qwen Image 2.0,<br>Qwen Image 2.0 Pro | Next-gen Qwen image generation (full replacement for Qwen 1.x) | 256-2048px (step 8)<br>Default: 1024×1024 | N/A | 🇨🇳 🇬🇧 | Single image | Standard / Pro pricing | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-2.0/text-to-image) |
 | **Qwen Image 2.0 Edit** | Qwen Image 2.0,<br>Qwen Image 2.0 Pro | Next-gen Qwen image editing | 256-1536px (step 8) | Up to 3, IMAGE batch or URLs | 🇨🇳 🇬🇧 | Single image | Standard / Pro pricing | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-2.0/edit) |
+| **Qwen Image 3.0 Text-to-Image** | Qwen Image 3.0,<br>Qwen Image 3.0 Pro | Qwen Image 3.0 generation, up to 800-character prompts, optional prompt expansion | 1k or 2k, 15 aspect ratios<br>Default: 1k, 1:1 | N/A | 🇨🇳 🇬🇧 | Single image | 3.0: $0.03; Pro: $0.04 (1k), $0.075 (2k) | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-qwen-image-3.0-text-to-image) |
+| **Qwen Image 3.0 Edit** | Qwen Image 3.0,<br>Qwen Image 3.0 Pro | Qwen Image 3.0 editing, optional prompt expansion | 1k or 2k, 15 aspect ratios or auto (first image) | 1-3 required, IMAGE batch or URLs, 384-2048px per side | 🇨🇳 🇬🇧 | Single image | 3.0: $0.03; Pro: $0.04 (1k), $0.075 (2k); +$0.003 per input image | [Link](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-qwen-image-3.0-edit) |
 | **Qwen Image Text-to-Image** | Qwen Image (20B MMDiT),<br>Qwen Image 2512 (7B) | Bilingual text-to-image generation | 256-1536px (step 8)<br>Default: 1024×1024 | N/A | 🇨🇳 🇬🇧 | Single image<br>~5-8 sec | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-text-to-image) |
 | **Qwen Image Edit** | Qwen Edit | Low-level & high-level semantic editing | 256-1536px (step 8) | 1 required, IMAGE or URL | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit) |
 | **Qwen Image Edit Plus** | Qwen Edit Plus,<br>Qwen Edit 2511 | Advanced multi-image context editing | 256-1536px (step 8) | Up to 3 required, IMAGE batch or URLs | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-plus) |
 | **Qwen Image Multiple Angles** | Qwen Edit 2509 | Angle-based image transformation | 256-1536px (step 8)<br>Default: 1024×1024 | 1-3 required, IMAGE batch or URLs | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-2509-multiple-angles) |
+| **Qwen Image Multiple Angles (96 poses)** | Qwen Image Edit Multiple Angles | Re-renders a subject from one of 96 camera poses (8 azimuths, 4 elevations, 3 framings) | Follows the API default | 1-3 required, IMAGE batch or URLs | 🇨🇳 🇬🇧 | Single image | $0.025/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-multiple-angles) |
 | **Qwen Image LoRA** | Qwen Image,<br>Qwen Image 2512 | Text-to-image with LoRA model influences | 256-1536px (step 8)<br>Default: 1024×1024 | N/A | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-text-to-image-lora) |
 | **Qwen Image Edit LoRA** | Qwen Edit LoRA | Single-image editing with LoRA influences | 256-1536px (step 8)<br>Default: 1024×1024 | 1 required, IMAGE or URL | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-lora) |
 | **Qwen Image Edit Plus LoRA** | Qwen Edit Plus LoRA,<br>Qwen Edit 2511 LoRA | Multi-image editing with LoRA influences | 256-1536px (step 8)<br>Default: 1024×1024 | Up to 3 required, IMAGE batch or URLs | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-plus-lora) |
@@ -362,6 +365,14 @@ Optional if API key is configured via ComfyUI Settings or config.ini — WaveSpe
 6. Configure dimensions and options (optional)
 7. Execute the workflow to generate angle-adjusted images
 
+### Qwen Image Multiple Angles (96 poses) Node
+
+1. Add the "Qwen Image Multiple Angles (96 poses)" node to your workflow
+2. Connect 1-3 images to `reference_images`, or enter URLs in `reference_images_url`
+3. Pick a camera pose: azimuth (8 positions around the subject), elevation (low, eye level, elevated, high) and framing (close-up, medium, wide)
+4. Optionally enter a prompt; it is appended to the camera-angle prompt
+5. Execute the workflow
+
 ### Qwen Image LoRA Node
 
 1. Add the "WaveSpeedAI Qwen Image LoRA" node to your workflow
@@ -497,6 +508,9 @@ For detailed API reference and parameters:
 - [Qwen Image Edit Plus API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-plus)
 - [Qwen Image Edit 2511 API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-2511)
 - [Qwen Image Multiple Angles API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-2509-multiple-angles)
+- [Qwen Image Multiple Angles (96 poses) API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-multiple-angles)
+- [Qwen Image 3.0 Edit API Documentation](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-qwen-image-3.0-edit)
+- [Qwen Image 3.0 Text-to-Image API Documentation](https://wavespeed.ai/docs/docs-api/alibaba/alibaba-qwen-image-3.0-text-to-image)
 - [Qwen Image LoRA API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-text-to-image-lora)
 - [Qwen Image Text-to-Image 2512 LoRA API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-text-to-image-2512-lora)
 - [Qwen Image Edit LoRA API Documentation](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-lora)
@@ -536,7 +550,7 @@ pip install -r requirements.txt
 ```
 [ERPK] Loaded <N> V3 nodes
 ```
-The WaveSpeed module alone contributes 64 nodes.
+The WaveSpeed module alone contributes 67 nodes.
 
 ### Common Issues
 
@@ -553,7 +567,7 @@ All WaveSpeed nodes are located under the **ERPK/WaveSpeedAI** category:
 3. Navigate to: **ERPK → WaveSpeedAI**
 4. Select your desired node
 
-**Available nodes (64 total):**
+**Available nodes (67 total):**
 
 Client & I/O:
 - WaveSpeed Client
@@ -570,10 +584,13 @@ Image (ByteDance Seedream):
 Image (Qwen):
 - Qwen Image 2.0 Text-to-Image
 - Qwen Image 2.0 Edit
+- Qwen Image 3.0 Text-to-Image
+- Qwen Image 3.0 Edit
 - Qwen Image Text-to-Image
 - Qwen Image Edit
 - Qwen Image Edit Plus
 - Qwen Image Multiple Angles
+- Qwen Image Multiple Angles (96 poses)
 - Qwen Image LoRA
 - Qwen Image Edit LoRA
 - Qwen Image Edit Plus LoRA
