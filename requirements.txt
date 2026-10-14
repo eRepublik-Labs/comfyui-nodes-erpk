@@ -13,7 +13,7 @@ cryptography>=48.0.1
 anthropic>=1.11.0
 
 # Google Gemini API integration
-google-genai>=2.2.0
+google-genai>=2.6.0
 
 # OpenAI API integration
 openai>=2.32.0

@@ -33,16 +33,18 @@ def _parse_stop_sequences(text):
     return sequences
 
 
-# Gemini 3.x models that reject thinking_level=minimal with a 400 (3.7/3.8 Flash
-# per their reference pages; 3.1 Pro Preview probed 2026-10-01). The node clamps
-# minimal up to low for them.
-_NO_MINIMAL_THINKING = {"gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.1-pro-preview"}
+# Models that reject thinking_level=minimal with a 400 (3.7/3.8 Flash per their
+# reference pages; 3.1 Pro Preview probed 2026-10-01; 4 Argon probed 2026-10-14).
+# The node clamps minimal up to low for them.
+_NO_MINIMAL_THINKING = {"gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.1-pro-preview",
+                        "gemini-4-argon"}
 
 
 # Output resolutions each image model accepts, smallest first, per
 # https://ai.google.dev/gemini-api/docs/image-generation. A model absent from
 # this map gets the requested size unchanged.
 _IMAGE_SIZES = {
+    "gemini-nano-banana-2.1": ["1K", "2K", "4K"],  # "512" -> 400 (probed 2026-10-14)
     "gemini-3.1-flash-image": ["0.5K", "1K", "2K", "4K"],
     "gemini-3.1-flash-lite-image": ["1K"],    # Nano Banana 2 Lite emits 1K only
     "gemini-3-pro-image": ["1K", "2K", "4K"],
@@ -74,10 +76,12 @@ def _resolve_image_size(model, image_size):
 
 # Aspect ratios for models that do not take the full 14-ratio list. The
 # 1:4/4:1/1:8/8:1 ratios are Gemini 3.1 Flash Image additions; the lite model
-# page lists only these ten.
+# page and the image-generation page's Pro Image table list only these ten
+# (3 Pro Image returns 400 for 1:8, probed 2026-10-14).
+_TEN_ASPECT_RATIOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]
 _ASPECT_RATIOS = {
-    "gemini-3.1-flash-lite-image": ["1:1", "2:3", "3:2", "3:4", "4:3",
-                                    "4:5", "5:4", "9:16", "16:9", "21:9"],
+    "gemini-3.1-flash-lite-image": _TEN_ASPECT_RATIOS,
+    "gemini-3-pro-image": _TEN_ASPECT_RATIOS,
 }
 
 
@@ -335,7 +339,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level (0.0=focused, 2.0=very creative)",
+                    tooltip="Creativity level (0.0=focused, 2.0=very creative) Ignored by Gemini 4 Argon.",
                 ),
                 IO.Int.Input(
                     "max_tokens",
@@ -344,7 +348,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     max=65536,
                     step=128,
                     optional=True,
-                    tooltip="Maximum length of response",
+                    tooltip="Maximum length of response. Google recommends at least 32768 for Gemini 4 Argon.",
                 ),
                 IO.Float.Input(
                     "top_p",
@@ -353,7 +357,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled)",
+                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon.",
                 ),
                 IO.Int.Input(
                     "top_k",
@@ -362,7 +366,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     max=100,
                     step=1,
                     optional=True,
-                    tooltip="Top-k sampling - limit token selection (0=disabled)",
+                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon.",
                 ),
                 IO.String.Input(
                     "stop_sequences",
@@ -392,7 +396,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
                              "default level (it does not turn thinking off). minimal is raised to low on "
-                             "models that reject it: 3.1 Pro Preview, 3.7 Flash, 3.8 Flash."),
+                             "models that reject it: 4 Argon, 3.1 Pro Preview, 3.7 Flash, 3.8 Flash."),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -529,7 +533,7 @@ class GeminiChat(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level",
+                    tooltip="Creativity level Ignored by Gemini 4 Argon.",
                 ),
                 IO.Int.Input(
                     "max_tokens",
@@ -538,7 +542,7 @@ class GeminiChat(IO.ComfyNode):
                     max=65536,
                     step=128,
                     optional=True,
-                    tooltip="Maximum length of response",
+                    tooltip="Maximum length of response. Google recommends at least 32768 for Gemini 4 Argon.",
                 ),
                 IO.Float.Input(
                     "top_p",
@@ -547,7 +551,7 @@ class GeminiChat(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled)",
+                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon.",
                 ),
                 IO.Int.Input(
                     "top_k",
@@ -556,7 +560,7 @@ class GeminiChat(IO.ComfyNode):
                     max=100,
                     step=1,
                     optional=True,
-                    tooltip="Top-k sampling - limit token selection (0=disabled)",
+                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon.",
                 ),
                 IO.String.Input(
                     "stop_sequences",
@@ -586,7 +590,7 @@ class GeminiChat(IO.ComfyNode):
                     optional=True,
                     tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
                              "default level (it does not turn thinking off). minimal is raised to low on "
-                             "models that reject it: 3.1 Pro Preview, 3.7 Flash, 3.8 Flash."),
+                             "models that reject it: 4 Argon, 3.1 Pro Preview, 3.7 Flash, 3.8 Flash."),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -672,6 +676,9 @@ class GeminiChat(IO.ComfyNode):
             if schema_obj:
                 config_params["response_schema"] = schema_obj
 
+            from .gemini_api.cooperative_call import resolve_timeout_ms
+            config_params["http_options"] = types.HttpOptions(timeout=resolve_timeout_ms(model))
+
             config = types.GenerateContentConfig(**config_params)
             if thinking_cfg is not None:
                 config.thinking_config = thinking_cfg
@@ -733,7 +740,7 @@ class GeminiVision(IO.ComfyNode):
                     max=65536,
                     step=128,
                     optional=True,
-                    tooltip="Maximum length of analysis",
+                    tooltip="Maximum length of analysis. Google recommends at least 32768 for Gemini 4 Argon.",
                 ),
                 IO.Float.Input(
                     "temperature",
@@ -742,7 +749,7 @@ class GeminiVision(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level (lower=more factual)",
+                    tooltip="Creativity level (lower=more factual) Ignored by Gemini 4 Argon.",
                 ),
                 IO.Float.Input(
                     "top_p",
@@ -751,7 +758,7 @@ class GeminiVision(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled)",
+                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon.",
                 ),
                 IO.Int.Input(
                     "top_k",
@@ -760,7 +767,7 @@ class GeminiVision(IO.ComfyNode):
                     max=100,
                     step=1,
                     optional=True,
-                    tooltip="Top-k sampling - limit token selection (0=disabled)",
+                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon.",
                 ),
                 IO.String.Input(
                     "stop_sequences",
@@ -790,7 +797,7 @@ class GeminiVision(IO.ComfyNode):
                     optional=True,
                     tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
                              "default level (it does not turn thinking off). minimal is raised to low on "
-                             "models that reject it: 3.1 Pro Preview, 3.7 Flash, 3.8 Flash."),
+                             "models that reject it: 4 Argon, 3.1 Pro Preview, 3.7 Flash, 3.8 Flash."),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -1174,7 +1181,7 @@ class GeminiImageGeneration(IO.ComfyNode):
                 IO.Combo.Input(
                     "model",
                     options=IMAGE_MODELS,
-                    default="gemini-3.1-flash-image",
+                    default=GeminiClient.DEFAULT_IMAGE_MODEL,
                     optional=True,
                     tooltip="Image generation model (overrides client model)",
                 ),
@@ -1185,7 +1192,9 @@ class GeminiImageGeneration(IO.ComfyNode):
                     max=2.0,
                     step=0.1,
                     optional=True,
-                    tooltip="Creativity level (higher = more creative)",
+                    tooltip=("Creativity level (higher = more creative). Gemini image models report a "
+                             "maximum temperature of 1.0: values above it are accepted without error "
+                             "but have no documented effect."),
                 ),
                 IO.Combo.Input(
                     "aspect_ratio",
@@ -1193,14 +1202,14 @@ class GeminiImageGeneration(IO.ComfyNode):
                              "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"],
                     default="default",
                     optional=True,
-                    tooltip="Image aspect ratio. 3.1 Flash takes all 14; 3.1 Flash Lite has no 1:4, 4:1, 1:8 or 8:1 and uses the closest supported ratio instead.",
+                    tooltip="Image aspect ratio. Nano Banana 2.1 and 3.1 Flash take all 14; 3.1 Flash Lite and 3 Pro have no 1:4, 4:1, 1:8 or 8:1 and use the closest supported ratio instead.",
                 ),
                 IO.Combo.Input(
                     "image_size",
                     options=["default", "0.5K", "1K", "2K", "4K"],
                     default="default",
                     optional=True,
-                    tooltip="Image resolution. 3.1 Flash: 0.5K-4K. 3 Pro: 1K-4K. 3.1 Flash Lite: 1K only. Unsupported sizes use the model's smallest size.",
+                    tooltip="Image resolution. 3.1 Flash: 0.5K-4K. Nano Banana 2.1 and 3 Pro: 1K-4K. 3.1 Flash Lite: 1K only. Unsupported sizes use the model's smallest size.",
                 ),
                 IO.Combo.Input(
                     "response_modalities",
@@ -1213,7 +1222,7 @@ class GeminiImageGeneration(IO.ComfyNode):
                     "enable_google_search",
                     default=False,
                     optional=True,
-                    tooltip="Enable Google Search grounding (3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it)",
+                    tooltip="Enable Google Search grounding (Nano Banana 2.1, 3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it)",
                 ),
                 IO.Int.Input(
                     "seed",
@@ -1241,7 +1250,7 @@ class GeminiImageGeneration(IO.ComfyNode):
 
         prompt = kwargs.get("prompt", "")
         client = kwargs.get("client")
-        model = kwargs.get("model", "gemini-3.1-flash-image")
+        model = kwargs.get("model", GeminiClient.DEFAULT_IMAGE_MODEL)
         temperature = kwargs.get("temperature", 1.0)
         aspect_ratio = kwargs.get("aspect_ratio", "default")
         image_size = kwargs.get("image_size", "default")
@@ -1416,7 +1425,7 @@ class GeminiImageEdit(IO.ComfyNode):
                 IO.Combo.Input(
                     "model",
                     options=IMAGE_MODELS,
-                    default="gemini-3.1-flash-image",
+                    default=GeminiClient.DEFAULT_IMAGE_MODEL,
                     optional=True,
                     tooltip="Image generation model (overrides client model)",
                 ),
@@ -1427,7 +1436,9 @@ class GeminiImageEdit(IO.ComfyNode):
                     max=2.0,
                     step=0.1,
                     optional=True,
-                    tooltip="Creativity level (higher = more creative)",
+                    tooltip=("Creativity level (higher = more creative). Gemini image models report a "
+                             "maximum temperature of 1.0: values above it are accepted without error "
+                             "but have no documented effect."),
                 ),
                 IO.Combo.Input(
                     "aspect_ratio",
@@ -1435,14 +1446,14 @@ class GeminiImageEdit(IO.ComfyNode):
                              "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"],
                     default="default",
                     optional=True,
-                    tooltip="Image aspect ratio. 3.1 Flash takes all 14; 3.1 Flash Lite has no 1:4, 4:1, 1:8 or 8:1 and uses the closest supported ratio instead.",
+                    tooltip="Image aspect ratio. Nano Banana 2.1 and 3.1 Flash take all 14; 3.1 Flash Lite and 3 Pro have no 1:4, 4:1, 1:8 or 8:1 and use the closest supported ratio instead.",
                 ),
                 IO.Combo.Input(
                     "image_size",
                     options=["default", "0.5K", "1K", "2K", "4K"],
                     default="default",
                     optional=True,
-                    tooltip="Image resolution. 3.1 Flash: 0.5K-4K. 3 Pro: 1K-4K. 3.1 Flash Lite: 1K only. Unsupported sizes use the model's smallest size.",
+                    tooltip="Image resolution. 3.1 Flash: 0.5K-4K. Nano Banana 2.1 and 3 Pro: 1K-4K. 3.1 Flash Lite: 1K only. Unsupported sizes use the model's smallest size.",
                 ),
                 IO.Combo.Input(
                     "response_modalities",
@@ -1455,7 +1466,7 @@ class GeminiImageEdit(IO.ComfyNode):
                     "enable_google_search",
                     default=False,
                     optional=True,
-                    tooltip="Enable Google Search grounding (3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it)",
+                    tooltip="Enable Google Search grounding (Nano Banana 2.1, 3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it)",
                 ),
                 IO.Image.Input(
                     "additional_images",
@@ -1496,7 +1507,7 @@ class GeminiImageEdit(IO.ComfyNode):
         image = kwargs.get("image")
         prompt = kwargs.get("prompt", "")
         client = kwargs.get("client")
-        model = kwargs.get("model", "gemini-3.1-flash-image")
+        model = kwargs.get("model", GeminiClient.DEFAULT_IMAGE_MODEL)
         temperature = kwargs.get("temperature", 1.0)
         aspect_ratio = kwargs.get("aspect_ratio", "default")
         image_size = kwargs.get("image_size", "default")

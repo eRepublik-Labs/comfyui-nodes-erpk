@@ -13,7 +13,7 @@ from .nodes import (
     GeminiImageEdit,
 )
 from .veo_nodes import VeoTextToVideo, VeoImageToVideo
-from .omni_nodes import GeminiOmniVideoGeneration
+from .omni_nodes import GeminiOmniReferenceToVideo, GeminiOmniVideoGeneration
 
 NODES = [
     GeminiAPIConfig,
@@ -28,6 +28,7 @@ NODES = [
     VeoTextToVideo,
     VeoImageToVideo,
     GeminiOmniVideoGeneration,
+    GeminiOmniReferenceToVideo,
 ]
 
 __all__ = ["NODES"]

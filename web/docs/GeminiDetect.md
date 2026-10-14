@@ -12,7 +12,7 @@ Detects objects in an image using Gemini's vision capabilities and emits their b
 | image | IMAGE | - | Image to detect objects in (single frame) |
 | objects | String | "" | Objects to detect, one per line (e.g. "red car"). Leave empty to detect all prominent objects. |
 | client | GEMINI_API_CLIENT | - | Gemini API client (optional if API key is configured in Settings) |
-| model | Combo | gemini-3.5-flash | Model to use for detection (optional) |
+| model | Combo | gemini-3.8-flash | Model to use for detection (optional) |
 | temperature | Float | 0.0 | Lower = more deterministic detection, 0.0-2.0 (optional) |
 | max_objects | Int | 20 | Maximum number of regions to return, 1-100 (optional) |
 | seed | Int | -1 | Seed for reproducible detection; randomizes by default |

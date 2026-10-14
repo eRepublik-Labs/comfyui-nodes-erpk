@@ -12,12 +12,12 @@ Edits and modifies existing images using text prompts. Supports up to 14 referen
 | image | IMAGE | - | Reference image(s) to edit. Use Batch Images node to combine multiple (up to 14). |
 | prompt | String | "" | Describe the edit. Reference images by order, content, or role. |
 | client | GEMINI_API_CLIENT | - | Gemini API client (optional, uses API key from config) |
-| model | Combo | gemini-3.1-flash-image | Image model: gemini-3.1-flash-image, gemini-3.1-flash-lite-image, gemini-3-pro-image (optional) |
-| temperature | Float | 1.0 | Creativity level, 0.0-2.0 (optional) |
-| aspect_ratio | Combo | default | Image aspect ratio: default, 1:1, 1:4, 1:8, 2:3, 3:2, 3:4, 4:1, 4:3, 4:5, 5:4, 8:1, 9:16, 16:9, 21:9. 3.1 Flash Lite has no 1:4, 4:1, 1:8 or 8:1 and uses the closest supported ratio (optional) |
-| image_size | Combo | default | Resolution: default, 0.5K, 1K, 2K, 4K. 3.1 Flash takes 0.5K-4K, 3 Pro 1K-4K, 3.1 Flash Lite 1K only; an unsupported size uses the model's smallest size (optional) |
+| model | Combo | gemini-nano-banana-2.1 | Image model: gemini-nano-banana-2.1, gemini-3.1-flash-image (deprecated in favour of Nano Banana 2.1), gemini-3.1-flash-lite-image, gemini-3-pro-image (optional) |
+| temperature | Float | 1.0 | Creativity level, 0.0-2.0. The image models report a maximum of 1.0; higher values are accepted without error but have no documented effect (optional) |
+| aspect_ratio | Combo | default | Image aspect ratio: default, 1:1, 1:4, 1:8, 2:3, 3:2, 3:4, 4:1, 4:3, 4:5, 5:4, 8:1, 9:16, 16:9, 21:9. 3.1 Flash Lite and 3 Pro have no 1:4, 4:1, 1:8 or 8:1 and use the closest supported ratio (optional) |
+| image_size | Combo | default | Resolution: default, 0.5K, 1K, 2K, 4K. 3.1 Flash takes 0.5K-4K, Nano Banana 2.1 and 3 Pro 1K-4K, 3.1 Flash Lite 1K only; an unsupported size uses the model's smallest size (optional) |
 | response_modalities | Combo | IMAGE | IMAGE (image only) or TEXT+IMAGE (image + text description) (optional) |
-| enable_google_search | Boolean | false | Enable Google Search grounding on 3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it (optional) |
+| enable_google_search | Boolean | false | Enable Google Search grounding on Nano Banana 2.1, 3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it (optional) |
 | additional_images | IMAGE | - | Additional reference images, combined with primary input up to 14 total (optional) |
 | image_refs | ERPK_IMAGE_REFS | - | Ordered reference images from a Regional Prompt Builder; sent right after the primary image so the prompt's image numbers line up (optional) |
 
@@ -32,5 +32,6 @@ Edits and modifies existing images using text prompts. Supports up to 14 referen
 
 - Reference images in prompts by order ("the first image"), content ("the logo"), or role ("the style reference")
 - Gemini 3 Pro supports up to 14 reference images (up to 6 objects, up to 5 humans for character consistency)
+- Nano Banana 2.1 supports up to 14 reference images (up to 10 objects, up to 4 characters)
 - Images are sent in order: primary image, then image_refs, then additional_images. The primary image is "the first image" in positional prompts
 - API key resolved from ComfyUI Settings or config.ini — connect a `client` from Gemini API Config only when you need shared safety/system-instruction state across nodes

@@ -1,9 +1,9 @@
 <!-- ABOUTME: Help documentation for the Gemini Omni Video Generation ComfyUI node. -->
-<!-- ABOUTME: Generates short 720p video from a prompt or a start image via Gemini Omni Flash. -->
+<!-- ABOUTME: Generates short 360p-4k video from a prompt or a start image via Gemini Omni Flash. -->
 
 # Gemini Omni Video Generation
 
-Generates 3-10 second video at 720p / 24 FPS using Gemini Omni Flash 1.1 (`gemini-omni-1.1-flash`). Connect an image to animate it (image-to-video) instead of generating from text alone.
+Generates 3-10 second video at 24 FPS, 360p to 4k, using Gemini Omni Flash 1.1 (`gemini-omni-1.1-flash`). Connect an image to animate it (image-to-video) instead of generating from text alone.
 
 Unlike the Veo nodes, this model is reached through Google's Interactions API and returns the video directly rather than through a long-running operation, so a generation completes in one call with no polling.
 
@@ -17,6 +17,7 @@ Unlike the Veo nodes, this model is reached through Google's Interactions API an
 | aspect_ratio | Combo | 16:9 | Video aspect ratio: 16:9 (landscape) or 9:16 (portrait) (optional) |
 | output_directory | String | "" | Directory to save video. Empty uses ComfyUI output folder (optional) |
 | seed | Int | -1 | Cache control only — never sent to the API. Range: -1 to 4294967295 (optional) |
+| resolution | Combo | 720p | Output resolution: 360p, 720p, 1080p or 4k. 1080p and 4k are upscaled by Google and need a stored interaction, so the node downloads, then deletes, the file (optional) |
 
 ## Output
 
@@ -34,16 +35,20 @@ The model rejects several knobs the other Gemini nodes accept, so this node does
 
 - **Negative prompts** — state exclusions inline instead, e.g. "Do not show text on screen"
 - **System instructions, temperature, top_p, stop sequences**
-- **Duration and resolution** — output is fixed at 3-10s, 720p, 24 FPS
+- **Duration** — the model picks 3-10s; output is always 24 FPS
+
+## Large outputs
+
+1080p and 4k videos exceed the 4MB inline response limit, so the node asks for URI delivery at those resolutions, waits for the Files API to mark the video ACTIVE (up to 10 minutes) and downloads it. 360p and 720p come back inline in the same call. The generation call itself gets at least a 15-minute timeout, since a 1080p or 4k render can take longer than the 5-minute default.
 
 ## Other limitations
 
-- Video extension and interpolation (generating between a first and last frame) are not supported
+- Interpolation (generating between a first and last frame) is not exposed by this node
 - Audio reference upload is not supported in the current API version
 - Reasoning across multiple input videos is not supported
-- Editing uploaded videos is unavailable in the EEA, Switzerland and the UK; editing model-generated video still works there
+- To generate from reference images, use Gemini Omni Reference to Video
 - All output carries a SynthID watermark
 
 ## Pricing
 
-$1.50 per 1M input tokens, and roughly $0.10 per second of generated video.
+$1.50 per 1M input tokens, and roughly $0.10 per second of generated video at 720p. Google has not published separate 1080p or 4k rates on the pricing page this node was checked against.

@@ -9,18 +9,31 @@ from typing import Any, Callable, Optional
 DEFAULT_POLL_INTERVAL_S = 0.25
 _DEFAULT_TIMEOUT_MS = 300000
 
+# Models that need a longer HTTP timeout than the default. Gemini 4 Argon:
+# "Hard prompts can take several minutes ... set HTTP client timeouts to at
+# least 15 minutes" (ai.google.dev/gemini-api/docs/latest-model). Omni Flash
+# renders a whole video inside one call, so a 1080p/4k job can outlast 5
+# minutes and still be billed.
+_MODEL_MIN_TIMEOUT_MS = {"gemini-4-argon": 900000, "gemini-omni-1.1-flash": 900000}
 
-def resolve_timeout_ms() -> int:
-    """Per-request Gemini timeout in milliseconds.
 
-    Configurable via the ERPK.GEMINI_TIMEOUT_MS ComfyUI setting; falls back to
-    5 minutes. Read at call time so the setting applies per run with no restart.
-    """
+def _configured_timeout_ms() -> int:
     try:
         from ...settings import get_comfy_setting
         return int(get_comfy_setting("ERPK.GEMINI_TIMEOUT_MS", _DEFAULT_TIMEOUT_MS))
     except (ImportError, ValueError, TypeError):
         return _DEFAULT_TIMEOUT_MS
+
+
+def resolve_timeout_ms(model: Optional[str] = None) -> int:
+    """Per-request Gemini timeout in milliseconds.
+
+    Configurable via the ERPK.GEMINI_TIMEOUT_MS ComfyUI setting; falls back to
+    5 minutes. Read at call time so the setting applies per run with no restart.
+    A model with a minimum (Gemini 4 Argon, Omni Flash) never gets less than
+    that minimum, and a longer configured timeout is kept.
+    """
+    return max(_configured_timeout_ms(), _MODEL_MIN_TIMEOUT_MS.get(model, 0))
 
 # A cancelled or timed-out call cannot abort its blocking thread (Python has no
 # preemption), so the slot stays busy until the genai HTTP timeout

@@ -1,5 +1,5 @@
 # ABOUTME: Tests that the MODELS dict contains expected model entries.
-# ABOUTME: Verifies all Gemini model IDs are registered and DEFAULT_MODEL is unchanged.
+# ABOUTME: Verifies all Gemini model IDs are registered and DEFAULT_MODEL is the current Flash.
 
 import pytest
 
@@ -16,20 +16,33 @@ class TestModelsDict:
         desc = GeminiClient.MODELS["gemini-3.1-pro-preview"]
         assert "reasoning" in desc.lower() or "advanced" in desc.lower()
 
-    def test_default_model_is_gemini_35_flash(self):
-        assert GeminiClient.DEFAULT_MODEL == "gemini-3.5-flash"
+    def test_default_model_is_gemini_38_flash(self):
+        # gemini-3.5-flash was deprecated 2026-10-08 and is served by
+        # gemini-3.6-flash (generate_content model_version, probed 2026-10-14);
+        # Alex's 2026-10-14 ruling makes 3.8 Flash the default.
+        assert GeminiClient.DEFAULT_MODEL == "gemini-3.8-flash"
 
     def test_gemini_35_flash_in_models(self):
+        # Deprecated but still answering; removing a combo ID breaks saved workflows.
         assert "gemini-3.5-flash" in GeminiClient.MODELS
 
-    def test_gemini_35_flash_description_mentions_speed_or_intelligence(self):
-        desc = GeminiClient.MODELS["gemini-3.5-flash"]
-        assert "intelligence" in desc.lower() or "fast" in desc.lower() or "speed" in desc.lower()
+    @pytest.mark.parametrize("model, served_by", [
+        ("gemini-3.5-flash", "3.6 Flash"),
+        ("gemini-3.7-flash", "3.8 Flash"),
+    ])
+    def test_routed_models_are_labelled_deprecated(self, model, served_by):
+        # Deprecations page: both deprecated 2026-10-08; model_version in the
+        # response names the model that actually answers (probed 2026-10-14).
+        desc = GeminiClient.MODELS[model]
+        assert "deprecated 2026-10-08" in desc.lower()
+        assert f"served by {served_by}" in desc
 
     def test_offered_text_models_are_exactly_the_current_set(self):
         # Alex's 2026-10-01 ruling: the 2.5 family, 3 Flash Preview and
-        # 3.1 Flash-Lite are withdrawn; these six remain.
+        # 3.1 Flash-Lite are withdrawn; these six remain. gemini-4-argon went
+        # GA on 2026-10-13 (Gemini API changelog).
         assert set(GeminiClient.MODELS) == {
+            "gemini-4-argon",
             "gemini-3.1-pro-preview",
             "gemini-3.8-flash",
             "gemini-3.7-flash",

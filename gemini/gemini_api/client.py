@@ -46,23 +46,26 @@ class GeminiClient:
 
     # Available models
     MODELS = {
+        "gemini-4-argon": "Gemini 4 Argon (Flagship reasoning; low/medium/high thinking; ignores temperature/top_p/top_k)",
         "gemini-3.1-pro-preview": "Gemini 3.1 Pro Preview (Most advanced reasoning)",
         "gemini-3.8-flash": "Gemini 3.8 Flash (Latest Flash; no minimal thinking)",
-        "gemini-3.7-flash": "Gemini 3.7 Flash (No minimal thinking)",
+        "gemini-3.7-flash": "Gemini 3.7 Flash (Deprecated 2026-10-08; served by 3.8 Flash)",
         "gemini-3.6-flash": "Gemini 3.6 Flash (Improved token efficiency, cheaper than 3.5 Flash)",
-        "gemini-3.5-flash": "Gemini 3.5 Flash (Frontier intelligence, fast and cost-efficient)",
+        "gemini-3.5-flash": "Gemini 3.5 Flash (Deprecated 2026-10-08; served by 3.6 Flash)",
         "gemini-3.5-flash-lite": "Gemini 3.5 Flash-Lite (Fastest, most cost-effective 3.5 model)",
     }
 
     # Image generation models
     IMAGE_MODELS = [
+        "gemini-nano-banana-2.1",
         "gemini-3.1-flash-image",
         "gemini-3.1-flash-lite-image",
         "gemini-3-pro-image",
     ]
 
     # Default configuration
-    DEFAULT_MODEL = "gemini-3.5-flash"
+    DEFAULT_MODEL = "gemini-3.8-flash"
+    DEFAULT_IMAGE_MODEL = "gemini-nano-banana-2.1"
     DEFAULT_MAX_TOKENS = 8192
     DEFAULT_TEMPERATURE = 0.7
 
@@ -235,6 +238,11 @@ class GeminiClient:
         if seed is not None:
             config_params["seed"] = seed
 
+        # Per-request timeout: the genai.Client one is fixed at construction,
+        # and some models (Gemini 4 Argon) need longer than the default.
+        timeout_ms = resolve_timeout_ms(model_to_use)
+        config_params["http_options"] = types.HttpOptions(timeout=timeout_ms)
+
         config = types.GenerateContentConfig(**config_params)
 
         # Add system instruction if set
@@ -263,6 +271,7 @@ class GeminiClient:
             model=model_to_use,
             contents=contents,
             config=config,
+            timeout_s=timeout_ms / 1000.0,
         )
 
         # Extract text from response

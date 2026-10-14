@@ -163,7 +163,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Gemini Chat** - Multi-turn conversations with automatic context preservation
 - **Gemini Vision** - Analyze images with multimodal capabilities
 - **Gemini Detect** - Open-vocabulary object detection: name objects (or leave empty to detect everything prominent) and get normalized regions on an `ERPK_REGIONS` output that wires into the Regional Prompt Builder's `regions` input
-- **Gemini Image Generation** - Generate images from text descriptions (3.1 Flash, 3.1 Flash Lite, 3 Pro; 0.5K to 4K resolution, up to 14 aspect ratios, Google Search grounding on 3.1 Flash and 3 Pro)
+- **Gemini Image Generation** - Generate images from text descriptions (Nano Banana 2.1, 3.1 Flash, 3.1 Flash Lite, 3 Pro; 0.5K to 4K resolution, up to 14 aspect ratios, Google Search grounding on all but 3.1 Flash Lite)
 - **Gemini Image Edit** - Edit and modify images with natural language prompts (up to 14 reference images, same model and resolution options)
 - **Gemini System Instruction** - Set persistent system-level instructions to guide model behavior
 - **Gemini Safety Settings** - Configure content safety filters (strict/balanced/permissive presets or custom)
@@ -172,15 +172,16 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 
 - **Veo Text to Video** - Generate videos from text prompts using Google's Veo 3.1 models (with synchronized audio; Google shuts these down on 2026-10-22)
 - **Veo Image to Video** - Generate videos from an input image and optional text prompt
-- **Gemini Omni Video Generation** - Generate 3-10s 720p video from a prompt or start image via Gemini Omni Flash (returns in one call, no polling)
+- **Gemini Omni Video Generation** - Generate 3-10s video (360p to 4k) from a prompt or start image via Gemini Omni Flash (returns in one call; 1080p/4k are downloaded from the Files API)
+- **Gemini Omni Reference to Video** - Generate video featuring the subjects in reference images via Gemini Omni Flash
 
 **Key Benefits:**
-- Support for Gemini 3.1 Pro Preview, 3.8, 3.7, 3.6 and 3.5 Flash, and 3.5 Flash-Lite
+- Support for Gemini 4 Argon, 3.1 Pro Preview, 3.8 Flash (default), 3.7, 3.6 and 3.5 Flash, and 3.5 Flash-Lite
 - **Thinking level** control across all models (none/minimal/low/medium/high). `none` keeps the model's default thinking; `minimal` is raised to `low` on models that reject it
 - **Veo video generation** with text-to-video and image-to-video (Veo 3.1 includes audio)
 - Each node selects its own model for maximum flexibility
 - State-of-the-art reasoning with Gemini 3.1 Pro Preview
-- Image generation with Gemini 3.1 Flash (recommended), 3.1 Flash Lite, and 3 Pro (0.5K to 4K resolution, model-dependent)
+- Image generation with Nano Banana 2.1 (recommended), 3.1 Flash, 3.1 Flash Lite, and 3 Pro (0.5K to 4K resolution, model-dependent)
 - Image editing with natural language instructions (up to 14 reference images)
 - Simple, straightforward API integration
 - Vision capabilities with batch image support
@@ -458,7 +459,7 @@ curl -X POST http://localhost:8188/prompt \
         "inputs": {
           "client": ["1", 0],
           "prompt": "Write a haiku about ComfyUI",
-          "model": "gemini-3.5-flash",
+          "model": "gemini-3.8-flash",
           "temperature": 0.7,
           "max_tokens": 256
         }

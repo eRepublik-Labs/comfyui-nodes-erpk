@@ -4,11 +4,11 @@ Complete Google Gemini API integration providing text generation, vision analysi
 
 **Version:** 2026.10.1
 **Category in ComfyUI:** `ERPK/Gemini` and `ERPK/Gemini/Veo`
-**SDK requirement:** `google-genai>=2.2.0` (per `gemini/requirements.txt`)
+**SDK requirement:** `google-genai>=2.6.0` (per `gemini/requirements.txt`). Omni Flash needs it: 2.2.0 sends `response_format.aspect_ratio` as `aspectRatio`, which the API rejects
 
 ## Features
 
-- **Text Generation** - Gemini 3.1 Pro Preview, 3.8, 3.7, 3.6 and 3.5 Flash, and 3.5 Flash-Lite
+- **Text Generation** - Gemini 4 Argon, 3.1 Pro Preview, 3.8, 3.7, 3.6 and 3.5 Flash, and 3.5 Flash-Lite
 - **Vision Analysis** - Analyze images with Gemini's multimodal capabilities
 - **Image Generation** - Generate images from text descriptions
 - **Image Editing** - Edit and modify images with natural language prompts (up to 14 reference images)
@@ -65,7 +65,7 @@ Complete Google Gemini API integration providing text generation, vision analysi
 
 6. **Verify installation:**
    - Look for `ERPK/Gemini` and `ERPK/Gemini/Veo` categories in ComfyUI node menu
-   - Should see 10 nodes available (8 Gemini + 2 Veo)
+   - Should see 13 nodes available (9 Gemini, 2 Veo, 2 Omni)
 
 ## Available Nodes
 
@@ -88,15 +88,15 @@ General-purpose text generation and completion.
 **Inputs:**
 - `client`: Gemini API client (optional)
 - `prompt`: Text prompt
-- `model`: gemini-3.5-flash (default), gemini-3.1-pro-preview, gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash-lite
-- `temperature`: 0.0-2.0 (creativity level, default: 0.7)
-- `max_tokens`: 256-65536 (output length, default: 8192)
+- `model`: gemini-3.8-flash (default), gemini-4-argon, gemini-3.1-pro-preview, gemini-3.7-flash (deprecated, served by 3.8 Flash), gemini-3.6-flash, gemini-3.5-flash (deprecated, served by 3.6 Flash), gemini-3.5-flash-lite
+- `temperature`: 0.0-2.0 (creativity level, default: 0.7). Gemini 4 Argon ignores temperature, top_p and top_k
+- `max_tokens`: 256-65536 (output length, default: 8192). Google recommends at least 32768 for Gemini 4 Argon
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
 - `top_k`: 0-100 (top-k sampling, default: 40, set 0 to disable)
 - `stop_sequences`: Newline-separated sequences where generation stops (max 5)
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
-- `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. "minimal" is raised to "low" on 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it
+- `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. "minimal" is raised to "low" on 4 Argon, 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it
 
 **Outputs:**
 - `response`: Generated text
@@ -117,17 +117,17 @@ Multi-turn conversation with message history preservation.
 **Inputs:**
 - `client`: Gemini API client (optional)
 - `prompt`: Your message
-- `model`: gemini-3.5-flash (default), gemini-3.1-pro-preview, gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash-lite
+- `model`: gemini-3.8-flash (default), gemini-4-argon, gemini-3.1-pro-preview, gemini-3.7-flash (deprecated, served by 3.8 Flash), gemini-3.6-flash, gemini-3.5-flash (deprecated, served by 3.6 Flash), gemini-3.5-flash-lite
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
-- `temperature`: 0.0-2.0 (default: 0.7)
-- `max_tokens`: 256-65536 (default: 8192)
+- `temperature`: 0.0-2.0 (default: 0.7). Gemini 4 Argon ignores temperature, top_p and top_k
+- `max_tokens`: 256-65536 (default: 8192). Google recommends at least 32768 for Gemini 4 Argon
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
 - `top_k`: 0-100 (top-k sampling, default: 40, set 0 to disable)
 - `stop_sequences`: Newline-separated sequences where generation stops (max 5)
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
-- `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. "minimal" is raised to "low" on 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it
+- `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. "minimal" is raised to "low" on 4 Argon, 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it
 
 **Outputs:**
 - `response`: Chat response
@@ -148,15 +148,15 @@ Analyze images with questions or instructions.
 - `client`: Gemini API client (optional)
 - `image`: ComfyUI image tensor (supports batches)
 - `prompt`: Question or instruction about the image(s)
-- `model`: gemini-3.5-flash (default), gemini-3.1-pro-preview, gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash-lite
-- `max_tokens`: 256-65536 (default: 8192)
-- `temperature`: 0.0-2.0 (default: 0.4, lower for more factual)
+- `model`: gemini-3.8-flash (default), gemini-4-argon, gemini-3.1-pro-preview, gemini-3.7-flash (deprecated, served by 3.8 Flash), gemini-3.6-flash, gemini-3.5-flash (deprecated, served by 3.6 Flash), gemini-3.5-flash-lite
+- `max_tokens`: 256-65536 (default: 8192). Google recommends at least 32768 for Gemini 4 Argon
+- `temperature`: 0.0-2.0 (default: 0.4, lower for more factual). Gemini 4 Argon ignores temperature, top_p and top_k
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
 - `top_k`: 0-100 (top-k sampling, default: 40, set 0 to disable)
 - `stop_sequences`: Newline-separated sequences where generation stops (max 5)
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
-- `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. "minimal" is raised to "low" on 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it
+- `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. "minimal" is raised to "low" on 4 Argon, 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it
 
 **Outputs:**
 - `analysis`: Text analysis of the image(s)
@@ -177,12 +177,12 @@ Generate images from text descriptions using Gemini's image generation models.
 **Inputs:**
 - `prompt`: Text description of the image to generate
 - `client`: Optional Gemini API client (from Gemini API Config node)
-- `model`: gemini-3.1-flash-image (default, recommended), gemini-3.1-flash-lite-image (Nano Banana 2 Lite, 1K only), or gemini-3-pro-image (professional)
-- `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
-- `aspect_ratio`: Image dimensions - 14 ratios for 3.1 Flash (including 1:4, 4:1, 1:8, 8:1). 3.1 Flash Lite has no 1:4, 4:1, 1:8 or 8:1 and uses the closest supported ratio instead
-- `image_size`: Resolution - "default", "0.5K", "1K", "2K", "4K". 3.1 Flash takes 0.5K-4K, 3 Pro 1K-4K, 3.1 Flash Lite 1K only; an unsupported size uses the model's smallest size
+- `model`: gemini-nano-banana-2.1 (default, recommended), gemini-3.1-flash-image (deprecated in favour of Nano Banana 2.1, keeps the only 0.5K tier), gemini-3.1-flash-lite-image (Nano Banana 2 Lite, 1K only), or gemini-3-pro-image (professional)
+- `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity). The image models report a maximum of 1.0; higher values are accepted without error but have no documented effect
+- `aspect_ratio`: Image dimensions - 14 ratios for Nano Banana 2.1 and 3.1 Flash (including 1:4, 4:1, 1:8, 8:1). 3.1 Flash Lite and 3 Pro have no 1:4, 4:1, 1:8 or 8:1 and use the closest supported ratio instead
+- `image_size`: Resolution - "default", "0.5K", "1K", "2K", "4K". 3.1 Flash takes 0.5K-4K, Nano Banana 2.1 and 3 Pro 1K-4K, 3.1 Flash Lite 1K only; an unsupported size uses the model's smallest size
 - `response_modalities`: "IMAGE" (image only) or "TEXT+IMAGE" (image + text description)
-- `enable_google_search`: Enable Google Search grounding (3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it)
+- `enable_google_search`: Enable Google Search grounding (Nano Banana 2.1, 3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it)
 
 **Outputs:**
 - `image`: Generated image (ComfyUI IMAGE tensor)
@@ -213,12 +213,12 @@ Edit and modify existing images using text prompts with Gemini's image generatio
 - `image`: Input image(s) to edit (up to 14 reference images). Use ComfyUI's **Batch Images** node to combine multiple images.
 - `prompt`: Text description of how to modify the image(s)
 - `client`: Optional Gemini API client (from Gemini API Config node)
-- `model`: gemini-3.1-flash-image (default, recommended), gemini-3.1-flash-lite-image (Nano Banana 2 Lite, 1K only), or gemini-3-pro-image (professional)
-- `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity)
-- `aspect_ratio`: Image dimensions - 14 ratios for 3.1 Flash (including 1:4, 4:1, 1:8, 8:1). 3.1 Flash Lite has no 1:4, 4:1, 1:8 or 8:1 and uses the closest supported ratio instead
-- `image_size`: Resolution - "default", "0.5K", "1K", "2K", "4K". 3.1 Flash takes 0.5K-4K, 3 Pro 1K-4K, 3.1 Flash Lite 1K only; an unsupported size uses the model's smallest size
+- `model`: gemini-nano-banana-2.1 (default, recommended), gemini-3.1-flash-image (deprecated in favour of Nano Banana 2.1, keeps the only 0.5K tier), gemini-3.1-flash-lite-image (Nano Banana 2 Lite, 1K only), or gemini-3-pro-image (professional)
+- `temperature`: 0.0-2.0 (default: 1.0, higher for more creativity). The image models report a maximum of 1.0; higher values are accepted without error but have no documented effect
+- `aspect_ratio`: Image dimensions - 14 ratios for Nano Banana 2.1 and 3.1 Flash (including 1:4, 4:1, 1:8, 8:1). 3.1 Flash Lite and 3 Pro have no 1:4, 4:1, 1:8 or 8:1 and use the closest supported ratio instead
+- `image_size`: Resolution - "default", "0.5K", "1K", "2K", "4K". 3.1 Flash takes 0.5K-4K, Nano Banana 2.1 and 3 Pro 1K-4K, 3.1 Flash Lite 1K only; an unsupported size uses the model's smallest size
 - `response_modalities`: "IMAGE" (image only) or "TEXT+IMAGE" (image + text description)
-- `enable_google_search`: Enable Google Search grounding (3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it)
+- `enable_google_search`: Enable Google Search grounding (Nano Banana 2.1, 3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it)
 - `additional_images`: Optional additional reference images (combined with primary image input, up to 14 total)
 
 **Outputs:**
@@ -299,10 +299,12 @@ Configure content safety filters.
 
 ### Gemini Omni Video Generation
 
-Generate 3-10 second video at 720p / 24 FPS with Gemini Omni Flash 1.1 (`gemini-omni-1.1-flash`).
+Generate 3-10 second video at 24 FPS, 360p to 4k, with Gemini Omni Flash 1.1 (`gemini-omni-1.1-flash`).
 
 Unlike Veo, this model is reached through Google's Interactions API and returns the
 video directly, so a generation completes in a single call with no polling.
+That call gets at least a 15-minute timeout, because a 1080p or 4k render can outlast
+the 5-minute default.
 
 **Inputs:**
 - `prompt`: What the video should show. Negative prompts are unsupported — state exclusions inline ("Do not show text on screen")
@@ -311,14 +313,36 @@ video directly, so a generation completes in a single call with no polling.
 - `aspect_ratio`: 16:9 (landscape) or 9:16 (portrait)
 - `output_directory`: Where to save the video (default: ComfyUI output folder)
 - `seed`: Cache control only — Omni Flash takes no API seed, so this is never sent. A fixed seed reuses the video you already paid for; -1 regenerates every queue
+- `resolution`: 360p, 720p (default), 1080p or 4k. Google upscales 1080p and 4k; those come back as a Files API download because they exceed the 4MB inline limit. That delivery requires Google to store the interaction (`store=true`); the node deletes the downloaded file right after
 
 **Outputs:**
 - `video_path`: Path to the generated video file (.mp4)
 
 **Not supported by this model:** system instructions, temperature, top_p, stop
-sequences, negative prompts, video extension, interpolation between first and last
-frames, and audio-reference upload. Duration and resolution are fixed. All output
-carries a SynthID watermark.
+sequences, negative prompts and audio-reference upload. This node does not expose
+interpolation between first and last frames, and duration is chosen by the model
+(3-10s). All output carries a SynthID watermark.
+
+---
+
+### Gemini Omni Reference to Video
+
+Generate 3-10 second video that features the people, objects or style shown in reference
+images (`reference_to_video` task).
+
+**Inputs:**
+- `prompt`: What the video should show. Cite references as `<IMAGE_REF_0>`, `<IMAGE_REF_1>`, ... in batch order
+- `reference_images`: One or more reference images (use Batch Images to combine several)
+- `client`, `aspect_ratio`, `resolution`, `output_directory`, `seed`: as on Gemini Omni Video Generation
+
+**Outputs:**
+- `video_path`: Path to the generated video file (.mp4)
+
+---
+
+**Omni tasks without a node:** Google does not offer `edit` or `extend` on uploaded videos in
+the EEA, Switzerland or the UK, so no node wraps them. The API's task list also names `upscale`,
+but `gemini-omni-1.1-flash` rejects it.
 
 ---
 
@@ -389,21 +413,23 @@ Generate videos from an input image and optional text prompt.
 
 | Model | Best For | Context Window | Notes |
 |-------|----------|----------------|-------|
+| **gemini-4-argon** | Flagship reasoning | 1M tokens | $2/$10 per 1M through 2026-11-30, then $4/$20. Thinking low/medium/high (`minimal` is clamped to `low`). Ignores temperature, top_p and top_k. Each call gets at least a 15-minute timeout, as Google advises; set `max_tokens` to 32768 or more for hard prompts |
 | **gemini-3.1-pro-preview** | Most advanced reasoning | 1M tokens | `minimal` thinking is clamped to `low` |
-| **gemini-3.8-flash** | Latest Flash generation | 1M tokens | Same price as 3.6/3.7; `minimal` thinking is clamped to `low` |
-| **gemini-3.7-flash** | Previous Flash generation | 1M tokens | `minimal` thinking is clamped to `low` |
+| **gemini-3.8-flash** | Latest Flash generation | 1M tokens | **Default**, same price as 3.6/3.7; `minimal` thinking is clamped to `low` |
+| **gemini-3.7-flash** | Previous Flash generation | 1M tokens | Deprecated 2026-10-08: Google serves these requests with 3.8 Flash; `minimal` thinking is clamped to `low` |
 | **gemini-3.6-flash** | Improved token efficiency | 1M tokens | Cheaper than 3.5 Flash |
-| **gemini-3.5-flash** | Frontier intelligence at high speed and low cost | 1M tokens | **Default**, stable, built for multi-step and long-horizon tasks |
+| **gemini-3.5-flash** | Previous default | 1M tokens | Deprecated 2026-10-08: Google serves these requests with 3.6 Flash. Kept so saved workflows still load |
 
 ### Image Generation Models
 
 | Model | Best For | Notes |
 |-------|----------|-------|
-| **gemini-3.1-flash-image** | Latest flagship image model | **Default**, Nano Banana 2, 4K output + Image Search Grounding |
+| **gemini-nano-banana-2.1** | Latest flagship image model | **Default**, Nano Banana 2.1, 1K-4K, all 14 aspect ratios, Search grounding; about half the 3.1 Flash Image price at every size |
+| **gemini-3.1-flash-image** | Previous flagship | Nano Banana 2, deprecated 2026-10-06 in favour of Nano Banana 2.1 (no shutdown date); the only model with a 0.5K tier |
 | **gemini-3-pro-image** | Professional quality | Nano Banana Pro, best for character consistency (up to 14 reference images) |
 | **gemini-3.1-flash-lite-image** | Fast, low-cost generation | Nano Banana 2 Lite, 1K only, no Google Search grounding |
 
-**Note:** Image generation models output images instead of text. `gemini-3.1-flash-image` outputs 0.5K to 4K, `gemini-3-pro-image` 1K to 4K, and `gemini-3.1-flash-lite-image` 1K only (other requests are clamped).
+**Note:** Image generation models output images instead of text. `gemini-3.1-flash-image` outputs 0.5K to 4K, `gemini-nano-banana-2.1` and `gemini-3-pro-image` 1K to 4K, and `gemini-3.1-flash-lite-image` 1K only (other requests are clamped).
 
 ### Video Generation Models (Veo)
 
@@ -498,7 +524,7 @@ https://ai.google.dev/pricing
 
 ### Model not available
 - Preview models (like gemini-3.1-pro-preview) may have limited availability
-- Try gemini-3.5-flash (the default) as a stable alternative
+- Try gemini-3.8-flash (the default) as a stable alternative
 
 ### Veo video generation timeout
 - Video generation can take 2-10 minutes depending on duration and model
