@@ -1,5 +1,5 @@
 <!-- ABOUTME: Help documentation for the Grok Text to Video ComfyUI node. -->
-<!-- ABOUTME: Text-to-video generation via xAI's grok-imagine-video model. -->
+<!-- ABOUTME: Text-to-video generation via xAI's grok-imagine-video models. -->
 
 # Grok Text to Video
 
@@ -11,9 +11,9 @@ Generates a short video clip from a text prompt using xAI's Grok video model. Th
 |-----------|------|---------|-------------|
 | client | GROK_API_CLIENT | — | Grok API client (optional if API key is in Settings) |
 | prompt | String | (empty) | Description of the video to generate |
-| model | Combo | grok-imagine-video | Video model: grok-imagine-video, grok-imagine-video-1.5 (optional) |
+| model | Combo | grok-imagine-video | Video model: grok-imagine-video, grok-imagine-video-1.5, grok-imagine-video-1.5-lite. Lite is the cheapest ($0.02/s) and reaches 1080p by upscaling 720p (optional) |
 | aspect_ratio | Combo | 16:9 | One of: 16:9, 9:16, 1:1, 4:3, 3:4, 3:2, 2:3 (optional) |
-| resolution | Combo | 720p | 480p (faster) or 720p (HD) (optional) |
+| resolution | Combo | 720p | 480p (faster), 720p (HD) or 1080p. 1080p works on grok-imagine-video-1.5 (native) and grok-imagine-video-1.5-lite (upscaled); grok-imagine-video tops out at 720p, so 1080p is sent as 720p there (optional) |
 | duration | Int | 5 | Video length in seconds (1–15) (optional) |
 | seed | Int | -1 | Cache-invalidation only — not forwarded to xAI. -1 randomizes (optional) |
 

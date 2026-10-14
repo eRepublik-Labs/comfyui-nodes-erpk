@@ -23,9 +23,15 @@ class GrokClient:
     DEFAULT_IMAGE_MODEL = "grok-imagine-image-2.0"
     DEFAULT_VIDEO_MODEL = "grok-imagine-video"
     VIDEO_MODELS = ["grok-imagine-video", "grok-imagine-video-1.5"]
+    # grok-imagine-video-1.5-lite is text/image-to-video only: it rejects
+    # reference images, so it is not in VIDEO_MODELS (reference-to-video).
+    TEXT_TO_VIDEO_MODELS = VIDEO_MODELS + ["grok-imagine-video-1.5-lite"]
     # Video edit and extend take a source video; grok-imagine-video-1.5 has no
     # video input (docs.x.ai model page and /v1/video-generation-models).
     VIDEO_INPUT_MODELS = ["grok-imagine-video"]
+    # /v1/videos/extensions requires a prompt; an empty one is rejected with
+    # INVALID_ARGUMENT "Prompt cannot be empty" (live probe 2026-10-14).
+    EXTEND_DEFAULT_PROMPT = "Continue the video naturally."
 
     # Current Grok image model per docs.x.ai. grok-imagine-image (v1) and
     # grok-imagine-image-quality were dropped on 2026-10-01; -quality retires on
@@ -49,10 +55,20 @@ class GrokClient:
     IMAGE_RESOLUTIONS = ["1k", "2k"]
 
     VIDEO_ASPECT_RATIOS = ["16:9", "9:16", "1:1", "4:3", "3:4", "3:2", "2:3"]
-    VIDEO_RESOLUTIONS = ["480p", "720p"]
+    VIDEO_RESOLUTIONS = ["480p", "720p"]  # reference-to-video tops out at 720p on every model
+    TEXT_TO_VIDEO_RESOLUTIONS = VIDEO_RESOLUTIONS + ["1080p"]
+    # Text-to-video resolutions per model (docs.x.ai video overview): 1.5 renders
+    # 1080p natively, 1.5-lite upscales 720p to 1080p, grok-imagine-video stops at 720p.
+    TEXT_TO_VIDEO_RESOLUTIONS_BY_MODEL = {
+        "grok-imagine-video": ["480p", "720p"],
+        "grok-imagine-video-1.5": ["480p", "720p", "1080p"],
+        "grok-imagine-video-1.5-lite": ["480p", "720p", "1080p"],
+    }
 
     MAX_EDIT_IMAGES = 5  # grok-imagine-image-2.0 multi-image edit cap (docs.x.ai)
-    MAX_REFERENCE_IMAGES = 3  # reference-to-video images we send (API max undocumented)
+    # Reference-to-video limits per model (docs.x.ai reference-to-video).
+    MAX_REFERENCE_IMAGES_BY_MODEL = {"grok-imagine-video": 7, "grok-imagine-video-1.5": 14}
+    MAX_REFERENCE_DURATION_BY_MODEL = {"grok-imagine-video": 10, "grok-imagine-video-1.5": 15}
 
     # reasoning_effort per model, from live gRPC probes on xai-sdk 1.20
     # (2026-10-01). grok-4.7 accepts low..xhigh and returns 400 on "none".
@@ -61,6 +77,13 @@ class GrokClient:
     # so any model missing from this dict never receives the field.
     REASONING_EFFORTS_BY_MODEL = {
         "grok-4.7": ["low", "medium", "high", "xhigh"],
+    }
+    # grok-4.20-multi-agent-0309 rejects reasoning_effort but takes agent_count
+    # 4 or 16; docs.x.ai multi-agent maps REST effort low/medium to 4 agents
+    # and high/xhigh to 16. Live probe 2026-10-14: 16 agents used 33.9k prompt
+    # tokens against 2.7k with agent_count unset.
+    AGENT_COUNT_BY_EFFORT = {
+        "grok-4.20-multi-agent-0309": {"low": 4, "medium": 4, "high": 16, "xhigh": 16},
     }
     REASONING_EFFORT_OPTIONS = ["(model default)", "none", "low", "medium", "high", "xhigh"]
     REASONING_EFFORT_MODEL_DEFAULT = "(model default)"
@@ -137,6 +160,15 @@ class GrokClient:
         if not accepted or not effort or effort == cls.REASONING_EFFORT_MODEL_DEFAULT:
             return None
         return effort if effort in accepted else accepted[0]
+
+    @classmethod
+    def resolve_agent_count(cls, model: str, effort: Optional[str]) -> Optional[int]:
+        """Return the agent_count to send for `model`, or None to omit it.
+
+        Only the multi-agent model takes it. "none" and "(model default)" omit
+        it, which lets the API pick its default (cheaper than 4 agents).
+        """
+        return cls.AGENT_COUNT_BY_EFFORT.get(model, {}).get(effort)
 
     def _generate_text_sync(
         self,
@@ -305,6 +337,37 @@ class GrokClient:
     # Video generation / editing / extension
     # ------------------------------------------------------------------
 
+    @classmethod
+    def validate_reference_request(cls, model: str, image_count: int, duration: int) -> None:
+        """Raise ValueError before any API call when `model` cannot take this reference-to-video request."""
+        max_images = cls.MAX_REFERENCE_IMAGES_BY_MODEL[model]
+        if image_count > max_images:
+            raise ValueError(
+                f"{model} takes at most {max_images} reference images; got {image_count}. "
+                "Trim the batch before this node."
+            )
+        max_duration = cls.MAX_REFERENCE_DURATION_BY_MODEL[model]
+        if duration > max_duration:
+            longest = max(cls.MAX_REFERENCE_DURATION_BY_MODEL.items(), key=lambda item: item[1])
+            raise ValueError(
+                f"{model} reference-to-video lasts at most {max_duration} s; got {duration} s. "
+                f"Lower duration or pick {longest[0]} (up to {longest[1]} s)."
+            )
+
+    @classmethod
+    def resolve_video_resolution(cls, model: str, resolution: str) -> str:
+        """Return the text-to-video resolution to send for `model`.
+
+        A resolution above the model's maximum is clamped to that maximum and
+        logged, as Veo clamps 4k to 1080p (gemini/veo_nodes.py).
+        """
+        allowed = cls.TEXT_TO_VIDEO_RESOLUTIONS_BY_MODEL[model]
+        if resolution in allowed:
+            return resolution
+        clamped = allowed[-1]
+        print(f"[Grok] {model} supports {allowed} only; using {clamped} instead of {resolution}")
+        return clamped
+
     def _generate_video_sync(
         self,
         prompt: str,
@@ -356,6 +419,11 @@ class GrokClient:
     async def edit_video(self, prompt: str, video_url: str, **kwargs) -> str:
         return await asyncio.to_thread(self._edit_video_sync, prompt, video_url, **kwargs)
 
+    @classmethod
+    def resolve_extend_prompt(cls, prompt: Optional[str]) -> str:
+        """Return the prompt to send to video extend: EXTEND_DEFAULT_PROMPT when blank."""
+        return (prompt or "").strip() or cls.EXTEND_DEFAULT_PROMPT
+
     def _extend_video_sync(
         self,
         video_url: str,
@@ -367,14 +435,13 @@ class GrokClient:
         """Append `duration` seconds of new content to the input video.
 
         SDK signature: extend(prompt, model, video_url, *, duration, ...).
-        `prompt` is positional and non-Optional; pass empty string when the
-        node's caller didn't supply one.
+        A blank prompt is replaced by EXTEND_DEFAULT_PROMPT.
         """
         if not video_url:
             raise ValueError("extend_video requires a source video URL")
         client = self._ensure_client()
         response = client.video.extend(
-            prompt or "",
+            self.resolve_extend_prompt(prompt),
             model,
             video_url,
             duration=duration,

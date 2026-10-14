@@ -110,7 +110,7 @@ def images_to_data_uris(images, max_count: int = 3) -> List[str]:
     """Convert a batch IMAGE tensor or list of images to a list of data URIs.
 
     The caller passes the count cap for its endpoint (GrokClient.MAX_EDIT_IMAGES
-    or MAX_REFERENCE_IMAGES). All images share _REQUEST_BUDGET_BYTES so the
+    or MAX_REFERENCE_IMAGES_BY_MODEL[model]). All images share _REQUEST_BUDGET_BYTES so the
     request stays under the SDK's 20 MiB gRPC send limit.
     """
     if images is None:

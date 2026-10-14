@@ -169,13 +169,14 @@ class TestGrokTextToVideo:
         assert inp is not None
         assert set(inp.options) == set(GrokClient.VIDEO_ASPECT_RATIOS)
 
-    def test_resolution_options_match_client_constants(self):
+    def test_resolution_options_reach_1080p(self):
         from erpk.grok.grok_api.client import GrokClient
         cls = _get_video_node("GrokTextToVideo")
         schema = cls.define_schema()
         inp = _schema_input(schema, "resolution")
         assert inp is not None
-        assert set(inp.options) == set(GrokClient.VIDEO_RESOLUTIONS)
+        # docs.x.ai video overview: text-to-video goes to 1080p on 1.5 and 1.5-lite.
+        assert inp.options == ["480p", "720p", "1080p"]
 
     def test_duration_bounds(self):
         cls = _get_video_node("GrokTextToVideo")

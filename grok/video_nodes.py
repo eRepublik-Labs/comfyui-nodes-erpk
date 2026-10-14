@@ -42,10 +42,13 @@ class GrokTextToVideo(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "model",
-                    options=GrokClient.VIDEO_MODELS,
+                    options=GrokClient.TEXT_TO_VIDEO_MODELS,
                     default=GrokClient.DEFAULT_VIDEO_MODEL,
                     optional=True,
-                    tooltip="xAI video model.",
+                    tooltip=(
+                        "xAI video model. grok-imagine-video-1.5-lite is the cheapest "
+                        "($0.02/s) and reaches 1080p by upscaling 720p."
+                    ),
                 ),
                 IO.Combo.Input(
                     "aspect_ratio",
@@ -56,10 +59,13 @@ class GrokTextToVideo(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "resolution",
-                    options=GrokClient.VIDEO_RESOLUTIONS,
+                    options=GrokClient.TEXT_TO_VIDEO_RESOLUTIONS,
                     default="720p",
                     optional=True,
-                    tooltip="Output resolution. 480p is faster; 720p is HD.",
+                    tooltip=(
+                        "Output resolution. 480p is faster; 720p is HD. 1080p on "
+                        "grok-imagine-video-1.5 and -1.5-lite; grok-imagine-video is sent 720p instead."
+                    ),
                 ),
                 IO.Int.Input(
                     "duration",
@@ -98,7 +104,7 @@ class GrokTextToVideo(IO.ComfyNode):
         prompt = kwargs.get("prompt", "")
         model = kwargs.get("model", GrokClient.DEFAULT_VIDEO_MODEL)
         aspect_ratio = kwargs.get("aspect_ratio", "16:9")
-        resolution = kwargs.get("resolution", "720p")
+        resolution = GrokClient.resolve_video_resolution(model, kwargs.get("resolution", "720p"))
         duration = kwargs.get("duration", 5)
 
         if not prompt or not prompt.strip():
@@ -124,7 +130,7 @@ class GrokTextToVideo(IO.ComfyNode):
 
 class GrokRefToVideo(IO.ComfyNode):
     """Generates a video guided by reference images and a text prompt using xAI Grok.
-    Prompt may reference images via <IMAGE_0>/<IMAGE_1>/<IMAGE_2> tokens."""
+    Prompt may reference images via <IMAGE_0>, <IMAGE_1>, ... tokens."""
 
     @classmethod
     def define_schema(cls):
@@ -134,7 +140,8 @@ class GrokRefToVideo(IO.ComfyNode):
             category="ERPK/Grok/Video",
             description=(
                 "Generate a video from reference images and a text prompt using xAI Grok. "
-                "Up to 3 images; prompt may use <IMAGE_0>, <IMAGE_1>, <IMAGE_2> tokens."
+                "Up to 7 images on grok-imagine-video, 14 on grok-imagine-video-1.5; "
+                "prompt may use <IMAGE_0>, <IMAGE_1>, ... tokens."
             ),
             not_idempotent=True,
             inputs=[
@@ -152,15 +159,16 @@ class GrokRefToVideo(IO.ComfyNode):
                     multiline=True,
                     default="",
                     tooltip=(
-                        "Text description of the video. Use <IMAGE_0>, <IMAGE_1>, <IMAGE_2> "
+                        "Text description of the video. Use <IMAGE_0>, <IMAGE_1>, ... "
                         "tokens to reference the connected images (first image is <IMAGE_0>)."
                     ),
                 ),
                 IO.Image.Input(
                     "reference_images",
                     tooltip=(
-                        "Batched IMAGE input — up to 3 frames. Used as visual reference "
-                        "for the generated video. Convert to data URIs automatically."
+                        "Batched IMAGE input: up to 7 frames on grok-imagine-video, 14 on "
+                        "grok-imagine-video-1.5; a larger batch is rejected before the API call. "
+                        "Used as visual reference for the generated video. Converted to data URIs automatically."
                     ),
                 ),
                 IO.Combo.Input(
@@ -190,7 +198,10 @@ class GrokRefToVideo(IO.ComfyNode):
                     min=1,
                     max=15,
                     optional=True,
-                    tooltip="Video duration in seconds (1–15).",
+                    tooltip=(
+                        "Video duration in seconds: up to 15 on grok-imagine-video-1.5, "
+                        "up to 10 on grok-imagine-video (longer is rejected before the API call)."
+                    ),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -232,7 +243,10 @@ class GrokRefToVideo(IO.ComfyNode):
         if reference_images is None:
             raise ValueError("reference_images is required for reference-to-video")
 
-        data_uris = images_to_data_uris(reference_images, max_count=GrokClient.MAX_REFERENCE_IMAGES)
+        GrokClient.validate_reference_request(model, len(reference_images), duration)
+        data_uris = images_to_data_uris(
+            reference_images, max_count=GrokClient.MAX_REFERENCE_IMAGES_BY_MODEL[model]
+        )
         if not data_uris:
             raise ValueError("Could not convert reference_images to data URIs")
 
@@ -393,7 +407,10 @@ class GrokVideoExtend(IO.ComfyNode):
                     multiline=True,
                     default="",
                     optional=True,
-                    tooltip="Optional prompt to guide the extended content.",
+                    tooltip=(
+                        "Optional prompt to guide the extended content. xAI requires one, so "
+                        f"when blank the node sends \"{GrokClient.EXTEND_DEFAULT_PROMPT}\""
+                    ),
                 ),
                 IO.Combo.Input(
                     "model",
@@ -430,7 +447,7 @@ class GrokVideoExtend(IO.ComfyNode):
         client_dict = kwargs.get("client")
         source_url = kwargs.get("video_url", "")
         duration = kwargs.get("duration", 5)
-        prompt = kwargs.get("prompt", "") or None
+        prompt = GrokClient.resolve_extend_prompt(kwargs.get("prompt"))
         model = kwargs.get("model", GrokClient.DEFAULT_VIDEO_MODEL)
 
         if not source_url or not source_url.strip():
@@ -439,8 +456,7 @@ class GrokVideoExtend(IO.ComfyNode):
         grok = _make_client(client_dict)
         print(f"[Grok] Video extend: model={model}, duration={duration}s, "
               f"source={source_url[:80]}")
-        if prompt:
-            print(f"[Grok] Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
+        print(f"[Grok] Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
 
         video_url = await grok.extend_video(
             video_url=source_url.strip(),

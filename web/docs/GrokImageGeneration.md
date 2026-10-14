@@ -15,7 +15,7 @@ Generates one or more images from a text prompt using xAI's Grok image model. Re
 | aspect_ratio | Combo | 1:1 | One of: 1:1, 16:9, 9:16, 4:3, 3:4, 2:1, 1:2, auto, 3:2, 2:3, 19.5:9, 9:19.5, 20:9, 9:20. `auto` sends no ratio and lets xAI choose (optional) |
 | resolution | Combo | 1k | 1k (~1024px) or 2k (~2048px) (optional) |
 | n | Int | 1 | Number of images to generate (1–10) (optional) |
-| quality | Combo | auto | low or medium. `auto` sends nothing: xAI's docs say it then serves low for generation, while the xai-sdk docstring says medium. Billed at the quality served (optional) |
+| quality | Combo | auto | low or medium. `auto` sends nothing; xAI then serves low for generation. Billed at the quality served (optional) |
 
 ## Output
 

@@ -10,9 +10,9 @@ Appends new content to the end of an existing video. The `duration` parameter co
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | client | GROK_API_CLIENT | — | Grok API client (optional if API key is in Settings) |
-| video_url | String | (empty) | Source video to extend: a public URL or a base64 data URI |
+| video_url | String | (empty) | Source video to extend: a public URL or a base64 data URI. xAI takes sources of 2–15 s |
 | duration | Int | 5 | Length of the **extended portion only**, in seconds (2–10). A 10 s source + duration=5 = 15 s output |
-| prompt | String | (empty) | Optional guidance for the new content (optional) |
+| prompt | String | (empty) | Guidance for the new content (optional). xAI rejects an empty prompt, so when blank the node sends "Continue the video naturally." |
 | model | Combo | grok-imagine-video | Video model. Only option: grok-imagine-video; grok-imagine-video-1.5 takes no video input (optional) |
 | seed | Int | -1 | Cache-invalidation only — not forwarded to xAI. -1 randomizes (optional) |
 

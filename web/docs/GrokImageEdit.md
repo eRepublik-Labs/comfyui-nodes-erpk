@@ -16,7 +16,7 @@ Edits one or more input images using a text prompt. Pass a batched IMAGE tensor 
 | aspect_ratio | Combo | auto | "auto" follows the first source image; otherwise one of 1:1, 16:9, 9:16, 4:3, 3:4, 2:1, 1:2, 3:2, 2:3, 19.5:9, 9:19.5, 20:9, 9:20 (optional) |
 | resolution | Combo | auto | auto, 1k (~1024px) or 2k (~2048px). "auto" sends nothing and lets xAI choose (optional) |
 | n | Int | 1 | Number of edited variations, 1-10. Each one is billed (optional) |
-| quality | Combo | auto | auto, low or medium. "auto" sends nothing and lets xAI choose (optional) |
+| quality | Combo | auto | auto, low or medium. "auto" sends nothing; xAI then serves medium for edits. Billed at the quality served (optional) |
 
 ## Output
 

@@ -28,12 +28,27 @@ TEXT_MODELS = [
 ]
 
 
+_REASONING_EFFORT_TOOLTIP = (
+    "Reasoning depth. grok-4.7 takes low to xhigh ('none' is sent as 'low'). "
+    "On grok-4.20-multi-agent-0309 it sets the agent count: low/medium = 4 agents, "
+    "high/xhigh = 16 agents, which costs about 12x the prompt tokens of the default; "
+    "'none' sends nothing there. Ignored for the other models. "
+    "'(model default)' sends nothing."
+)
+
+
+_CLIENT_TOOLTIP = (
+    "Grok API client from Grok API Client node. If not connected, the key comes from "
+    "ComfyUI Settings or grok/config.ini."
+)
+
+
 def _make_grok_client(client_dict) -> GrokClient:
     """Reconstruct a GrokClient from a client dict or create one via auto-resolution.
 
     GrokAPIClient.execute passes {"api_key": ...}. When the client input is not
     connected, client_dict is None and we fall through to the standard key
-    resolution chain (Settings > env > config.ini).
+    resolution chain (Settings > config.ini).
     """
     if client_dict is not None:
         return GrokClient(api_key=client_dict.get("api_key"))
@@ -132,7 +147,7 @@ class GrokTextGeneration(IO.ComfyNode):
                 IO.Custom("GROK_API_CLIENT").Input(
                     "client",
                     optional=True,
-                    tooltip="Grok API client from Grok API Client node. If not connected, resolves from ComfyUI Settings or environment.",
+                    tooltip=_CLIENT_TOOLTIP,
                 ),
                 IO.Combo.Input(
                     "model",
@@ -167,10 +182,7 @@ class GrokTextGeneration(IO.ComfyNode):
                     options=GrokClient.REASONING_EFFORT_OPTIONS,
                     default=GrokClient.REASONING_EFFORT_MODEL_DEFAULT,
                     optional=True,
-                    tooltip=(
-                        "Reasoning depth. Only grok-4.7 accepts it (low to xhigh; 'none' is sent "
-                        "as 'low'). Ignored for the other models. '(model default)' sends nothing."
-                    ),
+                    tooltip=_REASONING_EFFORT_TOOLTIP,
                 ),
             ],
             outputs=[
@@ -184,9 +196,9 @@ class GrokTextGeneration(IO.ComfyNode):
         model = kwargs.get("model") or GrokClient.DEFAULT_TEXT_MODEL
         temperature = kwargs.get("temperature", 0.7)
         max_tokens = kwargs.get("max_tokens", 4096)
-        reasoning_effort = GrokClient.resolve_reasoning_effort(
-            model, kwargs.get("reasoning_effort", GrokClient.REASONING_EFFORT_MODEL_DEFAULT)
-        )
+        effort = kwargs.get("reasoning_effort", GrokClient.REASONING_EFFORT_MODEL_DEFAULT)
+        reasoning_effort = GrokClient.resolve_reasoning_effort(model, effort)
+        agent_count = GrokClient.resolve_agent_count(model, effort)
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty.")
@@ -201,6 +213,7 @@ class GrokTextGeneration(IO.ComfyNode):
                 temperature=temperature,
                 max_tokens=max_tokens,
                 reasoning_effort=reasoning_effort,
+                agent_count=agent_count,
             )
             text = result.get("text", "")
             print(f"[Grok] Text generated ({len(text)} chars) via {model}")
@@ -229,7 +242,7 @@ class GrokChat(IO.ComfyNode):
                 IO.Custom("GROK_API_CLIENT").Input(
                     "client",
                     optional=True,
-                    tooltip="Grok API client from Grok API Client node. If not connected, resolves from ComfyUI Settings or environment.",
+                    tooltip=_CLIENT_TOOLTIP,
                 ),
                 IO.Combo.Input(
                     "model",
@@ -275,10 +288,7 @@ class GrokChat(IO.ComfyNode):
                     options=GrokClient.REASONING_EFFORT_OPTIONS,
                     default=GrokClient.REASONING_EFFORT_MODEL_DEFAULT,
                     optional=True,
-                    tooltip=(
-                        "Reasoning depth. Only grok-4.7 accepts it (low to xhigh; 'none' is sent "
-                        "as 'low'). Ignored for the other models. '(model default)' sends nothing."
-                    ),
+                    tooltip=_REASONING_EFFORT_TOOLTIP,
                 ),
             ],
             outputs=[
@@ -295,9 +305,9 @@ class GrokChat(IO.ComfyNode):
         reset_conversation = kwargs.get("reset_conversation", False)
         temperature = kwargs.get("temperature", 0.7)
         max_tokens = kwargs.get("max_tokens", 4096)
-        reasoning_effort = GrokClient.resolve_reasoning_effort(
-            model, kwargs.get("reasoning_effort", GrokClient.REASONING_EFFORT_MODEL_DEFAULT)
-        )
+        effort = kwargs.get("reasoning_effort", GrokClient.REASONING_EFFORT_MODEL_DEFAULT)
+        reasoning_effort = GrokClient.resolve_reasoning_effort(model, effort)
+        agent_count = GrokClient.resolve_agent_count(model, effort)
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty.")
@@ -319,6 +329,7 @@ class GrokChat(IO.ComfyNode):
                 temperature=temperature,
                 max_tokens=max_tokens,
                 reasoning_effort=reasoning_effort,
+                agent_count=agent_count,
             )
             text = result.get("text", "")
             messages.append({"role": "assistant", "content": text})
@@ -348,7 +359,7 @@ class GrokImageGeneration(IO.ComfyNode):
                 IO.Custom("GROK_API_CLIENT").Input(
                     "client",
                     optional=True,
-                    tooltip="Grok API client from Grok API Client node. If not connected, resolves from ComfyUI Settings or environment.",
+                    tooltip=_CLIENT_TOOLTIP,
                 ),
                 IO.Combo.Input(
                     "model",
@@ -385,8 +396,8 @@ class GrokImageGeneration(IO.ComfyNode):
                     default="auto",
                     optional=True,
                     tooltip=(
-                        "Generation quality: low or medium. 'auto' sends nothing and lets xAI "
-                        "pick (xAI's docs and SDK disagree on whether that is low or medium)."
+                        "Generation quality: low or medium. 'auto' sends nothing; xAI then "
+                        "serves low for generation. Billed at the quality served."
                     ),
                 ),
             ],
@@ -456,7 +467,7 @@ class GrokImageEdit(IO.ComfyNode):
                 IO.Custom("GROK_API_CLIENT").Input(
                     "client",
                     optional=True,
-                    tooltip="Grok API client from Grok API Client node. If not connected, resolves from ComfyUI Settings or environment.",
+                    tooltip=_CLIENT_TOOLTIP,
                 ),
                 IO.Combo.Input(
                     "model",
@@ -492,7 +503,10 @@ class GrokImageEdit(IO.ComfyNode):
                     options=GrokClient.IMAGE_QUALITIES,
                     default="auto",
                     optional=True,
-                    tooltip="Edit quality: low or medium. 'auto' sends nothing and lets xAI choose.",
+                    tooltip=(
+                        "Edit quality: low or medium. 'auto' sends nothing; xAI then serves "
+                        "medium for edits. Billed at the quality served."
+                    ),
                 ),
             ],
             outputs=[

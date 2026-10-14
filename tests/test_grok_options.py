@@ -1,6 +1,8 @@
 # ABOUTME: Behaviour tests for the Grok node options: what each widget offers and what reaches the SDK.
 # ABOUTME: SDK-backed tests build real xai-sdk requests and skip when xai_sdk is not installed.
 
+import asyncio
+
 import pytest
 
 from erpk.grok.grok_api.client import GrokClient
@@ -66,6 +68,92 @@ def test_video_input_nodes_offer_only_grok_imagine_video(node):
     assert inp.default == "grok-imagine-video"
 
 
+# ---------------------------------------------------------------------------
+# Text-to-video and reference-to-video models and resolutions
+# docs.x.ai video overview: text-to-video on grok-imagine-video-1.5 (native)
+# and grok-imagine-video-1.5-lite (upscaled from 720p) goes to 1080p;
+# grok-imagine-video stops at 720p; reference-to-video stops at 720p on every
+# model, and lite does not take reference images (live probe 2026-10-14:
+# INVALID_ARGUMENT "reference_images is not supported for this model").
+# ---------------------------------------------------------------------------
+
+def test_text_to_video_offers_lite_last():
+    inp = _input(_video_node("GrokTextToVideo"), "model")
+    assert inp.options == ["grok-imagine-video", "grok-imagine-video-1.5", "grok-imagine-video-1.5-lite"]
+    assert inp.default == "grok-imagine-video"
+
+
+def test_reference_to_video_does_not_offer_lite():
+    inp = _input(_video_node("GrokRefToVideo"), "model")
+    assert inp.options == ["grok-imagine-video", "grok-imagine-video-1.5"]
+
+
+def test_text_to_video_offers_1080p_last():
+    inp = _input(_video_node("GrokTextToVideo"), "resolution")
+    assert inp.options == ["480p", "720p", "1080p"]
+    assert inp.default == "720p"
+
+
+def test_reference_to_video_stops_at_720p():
+    assert _input(_video_node("GrokRefToVideo"), "resolution").options == ["480p", "720p"]
+
+
+@pytest.mark.parametrize("model", ["grok-imagine-video-1.5", "grok-imagine-video-1.5-lite"])
+def test_1080p_models_keep_1080p(model):
+    assert GrokClient.resolve_video_resolution(model, "1080p") == "1080p"
+
+
+def test_grok_imagine_video_1080p_is_clamped_to_720p():
+    assert GrokClient.resolve_video_resolution("grok-imagine-video", "1080p") == "720p"
+
+
+@pytest.mark.parametrize("model", ["grok-imagine-video", "grok-imagine-video-1.5", "grok-imagine-video-1.5-lite"])
+@pytest.mark.parametrize("resolution", ["480p", "720p"])
+def test_sub_1080p_resolutions_pass_unchanged(model, resolution):
+    assert GrokClient.resolve_video_resolution(model, resolution) == resolution
+
+
+def test_every_text_to_video_option_builds_a_valid_sdk_request():
+    xai_video = pytest.importorskip("xai_sdk.video")
+    node = _video_node("GrokTextToVideo")
+    for model in _input(node, "model").options:
+        for resolution in _input(node, "resolution").options:
+            xai_video._make_generate_request(
+                "a red cube", model, image_url=None, video_url=None, duration=1,
+                aspect_ratio="16:9", resolution=GrokClient.resolve_video_resolution(model, resolution),
+                reference_image_urls=None,
+            )
+
+
+# /v1/videos/extensions requires a prompt: an empty one returns sync
+# INVALID_ARGUMENT "Prompt cannot be empty. Please provide a prompt." (live
+# probe 2026-10-14). The node keeps prompt optional and sends this literal.
+EXTEND_DEFAULT_PROMPT = "Continue the video naturally."
+
+
+@pytest.mark.parametrize("prompt", [None, "", "   \n"])
+def test_blank_extend_prompt_sends_the_default(prompt):
+    assert GrokClient.resolve_extend_prompt(prompt) == EXTEND_DEFAULT_PROMPT
+
+
+def test_given_extend_prompt_is_sent_stripped():
+    assert GrokClient.resolve_extend_prompt("  The cat leaps off. ") == "The cat leaps off."
+
+
+def test_extend_tooltip_names_the_default_prompt():
+    tooltip = _input(_video_node("GrokVideoExtend"), "prompt").tooltip
+    assert EXTEND_DEFAULT_PROMPT in tooltip
+
+
+def test_blank_extend_prompt_builds_a_non_empty_sdk_request():
+    xai_video = pytest.importorskip("xai_sdk.video")
+    request = xai_video._make_extend_request(
+        GrokClient.resolve_extend_prompt(""), "grok-imagine-video",
+        video_url="https://example.com/a.mp4", duration=2,
+    )
+    assert request.prompt == EXTEND_DEFAULT_PROMPT
+
+
 
 # ---------------------------------------------------------------------------
 # Text: reasoning_effort widget and per-model clamp
@@ -73,7 +161,8 @@ def test_video_input_nodes_offer_only_grok_imagine_video(node):
 #   grok-4.7: low/medium/high/xhigh -> 200, none -> 400 "does not support
 #   reasoning_effort value none"; grok-4.20-0309-non-reasoning,
 #   grok-4.20-multi-agent-0309, grok-build-0.1: low -> 400 "does not support
-#   parameter reasoningEffort".
+#   parameter reasoningEffort". On grok-4.20-multi-agent-0309 the effort is
+#   carried by agent_count instead (see the agent_count tests below).
 # ---------------------------------------------------------------------------
 
 EFFORT_OPTIONS = ["(model default)", "none", "low", "medium", "high", "xhigh"]
@@ -111,6 +200,43 @@ def test_model_default_sends_nothing():
 @pytest.mark.parametrize("effort", EFFORT_OPTIONS)
 def test_models_without_effort_never_receive_it(model, effort):
     assert GrokClient.resolve_reasoning_effort(model, effort) is None
+
+
+# docs.x.ai multi-agent: REST reasoning.effort low/medium = 4 agents,
+# high/xhigh = 16 agents; the xAI SDK takes agent_count 4 or 16. Live probe
+# 2026-10-14: agent_count 4 -> 200, 16 -> 200, reasoning_effort -> 400.
+MULTI_AGENT = "grok-4.20-multi-agent-0309"
+
+
+@pytest.mark.parametrize("effort,agents", [("low", 4), ("medium", 4), ("high", 16), ("xhigh", 16)])
+def test_multi_agent_effort_maps_to_agent_count(effort, agents):
+    assert GrokClient.resolve_agent_count(MULTI_AGENT, effort) == agents
+
+
+@pytest.mark.parametrize("effort", ["(model default)", "none"])
+def test_multi_agent_default_and_none_send_no_agent_count(effort):
+    assert GrokClient.resolve_agent_count(MULTI_AGENT, effort) is None
+
+
+@pytest.mark.parametrize("model", ["grok-4.7", "grok-4.20-0309-non-reasoning", "grok-build-0.1"])
+@pytest.mark.parametrize("effort", EFFORT_OPTIONS)
+def test_other_models_never_receive_agent_count(model, effort):
+    assert GrokClient.resolve_agent_count(model, effort) is None
+
+
+def test_every_sent_agent_count_converts_in_the_sdk():
+    xai_chat = pytest.importorskip("xai_sdk.chat")
+    for effort in EFFORT_OPTIONS:
+        agents = GrokClient.resolve_agent_count(MULTI_AGENT, effort)
+        if agents is not None:
+            xai_chat._agent_count_to_proto(agents)
+
+
+@pytest.mark.parametrize("node", ["GrokTextGeneration", "GrokChat"])
+def test_effort_tooltip_states_the_sixteen_agent_cost(node):
+    tooltip = _input(_node(node), "reasoning_effort").tooltip
+    assert "16 agents" in tooltip
+    assert "12x" in tooltip
 
 
 def test_every_sent_effort_converts_in_the_sdk():
@@ -222,9 +348,49 @@ def test_image_edit_accepts_five_sources():
     assert GrokClient.MAX_EDIT_IMAGES == 5
 
 
-def test_reference_to_video_keeps_three_reference_images():
-    # The 5-source cap is image-edit only; the r2v reference cap is unchanged.
-    assert GrokClient.MAX_REFERENCE_IMAGES == 3
+# docs.x.ai reference-to-video: up to 7 reference images and 10 s on
+# grok-imagine-video; up to 14 images and 15 s on grok-imagine-video-1.5.
+
+@pytest.mark.parametrize("model,images", [("grok-imagine-video", 7), ("grok-imagine-video-1.5", 14)])
+def test_reference_to_video_accepts_the_documented_image_count(model, images):
+    GrokClient.validate_reference_request(model, images, 5)
+
+
+@pytest.mark.parametrize("model,images,limit", [("grok-imagine-video", 8, 7), ("grok-imagine-video-1.5", 15, 14)])
+def test_reference_to_video_rejects_more_images_than_the_model_takes(model, images, limit):
+    with pytest.raises(ValueError) as exc:
+        GrokClient.validate_reference_request(model, images, 5)
+    assert str(exc.value) == (
+        f"{model} takes at most {limit} reference images; got {images}. "
+        "Trim the batch before this node."
+    )
+
+
+@pytest.mark.parametrize("model,images,duration,message", [
+    ("grok-imagine-video", 8, 5, "at most 7 reference images; got 8"),
+    ("grok-imagine-video", 1, 11, "lasts at most 10 s; got 11 s"),
+])
+def test_reference_node_rejects_before_any_api_call(model, images, duration, message):
+    # No client and no key is configured: reaching the API would fail differently.
+    refs = ["data:image/jpeg;base64,AAAA"] * images
+    with pytest.raises(ValueError, match=message):
+        asyncio.run(_video_node("GrokRefToVideo").execute(
+            prompt="a cat", reference_images=refs, model=model, duration=duration,
+        ))
+
+
+@pytest.mark.parametrize("model,seconds", [("grok-imagine-video", 10), ("grok-imagine-video-1.5", 15)])
+def test_reference_to_video_accepts_the_documented_duration(model, seconds):
+    GrokClient.validate_reference_request(model, 1, seconds)
+
+
+def test_grok_imagine_video_reference_to_video_rejects_over_ten_seconds():
+    with pytest.raises(ValueError) as exc:
+        GrokClient.validate_reference_request("grok-imagine-video", 1, 11)
+    assert str(exc.value) == (
+        "grok-imagine-video reference-to-video lasts at most 10 s; got 11 s. "
+        "Lower duration or pick grok-imagine-video-1.5 (up to 15 s)."
+    )
 
 
 def test_five_worst_case_edit_sources_fit_one_grpc_message():
@@ -237,5 +403,18 @@ def test_five_worst_case_edit_sources_fit_one_grpc_message():
     torch.manual_seed(0)
     uris = images_to_data_uris(torch.rand(5, 2048, 2048, 3), max_count=GrokClient.MAX_EDIT_IMAGES)
     assert len(uris) == 5
+    headroom_for_prompt = 2**20
+    assert sum(len(u) for u in uris) <= 20 * 2**20 - headroom_for_prompt
+
+
+def test_fourteen_worst_case_reference_images_fit_one_grpc_message():
+    # grok-imagine-video-1.5 takes 14 references; they share the same 20 MiB
+    # gRPC send limit as the edit sources above.
+    torch = pytest.importorskip("torch")
+    from erpk.grok.grok_api.utils import images_to_data_uris
+
+    torch.manual_seed(0)
+    uris = images_to_data_uris(torch.rand(14, 2048, 2048, 3), max_count=14)
+    assert len(uris) == 14
     headroom_for_prompt = 2**20
     assert sum(len(u) for u in uris) <= 20 * 2**20 - headroom_for_prompt
