@@ -34,3 +34,5 @@ AGENTS.md
 .obsidian/
 CLAUDE.local.md
 .cs/vault-mnt/
+.cs-tmp.*
+.cs/private/
