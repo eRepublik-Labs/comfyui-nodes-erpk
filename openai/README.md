@@ -87,13 +87,14 @@ General-purpose text generation and completion.
 - `client`: OpenAI API client
 - `prompt`: Text prompt
 - `model`: gpt-6.1-sol (default), gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, chat-latest
-- `temperature`: 0.0-2.0 (creativity level, default: 0.7; ignored by every current model, which accepts only the default)
+- `temperature`: 0.0-2.0 (creativity level, default: 0.7; sent only when `reasoning_effort` is `none` on gpt-6-sol, gpt-6-luna or a gpt-5.6 tier; dropped otherwise, since every model rejects it while reasoning)
 - `max_tokens`: 256-128000 (output length, default: 4096)
-- `top_p`: 0.0-1.0 (nucleus sampling, default: 1.0; ignored by every current model, which accepts only the default)
-- `stop_sequences`: Newline-separated sequences where generation stops (ignored by every current model, which accepts only the default)
-- `response_format`: Output format - "default" or "json_object"
-- `reasoning_effort`: Reasoning depth for the gpt-6.x and gpt-5.6 models — none, minimal, low, medium, high, xhigh. `none` sends no effort (model default); `minimal` is rejected by every current model and is sent as `low`. Dropped for chat-latest
-- `verbosity`: Output verbosity for the gpt-6.x and gpt-5.6 models — default, low, medium, high. Shapes how chatty the response is independently of `max_tokens`. 'default' lets the model pick. Dropped for chat-latest.
+- `top_p`: 0.0-1.0 (nucleus sampling, default: 1.0; sent only when `reasoning_effort` is `none` on gpt-6-sol, gpt-6-luna or a gpt-5.6 tier; dropped otherwise, since every model rejects it while reasoning)
+- `stop_sequences`: Newline-separated sequences where generation stops (ignored by every current model, which rejects `stop` even with reasoning off)
+- `response_format`: Output format - "default", "json_object" (JSON mode) or "json_schema" (strict Structured Outputs, using the `json_schema` input)
+- `reasoning_effort`: Reasoning depth for the gpt-6.x and gpt-5.6 models — default, none, minimal, low, medium, high, xhigh. `default` (the starting value) sends nothing, so the model reasons at its own default (medium). `none` turns reasoning off on gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; gpt-6.1-sol and gpt-6-astra cannot turn it off, so there `none` acts like `default`. `minimal` is rejected by every current model and is sent as `low`. Dropped for chat-latest
+- `verbosity`: Output verbosity for the gpt-6.x and gpt-5.6 models — default, low, medium, high. Shapes how chatty the response is independently of `max_tokens`. 'default' lets the model pick. Not sent to chat-latest, which accepts it but ignores it.
+- `json_schema`: JSON Schema the reply must match when `response_format` is `json_schema`, sent with `strict: true`. Strict mode needs every property in `required` and `additionalProperties: false` on each object. Empty, invalid or non-object JSON is refused before the request
 
 **Outputs:**
 - `response`: Generated text
@@ -104,6 +105,7 @@ General-purpose text generation and completion.
 - Content generation
 - Text transformation
 - **JSON mode**: Set response_format to "json_object" for structured data extraction
+- **Structured Outputs**: Set response_format to "json_schema" and paste a JSON Schema into `json_schema` to force the reply's shape
 
 ---
 
@@ -116,12 +118,14 @@ Multi-turn conversation with message history preservation.
 - `model`: gpt-6.1-sol (default), gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, chat-latest
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
-- `temperature`: 0.0-2.0 (default: 0.7; ignored by every current model, which accepts only the default)
+- `temperature`: 0.0-2.0 (default: 0.7; sent only when `reasoning_effort` is `none` on gpt-6-sol, gpt-6-luna or a gpt-5.6 tier; dropped otherwise, since every model rejects it while reasoning)
 - `max_tokens`: 256-128000 (default: 4096)
-- `top_p`: 0.0-1.0 (nucleus sampling, default: 1.0; ignored by every current model, which accepts only the default)
-- `stop_sequences`: Newline-separated sequences where generation stops (ignored by every current model, which accepts only the default)
-- `response_format`: Output format - "default" or "json_object"
-- `reasoning_effort`: Reasoning depth for the gpt-6.x and gpt-5.6 models — none, minimal, low, medium, high, xhigh (`minimal` is sent as `low`)
+- `top_p`: 0.0-1.0 (nucleus sampling, default: 1.0; sent only when `reasoning_effort` is `none` on gpt-6-sol, gpt-6-luna or a gpt-5.6 tier; dropped otherwise, since every model rejects it while reasoning)
+- `stop_sequences`: Newline-separated sequences where generation stops (ignored by every current model, which rejects `stop` even with reasoning off)
+- `response_format`: Output format - "default", "json_object" (JSON mode) or "json_schema" (strict Structured Outputs, using the `json_schema` input)
+- `reasoning_effort`: Reasoning depth for the gpt-6.x and gpt-5.6 models — default, none, minimal, low, medium, high, xhigh. `default` (the starting value) sends nothing, so the model reasons at its own default (medium). `none` turns reasoning off on gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; gpt-6.1-sol and gpt-6-astra cannot turn it off, so there `none` acts like `default`. `minimal` is rejected by every current model and is sent as `low`. Dropped for chat-latest
+- `verbosity`: default, low, medium, high (not sent to chat-latest)
+- `json_schema`: JSON Schema for `response_format` json_schema (see OpenAI Text Generation)
 
 **Outputs:**
 - `response`: Chat response
@@ -131,7 +135,7 @@ Multi-turn conversation with message history preservation.
 - Maintains conversation context automatically
 - Connect multiple chat nodes to continue conversations
 - Reset conversation to start fresh
-- Supports JSON mode for structured responses in conversations
+- Supports JSON mode and strict json_schema Structured Outputs in conversations
 
 ---
 
@@ -143,9 +147,11 @@ Analyze images with questions or instructions.
 - `image`: ComfyUI image tensor (supports batches)
 - `prompt`: Question or instruction about the image(s)
 - `model`: gpt-6.1-sol (default), gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, chat-latest
-- `detail`: Image analysis detail level - "auto" (default), "low" (faster/cheaper), "high" (more detailed)
+- `detail`: Image analysis detail level - "auto" (default), "low" (faster/cheaper), "high" (more detailed), "original" (full resolution; on gpt-6-astra and the gpt-5.6 tiers `auto` already behaves this way)
 - `max_tokens`: 256-128000 (default: 4096)
-- `temperature`: 0.0-2.0 (default: 0.4; ignored by every current model, which accepts only the default)
+- `temperature`: 0.0-2.0 (default: 0.4; sent only when `reasoning_effort` is `none` on gpt-6-sol, gpt-6-luna or a gpt-5.6 tier; dropped otherwise, since every model rejects it while reasoning)
+- `reasoning_effort`: same values and behaviour as OpenAI Text Generation
+- `verbosity`: default, low, medium, high (not sent to chat-latest)
 
 **Outputs:**
 - `analysis`: Text analysis of the image(s)
@@ -191,7 +197,7 @@ Generate images from text descriptions using OpenAI's image generation models.
 - `size`: Preset (auto, 1024x1024, 1024x1536, 1536x1024, 2048x2048, 2048x1152, 1152x2048, 3840x2160, 2160x3840) or Custom
 - `custom_width` / `custom_height`: Used when size is Custom (256 to 3840, step 16). Sizes outside the gpt-image-2 envelope below are rejected before the request is sent.
 - `quality`: Image quality - auto (default), low, medium, high, xhigh, max (xhigh/max on GPT Image 2.5 only, clamped to high on gpt-image-2)
-- `background`: Background type - auto, transparent, opaque (transparent: GPT Image 2.5 only; gpt-image-2 rejects it)
+- `background`: Background type - auto, transparent, opaque (transparent: GPT Image 2.5 only, with png or webp output; gpt-image-2 or jpeg is refused before the request)
 - `moderation`: auto (default) / low
 - `n`: Number of images (1-10)
 - `seed`: Cache control only, not sent to the API (-1 randomizes)
@@ -205,7 +211,7 @@ Generate images from text descriptions using OpenAI's image generation models.
 **Features:**
 - Credentials resolved from ComfyUI Settings, the node input, or config.ini
 - Direct image output compatible with all ComfyUI image nodes
-- Transparent background support on gpt-image-2.5-sunburst / gpt-image-2.5-flare (in preview on gpt-image-2)
+- Transparent background support on gpt-image-2.5-sunburst / gpt-image-2.5-flare (gpt-image-2 rejects it)
 - n>1 returns a batched IMAGE tensor — no images are dropped
 - Size presets plus a Custom width/height pair (validated against the model's supported sizes by the API)
 
@@ -230,14 +236,17 @@ Generate images via the OpenAI Responses API with a mainline reasoning model dri
 - `client`: Optional OpenAI API client
 - `mainline_model`: Text/reasoning model that orchestrates the call — gpt-6.1-sol (default), gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna
 - `image_model`: Underlying GPT Image model — gpt-image-2 (default), gpt-image-2.5-sunburst, gpt-image-2.5-flare
-- `reasoning_effort`: none (default), minimal, low, medium, high, xhigh (`minimal` is rejected alongside the image tool and is sent as `low`)
-- `size`: 1024x1024 (default) and common variants
+- `reasoning_effort`: default (the starting value), none, minimal, low, medium, high, xhigh, max. `default` sends no effort, so the mainline reasons at its own default; `none` turns reasoning off where the mainline accepts it, as on the text nodes; `minimal` is rejected alongside the image tool and is sent as `low`. `max` works here but not on the text nodes (chat.completions rejects it)
+- `verbosity`: default, low, medium, high; sent as `text.verbosity`
+- `size`: auto (the model chooses), 1024x1024 (default) and common variants
 - `quality`: auto / low / medium / high / xhigh / max (xhigh/max on GPT Image 2.5 only)
-- `background`: auto / transparent / opaque
+- `background`: auto / transparent / opaque (transparent: GPT Image 2.5 only, with png or webp output)
 - `output_format`: png (default), jpeg, webp
 - `moderation`: auto (default) or low
 - `enable_web_search`: Attach the `web_search` tool so the mainline model can ground the prompt in fresh reference material (adds ~$10/1000 calls when invoked)
 - `seed`: Cache-bust seed (randomizes by default)
+- `reasoning_mode`: standard (default) or pro. Pro spends more mainline compute on the prompt revision and adds about 2,000 to 4,000 input tokens per call, even for a short prompt; it works with or without an effort
+- `output_compression`: 0-100 (default 100), sent only with jpeg or webp
 
 **Outputs:**
 - `image`: Generated image(s) as an IMAGE tensor (multi-image responses are batched)
@@ -263,7 +272,7 @@ Edit and modify existing images using text prompts with optional masking.
 - `custom_width` / `custom_height`: Used when size is Custom (256 to 3840, step 16)
 - `quality`: Image quality - auto (default), low, medium, high, xhigh, max (xhigh/max on GPT Image 2.5 only)
 - `moderation`: auto (default) / low
-- `background`: auto / transparent / opaque (transparent: GPT Image 2.5 only; gpt-image-2 rejects it)
+- `background`: auto / transparent / opaque (transparent: GPT Image 2.5 only, with png or webp output; gpt-image-2 or jpeg is refused before the request)
 - `input_fidelity`: auto / high / low (ignored by every current model: gpt-image-2 and the 2.5 models reject the param, so it is never sent)
 - `n`: Number of variations (1-10)
 - `seed`: Cache control only, not sent to the API (-1 randomizes)
@@ -303,7 +312,7 @@ Edit and modify existing images using text prompts with optional masking.
 | **gpt-5.6-luna** | Fast, cost-efficient GPT-5.6 tier | — | Lowest GPT-5.6 cost |
 | **chat-latest** | ChatGPT Instant, non-reasoning | 400K tokens | $5/$30 per MTok; no reasoning_effort or verbosity |
 
-Removed on 2026-10-01: gpt-5.5, gpt-5.5-pro, gpt-5.4 / -pro / -mini / -nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5 / -mini / -nano, gpt-4.1 / -mini / -nano, gpt-4o, gpt-4o-mini, o4-mini, o3, o3-mini, o3-pro. gpt-5.2-pro, gpt-5.4-pro and gpt-5.5-pro never worked here: they 404 on chat.completions. Every kept model rejects temperature, top_p and stop, so the node no longer sends them.
+Removed on 2026-10-01: gpt-5.5, gpt-5.5-pro, gpt-5.4 / -pro / -mini / -nano, gpt-5.2, gpt-5.2-pro, gpt-5.1, gpt-5 / -mini / -nano, gpt-4.1 / -mini / -nano, gpt-4o, gpt-4o-mini, o4-mini, o3, o3-mini, o3-pro. gpt-5.2-pro, gpt-5.4-pro and gpt-5.5-pro never worked here: they 404 on chat.completions. Every kept model rejects temperature, top_p and stop while reasoning, so the nodes send temperature and top_p only with `reasoning_effort` none on a model that accepts it, and never send stop.
 
 ### Image Generation Models
 
@@ -311,7 +320,7 @@ Removed on 2026-10-01: gpt-5.5, gpt-5.5-pro, gpt-5.4 / -pro / -mini / -nano, gpt
 |-------|----------|-------|
 | **gpt-image-2.5-sunburst** | Highest quality | 4K output, `xhigh`/`max` quality tiers, transparent background |
 | **gpt-image-2.5-flare** | Fastest 2.5 tier | 4K output, `xhigh`/`max` quality tiers, transparent background |
-| **gpt-image-2** | 4K, multilingual text | **Default**, 4K output, multilingual text, transparent background in preview |
+| **gpt-image-2** | 4K, multilingual text | **Default**, 4K output, multilingual text, no transparent background |
 
 gpt-image-1.5, gpt-image-1 and gpt-image-1-mini were removed on 2026-10-01, along with the DALL-E-only quality values hd / standard.
 
@@ -391,7 +400,7 @@ https://openai.com/pricing
 ### Image generation fails
 - Check your API quota and billing status
 - Some sizes are only available for certain models
-- Transparent backgrounds are supported on GPT Image 2.5 and in preview on gpt-image-2. Pass-through values: any of `auto`, `transparent`, `opaque` go to the API as-is. Transparent needs png or webp output.
+- Transparent backgrounds are supported on GPT Image 2.5 only; gpt-image-2 returns 400 for them. `auto`, `transparent` and `opaque` go to the API as-is. Transparent needs png or webp output; transparent with jpeg, or on gpt-image-2, is refused before the request.
 - gpt-image-2 enforces min 655,360 total pixels and max-edge 3840 — pick Custom and type a size your chosen model supports
 
 ### Rate limiting

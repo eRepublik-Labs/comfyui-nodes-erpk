@@ -208,14 +208,14 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 
 **Key Benefits:**
 - Support for GPT-6.1 Sol (default: 1.05M context, 128K output, $2/$10 per MTok), the GPT-6 Astra/Sol/Luna and GPT-5.6 Sol/Terra/Luna tiers, and chat-latest. The GPT-5.5 and older text models were removed on 2026-10-01
-- `reasoning_effort` parameter (none/minimal/low/medium/high/xhigh) for the reasoning models; `minimal` is sent as `low`, and chat-latest drops it
-- `verbosity` parameter (default/low/medium/high) — shapes how chatty the response is independently of `max_tokens`; dropped for chat-latest
-- Every current model rejects temperature, top_p and stop, so those widgets are kept for saved workflows but not sent
+- `reasoning_effort` parameter (default/none/minimal/low/medium/high/xhigh) for the reasoning models, matching ComfyUI's own OpenAI node; `default` leaves the effort to the model, `none` turns reasoning off on gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers and acts like `default` on gpt-6.1-sol and gpt-6-astra, `minimal` is sent as `low`, and chat-latest drops it. The Responses image node also offers `max` and a `pro` reasoning mode
+- `verbosity` parameter (default/low/medium/high) — shapes how chatty the response is independently of `max_tokens`; not sent to chat-latest, which ignores it
+- Every current model rejects temperature, top_p and stop while reasoning; temperature and top_p are sent only with `reasoning_effort` none on a model that accepts it, and stop is never sent
 - Image generation with GPT-Image-2 (4K output, multilingual text) and GPT-Image-2.5 Sunburst / Flare (xhigh/max quality, transparent background). GPT-Image-1.5, 1 and 1-Mini were removed on 2026-10-01
 - Image editing with optional mask support for inpainting
 - Multi-turn conversation with session management
 - Automatic retry with exponential backoff
-- JSON response format support
+- JSON mode and strict json_schema Structured Outputs on Text Generation and Chat
 
 **Installation & Documentation:** See [openai/README.md](openai/README.md)
 

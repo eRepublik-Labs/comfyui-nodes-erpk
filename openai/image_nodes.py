@@ -27,7 +27,9 @@ RESPONSES_IMAGE_MODELS = [
     "gpt-image-2.5-flare",
 ]
 
-REASONING_EFFORT_LEVELS = ["none", "minimal", "low", "medium", "high", "xhigh"]
+# max is Responses-only: 200 on all 7 mainlines here, 400 on chat.completions
+# (measured 2026-10-14), so the text nodes stop at xhigh.
+REASONING_EFFORT_LEVELS = ["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"]
 
 # Size presets shared by the generation and edit nodes, mirroring the official
 # ComfyUI GPT Image node. "Custom" reads custom_width / custom_height.
@@ -81,6 +83,7 @@ def size_inputs(model_hint):
     ]
 
 GEN_SIZES = [
+    "auto",
     "1024x1024", "1024x1536", "1536x1024",
     "1792x1024", "1024x1792",
     # OpenAI marks resolutions above 2560x1440 as experimental
@@ -118,7 +121,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     tooltip=(
                         "Image generation model. "
                         "gpt-image-2.5-sunburst / -flare: newest, add xhigh/max quality and transparent background. "
-                        "gpt-image-2: 4K output, multilingual text; transparent background in preview."
+                        "gpt-image-2: 4K output, multilingual text; no transparent background (the API rejects it)."
                     ),
                 ),
                 *size_inputs(
@@ -333,11 +336,14 @@ class OpenAIImageResponses(IO.ComfyNode):
                 IO.Combo.Input(
                     "reasoning_effort",
                     options=REASONING_EFFORT_LEVELS,
-                    default="none",
+                    default="default",
                     optional=True,
                     tooltip=(
-                        "Mainline-model reasoning depth. 'none' sends no effort, so the model uses "
-                        "its own default. 'low' to 'xhigh' increase prompt-interpretation quality "
+                        "Mainline-model reasoning depth. 'default' sends nothing, so the model uses "
+                        "its own default (medium). 'none' turns reasoning off on gpt-6-sol, "
+                        "gpt-6-luna and the gpt-5.6 tiers; gpt-6.1-sol and gpt-6-astra reject it, so "
+                        "there 'none' acts like 'default'. "
+                        "'low' to 'max' increase prompt-interpretation quality "
                         "at token cost. 'minimal' is rejected alongside the image tool and is sent "
                         "as 'low'. "
                         "Note: when enabled, reasoning_summary output contains the model's raw "
@@ -361,7 +367,7 @@ class OpenAIImageResponses(IO.ComfyNode):
                     options=GEN_SIZES,
                     default="1024x1024",
                     optional=True,
-                    tooltip="Image size. Same constraints as direct endpoint (gpt-image-2: min 655,360 pixels). 3840x2160 / 2160x3840 are experimental per OpenAI.",
+                    tooltip="Image size. 'auto' lets the model choose. Same constraints as direct endpoint (gpt-image-2: min 655,360 pixels). 3840x2160 / 2160x3840 are experimental per OpenAI.",
                 ),
                 IO.Combo.Input(
                     "quality",
@@ -385,7 +391,7 @@ class OpenAIImageResponses(IO.ComfyNode):
                     options=["png", "jpeg", "webp"],
                     default="png",
                     optional=True,
-                    tooltip="Output image format.",
+                    tooltip="Output image format. 'transparent' background needs png or webp.",
                 ),
                 IO.Combo.Input(
                     "moderation",
@@ -412,6 +418,25 @@ class OpenAIImageResponses(IO.ComfyNode):
                     control_after_generate="randomize",
                     tooltip="Cache-bust seed. Randomizes by default.",
                 ),
+                IO.Combo.Input(
+                    "reasoning_mode",
+                    options=["standard", "pro"],
+                    default="standard",
+                    optional=True,
+                    tooltip=(
+                        "Mainline-model reasoning mode. 'pro' spends more compute on the "
+                        "prompt revision and adds about 2,000 to 4,000 input tokens per call, even "
+                        "for a short prompt. Responses API only."
+                    ),
+                ),
+                IO.Int.Input(
+                    "output_compression",
+                    default=100,
+                    min=0,
+                    max=100,
+                    optional=True,
+                    tooltip="Compression level 0-100 (100 = least compression). Applied only to jpeg and webp.",
+                ),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -432,7 +457,7 @@ class OpenAIImageResponses(IO.ComfyNode):
         client = kwargs.get("client")
         mainline_model = kwargs.get("mainline_model", RESPONSES_MAINLINE_MODELS[0])
         image_model = kwargs.get("image_model", "gpt-image-2")
-        reasoning_effort = kwargs.get("reasoning_effort", "none")
+        reasoning_effort = kwargs.get("reasoning_effort", "default")
         verbosity = kwargs.get("verbosity", "default")
         size = kwargs.get("size", "1024x1024")
         quality = kwargs.get("quality", "auto")
@@ -440,6 +465,8 @@ class OpenAIImageResponses(IO.ComfyNode):
         output_format = kwargs.get("output_format", "png")
         moderation = kwargs.get("moderation", "auto")
         enable_web_search = kwargs.get("enable_web_search", False)
+        reasoning_mode = kwargs.get("reasoning_mode", "standard")
+        output_compression = kwargs.get("output_compression", 100)
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -468,6 +495,8 @@ class OpenAIImageResponses(IO.ComfyNode):
                 output_format=output_format,
                 moderation=moderation,
                 enable_web_search=enable_web_search,
+                reasoning_mode=reasoning_mode,
+                output_compression=output_compression,
             )
 
             if response.get("blocked", False):

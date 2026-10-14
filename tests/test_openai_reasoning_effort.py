@@ -18,9 +18,12 @@ for _name in ("APIError", "RateLimitError", "APIConnectionError"):
         setattr(_local_openai, _name, type(_name, (Exception,), {}))
 
 from openai.openai_api.client import OpenAIClient
+from tests.openai_sdk_signature import assert_binds
 
 
-REASONING_EFFORT_OPTIONS = ["none", "minimal", "low", "medium", "high", "xhigh"]
+# Mirrors ComfyUI's own OpenAI node (comfy_api_nodes/nodes_openai.py, v0.39.2):
+# "default" sends no effort and is the starting value; "none" turns reasoning off.
+REASONING_EFFORT_OPTIONS = ["default", "none", "minimal", "low", "medium", "high", "xhigh"]
 VERBOSITY_OPTIONS = ["default", "low", "medium", "high"]
 
 
@@ -78,8 +81,8 @@ class TestReasoningEffortSchema:
         )
         inp = matches[0]
         assert inp.optional is True
-        assert set(inp.options) == set(REASONING_EFFORT_OPTIONS)
-        assert inp.default == "none"
+        assert inp.options == REASONING_EFFORT_OPTIONS
+        assert inp.default == "default"
 
     def test_reasoning_effort_in_text_gen_schema(self):
         cls = _import_node("nodes", "OpenAITextGeneration")
@@ -385,3 +388,161 @@ class TestMinimalEffortClamp:
             prompt="hello", model=model_id, reasoning_effort="minimal",
         ))
         assert mock_sdk.chat.completions.create.call_args.kwargs["reasoning_effort"] == "low"
+
+
+# Measured 2026-10-14 on chat.completions: reasoning_effort "none" returns 200
+# on these five and 400 on gpt-6.1-sol and gpt-6-astra; with effort none,
+# temperature 0.7 and top_p 0.9 return 200 on the five, while stop still 400s.
+ACCEPTS_EFFORT_NONE = ["gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]
+REJECTS_EFFORT_NONE = ["gpt-6.1-sol", "gpt-6-astra"]
+
+
+def _run_node(class_name, model, **inputs):
+    """Run a text node through the real client with only the SDK mocked."""
+    client, mock_sdk = _make_client_with_mock_sdk()
+    cls = _import_node("nodes", class_name)
+    if class_name == "OpenAIVision":
+        torch = pytest.importorskip("torch")
+        asyncio.run(cls.execute(torch.zeros(1, 8, 8, 3), "describe", client=client, model=model, **inputs))
+    else:
+        asyncio.run(cls.execute("hello", client=client, model=model, **inputs))
+    return mock_sdk.chat.completions.create.call_args.kwargs
+
+
+TEXT_NODES = ["OpenAITextGeneration", "OpenAIChat", "OpenAIVision"]
+
+
+class TestEffortNone:
+    """The widget's 'none' sends a real reasoning_effort 'none' (no reasoning)
+    where the model accepts it, and is omitted (model default) where it 400s."""
+
+    @pytest.mark.parametrize("class_name", TEXT_NODES)
+    @pytest.mark.parametrize("model_id", ACCEPTS_EFFORT_NONE)
+    def test_none_is_sent_where_accepted(self, class_name, model_id):
+        kwargs = _run_node(class_name, model_id, reasoning_effort="none")
+        assert kwargs["reasoning_effort"] == "none"
+
+    @pytest.mark.parametrize("class_name", TEXT_NODES)
+    @pytest.mark.parametrize("model_id", ACCEPTS_EFFORT_NONE + REJECTS_EFFORT_NONE)
+    def test_default_sends_no_effort_and_no_sampling(self, class_name, model_id):
+        kwargs = _run_node(class_name, model_id, reasoning_effort="default", temperature=0.7, top_p=0.9)
+        assert "reasoning_effort" not in kwargs
+        assert "temperature" not in kwargs
+        assert "top_p" not in kwargs
+
+    @pytest.mark.parametrize("class_name", TEXT_NODES)
+    @pytest.mark.parametrize("model_id", REJECTS_EFFORT_NONE)
+    def test_none_is_omitted_where_rejected(self, class_name, model_id):
+        kwargs = _run_node(class_name, model_id, reasoning_effort="none")
+        assert "reasoning_effort" not in kwargs
+
+    @pytest.mark.parametrize("class_name", ["OpenAITextGeneration", "OpenAIChat"])
+    @pytest.mark.parametrize("model_id", ACCEPTS_EFFORT_NONE)
+    def test_effort_none_lets_temperature_and_top_p_through(self, class_name, model_id):
+        kwargs = _run_node(
+            class_name, model_id, reasoning_effort="none",
+            temperature=0.7, top_p=0.9, stop_sequences="zzz",
+        )
+        assert kwargs["temperature"] == 0.7
+        assert kwargs["top_p"] == 0.9
+        assert "stop" not in kwargs
+
+    @pytest.mark.parametrize("model_id", ACCEPTS_EFFORT_NONE)
+    def test_vision_effort_none_sends_temperature(self, model_id):
+        kwargs = _run_node("OpenAIVision", model_id, reasoning_effort="none", temperature=0.4)
+        assert kwargs["temperature"] == 0.4
+
+    @pytest.mark.parametrize("class_name", ["OpenAITextGeneration", "OpenAIChat"])
+    @pytest.mark.parametrize("model_id", REJECTS_EFFORT_NONE + ["chat-latest"])
+    def test_sampling_still_dropped_without_a_real_none(self, class_name, model_id):
+        kwargs = _run_node(
+            class_name, model_id, reasoning_effort="none",
+            temperature=0.7, top_p=0.9, stop_sequences="zzz",
+        )
+        for param in ("temperature", "top_p", "stop"):
+            assert param not in kwargs, f"{param} sent to {model_id}"
+
+    @pytest.mark.parametrize("model_id", ACCEPTS_EFFORT_NONE)
+    def test_sampling_dropped_when_effort_is_not_none(self, model_id):
+        kwargs = _run_node(
+            "OpenAITextGeneration", model_id, reasoning_effort="low",
+            temperature=0.7, top_p=0.9,
+        )
+        assert "temperature" not in kwargs
+        assert "top_p" not in kwargs
+
+
+# The schema the 2026-10-14 probe sent with strict:true (200 on all 8 models).
+STRICT_SCHEMA = {
+    "type": "object",
+    "properties": {"a": {"type": "integer"}},
+    "required": ["a"],
+    "additionalProperties": False,
+}
+
+
+class TestJsonSchemaResponseFormat:
+    """Strict Structured Outputs (response_format json_schema) on the text and
+    chat nodes. The schema is a String widget appended last, so saved
+    workflows keep their widget slots."""
+
+    @pytest.mark.parametrize("class_name", ["OpenAITextGeneration", "OpenAIChat"])
+    def test_schema_options_and_widget(self, class_name):
+        inputs = _import_node("nodes", class_name).define_schema().inputs
+        response_format = next(i for i in inputs if i.id == "response_format")
+        assert response_format.options == ["default", "json_object", "json_schema"]
+        last = inputs[-1]
+        assert last.id == "json_schema"
+        assert last.optional is True
+        assert last.multiline is True
+
+    @pytest.mark.parametrize("class_name", ["OpenAITextGeneration", "OpenAIChat"])
+    def test_schema_sent_strict(self, class_name):
+        import json
+        kwargs = _run_node(
+            class_name, "gpt-6-luna",
+            response_format="json_schema", json_schema=json.dumps(STRICT_SCHEMA),
+        )
+        assert_binds(kwargs, "openai.resources.chat.completions", "Completions", "create")
+        assert kwargs["response_format"] == {
+            "type": "json_schema",
+            "json_schema": {"name": "response", "strict": True, "schema": STRICT_SCHEMA},
+        }
+
+    @pytest.mark.parametrize("class_name", ["OpenAITextGeneration", "OpenAIChat"])
+    @pytest.mark.parametrize("schema,message", [
+        ("{not json", r"json_schema is not valid JSON: Expecting property name"),
+        ("", r"response_format 'json_schema' needs a JSON Schema in the json_schema input"),
+        ("[1, 2]", r"json_schema must be a JSON object \(a JSON Schema\), got list"),
+    ])
+    def test_bad_schema_refused_before_the_call(self, class_name, schema, message):
+        client, mock_sdk = _make_client_with_mock_sdk()
+        cls = _import_node("nodes", class_name)
+        with pytest.raises(ValueError, match=message):
+            asyncio.run(cls.execute(
+                "hello", client=client, model="gpt-6-luna",
+                response_format="json_schema", json_schema=schema,
+            ))
+        mock_sdk.chat.completions.create.assert_not_called()
+
+    def test_schema_ignored_unless_selected(self):
+        kwargs = _run_node(
+            "OpenAITextGeneration", "gpt-6-luna",
+            response_format="json_object", json_schema="{not json",
+        )
+        assert kwargs["response_format"] == {"type": "json_object"}
+
+
+class TestVisionDetail:
+    """image_url.detail 'original' returns 200 on all 8 models (measured
+    2026-10-14); the chat reference lists auto|low|high|original."""
+
+    def test_detail_offers_original(self):
+        inputs = _import_node("nodes", "OpenAIVision").define_schema().inputs
+        detail = next(i for i in inputs if i.id == "detail")
+        assert detail.options == ["auto", "low", "high", "original"]
+
+    def test_original_reaches_the_image_part(self):
+        kwargs = _run_node("OpenAIVision", "gpt-6-luna", detail="original")
+        image_parts = [p for p in kwargs["messages"][-1]["content"] if p["type"] == "image_url"]
+        assert [p["image_url"]["detail"] for p in image_parts] == ["original"]

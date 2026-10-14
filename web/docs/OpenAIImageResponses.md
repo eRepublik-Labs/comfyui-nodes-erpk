@@ -24,15 +24,17 @@ Use **OpenAI Image Generation (Responses)** when you want:
 | `client` | OPENAI_API_CLIENT (optional) | — | Provided by an OpenAI API Config node. Optional if API key is in ComfyUI Settings or config.ini. |
 | `mainline_model` | Combo | `gpt-6.1-sol` | Text/reasoning model that drives the call. Options: gpt-6.1-sol, gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna. Each accepted the image_generation tool on 2026-10-01. |
 | `image_model` | Combo | `gpt-image-2` | GPT Image model used for pixel generation inside the tool. Options: gpt-image-2, gpt-image-2.5-sunburst, gpt-image-2.5-flare. |
-| `reasoning_effort` | Combo | `none` | Mainline-model reasoning depth: none / minimal / low / medium / high / xhigh. `none` sends no effort, so the model uses its own default. `minimal` is rejected alongside the image tool (measured 2026-10-01) and is sent as `low`. |
-| `verbosity` | Combo | `default` | Mainline-model output verbosity: default / low / medium / high. Shapes how chatty the model is independent of token caps. |
-| `size` | Combo | `1024x1024` | Image size: 1024x1024, 1024x1536, 1536x1024, 1792x1024, 1024x1792, 2048x2048, 2048x1152, 2560x1440, 3840x2160, 2160x3840. Every image model needs at least 655,360 pixels, so 512x512 and 256x256 were removed on 2026-10-01. 3840x2160 / 2160x3840 are experimental per OpenAI. |
+| `reasoning_effort` | Combo | `default` | Mainline-model reasoning depth: default / none / minimal / low / medium / high / xhigh / max. `default` sends nothing, so the mainline uses its own default (medium). `none` turns reasoning off on gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; gpt-6.1-sol and gpt-6-astra reject it, so there `none` acts like `default`. `minimal` is rejected alongside the image tool (measured 2026-10-01) and is sent as `low`. `max` works on every mainline here (measured 2026-10-14) but not on the text nodes, where chat.completions rejects it. |
+| `verbosity` | Combo | `default` | Mainline-model output verbosity: default / low / medium / high. Shapes how chatty the model is independent of token caps. Sent as `text.verbosity`. |
+| `size` | Combo | `1024x1024` | Image size: auto (the model chooses), 1024x1024, 1024x1536, 1536x1024, 1792x1024, 1024x1792, 2048x2048, 2048x1152, 2560x1440, 3840x2160, 2160x3840. Every image model needs at least 655,360 pixels, so 512x512 and 256x256 were removed on 2026-10-01. 3840x2160 / 2160x3840 are experimental per OpenAI. |
 | `quality` | Combo | `auto` | Image quality tier: auto / low / medium / high / xhigh / max. xhigh/max on GPT Image 2.5 only (clamped to high on gpt-image-2). |
 | `background` | Combo | `auto` | Background: auto / transparent / opaque, sent as chosen. Transparent works on GPT Image 2.5 only; gpt-image-2 rejects it, and the node stops before the call; it needs png or webp output. |
-| `output_format` | Combo | `png` | Output image format: png, jpeg, webp. |
+| `output_format` | Combo | `png` | Output image format: png, jpeg, webp. Transparent background needs png or webp; transparent with jpeg is refused before the call. |
 | `moderation` | Combo | `auto` | Content moderation: auto (default safety) or low (relaxed). |
 | `enable_web_search` | Boolean | `false` | Add the web_search tool alongside image_generation. Mainline model decides whether to invoke it. Adds $10/1000 calls when used. |
 | `seed` | Int | -1 | Cache-bust seed. -1 randomizes every run. |
+| `reasoning_mode` | Combo | `standard` | Mainline reasoning mode: standard or pro (Responses API only). Pro spends more compute on the prompt revision and adds about 2,000 to 4,000 input tokens per call, even for a one-line prompt. It works with or without an effort; without one the mainline reasons at medium. |
+| `output_compression` | Int | 100 | Compression 0–100. Sent only with jpeg or webp; png sends neither field. |
 
 ## Outputs
 
@@ -40,7 +42,7 @@ Use **OpenAI Image Generation (Responses)** when you want:
 |---|---|---|
 | `image` | IMAGE | Generated image as a ComfyUI tensor. If the model emits multiple images in a single response, they're stacked into a batch. |
 | `revised_prompt` | STRING | The prompt after mainline-model revision. Useful for understanding how your input was interpreted. |
-| `reasoning_summary` | STRING | Raw chain-of-thought from the mainline model when `reasoning_effort != none`. Empty otherwise. **Heads up**: OpenAI's reasoning models think about both the task *and* the response format (output channels, tool calls, message structure). The summary often mixes "how I approached this image" with "should I produce a final message alongside the tool call?" — it's genuinely what the model returned, not a curated creative rationale. If you only want the image, ignore this output. If you want the creative thinking, you may need to parse or skim past the orchestration-level chatter. |
+| `reasoning_summary` | STRING | Raw chain-of-thought from the mainline model when it reasons. Empty when reasoning is off. **Heads up**: OpenAI's reasoning models think about both the task *and* the response format (output channels, tool calls, message structure). The summary often mixes "how I approached this image" with "should I produce a final message alongside the tool call?" — it's genuinely what the model returned, not a curated creative rationale. If you only want the image, ignore this output. If you want the creative thinking, you may need to parse or skim past the orchestration-level chatter. |
 
 ## Notes
 

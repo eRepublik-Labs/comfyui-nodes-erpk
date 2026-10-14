@@ -20,7 +20,7 @@ Edits existing images based on text prompts using OpenAI's image editing API. Su
 | quality | Combo | auto | Image quality: auto, low, medium, high, xhigh, max (optional). xhigh/max on GPT Image 2.5 only (clamped to high on gpt-image-2) |
 | moderation | Combo | auto | Content filter strictness: auto or low (optional). See Notes |
 | n | Int | 1 | Number of images to generate (optional). Range: 1–10 |
-| background | Combo | auto | auto, transparent, opaque (optional). Transparent works on GPT Image 2.5 only; gpt-image-2 rejects it, and the node stops before the call; it needs png or webp output |
+| background | Combo | auto | auto, transparent, opaque (optional). Transparent works on GPT Image 2.5 only and needs png or webp output; gpt-image-2, or transparent with jpeg, is refused before the call |
 | input_fidelity | Combo | auto | auto, high, low (optional). Ignored by every current model: gpt-image-2 and the 2.5 models always edit at high fidelity and reject the field, so it is never sent. Kept so saved workflows load |
 | seed | Int | -1 | Cache control only, not sent to the API. -1 randomizes (re-runs every queue); a fixed value reuses the cached result |
 | output_format | Combo | png | Output file format: png, jpeg, webp (optional). `transparent` background needs png or webp |

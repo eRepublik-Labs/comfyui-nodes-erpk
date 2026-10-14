@@ -1,17 +1,27 @@
 # ABOUTME: ComfyUI V3 nodes for OpenAI API integration
 # ABOUTME: Provides text generation, vision, chat, and configuration nodes
 
+import json
+
 from comfy_api.latest import IO
 from .openai_api.client import OpenAIClient
 
 TEXT_MODELS = list(OpenAIClient.MODELS.keys())
 VISION_MODELS = [m for m in TEXT_MODELS if not m.startswith("o")]
 
-REASONING_EFFORT_OPTIONS = ["none", "minimal", "low", "medium", "high", "xhigh"]
+REASONING_EFFORT_OPTIONS = ["default", "none", "minimal", "low", "medium", "high", "xhigh"]
 REASONING_EFFORT_TOOLTIP = (
-    "Reasoning depth for the gpt-5.6 and gpt-6.x models. 'none' sends no effort "
-    "(the model uses its own default). 'minimal' is rejected by every current "
-    "model and is sent as 'low'. Ignored by chat-latest."
+    "Reasoning depth for the gpt-5.6 and gpt-6.x models. 'default' sends nothing, so "
+    "the model reasons at its own default (medium). 'none' turns reasoning off on "
+    "gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; gpt-6.1-sol and gpt-6-astra cannot "
+    "turn it off, so there 'none' acts like 'default'. 'minimal' is rejected by every "
+    "current model and is sent as 'low'. Ignored by chat-latest."
+)
+
+# temperature and top_p 400 on every current model unless reasoning is off.
+SAMPLING_NOTE = (
+    "Sent only when reasoning_effort is 'none' on gpt-6-sol, gpt-6-luna or a gpt-5.6 "
+    "tier; every other model and effort accepts only the default, so it is dropped."
 )
 
 VERBOSITY_OPTIONS = ["default", "low", "medium", "high"]
@@ -19,8 +29,49 @@ VERBOSITY_TOOLTIP = (
     "Output verbosity for the gpt-5.6 and gpt-6.x models. 'low' produces terse responses, "
     "'high' produces more detailed ones. Distinct from max_tokens — shapes "
     "style, not the hard length cap. 'default' lets the model choose. "
-    "Ignored by chat-latest, which does not accept verbosity."
+    "Not sent to chat-latest, which accepts the field but ignores it."
 )
+
+RESPONSE_FORMAT_OPTIONS = ["default", "json_object", "json_schema"]
+RESPONSE_FORMAT_TOOLTIP = (
+    "Output format. json_object is JSON mode; json_schema is strict Structured "
+    "Outputs, which forces the reply to match the JSON Schema in the json_schema input."
+)
+
+
+def json_schema_input():
+    """The JSON Schema String for response_format json_schema, appended last."""
+    return IO.String.Input(
+        "json_schema",
+        default="",
+        multiline=True,
+        optional=True,
+        tooltip=(
+            "JSON Schema the reply must match when response_format is json_schema "
+            "(sent with strict: true). Strict mode needs every property listed in "
+            "required and additionalProperties set to false on each object."
+        ),
+    )
+
+
+def build_response_format(response_format, json_schema):
+    """The chat.completions response_format for the node's widgets, or None."""
+    if response_format == "json_object":
+        return {"type": "json_object"}
+    if response_format != "json_schema":
+        return None
+    if not json_schema or not json_schema.strip():
+        raise ValueError("response_format 'json_schema' needs a JSON Schema in the json_schema input")
+    try:
+        schema = json.loads(json_schema)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"json_schema is not valid JSON: {e}") from e
+    if not isinstance(schema, dict):
+        raise ValueError(f"json_schema must be a JSON object (a JSON Schema), got {type(schema).__name__}")
+    return {
+        "type": "json_schema",
+        "json_schema": {"name": "response", "strict": True, "schema": schema},
+    }
 
 
 class OpenAIAPIConfig(IO.ComfyNode):
@@ -91,7 +142,7 @@ class OpenAITextGeneration(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level (0.0=focused, 2.0=very creative). Ignored by every current model, which accepts only the default.",
+                    tooltip="Creativity level (0.0=focused, 2.0=very creative). " + SAMPLING_NOTE,
                 ),
                 IO.Int.Input(
                     "max_tokens",
@@ -109,7 +160,7 @@ class OpenAITextGeneration(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (1.0=disabled). Ignored by every current model.",
+                    tooltip="Nucleus sampling - cumulative probability threshold (1.0=disabled). " + SAMPLING_NOTE,
                 ),
                 IO.String.Input(
                     "stop_sequences",
@@ -120,15 +171,15 @@ class OpenAITextGeneration(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "response_format",
-                    options=["default", "json_object"],
+                    options=RESPONSE_FORMAT_OPTIONS,
                     default="default",
                     optional=True,
-                    tooltip="Output format (use json_object for JSON mode)",
+                    tooltip=RESPONSE_FORMAT_TOOLTIP,
                 ),
                 IO.Combo.Input(
                     "reasoning_effort",
                     options=REASONING_EFFORT_OPTIONS,
-                    default="none",
+                    default="default",
                     optional=True,
                     tooltip=REASONING_EFFORT_TOOLTIP,
                 ),
@@ -147,6 +198,7 @@ class OpenAITextGeneration(IO.ComfyNode):
                     control_after_generate="randomize",
                     tooltip="Seed for reproducible outputs (best-effort). Randomizes by default.",
                 ),
+                json_schema_input(),
             ],
             outputs=[
                 IO.String.Output("response"),
@@ -167,12 +219,15 @@ class OpenAITextGeneration(IO.ComfyNode):
         top_p = kwargs.get("top_p", 1.0)
         stop_sequences = kwargs.get("stop_sequences", "")
         response_format = kwargs.get("response_format", "default")
-        reasoning_effort = kwargs.get("reasoning_effort", "none")
+        reasoning_effort = kwargs.get("reasoning_effort", "default")
         verbosity = kwargs.get("verbosity", "default")
         seed = kwargs.get("seed", -1)
+        json_schema = kwargs.get("json_schema", "")
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
+
+        resp_format = build_response_format(response_format, json_schema)
 
         if client is None:
             client = OpenAIClient(api_key=None)
@@ -185,12 +240,6 @@ class OpenAITextGeneration(IO.ComfyNode):
         if stop_sequences and stop_sequences.strip():
             stop_seq_list = [s.strip() for s in stop_sequences.strip().split('\n') if s.strip()]
 
-        # Parse response format
-        resp_format = None
-        if response_format == "json_object":
-            resp_format = {"type": "json_object"}
-
-        effort = reasoning_effort if reasoning_effort and reasoning_effort != "none" else None
 
         try:
             response = await client.generate_content(
@@ -202,7 +251,7 @@ class OpenAITextGeneration(IO.ComfyNode):
                 stop_sequences=stop_seq_list,
                 response_format=resp_format,
                 seed=seed if seed != -1 else None,
-                reasoning_effort=effort,
+                reasoning_effort=reasoning_effort,
                 verbosity=verbosity if verbosity and verbosity != "default" else None,
             )
 
@@ -269,7 +318,7 @@ class OpenAIChat(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level. Ignored by every current model, which accepts only the default.",
+                    tooltip="Creativity level. " + SAMPLING_NOTE,
                 ),
                 IO.Int.Input(
                     "max_tokens",
@@ -287,7 +336,7 @@ class OpenAIChat(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (1.0=disabled). Ignored by every current model.",
+                    tooltip="Nucleus sampling - cumulative probability threshold (1.0=disabled). " + SAMPLING_NOTE,
                 ),
                 IO.String.Input(
                     "stop_sequences",
@@ -298,15 +347,15 @@ class OpenAIChat(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "response_format",
-                    options=["default", "json_object"],
+                    options=RESPONSE_FORMAT_OPTIONS,
                     default="default",
                     optional=True,
-                    tooltip="Output format (use json_object for JSON mode)",
+                    tooltip=RESPONSE_FORMAT_TOOLTIP,
                 ),
                 IO.Combo.Input(
                     "reasoning_effort",
                     options=REASONING_EFFORT_OPTIONS,
-                    default="none",
+                    default="default",
                     optional=True,
                     tooltip=REASONING_EFFORT_TOOLTIP,
                 ),
@@ -325,6 +374,7 @@ class OpenAIChat(IO.ComfyNode):
                     control_after_generate="randomize",
                     tooltip="Seed for reproducible outputs (best-effort). Randomizes by default.",
                 ),
+                json_schema_input(),
             ],
             outputs=[
                 IO.String.Output("response"),
@@ -348,12 +398,15 @@ class OpenAIChat(IO.ComfyNode):
         top_p = kwargs.get("top_p", 1.0)
         stop_sequences = kwargs.get("stop_sequences", "")
         response_format = kwargs.get("response_format", "default")
-        reasoning_effort = kwargs.get("reasoning_effort", "none")
+        reasoning_effort = kwargs.get("reasoning_effort", "default")
         verbosity = kwargs.get("verbosity", "default")
         seed = kwargs.get("seed", -1)
+        json_schema = kwargs.get("json_schema", "")
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
+
+        resp_format = build_response_format(response_format, json_schema)
 
         if client is None:
             client = OpenAIClient(api_key=None)
@@ -378,12 +431,6 @@ class OpenAIChat(IO.ComfyNode):
             if stop_sequences and stop_sequences.strip():
                 stop_seq_list = [s.strip() for s in stop_sequences.strip().split('\n') if s.strip()]
 
-            # Parse response format
-            resp_format = None
-            if response_format == "json_object":
-                resp_format = {"type": "json_object"}
-
-            effort = reasoning_effort if reasoning_effort and reasoning_effort != "none" else None
 
             # Send chat request
             response = await client.chat(
@@ -395,7 +442,7 @@ class OpenAIChat(IO.ComfyNode):
                 stop_sequences=stop_seq_list,
                 response_format=resp_format,
                 seed=seed if seed != -1 else None,
-                reasoning_effort=effort,
+                reasoning_effort=reasoning_effort,
                 verbosity=verbosity if verbosity and verbosity != "default" else None,
             )
 
@@ -449,10 +496,14 @@ class OpenAIVision(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "detail",
-                    options=["auto", "low", "high"],
+                    options=["auto", "low", "high", "original"],
                     default="auto",
                     optional=True,
-                    tooltip="Image detail level (low=faster/cheaper, high=more detailed)",
+                    tooltip=(
+                        "Image detail level (low=faster/cheaper, high=more detailed, "
+                        "original=full resolution without downscaling). On gpt-6-astra and "
+                        "the gpt-5.6 tiers, auto already behaves as original."
+                    ),
                 ),
                 IO.Int.Input(
                     "max_tokens",
@@ -470,12 +521,12 @@ class OpenAIVision(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level (lower=more factual). Ignored by every current model, which accepts only the default.",
+                    tooltip="Creativity level (lower=more factual). " + SAMPLING_NOTE,
                 ),
                 IO.Combo.Input(
                     "reasoning_effort",
                     options=REASONING_EFFORT_OPTIONS,
-                    default="none",
+                    default="default",
                     optional=True,
                     tooltip=REASONING_EFFORT_TOOLTIP,
                 ),
@@ -514,7 +565,7 @@ class OpenAIVision(IO.ComfyNode):
         detail = kwargs.get("detail", "auto")
         max_tokens = kwargs.get("max_tokens", 4096)
         temperature = kwargs.get("temperature", 0.4)
-        reasoning_effort = kwargs.get("reasoning_effort", "none")
+        reasoning_effort = kwargs.get("reasoning_effort", "default")
         verbosity = kwargs.get("verbosity", "default")
         seed = kwargs.get("seed", -1)
 
@@ -529,7 +580,6 @@ class OpenAIVision(IO.ComfyNode):
             image_content = ImageConverter.tensors_to_vision_content(image, detail=detail)
             print(f"[OpenAI] Analyzing {len(image_content)} image(s)")
 
-            effort = reasoning_effort if reasoning_effort and reasoning_effort != "none" else None
 
             # Generate content with images
             response = await client.generate_content(
@@ -539,7 +589,7 @@ class OpenAIVision(IO.ComfyNode):
                 temperature=temperature,
                 model=model,
                 seed=seed if seed != -1 else None,
-                reasoning_effort=effort,
+                reasoning_effort=reasoning_effort,
                 verbosity=verbosity if verbosity and verbosity != "default" else None,
             )
 

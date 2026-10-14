@@ -76,18 +76,27 @@ class OpenAIClient:
     MAX_RETRIES = 3
     INITIAL_RETRY_DELAY = 1.0
 
-    # reasoning_effort values the API rejects for a model. gpt-5.6 Sol/Terra/
-    # Luna and gpt-6 Sol/Luna accept none/low/medium/high/xhigh; gpt-6-astra
-    # accepts low/medium/high/xhigh (measured 2026-09-23), as does gpt-6.1-sol
-    # (measured 2026-10-01). Rejected values clamp to low.
+    # reasoning_effort values the API rejects for a model, clamped to low.
+    # 'minimal' 400s on every reasoning model (measured 2026-09-23,
+    # 2026-10-01, 2026-10-14).
     UNSUPPORTED_EFFORT = {
-        "gpt-6.1-sol": {"minimal", "none"},
+        "gpt-6.1-sol": {"minimal"},
         "gpt-5.6-sol": {"minimal"},
         "gpt-5.6-terra": {"minimal"},
         "gpt-5.6-luna": {"minimal"},
-        "gpt-6-astra": {"minimal", "none"},
+        "gpt-6-astra": {"minimal"},
         "gpt-6-sol": {"minimal"},
         "gpt-6-luna": {"minimal"},
+    }
+
+    # Models that accept reasoning_effort "none", which switches reasoning
+    # off. gpt-6.1-sol and gpt-6-astra return 400 for it, so there "none" is
+    # omitted and the model reasons at its default (medium). With effort
+    # "none" these models also accept temperature and top_p, which 400 at any
+    # other effort; stop still 400s (all measured 2026-10-14).
+    EFFORT_NONE_MODELS = {
+        "gpt-6-sol", "gpt-6-luna",
+        "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     }
 
     # Codes the API uses to refuse on safety grounds. The images endpoints
@@ -140,8 +149,16 @@ class OpenAIClient:
         return " ".join(p for p in parts if p)
 
     @classmethod
-    def _effort_for(cls, model: str, effort: str) -> str:
-        """Clamp a reasoning_effort the model does not document down to low."""
+    def _effort_for(cls, model: str, effort: str) -> Optional[str]:
+        """The reasoning_effort to send, or None to omit it.
+
+        'default' is always omitted, leaving the effort to the model. 'none' is
+        omitted on models that reject it; other rejected values clamp to low.
+        """
+        if effort == "default":
+            return None
+        if effort == "none" and model not in cls.EFFORT_NONE_MODELS:
+            return None
         if effort in cls.UNSUPPORTED_EFFORT.get(model, ()):
             print(f"[OpenAI] {model} does not support reasoning_effort '{effort}'; using 'low'")
             return "low"
@@ -352,7 +369,11 @@ class OpenAIClient:
         else:
             params["max_tokens"] = max_tokens
 
-        is_reasoning = model_to_use in self.REASONING_MODELS
+        effort = None
+        if reasoning_effort and model_to_use in self.REASONING_MODELS:
+            effort = self._effort_for(model_to_use, reasoning_effort)
+        if effort:
+            params["reasoning_effort"] = effort
 
         if model_to_use not in self.NO_SAMPLING_MODELS:
             params["temperature"] = temperature
@@ -360,9 +381,10 @@ class OpenAIClient:
                 params["top_p"] = top_p
             if stop_sequences:
                 params["stop"] = stop_sequences
-
-        if reasoning_effort and is_reasoning:
-            params["reasoning_effort"] = self._effort_for(model_to_use, reasoning_effort)
+        elif effort == "none":
+            params["temperature"] = temperature
+            if top_p is not None:
+                params["top_p"] = top_p
 
         if verbosity and verbosity != "default" and model_to_use in self.VERBOSITY_MODELS:
             params["verbosity"] = verbosity
@@ -457,7 +479,8 @@ class OpenAIClient:
             stop_sequences: List of sequences where generation stops
             response_format: Output format (e.g., {"type": "json_object"})
             reasoning_effort: Reasoning depth for reasoning models
-                (minimal/low/medium/high/xhigh). Silently dropped for non-reasoning models.
+                (none/minimal/low/medium/high/xhigh). Silently dropped for non-reasoning
+                models; 'none' is omitted where the model rejects it.
             **kwargs: Additional parameters
 
         Returns:
@@ -497,7 +520,8 @@ class OpenAIClient:
             stop_sequences: List of stop sequences
             response_format: Output format specification
             reasoning_effort: Reasoning depth for reasoning models
-                (minimal/low/medium/high/xhigh). Silently dropped for non-reasoning models.
+                (none/minimal/low/medium/high/xhigh). Silently dropped for non-reasoning
+                models; 'none' is omitted where the model rejects it.
             **kwargs: Additional parameters
 
         Returns:
@@ -527,7 +551,11 @@ class OpenAIClient:
         else:
             params["max_tokens"] = max_tokens
 
-        is_reasoning = model_to_use in self.REASONING_MODELS
+        effort = None
+        if reasoning_effort and model_to_use in self.REASONING_MODELS:
+            effort = self._effort_for(model_to_use, reasoning_effort)
+        if effort:
+            params["reasoning_effort"] = effort
 
         if model_to_use not in self.NO_SAMPLING_MODELS:
             params["temperature"] = temperature
@@ -535,9 +563,10 @@ class OpenAIClient:
                 params["top_p"] = top_p
             if stop_sequences:
                 params["stop"] = stop_sequences
-
-        if reasoning_effort and is_reasoning:
-            params["reasoning_effort"] = self._effort_for(model_to_use, reasoning_effort)
+        elif effort == "none":
+            params["temperature"] = temperature
+            if top_p is not None:
+                params["top_p"] = top_p
 
         if verbosity and verbosity != "default" and model_to_use in self.VERBOSITY_MODELS:
             params["verbosity"] = verbosity
@@ -609,7 +638,8 @@ class OpenAIClient:
             stop_sequences: List of stop sequences
             response_format: Output format specification
             reasoning_effort: Reasoning depth for reasoning models
-                (minimal/low/medium/high/xhigh). Silently dropped for non-reasoning models.
+                (none/minimal/low/medium/high/xhigh). Silently dropped for non-reasoning
+                models; 'none' is omitted where the model rejects it.
             **kwargs: Additional parameters
 
         Returns:
@@ -623,13 +653,20 @@ class OpenAIClient:
         )
 
     @classmethod
-    def _check_background(cls, model: str, background: str) -> None:
-        """Raise before the call when a model would reject the background (400)."""
-        if background == "transparent" and model not in cls.TRANSPARENT_BACKGROUND_MODELS:
+    def _check_background(cls, model: str, background: str, output_format: str) -> None:
+        """Raise before the call when the API would reject the background (400)."""
+        if background != "transparent":
+            return
+        if model not in cls.TRANSPARENT_BACKGROUND_MODELS:
             supported = ", ".join(sorted(cls.TRANSPARENT_BACKGROUND_MODELS))
             raise ValueError(
                 f"{model} does not support background='transparent'. "
                 f"Use {supported}, or set background to auto or opaque."
+            )
+        if output_format == "jpeg":
+            raise ValueError(
+                "background='transparent' cannot be used with output_format='jpeg', "
+                "which has no alpha channel. Use png or webp, or set background to auto or opaque."
             )
 
     def _generate_image_sync(
@@ -678,7 +715,7 @@ class OpenAIClient:
             if quality != "auto":
                 params["quality"] = self._quality_for(model, quality)
             if background != "auto":
-                self._check_background(model, background)
+                self._check_background(model, background, output_format)
                 params["background"] = background
             if moderation != "auto":
                 params["moderation"] = moderation
@@ -799,7 +836,7 @@ class OpenAIClient:
         prompt: str,
         mainline_model: str = DEFAULT_MODEL,
         image_model: str = "gpt-image-2",
-        reasoning_effort: str = "none",
+        reasoning_effort: str = "default",
         size: str = "auto",
         quality: str = "auto",
         background: str = "auto",
@@ -808,6 +845,8 @@ class OpenAIClient:
         enable_web_search: bool = False,
         action: str = "auto",
         verbosity: str = "default",
+        reasoning_mode: str = "standard",
+        output_compression: int = 100,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -836,12 +875,11 @@ class OpenAIClient:
             image_tool["size"] = size
         if quality != "auto":
             image_tool["quality"] = self._quality_for(image_model, quality)
-        if output_format and output_format != "png":
-            image_tool["output_format"] = output_format
+        image_tool.update(self._output_format_params(output_format, output_compression))
         if moderation != "auto":
             image_tool["moderation"] = moderation
         if background != "auto":
-            self._check_background(image_model, background)
+            self._check_background(image_model, background, output_format)
             image_tool["background"] = background
 
         tools = [image_tool]
@@ -860,14 +898,23 @@ class OpenAIClient:
         if self.system_instruction and self.system_instruction.strip():
             request_params["instructions"] = self.system_instruction
 
-        if reasoning_effort and reasoning_effort != "none" and mainline_model in self.REASONING_MODELS:
-            request_params["reasoning"] = {
-                "effort": self._effort_for(mainline_model, reasoning_effort),
-                "summary": "auto",
-            }
+        reasoning = {}
+        effort = None
+        if reasoning_effort and mainline_model in self.REASONING_MODELS:
+            effort = self._effort_for(mainline_model, reasoning_effort)
+        if effort:
+            reasoning = {"effort": effort, "summary": "auto"}
+        # Pro mode (Responses only) also works without an effort, which then
+        # defaults to medium.
+        if reasoning_mode == "pro" and mainline_model in self.REASONING_MODELS:
+            reasoning["mode"] = "pro"
+        if reasoning:
+            request_params["reasoning"] = reasoning
 
+        # The Responses API takes verbosity under `text`; a top-level field is
+        # a TypeError in the SDK and a 400 on the server.
         if verbosity and verbosity != "default" and mainline_model in self.VERBOSITY_MODELS:
-            request_params["verbosity"] = verbosity
+            request_params["text"] = {"verbosity": verbosity}
 
         try:
             response = self.client.responses.create(**request_params)
@@ -918,7 +965,7 @@ class OpenAIClient:
         prompt: str,
         mainline_model: str = DEFAULT_MODEL,
         image_model: str = "gpt-image-2",
-        reasoning_effort: str = "none",
+        reasoning_effort: str = "default",
         size: str = "auto",
         quality: str = "auto",
         background: str = "auto",
@@ -927,6 +974,8 @@ class OpenAIClient:
         enable_web_search: bool = False,
         action: str = "auto",
         verbosity: str = "default",
+        reasoning_mode: str = "standard",
+        output_compression: int = 100,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -945,7 +994,8 @@ class OpenAIClient:
             reasoning_effort=reasoning_effort, size=size, quality=quality,
             background=background, output_format=output_format,
             moderation=moderation, enable_web_search=enable_web_search,
-            action=action, verbosity=verbosity, **kwargs
+            action=action, verbosity=verbosity, reasoning_mode=reasoning_mode,
+            output_compression=output_compression, **kwargs
         )
 
     def _edit_image_sync(
@@ -1029,10 +1079,13 @@ class OpenAIClient:
             # GPT Image models always return base64, do not accept response_format
             if quality != "auto":
                 params["quality"] = self._quality_for(model, quality)
+            # Images.edit() has no `moderation` keyword in any SDK release, though
+            # the endpoint takes the field (it validates auto/low), so it goes in
+            # the request body directly.
             if moderation != "auto":
-                params["moderation"] = moderation
+                params["extra_body"] = {"moderation": moderation}
             if background and background != "auto":
-                self._check_background(model, background)
+                self._check_background(model, background, output_format)
                 params["background"] = background
             # gpt-image-2 always processes at high fidelity and rejects input_fidelity.
             if input_fidelity and input_fidelity != "auto" and model not in self.GPT_IMAGE_2_MODELS:

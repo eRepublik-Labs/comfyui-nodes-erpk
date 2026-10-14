@@ -48,7 +48,8 @@ class TestOpenAIModels:
         assert m in OpenAIClient.NEW_TOKEN_PARAM_MODELS
         assert m in OpenAIClient.VERBOSITY_MODELS
         assert OpenAIClient._effort_for(m, "minimal") == "low"
-        assert OpenAIClient._effort_for(m, "none") == "low"
+        # 'none' 400s here, so it is omitted (Alex's 2026-10-14 ruling).
+        assert OpenAIClient._effort_for(m, "none") is None
         assert OpenAIClient._effort_for(m, "xhigh") == "xhigh"
 
     def test_gpt_56_tiers_present(self):
@@ -121,7 +122,8 @@ class TestGptImage25:
 class TestReasoningEffortClamp:
     """gpt-5.6 Sol/Terra/Luna document none/low/medium/high/xhigh/max and
     gpt-6-astra documents low/medium/high/xhigh/max; neither lists minimal.
-    The node offers minimal and none, so unsupported values clamp to low
+    The node offers minimal and none: 'minimal' clamps to low, and 'none' is
+    omitted where it 400s (gpt-6.1-sol and gpt-6-astra, measured 2026-10-14)
     rather than earning a 400."""
 
     def test_minimal_clamps_to_low_on_56_and_6(self):
@@ -129,8 +131,8 @@ class TestReasoningEffortClamp:
                   "gpt-6-astra", "gpt-6-sol", "gpt-6-luna"):
             assert OpenAIClient._effort_for(m, "minimal") == "low", m
 
-    def test_none_clamps_only_on_gpt_6(self):
-        assert OpenAIClient._effort_for("gpt-6-astra", "none") == "low"
+    def test_none_omitted_only_where_rejected(self):
+        assert OpenAIClient._effort_for("gpt-6-astra", "none") is None
         assert OpenAIClient._effort_for("gpt-5.6-sol", "none") == "none"
         assert OpenAIClient._effort_for("gpt-6-sol", "none") == "none"
         assert OpenAIClient._effort_for("gpt-6-luna", "none") == "none"

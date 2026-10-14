@@ -16,7 +16,7 @@ Generates images with OpenAI's GPT Image models: gpt-image-2 and the GPT Image 2
 | custom_width | Int | 1024 | Width when size is Custom (optional). 256 to 3840, step 16 |
 | custom_height | Int | 1024 | Height when size is Custom (optional). 256 to 3840, step 16 |
 | quality | Combo | auto | Image quality: auto, low, medium, high, xhigh, max (optional). xhigh/max on GPT Image 2.5 only (clamped to high on gpt-image-2) |
-| background | Combo | auto | Background type: auto, transparent, opaque (optional). Transparent works on GPT Image 2.5 only; gpt-image-2 rejects it, and the node stops before the call |
+| background | Combo | auto | Background type: auto, transparent, opaque (optional). Transparent works on GPT Image 2.5 only and needs png or webp output; gpt-image-2, or transparent with jpeg, is refused before the call |
 | moderation | Combo | auto | Content filter strictness: auto or low (optional). See Notes |
 | n | Int | 1 | Number of images to generate (optional). Range: 1–10 |
 | seed | Int | -1 | Cache control only, not sent to the API. -1 randomizes (re-runs every queue); a fixed value reuses the cached result |

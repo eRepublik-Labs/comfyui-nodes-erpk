@@ -142,7 +142,7 @@ class ImageConverter:
 
         Args:
             tensors: ComfyUI image tensor [B, H, W, C]
-            detail: Detail level (auto, low, high)
+            detail: Detail level (auto, low, high, original)
 
         Returns:
             List of image content dicts for OpenAI API

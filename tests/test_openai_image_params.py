@@ -15,6 +15,7 @@ if not hasattr(_local_openai, "APIError"):
     _local_openai.APIError = type("APIError", (Exception,), {})
 
 from openai.openai_api.client import OpenAIClient
+from tests.openai_sdk_signature import assert_binds
 
 
 GPT_IMAGE_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"]
@@ -154,20 +155,28 @@ class TestModeration:
         ))
         assert "moderation" not in mock.images.generate.call_args[1]
 
-    def test_moderation_in_edit_for_gpt_image_models(self):
+    @pytest.mark.parametrize("model", GPT_IMAGE_MODELS)
+    def test_moderation_in_edit_reaches_the_server_through_extra_body(self, model):
+        # Images.edit() has no `moderation` keyword in any SDK (2.15, 2.38,
+        # 3.31), so passing it raises TypeError before the request. The server
+        # does take the field: a bogus value via extra_body gets a 400 "Supported
+        # values are: 'auto' and 'low'" naming moderation (measured 2026-10-14).
         client, mock = _make_client_with_mock()
         asyncio.run(client.edit_image(
-            image_data=b"fakepng", prompt="edit", model="gpt-image-2", moderation="low",
+            image_data=b"fakepng", prompt="edit", model=model, moderation="low",
         ))
         params = mock.images.edit.call_args[1]
-        assert params.get("moderation") == "low"
+        assert_binds(params, "openai.resources.images", "Images", "edit")
+        assert params["extra_body"] == {"moderation": "low"}
 
     def test_moderation_auto_not_sent_in_edit(self):
         client, mock = _make_client_with_mock()
         asyncio.run(client.edit_image(
             image_data=b"fakepng", prompt="edit", model="gpt-image-2", moderation="auto",
         ))
-        assert "moderation" not in mock.images.edit.call_args[1]
+        params = mock.images.edit.call_args[1]
+        assert "moderation" not in params
+        assert "extra_body" not in params
 
 
 class TestNValidation:
@@ -427,3 +436,49 @@ class TestOutputFormat:
                 "a cat", client=RecordingClient(), output_format="jpeg", output_compression=70,
             ))
         assert (seen["output_format"], seen["output_compression"]) == ("jpeg", 70)
+
+
+class TestTransparentNeedsAlphaFormat:
+    """background=transparent with output_format=jpeg returns 400 "Transparent
+    background is not supported for JPEG output format" (measured on
+    gpt-image-2.5-flare 2026-10-14), so all three paths refuse it before the
+    call, naming both values."""
+
+    MESSAGE = r"background='transparent'.*output_format='jpeg'"
+
+    def test_generate_refuses_transparent_jpeg(self):
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError, match=self.MESSAGE):
+            asyncio.run(client.generate_image(
+                prompt="x", model="gpt-image-2.5-flare", size="1024x1024",
+                background="transparent", output_format="jpeg",
+            ))
+        mock.images.generate.assert_not_called()
+
+    def test_edit_refuses_transparent_jpeg(self):
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError, match=self.MESSAGE):
+            asyncio.run(client.edit_image(
+                image_data=b"fakepng", prompt="x", model="gpt-image-2.5-flare",
+                background="transparent", output_format="jpeg",
+            ))
+        mock.images.edit.assert_not_called()
+
+    def test_responses_refuses_transparent_jpeg(self):
+        client, mock = _make_client_with_mock()
+        client.system_instruction = None
+        with pytest.raises(ValueError, match=self.MESSAGE):
+            asyncio.run(client.generate_image_via_responses(
+                prompt="x", image_model="gpt-image-2.5-flare", size="1024x1024",
+                background="transparent", output_format="jpeg",
+            ))
+        mock.responses.create.assert_not_called()
+
+    @pytest.mark.parametrize("output_format", ["png", "webp"])
+    def test_transparent_png_and_webp_still_sent(self, output_format):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.generate_image(
+            prompt="x", model="gpt-image-2.5-flare", size="1024x1024",
+            background="transparent", output_format=output_format,
+        ))
+        assert mock.images.generate.call_args[1]["background"] == "transparent"
