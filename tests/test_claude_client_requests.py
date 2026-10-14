@@ -176,8 +176,9 @@ def test_streaming_error_raises_the_sdk_error(monkeypatch):
 
 # --- Usage cost is priced by the model that answered ---------------------------
 # Expected prices are Anthropic's published per-MTok rates (about-claude/pricing,
-# read 2026-10-01): base input / 5m cache write / cache hit / output.
-#   Sonnet 5.5: $2 / $2.50 / $0.20 / $10      Opus 5: $5 / $6.25 / $0.50 / $25
+# read 2026-10-01, Sonnet 5.5 cache hit re-read 2026-10-14): base input / 5m
+# cache write / cache hit / output.
+#   Sonnet 5.5: $2 / $2.50 / $0.10 / $10      Opus 5: $5 / $6.25 / $0.50 / $25
 
 MTOK = 1_000_000
 ONE_MTOK_EACH = {"input_tokens": MTOK, "output_tokens": MTOK,
@@ -191,10 +192,11 @@ def test_usage_cost_uses_the_answering_models_prices(monkeypatch):
     stats = client.get_usage_stats()
     assert stats["input_cost_usd"] == 2.0
     assert stats["output_cost_usd"] == 10.0
-    assert stats["cache_read_cost_usd"] == 0.2
+    # Sonnet 5.5 cache hits are $0.10/MTok (pricing page footnote 2, 2026-10-14).
+    assert stats["cache_read_cost_usd"] == 0.1
     assert stats["cache_write_cost_usd"] == 2.5
-    assert stats["total_cost_usd"] == 14.7
-    assert stats["cache_savings_usd"] == 1.8
+    assert stats["total_cost_usd"] == 14.6
+    assert stats["cache_savings_usd"] == 1.9
 
 
 def test_usage_cost_sums_calls_on_different_models(monkeypatch):
@@ -229,3 +231,61 @@ def test_reset_clears_cost(monkeypatch):
     stats = client.get_usage_stats()
     assert stats["total_cost_usd"] == 0.0
     assert stats["input_tokens"] == 0
+
+
+# --- Haiku 5.5 long-context tier ------------------------------------------------
+# about-claude/pricing "Long context pricing", read 2026-10-14: a Haiku 5.5
+# request whose prompt (input + cache reads + cache writes) is over 100,000
+# tokens is billed entirely at the long-context rates.
+#   up to 100K: $0.10 in / $0.125 5m write / $0.01 cache hit / $0.50 out
+#   over 100K:  $0.50 in / $0.625 5m write / $0.05 cache hit / $2.50 out
+
+
+def _haiku_stats(monkeypatch, input_tokens, cache_read, cache_write, output_tokens):
+    usage = {"input_tokens": input_tokens, "output_tokens": output_tokens,
+             "cache_read_input_tokens": cache_read, "cache_creation_input_tokens": cache_write}
+    wire = Wire((200, message_body(model="claude-haiku-5-5", usage=usage)))
+    client = _client(monkeypatch, wire)
+    asyncio.run(client.send_request(messages=USER))
+    return client.get_usage_stats()
+
+
+def test_haiku_prompt_of_exactly_100k_tokens_is_billed_at_base_rates(monkeypatch):
+    # 42,000 + 50,000 + 8,000 = 100,000 prompt tokens.
+    stats = _haiku_stats(monkeypatch, 42_000, 50_000, 8_000, 2_000)
+    assert stats["input_cost_usd"] == 0.0042     # 42,000 x $0.10/M
+    assert stats["cache_read_cost_usd"] == 0.0005  # 50,000 x $0.01/M
+    assert stats["cache_write_cost_usd"] == 0.001  # 8,000 x $0.125/M
+    assert stats["output_cost_usd"] == 0.001     # 2,000 x $0.50/M
+    assert stats["total_cost_usd"] == 0.0067
+    assert stats["cache_savings_usd"] == 0.0045  # 50,000 x ($0.10 - $0.01)/M
+
+
+def test_haiku_prompt_of_100001_tokens_is_billed_at_long_context_rates(monkeypatch):
+    # 42,001 + 50,000 + 8,000 = 100,001 prompt tokens.
+    stats = _haiku_stats(monkeypatch, 42_001, 50_000, 8_000, 2_000)
+    assert stats["input_cost_usd"] == 0.021      # 42,001 x $0.50/M = 0.0210005
+    assert stats["cache_read_cost_usd"] == 0.0025  # 50,000 x $0.05/M
+    assert stats["cache_write_cost_usd"] == 0.005  # 8,000 x $0.625/M
+    assert stats["output_cost_usd"] == 0.005     # 2,000 x $2.50/M
+    assert stats["total_cost_usd"] == 0.0335
+    assert stats["cache_savings_usd"] == 0.0225  # 50,000 x ($0.50 - $0.05)/M
+
+
+def test_haiku_cache_tokens_count_toward_the_long_context_threshold(monkeypatch):
+    # input_tokens alone (42,000) is far below 100K; the cache read tips it over.
+    stats = _haiku_stats(monkeypatch, 42_000, 50_001, 8_000, 2_000)
+    assert stats["input_cost_usd"] == 0.021      # 42,000 x $0.50/M
+    assert stats["output_cost_usd"] == 0.005     # 2,000 x $2.50/M
+
+
+def test_long_prompts_on_other_models_keep_flat_rates(monkeypatch):
+    # Only Haiku 5.5 has a long-context tier ("Claude 4.6 and later models
+    # (except Claude Haiku 5.5) include the full 1M token context window at
+    # standard pricing").
+    usage = {"input_tokens": 200_000, "output_tokens": 0,
+             "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
+    wire = Wire((200, message_body(model="claude-sonnet-5-5", usage=usage)))
+    client = _client(monkeypatch, wire)
+    asyncio.run(client.send_request(messages=USER))
+    assert client.get_usage_stats()["input_cost_usd"] == 0.4  # 200,000 x $2/M

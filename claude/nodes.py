@@ -21,7 +21,7 @@ class ClaudeAPIClient(IO.ComfyNode):
                     "model",
                     options=TEXT_MODELS,
                     default=DEFAULT_TEXT_MODEL,
-                    tooltip="Claude model to use. Sonnet 5.5 (default) offers the best balance of performance and cost; Opus 5.5 is the highest-capability tier. Fable access depends on your organization's data-retention settings.",
+                    tooltip="Claude model to use. Sonnet 5.5 (default) offers the best balance of performance and cost; Opus 5.5 is the highest-capability tier; Haiku 5.5 is the fastest and cheapest. Fable access depends on your organization's data-retention settings.",
                 ),
                 IO.String.Input(
                     "api_key",

@@ -15,6 +15,7 @@ TEXT_MODELS = [
     "claude-opus-5",
     "claude-fable-5-1",
     "claude-fable-5",
+    "claude-haiku-5-5",
 ]
 
 DEFAULT_TEXT_MODEL = TEXT_MODELS[0]
@@ -24,7 +25,7 @@ INHERIT_FROM_CLIENT = "(inherit from client)"
 
 # output_config.effort levels. Every offered model accepts all five; the
 # sentinel omits the field so each model keeps its own default (high, or
-# medium on Opus 5.5).
+# medium on Opus 5.5 and Haiku 5.5).
 MODEL_DEFAULT_EFFORT = "(model default)"
 EFFORT_OPTIONS = [MODEL_DEFAULT_EFFORT, "low", "medium", "high", "xhigh", "max"]
 EFFORT_TOOLTIP = (

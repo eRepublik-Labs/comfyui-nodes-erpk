@@ -58,6 +58,13 @@ class ClaudeTokenCounter(IO.ComfyNode):
                     "input": model_data.get("input_price_per_mtok", 0),
                     "output": model_data.get("output_price_per_mtok", 0),
                 }
+                long_context = model_data.get("long_context")
+                if long_context:
+                    pricing[model_id]["long_context"] = {
+                        "above_prompt_tokens": long_context["above_prompt_tokens"],
+                        "input": long_context["input_price_per_mtok"],
+                        "output": long_context["output_price_per_mtok"],
+                    }
 
             return pricing, pricing_data.get("_last_updated", "Unknown")
         except Exception as e:
@@ -69,7 +76,12 @@ class ClaudeTokenCounter(IO.ComfyNode):
                 "claude-opus-5": {"input": 5.0, "output": 25.0},
                 "claude-fable-5-1": {"input": 10.0, "output": 50.0},
                 "claude-fable-5": {"input": 10.0, "output": 50.0},
-            }, "2026-10-01"
+                "claude-haiku-5-5": {
+                    "input": 0.1,
+                    "output": 0.5,
+                    "long_context": {"above_prompt_tokens": 100_000, "input": 0.5, "output": 2.5},
+                },
+            }, "2026-10-14"
 
     @classmethod
     async def execute(cls, **kwargs) -> IO.NodeOutput:
@@ -99,7 +111,13 @@ class ClaudeTokenCounter(IO.ComfyNode):
             pricing_data, last_updated = cls.load_pricing()
             pricing = pricing_data.get(model, pricing_data.get(DEFAULT_TEXT_MODEL, {"input": 2.0, "output": 10.0}))
 
-            input_cost_per_1k = (token_count / 1_000_000) * pricing["input"]
+            # The text priced as a prompt decides the tier; as output, its
+            # request's prompt length is unknown, so it stays at the base rate.
+            long_context = pricing.get("long_context")
+            in_long_context = bool(long_context) and token_count > long_context["above_prompt_tokens"]
+            input_price = long_context["input"] if in_long_context else pricing["input"]
+
+            input_cost_per_1k = (token_count / 1_000_000) * input_price
             output_cost_per_1k = (token_count / 1_000_000) * pricing["output"]
 
             summary = f"""Token Count Analysis:
@@ -123,6 +141,12 @@ Per 1K Repetitions:
 Pricing last updated: {last_updated}
 Source: anthropic.com/pricing
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
+
+            if in_long_context:
+                summary += (
+                    f"\n\nLong context: a prompt over {long_context['above_prompt_tokens']:,} tokens bills the whole "
+                    f"request at ${long_context['input']:.2f}/MTok in, ${long_context['output']:.2f}/MTok out"
+                )
 
             if context_percentage > 90:
                 summary += "\n\nWARNING: Using >90% of context window!"

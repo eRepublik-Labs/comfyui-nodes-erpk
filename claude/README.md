@@ -76,7 +76,7 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 Initializes the Claude API client. Optional if API key is configured in ComfyUI Settings — generation nodes can run standalone.
 
 **Inputs:**
-- `model`: claude-sonnet-5-5 (default), claude-sonnet-5, claude-opus-5-5, claude-opus-5, claude-fable-5-1, claude-fable-5
+- `model`: claude-sonnet-5-5 (default), claude-sonnet-5, claude-opus-5-5, claude-opus-5, claude-fable-5-1, claude-fable-5, claude-haiku-5-5
 - `api_key`: Optional API key (uses Settings/config if empty)
 - `enable_streaming`: Enable streaming responses
 - `enable_caching`: Send automatic prompt caching (see [Prompt Caching](#prompt-caching))
@@ -299,7 +299,7 @@ Enabled by default (`enable_caching` on Claude API Client). Each request carries
 
 **How it works:**
 - The first request writes the prefix to a 5-minute cache, billed at 1.25x the input price
-- A repeat within 5 minutes reads it at the cache-read price: 0.1x input on most models, 0.05x on Opus 5.5, 0.025x on Fable 5.1
+- A repeat within 5 minutes reads it at the cache-read price: 0.1x input on most models, 0.05x on Opus 5.5 and Sonnet 5.5, 0.025x on Fable 5.1
 - Prompts below the model's minimum cacheable length are not cached
 - Measured 2026-10-01 on Sonnet 5.5: a 7,226-token system prompt sent twice wrote 7,226 cache tokens on the first call and read 7,226 on the second
 
@@ -307,10 +307,10 @@ Enabled by default (`enable_caching` on Claude API Client). Each request carries
 - Input: $2
 - Output: $10
 - 5-minute cache write: $2.50
-- Cache read: $0.20
+- Cache read: $0.10
 
 ### Effort
-Text Generation, Conversation, Prompt Enhancer, Vision Analysis and Structured Output have an `effort` widget (low, medium, high, xhigh, max). Lower effort spends fewer thinking and output tokens. `(model default)` sends nothing, so each model keeps its own default (high; medium on Opus 5.5)
+Text Generation, Conversation, Prompt Enhancer, Vision Analysis and Structured Output have an `effort` widget (low, medium, high, xhigh, max). Lower effort spends fewer thinking and output tokens. `(model default)` sends nothing, so each model keeps its own default (high; medium on Opus 5.5 and Haiku 5.5)
 
 ### Token Management
 - Use Token Counter node to check prompt lengths before generation
@@ -319,12 +319,13 @@ Text Generation, Conversation, Prompt Enhancer, Vision Analysis and Structured O
 
 ### Model Selection
 Every offered model has a 1M-token context window, up to 128K output tokens, adaptive thinking, and rejects temperature/top_p/top_k (the client never sends them).
-- **Claude Sonnet 5.5** (default): $2/1M in, $10/1M out - Newest Sonnet, the general-purpose choice
+- **Claude Sonnet 5.5** (default): $2/1M in, $10/1M out - Newest Sonnet, the general-purpose choice; cache reads at 0.05x
 - **Claude Sonnet 5**: $2/1M in, $10/1M out - Previous Sonnet
 - **Claude Opus 5.5**: $4/1M in, $20/1M out - Highest-capability Opus; cache reads at 0.05x
 - **Claude Opus 5**: $5/1M in, $25/1M out - Previous Opus
 - **Claude Fable 5.1**: $10/1M in, $50/1M out - Most capable model; needs an organization with data retention enabled
 - **Claude Fable 5**: $10/1M in, $50/1M out - Previous Fable; same access requirement
+- **Claude Haiku 5.5**: $0.10/1M in, $0.50/1M out - Fastest and cheapest; default effort medium. A prompt over 100,000 tokens (input plus cache reads and writes) bills the whole request at 5x: $0.50 in, $2.50 out. Usage Stats and Token Counter apply this tier
 
 Removed 2026-10-01: claude-opus-4-8, claude-opus-4-7, claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929. A saved workflow that selects one fails validation until you pick a current model.
 
@@ -380,6 +381,10 @@ Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**)
 ### "unexpected keyword argument" TypeError
 **Cause:** The installed `anthropic` SDK is older than 1.11.0.
 **Solution:** `pip install -U -r claude/requirements.txt` in ComfyUI's Python environment, then restart ComfyUI.
+
+### "Claude's reply was cut off at max_tokens=N"
+**Cause:** The reply hit the node's `max_tokens` before it finished. Thinking counts toward `max_tokens`, so at low values it can use the whole budget before any text is written. Every Claude node raises this error instead of passing a cut-off reply downstream; the tokens are still billed and show in Usage Stats.
+**Solution:** Raise `max_tokens` on the node, or lower `effort`.
 
 ### "Context window exceeded" Error
 **Solution:**

@@ -145,11 +145,6 @@ class ClaudeStructuredOutput(IO.ComfyNode):
             **effort_kwargs(kwargs.get("effort")),
         )
 
-        if response.stop_reason == "max_tokens":
-            raise ValueError(
-                f"Claude's JSON was cut off at max_tokens={max_tokens} (thinking counts toward it); raise max_tokens"
-            )
-
         from .claude_api.client import response_text
         try:
             parsed = json.loads(response_text(response))

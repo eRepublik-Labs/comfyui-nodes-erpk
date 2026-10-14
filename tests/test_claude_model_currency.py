@@ -27,6 +27,7 @@ FABLE_5 = "claude-fable-5"
 FABLE_5_1 = "claude-fable-5-1"
 SONNET_5_5 = "claude-sonnet-5-5"
 SONNET_5 = "claude-sonnet-5"
+HAIKU_5_5 = "claude-haiku-5-5"
 
 # Withdrawn 2026-10-01 (Alex's call): every remaining model is Claude 5 or later.
 REMOVED = (
@@ -164,16 +165,57 @@ def test_sonnet_5_5_offered_in_every_dropdown():
 
 def test_sonnet_5_5_priced_at_published_rate():
     # https://platform.claude.com/docs/en/about-claude/pricing and the Sonnet 5.5
-    # model page: $2 / $10 per MTok, cache hits $0.20 (0.1x).
+    # model page: $2 / $10 per MTok, cache hits $0.10 (0.05x, pricing footnote 2:
+    # "0.05x on Opus 5.5 and Sonnet 5.5"), re-read 2026-10-14.
     entry = _pricing()[SONNET_5_5]
     assert entry["input_price_per_mtok"] == 2.0
     assert entry["output_price_per_mtok"] == 10.0
-    assert entry["cache_read_price_per_mtok"] == 0.2
+    assert entry["cache_read_price_per_mtok"] == 0.1
 
 
 def test_sonnet_5_5_has_1m_context():
     # GET /v1/models/claude-sonnet-5-5 reports max_input_tokens 1000000.
     assert TokenManager.CONTEXT_WINDOWS[SONNET_5_5] == 1_000_000
+
+
+# --- Haiku 5.5 is offered but is not the default ----------------------------
+
+
+def test_haiku_5_5_offered_in_every_dropdown():
+    for node in (ClaudeAPIClient, ClaudeTokenCounter, ClaudeVisionAnalysis):
+        assert HAIKU_5_5 in _combo_options(node)
+
+
+def test_haiku_5_5_is_not_the_default():
+    assert _combo_options(ClaudeAPIClient)[0] == SONNET_5_5
+
+
+def test_haiku_5_5_priced_at_published_rate():
+    # https://platform.claude.com/docs/en/about-claude/pricing, read 2026-10-14:
+    # $0.10 / $0.50 per MTok, 5m cache write $0.125, cache hit $0.01 (prompts up
+    # to 100K tokens; the long-context tier is tested in test_claude_usage_pricing).
+    entry = _pricing()[HAIKU_5_5]
+    assert entry["input_price_per_mtok"] == 0.10
+    assert entry["output_price_per_mtok"] == 0.50
+    assert entry["cache_read_price_per_mtok"] == 0.01
+    assert entry["cache_write_5m_price_per_mtok"] == 0.125
+
+
+def test_haiku_5_5_in_token_counter_fallback(monkeypatch):
+    import claude.token_counter as token_counter
+
+    def unreadable(*args, **kwargs):
+        raise OSError("pricing.json unreadable")
+
+    monkeypatch.setattr(token_counter, "open", unreadable, raising=False)
+    pricing, _ = ClaudeTokenCounter.load_pricing()
+    assert pricing[HAIKU_5_5]["input"] == 0.10
+    assert pricing[HAIKU_5_5]["output"] == 0.50
+
+
+def test_haiku_5_5_has_1m_context():
+    # GET /v1/models/claude-haiku-5-5 reports max_input_tokens 1000000 (2026-10-14).
+    assert TokenManager.CONTEXT_WINDOWS[HAIKU_5_5] == 1_000_000
 
 
 # --- Withdrawn models are gone from every metadata source -------------------
@@ -246,14 +288,28 @@ def test_every_offered_model_has_a_context_window():
     assert set(_combo_options(ClaudeAPIClient)) <= set(TokenManager.CONTEXT_WINDOWS)
 
 
-def test_pricing_fallback_matches_pricing_json():
+def test_pricing_fallback_matches_pricing_json(monkeypatch):
     # token_counter's hardcoded fallback is used when pricing.json fails to load;
     # if it drifts, a read failure silently changes every cost estimate.
-    fallback, _ = ClaudeTokenCounter.load_pricing.__func__(ClaudeTokenCounter)
+    import claude.token_counter as token_counter
+
+    def unreadable(*args, **kwargs):
+        raise OSError("pricing.json unreadable")
+
+    monkeypatch.setattr(token_counter, "open", unreadable, raising=False)
+    fallback, _ = ClaudeTokenCounter.load_pricing()
     published = _pricing()
     for model, prices in published.items():
         assert fallback[model]["input"] == prices["input_price_per_mtok"], model
         assert fallback[model]["output"] == prices["output_price_per_mtok"], model
+        long_context = prices.get("long_context")
+        assert ("long_context" in fallback[model]) == bool(long_context), model
+        if long_context:
+            assert fallback[model]["long_context"] == {
+                "above_prompt_tokens": long_context["above_prompt_tokens"],
+                "input": long_context["input_price_per_mtok"],
+                "output": long_context["output_price_per_mtok"],
+            }, model
 
 
 def test_every_offered_model_has_a_published_5m_cache_write_price():
@@ -261,6 +317,7 @@ def test_every_offered_model_has_a_published_5m_cache_write_price():
     # column, read 2026-10-01. ClaudeUsageStats bills cache creation at this rate.
     published = {
         SONNET_5_5: 2.5, SONNET_5: 2.5, OPUS_5_5: 5.0, OPUS_5: 6.25, FABLE_5_1: 12.5, FABLE_5: 12.5,
+        HAIKU_5_5: 0.125,  # read 2026-10-14
     }
     pricing = _pricing()
     assert set(published) == set(_combo_options(ClaudeAPIClient))

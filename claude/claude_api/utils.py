@@ -94,6 +94,7 @@ class TokenManager:
         "claude-opus-5": 1_000_000,
         "claude-fable-5-1": 1_000_000,
         "claude-fable-5": 1_000_000,
+        "claude-haiku-5-5": 1_000_000,
     }
 
     # Default reserve tokens for response generation

@@ -31,6 +31,25 @@ def model_prices() -> Dict[str, Dict[str, float]]:
         return json.load(f)["models"]
 
 
+def tier_prices(prices: Dict[str, Any], prompt_tokens: int) -> Dict[str, Any]:
+    """A model's pricing.json entry, or its long_context rates once the prompt
+    (input + cache reads + cache writes) exceeds that tier's threshold."""
+    long_context = prices.get("long_context")
+    if long_context and prompt_tokens > long_context["above_prompt_tokens"]:
+        return long_context
+    return prices
+
+
+def raise_if_truncated(message, max_tokens: int) -> None:
+    """Refuse a reply that stopped at max_tokens: its text is cut off, or absent
+    when thinking used the whole budget. Usage must be recorded first; the
+    tokens were billed either way."""
+    if message.stop_reason == "max_tokens":
+        raise ValueError(
+            f"Claude's reply was cut off at max_tokens={max_tokens} (thinking counts toward it); raise max_tokens"
+        )
+
+
 def response_text(response) -> str:
     """Join the text blocks of a Messages response.
 
@@ -180,7 +199,8 @@ class ClaudeClient:
 
         usage.input_tokens excludes cached tokens, which are billed separately:
         cache reads at the hit price, cache creation at the 5-minute write price
-        (automatic caching uses the 5-minute TTL).
+        (automatic caching uses the 5-minute TTL). A model with a long-context
+        tier prices the whole response by its total prompt size.
         """
         usage = message.usage
         tokens = {
@@ -199,6 +219,7 @@ class ClaudeClient:
                 print(f"[Claude] Warning: no price for model {message.model!r}; its usage is not costed")
                 self.unpriced_models.add(message.model)
                 return
+            prices = tier_prices(prices, tokens["input"] + tokens["cache_read"] + tokens["cache_write"])
             per_mtok = {
                 "input": prices["input_price_per_mtok"],
                 "output": prices["output_price_per_mtok"],
@@ -226,6 +247,7 @@ class ClaudeClient:
             try:
                 response = self.client.messages.create(**params)
                 self._record_usage(response)
+                raise_if_truncated(response, params["max_tokens"])
                 return response
 
             except APIError as e:
@@ -264,6 +286,7 @@ class ClaudeClient:
         Raises:
             anthropic.APIError: The SDK's own error, once retries are exhausted
                 or immediately for a non-retryable 4xx
+            ValueError: The reply stopped at max_tokens
         """
         return await asyncio.to_thread(
             self._send_request_sync,
@@ -294,12 +317,15 @@ class ClaudeClient:
 
         Raises:
             anthropic.APIError: The SDK's own error
+            ValueError: The reply stopped at max_tokens (after its chunks)
         """
         params = self._build_params(messages, system, max_tokens, model, effort, kwargs)
         with self.client.messages.stream(**params) as stream:
             for text in stream.text_stream:
                 yield text
-            self._record_usage(stream.get_final_message())
+            final = stream.get_final_message()
+            self._record_usage(final)
+            raise_if_truncated(final, params["max_tokens"])
 
     def _count_tokens_sync(self, messages: list, system: Optional[str] = None) -> int:
         try:

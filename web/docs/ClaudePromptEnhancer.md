@@ -17,7 +17,7 @@ Transforms simple prompts into detailed, styled descriptions for image generatio
 | max_tokens | Int | 1024 | Maximum length of enhanced prompt; thinking counts toward it (optional). Min: 256, Max: 128000, Step: 128 |
 | use_streaming | Boolean | False | Enable streaming (optional). May not display in real-time in ComfyUI |
 | model | Combo | (inherit from client) | Model override for this call (optional). Choose a model from the list, or inherit the connected client's model. Without a client, inherit means the Claude API client's default model |
-| effort | Combo | (model default) | How much effort Claude spends: thinking depth, tool calls and answer length (optional). Options: (model default), low, medium, high, xhigh, max. (model default) sends nothing, so the model keeps its own default (high; medium on Opus 5.5). Higher levels cost more tokens and time |
+| effort | Combo | (model default) | How much effort Claude spends: thinking depth, tool calls and answer length (optional). Options: (model default), low, medium, high, xhigh, max. (model default) sends nothing, so the model keeps its own default (high; medium on Opus 5.5 and Haiku 5.5). Higher levels cost more tokens and time |
 
 ## Output
 
@@ -30,5 +30,6 @@ Transforms simple prompts into detailed, styled descriptions for image generatio
 - Each style has a custom system prompt guiding Claude to add style-specific details (lighting, composition, mood, etc.)
 - Outputs only the enhanced prompt text with no preamble or explanation
 - Connect the output directly to image generation nodes
+- A reply cut off at `max_tokens` raises an error asking you to raise `max_tokens` instead of returning partial text. Thinking counts toward `max_tokens`, so a low value can be used up before any text is written
 - Re-executes on every queue (not cached) since results vary
 - Style categories: Photography, Digital Art, Traditional Art, Historical Periods, Fantasy/Sci-Fi, Anime, Dark/Atmospheric

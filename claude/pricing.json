@@ -1,6 +1,6 @@
 {
   "_comment": "Claude API Pricing - Update from https://www.anthropic.com/pricing",
-  "_last_updated": "2026-10-01",
+  "_last_updated": "2026-10-14",
   "_version": "1.0",
 
   "models": {
@@ -8,7 +8,7 @@
       "name": "Claude Sonnet 5.5",
       "input_price_per_mtok": 2.0,
       "output_price_per_mtok": 10.0,
-      "cache_read_price_per_mtok": 0.2,
+      "cache_read_price_per_mtok": 0.1,
       "cache_write_5m_price_per_mtok": 2.5
     },
     "claude-sonnet-5": {
@@ -45,11 +45,26 @@
       "output_price_per_mtok": 50.0,
       "cache_read_price_per_mtok": 1.0,
       "cache_write_5m_price_per_mtok": 12.5
+    },
+    "claude-haiku-5-5": {
+      "name": "Claude Haiku 5.5",
+      "input_price_per_mtok": 0.1,
+      "output_price_per_mtok": 0.5,
+      "cache_read_price_per_mtok": 0.01,
+      "cache_write_5m_price_per_mtok": 0.125,
+      "long_context": {
+        "above_prompt_tokens": 100000,
+        "input_price_per_mtok": 0.5,
+        "output_price_per_mtok": 2.5,
+        "cache_read_price_per_mtok": 0.05,
+        "cache_write_5m_price_per_mtok": 0.625
+      }
     }
   },
 
   "notes": {
-    "cache_multiplier": "Cache read prices are usually 0.1x of input prices (0.05x on Opus 5.5, 0.025x on Fable 5.1); 5-minute cache writes are 1.25x",
+    "cache_multiplier": "Cache read prices are usually 0.1x of input prices (0.05x on Opus 5.5 and Sonnet 5.5, 0.025x on Fable 5.1); 5-minute cache writes are 1.25x",
+    "long_context": "A request whose prompt (input + cache reads + cache writes) exceeds above_prompt_tokens is billed entirely at the long_context rates (Haiku 5.5 only)",
     "pricing_page": "https://www.anthropic.com/pricing",
     "currency": "USD"
   }

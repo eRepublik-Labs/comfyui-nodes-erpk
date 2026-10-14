@@ -148,7 +148,7 @@ def test_structured_output_truncated_by_max_tokens_says_so(monkeypatch):
 # --- effort widget and max_tokens ceiling -------------------------------------
 # Effort levels low..max are accepted by every offered model (measured
 # 2026-10-01 on sonnet-5-5; build-with-claude/effort). "(model default)" omits
-# the field so each model keeps its own default (high; medium on Opus 5.5).
+# the field so each model keeps its own default (high; medium on Opus 5.5 and Haiku 5.5).
 # Every offered model allows 128K output tokens (GET /v1/models max_tokens).
 
 WIDGET_TYPES = ("STRING", "INT", "FLOAT", "BOOLEAN", "COMBO")
@@ -267,3 +267,59 @@ def test_conversation_info_reports_usage_of_the_1m_window():
     history = {"messages": [{"role": "user", "content": "x" * 400_000}], "system": None}
     info = ClaudeConversationInfo.execute(conversation_history=history).args[0]
     assert "~10.0% of 1,000,000-token window" in info
+
+
+# --- ClaudeTokenCounter: Haiku 5.5 long-context tier ---------------------------
+# about-claude/pricing "Long context pricing", read 2026-10-14: a Haiku 5.5
+# prompt over 100,000 tokens is billed at $0.50/MTok input instead of $0.10.
+# Without a client the counter estimates 4 characters per token.
+
+
+def _token_summary(text, model="claude-haiku-5-5"):
+    from claude.token_counter import ClaudeTokenCounter
+    return asyncio.run(ClaudeTokenCounter.execute(text=text, model=model)).args[1]
+
+
+def test_token_counter_prices_a_100k_token_haiku_prompt_at_the_base_rate():
+    summary = _token_summary("a" * 400_000)
+    assert "As Input:    $0.010000" in summary  # 100,000 x $0.10/M
+    assert "Long context" not in summary
+
+
+def test_token_counter_prices_a_100001_token_haiku_prompt_at_the_long_context_rate():
+    summary = _token_summary("a" * 400_004)
+    assert "As Input:    $0.050001" in summary  # 100,001 x $0.50/M = 0.0500005
+    assert "Long context:" in summary
+
+
+# --- A reply cut off at max_tokens is an error, never partial output ------------
+# Measured 2026-10-14 on claude-haiku-5-5: PromptEnhancer at max_tokens=256
+# came back with stop_reason "max_tokens" and a half-written prompt; with
+# thinking on, a low max_tokens can also leave only a thinking block.
+
+TRUNCATED = "cut off at max_tokens=256"
+
+
+@pytest.mark.parametrize("node", TEXT_NODES)
+def test_reply_cut_off_at_max_tokens_raises(monkeypatch, node):
+    wire = Wire((200, message_body(text="A half-writ", stop_reason="max_tokens")))
+    client = _client(monkeypatch, wire)
+    with pytest.raises(ValueError, match=TRUNCATED):
+        TEXT_NODES[node](client, max_tokens=256)
+    # The truncated reply was billed, so its tokens still reach Usage Stats.
+    assert client.get_usage_stats()["output_tokens"] == 5
+
+
+def test_thinking_only_reply_at_max_tokens_names_max_tokens(monkeypatch):
+    wire = Wire((200, message_body(text=None, stop_reason="max_tokens")))
+    with pytest.raises(ValueError, match=TRUNCATED):
+        _run_text_generation(_client(monkeypatch, wire), max_tokens=256)
+
+
+@pytest.mark.parametrize("run", [_run_text_generation, _run_prompt_enhancer])
+def test_streamed_reply_cut_off_at_max_tokens_raises(monkeypatch, run):
+    wire = Wire((200, message_body(text="A half-writ", stop_reason="max_tokens")))
+    client = _client(monkeypatch, wire, enable_streaming=True)
+    with pytest.raises(ValueError, match=TRUNCATED):
+        run(client, use_streaming=True, max_tokens=256)
+    assert client.get_usage_stats()["output_tokens"] == 5
