@@ -307,7 +307,7 @@ wheels = [
 
 [[package]]
 name = "comfyui-nodes-erpk"
-version = "2026.10.5"
+version = "2026.10.6"
 source = { virtual = "." }
 dependencies = [
     { name = "anthropic" },
