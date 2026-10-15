@@ -119,6 +119,4 @@ class SeedreamV5ProLayersNode(IO.ComfyNode):
                 f"Layer decomposition returned {len(urls)} {images_word}, so there are no layers to output")
 
         base, layers, masks = cls._load_layers(urls)
-        from ..utils.inline_preview import inline_preview_image
-        ui = inline_preview_image(cls, base, slot=0)
-        return IO.NodeOutput(base, layers, masks, ui=ui)
+        return IO.NodeOutput(base, layers, masks)

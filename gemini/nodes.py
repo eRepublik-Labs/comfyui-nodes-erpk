@@ -1384,9 +1384,7 @@ class GeminiImageGeneration(IO.ComfyNode):
             if description_text:
                 print(f"[Gemini] Also got description: {description_text[:100]}...")
 
-            from ..utils.inline_preview import inline_preview_image
-            ui = inline_preview_image(cls, image_tensor, slot=0)
-            return IO.NodeOutput(image_tensor, description_text, ui=ui)
+            return IO.NodeOutput(image_tensor, description_text)
 
         except Exception as e:
             error_msg = f"Failed to generate image: {str(e)}"
@@ -1658,9 +1656,7 @@ class GeminiImageEdit(IO.ComfyNode):
             if description_text:
                 print(f"[Gemini] Also got description: {description_text[:100]}...")
 
-            from ..utils.inline_preview import inline_preview_image
-            ui = inline_preview_image(cls, image_tensor, slot=0)
-            return IO.NodeOutput(image_tensor, description_text, ui=ui)
+            return IO.NodeOutput(image_tensor, description_text)
 
         except Exception as e:
             error_msg = f"Failed to edit image: {str(e)}"

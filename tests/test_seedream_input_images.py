@@ -72,7 +72,7 @@ EDIT_NODES = [
 
 def _node(module, name):
     # Loaded under the erpk test package (see conftest) so the nodes' relative
-    # import of the shared inline preview resolves.
+    # imports resolve.
     return getattr(importlib.import_module(f"erpk.wavespeed.{module}"), name)
 
 
@@ -113,8 +113,7 @@ def _run(node, **kwargs):
         return {"outputs": ["https://example.com/out.png"]}
 
     with patch("erpk.wavespeed.wavespeed_api.client.WaveSpeedClient.send_request", fake_send), \
-         patch("erpk.wavespeed.wavespeed_api.utils.imageurl2tensor", return_value=torch.zeros(1, 8, 8, 3)), \
-         patch("erpk.utils.inline_preview.inline_preview_image", return_value=None):
+         patch("erpk.wavespeed.wavespeed_api.utils.imageurl2tensor", return_value=torch.zeros(1, 8, 8, 3)):
         asyncio.run(node.execute(client={"api_key": "test-key"}, **kwargs))
     return sent["images"]
 

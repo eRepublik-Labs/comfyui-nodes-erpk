@@ -309,8 +309,8 @@ class TestNodeForwardsNewWidgets:
         import base64
         import io
         from PIL import Image
-        # Through the erpk package, so the node's relative import of
-        # utils.inline_preview resolves as it does inside ComfyUI.
+        # Through the erpk package, so the node's relative imports
+        # resolve as they do inside ComfyUI.
         from erpk.openai.image_nodes import OpenAIImageResponses
 
         png = io.BytesIO()

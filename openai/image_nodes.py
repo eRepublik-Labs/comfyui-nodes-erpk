@@ -277,9 +277,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
             if revised_prompt:
                 print(f"[OpenAI] Revised prompt: {revised_prompt[:100]}...")
 
-            from ..utils.inline_preview import inline_preview_image
-            ui = inline_preview_image(cls, image_tensor, slot=0)
-            return IO.NodeOutput(image_tensor, revised_prompt, ui=ui)
+            return IO.NodeOutput(image_tensor, revised_prompt)
 
         except Exception as e:
             error_msg = f"Failed to generate image: {str(e)}"
@@ -524,9 +522,7 @@ class OpenAIImageResponses(IO.ComfyNode):
             if reasoning_summary:
                 print(f"[OpenAI Responses] Reasoning summary ({len(reasoning_summary)} chars)")
 
-            from ..utils.inline_preview import inline_preview_image
-            ui = inline_preview_image(cls, image_tensor, slot=0)
-            return IO.NodeOutput(image_tensor, revised_prompt, reasoning_summary, ui=ui)
+            return IO.NodeOutput(image_tensor, revised_prompt, reasoning_summary)
 
         except Exception as e:
             error_msg = f"Failed to generate image via Responses API: {str(e)}"
@@ -797,9 +793,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                 image_tensor = torch.cat(tensors, dim=0)
             print(f"[OpenAI] Edited {len(tensors)} image(s), batch shape: {image_tensor.shape}")
 
-            from ..utils.inline_preview import inline_preview_image
-            ui = inline_preview_image(cls, image_tensor, slot=0)
-            return IO.NodeOutput(image_tensor, ui=ui)
+            return IO.NodeOutput(image_tensor)
 
         except Exception as e:
             error_msg = f"Failed to edit image: {str(e)}"

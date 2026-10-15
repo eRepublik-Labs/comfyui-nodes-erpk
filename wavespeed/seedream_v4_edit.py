@@ -101,6 +101,4 @@ class SeedreamV4EditNode(IO.ComfyNode):
             raise ValueError("No image URLs in the generated result")
 
         images = imageurl2tensor(image_urls)
-        from ..utils.inline_preview import inline_preview_image
-        ui = inline_preview_image(cls, images, slot=0)
-        return IO.NodeOutput(images, ui=ui)
+        return IO.NodeOutput(images)
