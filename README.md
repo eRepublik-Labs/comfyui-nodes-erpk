@@ -129,7 +129,7 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 
 - **Claude API Client** - Initialize Claude API connection with model selection (Sonnet 5.5 by default, Sonnet 5, Opus 5.5, Opus 5, Fable 5.1, Fable 5, Haiku 5.5) and configuration. Optional if API key is configured in ComfyUI Settings or config.ini -- Claude nodes can run standalone.
 - **Claude Prompt Enhancer** - Transform simple prompts into detailed descriptions with 51 artistic styles (photorealistic, cinematic, fantasy, cyberpunk, anime, oil painting, watercolor, and more)
-- **Claude Vision Analysis** - Analyze images with Claude's multimodal capabilities (up to 20 images simultaneously). Optional per-node `model` override lets you use a different model for vision than the one your client is configured with.
+- **Claude Vision Analysis** - Analyze images with Claude's multimodal capabilities (up to 600 images per request). Optional per-node `model` override lets you use a different model for vision than the one your client is configured with.
 - **Claude Text Generation** - General-purpose text completion and generation
 - **Claude Conversation** - Multi-turn dialogues with context preservation and automatic memory management
 - **Claude Conversation Info** - Display conversation statistics and token usage

@@ -8,7 +8,7 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 ## Features
 
 - **Prompt Enhancement** - Transform simple prompts into detailed descriptions with 51 artistic styles
-- **Vision Analysis** - Analyze images with Claude's multimodal capabilities (up to 20 images)
+- **Vision Analysis** - Analyze images with Claude's multimodal capabilities (up to 600 images)
 - **Text Generation** - General-purpose text completion and generation
 - **Conversations** - Multi-turn dialogues with context preservation
 - **Token Management** - Count tokens, estimate costs, automatic context trimming
@@ -113,11 +113,11 @@ Analyzes images using Claude's multimodal capabilities.
 
 **Inputs:**
 - `client`: Claude API client (optional)
-- `image`: IMAGE tensor (ComfyUI format)
+- `image`: IMAGE batch; the node sends every image in it
 - `question`: Question or instruction about the image
-- `additional_images`: Optional (up to 19 more images)
+- `additional_images`: Optional, sent after the primary batch (up to 600 images in total)
 - `detail_level`: low, medium, high
-- `max_tokens`: 256-128000 (output length; thinking counts toward it)
+- `max_tokens`: 256-128000 (default 8192; thinking counts toward it)
 - `model`: Model override for this call, or inherit the client's model (default)
 - `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
 
@@ -161,7 +161,7 @@ Multi-turn conversations with message history.
 - `auto_trim`: Auto-trim old messages to fit the context window of the model this node calls
 - `reset_conversation`: Start fresh conversation
 - `temperature`: Ignored. Current Claude models reject it, so it is never sent; kept so saved workflows load
-- `max_tokens`: 256-128000 (output length; thinking counts toward it)
+- `max_tokens`: 256-128000 (default 8192; thinking counts toward it)
 - `model`: Model override for this call, or inherit the client's model (default)
 - `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
 
@@ -389,6 +389,7 @@ Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**)
 ### "Claude's reply was cut off at max_tokens=N"
 **Cause:** The reply hit the node's `max_tokens` before it finished. Thinking counts toward `max_tokens`, so at low values it can use the whole budget before any text is written. Every Claude node raises this error instead of passing a cut-off reply downstream; the tokens are still billed and show in Usage Stats.
 **Solution:** Raise `max_tokens` on the node, or lower `effort`.
+**Note:** Every node accepts `max_tokens` up to 128000. Above 21,333 the `anthropic` SDK refuses a non-streaming request, so the client streams it internally and still returns the complete reply.
 
 ### "Context window exceeded" Error
 **Solution:**
@@ -402,10 +403,11 @@ Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**)
 
 ### Image validation errors
 **Solution:**
-- Max image size: 5MB
-- Max dimensions: 8000x8000px
+- Max image size: 10 MB of base64 (a PNG of about 7.86 MB); a larger image raises an error naming its size
+- Max images per request: 600; more raises an error naming the count
+- Max dimensions: 8000x8000px, or 3000x3000px when a request has more than 20 images
 - Supported formats: JPEG, PNG, GIF, WebP
-- Node auto-resizes oversized images
+- Node auto-resizes images over the dimension limit for its image count
 
 ## Technical Details
 

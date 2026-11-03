@@ -63,7 +63,7 @@ class ClaudeConversation(IO.ComfyNode):
                 ),
                 IO.Int.Input(
                     "max_tokens",
-                    default=2048,
+                    default=8192,
                     min=256,
                     max=128000,
                     step=128,
@@ -109,7 +109,7 @@ class ClaudeConversation(IO.ComfyNode):
         system_prompt = kwargs.get("system_prompt", "")
         auto_trim = kwargs.get("auto_trim", True)
         reset_conversation = kwargs.get("reset_conversation", False)
-        max_tokens = kwargs.get("max_tokens", 2048)
+        max_tokens = kwargs.get("max_tokens", 8192)
         model = kwargs.get("model", INHERIT_FROM_CLIENT)
         request_kwargs = {} if model == INHERIT_FROM_CLIENT else {"model": model}
         request_kwargs.update(effort_kwargs(kwargs.get("effort")))

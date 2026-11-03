@@ -70,7 +70,7 @@ def test_vision_inherit_does_not_pass_model_to_client():
         pil = MagicMock()
         pil.size = (100, 100)
         mock_converter.tensor_to_pil.return_value = pil
-        mock_converter.encode_and_validate_for_claude.return_value = ("fake_base64", None)
+        mock_converter.encode_and_validate_for_claude.return_value = "fake_base64"
 
         asyncio.run(ClaudeVisionAnalysis.execute(
             image=_mock_image_tensor(),
@@ -93,7 +93,7 @@ def test_vision_explicit_model_is_passed_to_client():
         pil = MagicMock()
         pil.size = (100, 100)
         mock_converter.tensor_to_pil.return_value = pil
-        mock_converter.encode_and_validate_for_claude.return_value = ("fake_base64", None)
+        mock_converter.encode_and_validate_for_claude.return_value = "fake_base64"
 
         asyncio.run(ClaudeVisionAnalysis.execute(
             image=_mock_image_tensor(),
