@@ -22,7 +22,7 @@ else:
     import httpx as httpx_mod
 
 
-def message_body(text="ok", model="claude-sonnet-5-5", stop_reason="end_turn", thinking="hmm", usage=None):
+def message_body(text="ok", model="claude-sonnet-5-5", stop_reason="end_turn", thinking="hmm", usage=None, stop_details=None):
     content = []
     if thinking is not None:
         content.append({"type": "thinking", "thinking": thinking, "signature": "sig"})
@@ -36,6 +36,7 @@ def message_body(text="ok", model="claude-sonnet-5-5", stop_reason="end_turn", t
         "content": content,
         "stop_reason": stop_reason,
         "stop_sequence": None,
+        "stop_details": stop_details,
         "usage": usage or {
             "input_tokens": 10,
             "output_tokens": 5,

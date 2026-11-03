@@ -289,3 +289,37 @@ def test_long_prompts_on_other_models_keep_flat_rates(monkeypatch):
     client = _client(monkeypatch, wire)
     asyncio.run(client.send_request(messages=USER))
     assert client.get_usage_stats()["input_cost_usd"] == 0.4  # 200,000 x $2/M
+
+
+# --- Refusals and retries ------------------------------------------------------
+# A safety-classifier decline is HTTP 200 with stop_reason "refusal" and a
+# stop_details {type, category, explanation} block (handling-stop-reasons docs).
+
+REFUSED = message_body(text=None, thinking=None, stop_reason="refusal",
+                       stop_details={"type": "refusal", "category": "cyber", "explanation": "Declined."})
+
+
+def test_refusal_raises_with_its_category(monkeypatch):
+    client = _client(monkeypatch, Wire((200, REFUSED)))
+    with pytest.raises(ValueError, match="^Claude refused this request \\(category: cyber\\): Declined\\.$"):
+        asyncio.run(client.send_request(messages=USER))
+
+
+def test_streaming_refusal_raises_with_its_category(monkeypatch):
+    client = _client(monkeypatch, Wire((200, REFUSED)))
+    with pytest.raises(ValueError, match="^Claude refused this request \\(category: cyber\\): Declined\\.$"):
+        _stream(client)
+
+
+def test_sdk_retries_are_off_so_the_client_loop_is_the_only_retry():
+    # The SDK retries 429/5xx twice on its own; stacked under MAX_RETRIES=3
+    # that was up to 9 HTTP attempts per rate-limited call.
+    from claude.claude_api.client import ClaudeClient
+    assert ClaudeClient(api_key="test-key").client.max_retries == 0
+
+
+def test_default_max_tokens_leaves_room_for_thinking():
+    # Thinking counts toward max_tokens; at 1024 short prompts hit the
+    # truncation error before any text is written.
+    from claude.claude_api.client import ClaudeClient
+    assert ClaudeClient.DEFAULT_MAX_TOKENS == 8192

@@ -164,9 +164,9 @@ PRIOR_WIDGETS = {
     "ClaudeStructuredOutput": ["prompt", "system_prompt", "temperature", "max_tokens", "seed"],
 }
 DEFAULT_MAX_TOKENS = {
-    "ClaudeTextGeneration": 1024,
+    "ClaudeTextGeneration": 8192,
     "ClaudeConversation": 2048,
-    "ClaudePromptEnhancer": 1024,
+    "ClaudePromptEnhancer": 8192,
     "ClaudeVisionAnalysis": 2048,
     "ClaudeStructuredOutput": 4096,
 }
