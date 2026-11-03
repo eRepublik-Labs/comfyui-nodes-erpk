@@ -65,7 +65,8 @@ def _sse(body):
                                                    "delta": {"type": "signature_delta", "signature": block["signature"]}}))
         events.append(("content_block_stop", {"type": "content_block_stop", "index": index}))
     events.append(("message_delta", {"type": "message_delta",
-                                     "delta": {"stop_reason": body["stop_reason"], "stop_sequence": None},
+                                     "delta": {"stop_reason": body["stop_reason"], "stop_sequence": None,
+                                               "stop_details": body["stop_details"]},
                                      "usage": {"output_tokens": body["usage"]["output_tokens"]}}))
     events.append(("message_stop", {"type": "message_stop"}))
     return "".join(f"event: {name}\ndata: {json.dumps(data)}\n\n" for name, data in events)

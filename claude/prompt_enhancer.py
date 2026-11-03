@@ -262,7 +262,7 @@ Emphasize architectural beauty and structural design."""
                 ),
                 IO.Int.Input(
                     "max_tokens",
-                    default=1024,
+                    default=8192,
                     min=256,
                     max=128000,
                     step=128,
@@ -310,7 +310,7 @@ Emphasize architectural beauty and structural design."""
         style = kwargs.get("style", "photorealistic")
         detail_level = kwargs.get("detail_level", "detailed")
         client = kwargs.get("client")
-        max_tokens = kwargs.get("max_tokens", 1024)
+        max_tokens = kwargs.get("max_tokens", 8192)
         use_streaming = kwargs.get("use_streaming", False)
         model = kwargs.get("model", INHERIT_FROM_CLIENT)
         request_kwargs = {} if model == INHERIT_FROM_CLIENT else {"model": model}

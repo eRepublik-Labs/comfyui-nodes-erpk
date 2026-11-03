@@ -50,6 +50,18 @@ def raise_if_truncated(message, max_tokens: int) -> None:
         )
 
 
+def raise_if_refused(message) -> None:
+    """Refuse a reply Claude's safety classifiers declined (HTTP 200,
+    stop_reason "refusal"); its content is empty and reads as "no text block"
+    otherwise. Usage must be recorded first; the tokens were billed."""
+    if message.stop_reason != "refusal":
+        return
+    details = getattr(message, "stop_details", None)
+    category = getattr(details, "category", None) or "unspecified"
+    explanation = getattr(details, "explanation", None) or "no explanation given"
+    raise ValueError(f"Claude refused this request (category: {category}): {explanation}")
+
+
 def response_text(response) -> str:
     """Join the text blocks of a Messages response.
 
@@ -77,7 +89,8 @@ class ClaudeClient:
 
     # Default configuration
     DEFAULT_MODEL = DEFAULT_TEXT_MODEL
-    DEFAULT_MAX_TOKENS = 1024
+    # Thinking counts toward max_tokens; 1024 left short prompts cut off before any text.
+    DEFAULT_MAX_TOKENS = 8192
     MAX_RETRIES = 3
     INITIAL_RETRY_DELAY = 1.0  # seconds
 
@@ -111,7 +124,8 @@ class ClaudeClient:
         # Resolve API key from multiple sources
         self.api_key = self._resolve_api_key(api_key, config_path)
 
-        self.client = Anthropic(api_key=self.api_key)
+        # max_retries=0: the SDK's own 2 retries would stack under MAX_RETRIES.
+        self.client = Anthropic(api_key=self.api_key, max_retries=0)
 
         # Track usage statistics. When one client is shared across concurrent
         # nodes these counters are updated from asyncio.to_thread worker threads,
@@ -247,6 +261,7 @@ class ClaudeClient:
             try:
                 response = self.client.messages.create(**params)
                 self._record_usage(response)
+                raise_if_refused(response)
                 raise_if_truncated(response, params["max_tokens"])
                 return response
 
@@ -286,7 +301,7 @@ class ClaudeClient:
         Raises:
             anthropic.APIError: The SDK's own error, once retries are exhausted
                 or immediately for a non-retryable 4xx
-            ValueError: The reply stopped at max_tokens
+            ValueError: The reply stopped at max_tokens, or Claude refused it
         """
         return await asyncio.to_thread(
             self._send_request_sync,
@@ -317,7 +332,7 @@ class ClaudeClient:
 
         Raises:
             anthropic.APIError: The SDK's own error
-            ValueError: The reply stopped at max_tokens (after its chunks)
+            ValueError: The reply stopped at max_tokens (after its chunks), or Claude refused it
         """
         params = self._build_params(messages, system, max_tokens, model, effort, kwargs)
         with self.client.messages.stream(**params) as stream:
@@ -325,6 +340,7 @@ class ClaudeClient:
                 yield text
             final = stream.get_final_message()
             self._record_usage(final)
+            raise_if_refused(final)
             raise_if_truncated(final, params["max_tokens"])
 
     def _count_tokens_sync(self, messages: list, system: Optional[str] = None) -> int:

@@ -48,7 +48,7 @@ class ClaudeTextGeneration(IO.ComfyNode):
                 ),
                 IO.Int.Input(
                     "max_tokens",
-                    default=1024,
+                    default=8192,
                     min=256,
                     max=128000,
                     step=128,
@@ -95,7 +95,7 @@ class ClaudeTextGeneration(IO.ComfyNode):
         prompt = kwargs.get("prompt", "")
         client = kwargs.get("client")
         system_prompt = kwargs.get("system_prompt", "")
-        max_tokens = kwargs.get("max_tokens", 1024)
+        max_tokens = kwargs.get("max_tokens", 8192)
         use_streaming = kwargs.get("use_streaming", False)
         model = kwargs.get("model", INHERIT_FROM_CLIENT)
         request_kwargs = {} if model == INHERIT_FROM_CLIENT else {"model": model}
