@@ -86,9 +86,12 @@ class TestRequestShape:
         args = sdk.responses.create.call_args.kwargs
         assert "reasoning" not in args
 
-    @pytest.mark.parametrize("mainline", ["gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"])
+    @pytest.mark.parametrize("mainline", [
+        "gpt-6.1-terra", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+    ])
     def test_none_effort_is_sent_where_the_mainline_accepts_it(self, mainline):
-        # Responses effort "none" measured 200 on these mainlines (2026-10-14 study).
+        # Responses effort "none" measured 200 on these mainlines (2026-10-14
+        # study, gpt-6.1-terra 2026-11-03).
         client, sdk = _make_client_with_mock_response([_image_call()])
         asyncio.run(client.generate_image_via_responses(
             prompt="x", mainline_model=mainline, image_model="gpt-image-2", reasoning_effort="none",
@@ -433,8 +436,9 @@ class TestNodeSchema:
         assert inp is not None
         # Each returned 200 on responses.create with the image_generation tool
         # attached (tool_choice="none", measured 2026-10-01).
+        # gpt-6.1-terra measured the same way 2026-11-03.
         assert set(inp.options) == {
-            "gpt-6.1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
+            "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
             "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
         }
         assert inp.default == "gpt-6.1-sol"
@@ -445,7 +449,7 @@ class TestNodeSchema:
         # The 2.5 model pages: "Select it directly in the Image API or as the
         # model of the Responses API image generation tool."
         assert set(inp.options) == {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"}
-        assert inp.default == "gpt-image-2"
+        assert inp.default == "gpt-image-2.5-flare"
 
     def test_quality_offers_extended_tiers(self, schema):
         inp = next(i for i in schema.inputs if i.id == "quality")

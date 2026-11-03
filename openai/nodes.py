@@ -13,15 +13,15 @@ REASONING_EFFORT_OPTIONS = ["default", "none", "minimal", "low", "medium", "high
 REASONING_EFFORT_TOOLTIP = (
     "Reasoning depth for the gpt-5.6 and gpt-6.x models. 'default' sends nothing, so "
     "the model reasons at its own default (medium). 'none' turns reasoning off on "
-    "gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; gpt-6.1-sol and gpt-6-astra cannot "
+    "gpt-6.1-terra, gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; gpt-6.1-sol and gpt-6-astra cannot "
     "turn it off, so there 'none' acts like 'default'. 'minimal' is rejected by every "
     "current model and is sent as 'low'. Ignored by chat-latest."
 )
 
 # temperature and top_p 400 on every current model unless reasoning is off.
 SAMPLING_NOTE = (
-    "Sent only when reasoning_effort is 'none' on gpt-6-sol, gpt-6-luna or a gpt-5.6 "
-    "tier; every other model and effort accepts only the default, so it is dropped."
+    "Sent only when reasoning_effort is 'none' on gpt-6.1-terra, gpt-6-sol, gpt-6-luna "
+    "or a gpt-5.6 tier; every other model and effort accepts only the default, so it is dropped."
 )
 
 VERBOSITY_OPTIONS = ["default", "low", "medium", "high"]

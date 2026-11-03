@@ -13,7 +13,7 @@ Edits existing images based on text prompts using OpenAI's image editing API. Su
 | prompt | String | (empty) | Description of how to modify the image |
 | client | OPENAI_API_CLIENT | — | OpenAI API client (optional if API key is configured in Settings) |
 | mask | Mask | — | Areas to edit: white=edit, black=keep (optional). Enables inpainting |
-| model | Combo | gpt-image-2 | Editing model: gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-2 (optional) |
+| model | Combo | gpt-image-2.5-sunburst | Editing model: gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-2 (optional) |
 | size | Combo | 1024x1024 | Output size preset or Custom (optional). Presets: auto, 1024x1024, 1024x1536, 1536x1024, 2048x2048, 2048x1152, 1152x2048, 3840x2160, 2160x3840. Every model accepts any Custom size with edges divisible by 16, aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels, max edge 3840. Above 2560x1440 is experimental per OpenAI |
 | custom_width | Int | 1024 | Width when size is Custom (optional). 256 to 3840, step 16 |
 | custom_height | Int | 1024 | Height when size is Custom (optional). 256 to 3840, step 16 |

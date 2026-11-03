@@ -1,6 +1,9 @@
 # ABOUTME: Tests for OpenAI model list completeness and configuration sets
 # ABOUTME: Verifies reasoning models, token param models, and vision models are consistent
 
+import asyncio
+from types import SimpleNamespace
+
 import pytest
 
 from openai.openai_api.client import OpenAIClient
@@ -51,6 +54,31 @@ class TestOpenAIModels:
         # 'none' 400s here, so it is omitted (Alex's 2026-10-14 ruling).
         assert OpenAIClient._effort_for(m, "none") is None
         assert OpenAIClient._effort_for(m, "xhigh") == "xhigh"
+
+    def test_gpt_6_1_terra_offered_as_reasoning_model(self):
+        """gpt-6.1-terra, measured on chat.completions 2026-11-03: effort
+        none/low/medium/high/xhigh 200, minimal and max 400; temperature 0.5
+        400 unless effort is none, where temperature and top_p return 200;
+        verbosity low/medium/high 200; max_tokens 400 (needs
+        max_completion_tokens); response.model echoed "gpt-6.1-terra". On
+        Responses with the image tool, effort none to max 200, minimal 400."""
+        from openai.image_nodes import RESPONSES_MAINLINE_MODELS
+        m = "gpt-6.1-terra"
+        assert m in OpenAIClient.MODELS
+        assert m in OpenAIClient.REASONING_MODELS
+        assert m in OpenAIClient.NEW_TOKEN_PARAM_MODELS
+        assert m in OpenAIClient.NO_SAMPLING_MODELS
+        assert m in OpenAIClient.VERBOSITY_MODELS
+        assert m in OpenAIClient.EFFORT_NONE_MODELS
+        assert OpenAIClient.UNSUPPORTED_EFFORT[m] == {"minimal"}
+        assert m in RESPONSES_MAINLINE_MODELS
+        assert RESPONSES_MAINLINE_MODELS[0] == "gpt-6.1-sol"
+        for effort in ("none", "low", "medium", "high", "xhigh"):
+            assert OpenAIClient._effort_for(m, effort) == effort
+        assert OpenAIClient._effort_for(m, "minimal") == "low"
+        # max 400s on chat.completions, where the text nodes stop at xhigh,
+        # but returns 200 on Responses, which shares _effort_for.
+        assert OpenAIClient._effort_for(m, "max") == "max"
 
     def test_gpt_56_tiers_present(self):
         """GPT-5.6 Sol/Terra/Luna are selectable in MODELS."""
@@ -149,7 +177,7 @@ class TestOfferedCatalog:
     Image 1.x models leave the image nodes."""
 
     KEPT_TEXT = {
-        "gpt-6.1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
+        "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "chat-latest",
     }
     KEPT_IMAGE = {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"}
@@ -197,3 +225,58 @@ class TestMaxTokensCap:
             inp = next(i for i in node.define_schema().inputs if i.id == "max_tokens")
             assert inp.max == 128000, node.__name__
             assert inp.default == 4096, node.__name__
+
+
+class TestImageModelDefaults:
+    """Alex's 2026-11-03 call: Image Generation and the Responses image tool
+    default to gpt-image-2.5-flare, Image Edit to gpt-image-2.5-sunburst (the
+    images.edit reference's own default). A saved workflow keeps the model it
+    stored; only a new node, or a prompt that omits the input, gets these."""
+
+    @pytest.mark.parametrize("node_name,input_id,expected", [
+        ("OpenAIImageGeneration", "model", "gpt-image-2.5-flare"),
+        ("OpenAIImageResponses", "image_model", "gpt-image-2.5-flare"),
+        ("OpenAIImageEdit", "model", "gpt-image-2.5-sunburst"),
+    ])
+    def test_new_node_starts_on_the_documented_model(self, node_name, input_id, expected):
+        import openai.image_nodes as image_nodes
+        inputs = getattr(image_nodes, node_name).define_schema().inputs
+        model = next(i for i in inputs if i.id == input_id)
+        assert model.default == expected
+        assert expected in model.options
+
+    @staticmethod
+    def _recording_client(method_name, seen):
+        async def record(**kwargs):
+            seen.update(kwargs)
+            return {"blocked": True, "error": "stop here"}
+        return SimpleNamespace(**{method_name: record})
+
+    def test_generation_without_a_model_sends_flare(self):
+        from openai.image_nodes import OpenAIImageGeneration
+        seen = {}
+        with pytest.raises(ValueError, match="stop here"):
+            asyncio.run(OpenAIImageGeneration.execute(
+                "a cat", client=self._recording_client("generate_image", seen),
+            ))
+        assert seen["model"] == "gpt-image-2.5-flare"
+
+    def test_responses_without_an_image_model_sends_flare(self):
+        from openai.image_nodes import OpenAIImageResponses
+        seen = {}
+        with pytest.raises(ValueError, match="stop here"):
+            asyncio.run(OpenAIImageResponses.execute(
+                "a cat", client=self._recording_client("generate_image_via_responses", seen),
+            ))
+        assert seen["image_model"] == "gpt-image-2.5-flare"
+
+    def test_edit_without_a_model_sends_sunburst(self):
+        torch = pytest.importorskip("torch")
+        from openai.image_nodes import OpenAIImageEdit
+        seen = {}
+        with pytest.raises(ValueError, match="stop here"):
+            asyncio.run(OpenAIImageEdit.execute(
+                torch.zeros(1, 8, 8, 3), "add a hat",
+                client=self._recording_client("edit_image", seen),
+            ))
+        assert seen["model"] == "gpt-image-2.5-sunburst"

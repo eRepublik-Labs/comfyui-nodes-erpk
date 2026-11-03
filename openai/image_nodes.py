@@ -7,11 +7,17 @@ from .openai_api.client import OpenAIClient
 IMAGE_MODELS = list(OpenAIClient.IMAGE_MODELS.keys())
 EDIT_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"]
 
+# A saved workflow keeps its stored model; these reach only new nodes and
+# prompts that omit the input.
+GENERATION_DEFAULT_MODEL = "gpt-image-2.5-flare"
+EDIT_DEFAULT_MODEL = "gpt-image-2.5-sunburst"
+
 # Mainline (text/reasoning) models for the Responses API call. Each returned
 # 200 on responses.create with the image_generation tool attached (measured
-# 2026-10-01). The first entry is the node default.
+# 2026-10-01, gpt-6.1-terra 2026-11-03). The first entry is the node default.
 RESPONSES_MAINLINE_MODELS = [
     "gpt-6.1-sol",
+    "gpt-6.1-terra",
     "gpt-6-astra",
     "gpt-6-sol",
     "gpt-6-luna",
@@ -27,8 +33,9 @@ RESPONSES_IMAGE_MODELS = [
     "gpt-image-2.5-flare",
 ]
 
-# max is Responses-only: 200 on all 7 mainlines here, 400 on chat.completions
-# (measured 2026-10-14), so the text nodes stop at xhigh.
+# max is Responses-only: 200 on all 8 mainlines here, 400 on chat.completions
+# (measured 2026-10-14, gpt-6.1-terra 2026-11-03), so the text nodes stop at
+# xhigh.
 REASONING_EFFORT_LEVELS = ["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"]
 
 # Size presets shared by the generation and edit nodes, mirroring the official
@@ -116,7 +123,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
                 IO.Combo.Input(
                     "model",
                     options=IMAGE_MODELS,
-                    default="gpt-image-2",
+                    default=GENERATION_DEFAULT_MODEL,
                     optional=True,
                     tooltip=(
                         "Image generation model. "
@@ -209,7 +216,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
         from .openai_api.utils import ImageConverter
 
         client = kwargs.get("client")
-        model = kwargs.get("model", "gpt-image-2")
+        model = kwargs.get("model", GENERATION_DEFAULT_MODEL)
         size = resolve_size(
             kwargs.get("size", "1024x1024"),
             kwargs.get("custom_width", 1024),
@@ -320,14 +327,15 @@ class OpenAIImageResponses(IO.ComfyNode):
                         "Text/reasoning model that drives the Responses API call. "
                         "Not the image model — this picks prompt interpretation, "
                         "reasoning, and (optionally) web search. gpt-6.1-sol is the "
-                        "default; gpt-6-astra is the top tier; gpt-6-luna and "
+                        "default; gpt-6.1-terra is the fast, efficient 6.1 tier at "
+                        "half Sol's price; gpt-6-astra is the top tier; gpt-6-luna and "
                         "gpt-5.6-luna are the cheapest."
                     ),
                 ),
                 IO.Combo.Input(
                     "image_model",
                     options=RESPONSES_IMAGE_MODELS,
-                    default="gpt-image-2",
+                    default=GENERATION_DEFAULT_MODEL,
                     optional=True,
                     tooltip="Underlying GPT Image model used for pixel generation inside the tool.",
                 ),
@@ -338,8 +346,8 @@ class OpenAIImageResponses(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Mainline-model reasoning depth. 'default' sends nothing, so the model uses "
-                        "its own default (medium). 'none' turns reasoning off on gpt-6-sol, "
-                        "gpt-6-luna and the gpt-5.6 tiers; gpt-6.1-sol and gpt-6-astra reject it, so "
+                        "its own default (medium). 'none' turns reasoning off on gpt-6.1-terra, "
+                        "gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; gpt-6.1-sol and gpt-6-astra reject it, so "
                         "there 'none' acts like 'default'. "
                         "'low' to 'max' increase prompt-interpretation quality "
                         "at token cost. 'minimal' is rejected alongside the image tool and is sent "
@@ -454,7 +462,7 @@ class OpenAIImageResponses(IO.ComfyNode):
 
         client = kwargs.get("client")
         mainline_model = kwargs.get("mainline_model", RESPONSES_MAINLINE_MODELS[0])
-        image_model = kwargs.get("image_model", "gpt-image-2")
+        image_model = kwargs.get("image_model", GENERATION_DEFAULT_MODEL)
         reasoning_effort = kwargs.get("reasoning_effort", "default")
         verbosity = kwargs.get("verbosity", "default")
         size = kwargs.get("size", "1024x1024")
@@ -570,7 +578,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                 IO.Combo.Input(
                     "model",
                     options=EDIT_MODELS,
-                    default="gpt-image-2",
+                    default=EDIT_DEFAULT_MODEL,
                     optional=True,
                     tooltip=(
                         "Image editing model. gpt-image-2.5-sunburst / -flare add xhigh/max quality; "
@@ -671,7 +679,7 @@ class OpenAIImageEdit(IO.ComfyNode):
 
         client = kwargs.get("client")
         mask = kwargs.get("mask")
-        model = kwargs.get("model", "gpt-image-2")
+        model = kwargs.get("model", EDIT_DEFAULT_MODEL)
         size = resolve_size(
             kwargs.get("size", "1024x1024"),
             kwargs.get("custom_width", 1024),

@@ -199,20 +199,20 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 #### Nodes
 
 - **OpenAI API Config** - Initialize OpenAI API connection (API key configuration). Optional if API key is configured in ComfyUI Settings or config.ini -- OpenAI nodes can run standalone.
-- **OpenAI Text Generation** - General-purpose text generation with model selection (GPT-6.1 Sol default, GPT-6 Astra/Sol/Luna, GPT-5.6 Sol/Terra/Luna, chat-latest) and optional `reasoning_effort` and `verbosity` controls
+- **OpenAI Text Generation** - General-purpose text generation with model selection (GPT-6.1 Sol default, GPT-6.1 Terra, GPT-6 Astra/Sol/Luna, GPT-5.6 Sol/Terra/Luna, chat-latest) and optional `reasoning_effort` and `verbosity` controls
 - **OpenAI Chat** - Multi-turn conversations with automatic context preservation, plus reasoning_effort and verbosity control on the gpt-6.x and gpt-5.6 models
 - **OpenAI Vision** - Analyze images with any OpenAI text model (GPT-6.1 Sol default)
 - **OpenAI System Instruction** - Set persistent system-level instructions to guide model behavior
-- **OpenAI Image Generation** - Generate images with GPT-Image-2 (default), GPT-Image-2.5 Sunburst and Flare, with png / jpeg / webp output
-- **OpenAI Image Generation (Responses)** - Generate images via the Responses API with a mainline reasoning model (gpt-6.1-sol default) driving the `image_generation` hosted tool. Adds optional web search grounding and prompt revision.
-- **OpenAI Image Edit** - Edit and inpaint images with natural language prompts
+- **OpenAI Image Generation** - Generate images with GPT-Image-2.5 Flare (default), GPT-Image-2.5 Sunburst and GPT-Image-2, with png / jpeg / webp output
+- **OpenAI Image Generation (Responses)** - Generate images via the Responses API with a mainline reasoning model (gpt-6.1-sol default) driving the `image_generation` hosted tool (GPT-Image-2.5 Flare by default). Adds optional web search grounding and prompt revision.
+- **OpenAI Image Edit** - Edit and inpaint images with natural language prompts (GPT-Image-2.5 Sunburst default)
 
 **Key Benefits:**
-- Support for GPT-6.1 Sol (default: 1.05M context, 128K output, $2/$10 per MTok), the GPT-6 Astra/Sol/Luna and GPT-5.6 Sol/Terra/Luna tiers, and chat-latest. The GPT-5.5 and older text models were removed on 2026-10-01
-- `reasoning_effort` parameter (default/none/minimal/low/medium/high/xhigh) for the reasoning models, matching ComfyUI's own OpenAI node; `default` leaves the effort to the model, `none` turns reasoning off on gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers and acts like `default` on gpt-6.1-sol and gpt-6-astra, `minimal` is sent as `low`, and chat-latest drops it. The Responses image node also offers `max` and a `pro` reasoning mode
+- Support for GPT-6.1 Sol (default: 1.05M context, 128K output, $2/$10 per MTok) and GPT-6.1 Terra (same context and output, $1/$5 per MTok), the GPT-6 Astra/Sol/Luna and GPT-5.6 Sol/Terra/Luna tiers, and chat-latest. The GPT-5.5 and older text models were removed on 2026-10-01
+- `reasoning_effort` parameter (default/none/minimal/low/medium/high/xhigh) for the reasoning models, matching ComfyUI's own OpenAI node; `default` leaves the effort to the model, `none` turns reasoning off on gpt-6.1-terra, gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers and acts like `default` on gpt-6.1-sol and gpt-6-astra, `minimal` is sent as `low`, and chat-latest drops it. The Responses image node also offers `max` and a `pro` reasoning mode
 - `verbosity` parameter (default/low/medium/high) — shapes how chatty the response is independently of `max_tokens`; not sent to chat-latest, which ignores it
 - Every current model rejects temperature, top_p and stop while reasoning; temperature and top_p are sent only with `reasoning_effort` none on a model that accepts it, and stop is never sent
-- Image generation with GPT-Image-2 (4K output, multilingual text) and GPT-Image-2.5 Sunburst / Flare (xhigh/max quality, transparent background). GPT-Image-1.5, 1 and 1-Mini were removed on 2026-10-01
+- Image generation with GPT-Image-2.5 Flare / Sunburst (xhigh/max quality, transparent background; Flare is the generation default, Sunburst the edit default) and GPT-Image-2 (4K output, multilingual text). GPT-Image-1.5, 1 and 1-Mini were removed on 2026-10-01
 - Image editing with optional mask support for inpainting
 - Multi-turn conversation with session management
 - Automatic retry with exponential backoff
