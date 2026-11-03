@@ -30,3 +30,4 @@ Detects objects in an image using Gemini's vision capabilities and emits their b
 - Degenerate boxes (width or height at or below 0.5% of the frame) are dropped; coordinates are clamped into the frame.
 - `max_objects` keeps the first N detections returned by the model, not the largest N.
 - Default temperature is 0.0 for factual, repeatable detection.
+- Detection allows 8192 output tokens, thinking included. A detection list cut off at that limit raises an error instead of returning a partial list.

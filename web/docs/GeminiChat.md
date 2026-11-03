@@ -15,7 +15,7 @@ Multi-turn conversation with Gemini that preserves message history. Chain multip
 | chat_session | GEMINI_CHAT_SESSION | - | Previous chat session from another Chat node (optional) |
 | reset_conversation | Boolean | false | Start a new conversation, discarding history (optional) |
 | temperature | Float | 0.7 | Creativity level, 0.0-2.0 Ignored by Gemini 4 Argon (optional) |
-| max_tokens | Int | 8192 | Maximum response length, 256-65536. Google recommends at least 32768 for Gemini 4 Argon (optional) |
+| max_tokens | Int | 8192 | Maximum response length, 256-65536. Google recommends at least 32768 for Gemini 4 Argon. Thinking counts toward it, and a reply cut off at the limit raises an error rather than returning partial text (optional) |
 | top_p | Float | 0.95 | Nucleus sampling threshold, 0.0=disabled. Ignored by Gemini 4 Argon (optional) |
 | top_k | Int | 40 | Top-k sampling limit, 0=disabled. Ignored by Gemini 4 Argon (optional) |
 | stop_sequences | String | "" | Stop generation at these sequences, one per line, max 5 (optional) |
@@ -34,5 +34,6 @@ Multi-turn conversation with Gemini that preserves message history. Chain multip
 
 - Connect the chat_session output to the next Chat node's chat_session input to continue the conversation
 - Use reset_conversation to start fresh while keeping the same client configuration
+- Each turn sends the system instruction and safety settings of the client connected to that Chat node. When chaining Chat nodes, connect the configured client to every one of them
 - A new session is automatically created if no chat_session input is provided
 - Supports JSON mode for structured responses within conversations

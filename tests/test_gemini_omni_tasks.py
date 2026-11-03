@@ -58,9 +58,24 @@ def test_text_part():
 
 
 def test_reference_request_uses_reference_task_and_aspect_ratio():
-    request = _build_omni_video_request("reference_to_video", "720p", aspect_ratio="9:16")
+    request = _build_omni_video_request("reference_to_video", "720p", 6, aspect_ratio="9:16")
     assert request["generation_config"]["video_config"]["task"] == "reference_to_video"
     assert request["response_format"]["aspect_ratio"] == "9:16"
+    assert request["response_format"]["duration"] == "6s"
+
+
+def test_reference_inputs_keep_their_saved_order():
+    # widgets_values is positional, so the duration widget goes after every
+    # widget a saved workflow already holds.
+    assert [i.id for i in GeminiOmniReferenceToVideo.define_schema().inputs] == [
+        "prompt", "reference_images", "client", "aspect_ratio", "resolution",
+        "output_directory", "seed", "duration_seconds",
+    ]
+
+
+def test_reference_duration_widget_spans_the_api_range_and_defaults_to_ten_seconds():
+    spec = _input(GeminiOmniReferenceToVideo, "duration_seconds")
+    assert (spec.min, spec.max, spec.default) == (3, 10, 10)
 
 
 def test_reference_images_input_is_required():

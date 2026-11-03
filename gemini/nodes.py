@@ -7,7 +7,7 @@ import math
 
 from comfy_api.latest import IO
 
-from .gemini_api.client import GeminiClient
+from .gemini_api.client import GeminiClient, raise_if_cut_off, stop_reason
 
 # Degenerate-box floor for detections, mirroring utils/regional_prompt's
 # MIN_REGION_EXTENT (the regions contract). It is duplicated rather than imported
@@ -679,7 +679,7 @@ class GeminiChat(IO.ComfyNode):
             from .gemini_api.cooperative_call import resolve_timeout_ms
             config_params["http_options"] = types.HttpOptions(timeout=resolve_timeout_ms(model))
 
-            config = types.GenerateContentConfig(**config_params)
+            config = client.request_config(**config_params)
             if thinking_cfg is not None:
                 config.thinking_config = thinking_cfg
             response = await asyncio.to_thread(
@@ -688,7 +688,10 @@ class GeminiChat(IO.ComfyNode):
                 config=config,
             )
 
+            raise_if_cut_off(response, max_tokens)
             text = response.text
+            if text is None:
+                raise ValueError(f"Gemini returned no text. Reason: {stop_reason(response)}")
             print(f"[Gemini] Chat response generated ({len(text)} characters)")
 
             return IO.NodeOutput(text, chat_session)
@@ -1286,7 +1289,7 @@ class GeminiImageGeneration(IO.ComfyNode):
 
             from google.genai import types
 
-            config = types.GenerateContentConfig(
+            config = image_client.request_config(
                 temperature=temperature,
                 seed=seed if seed != -1 else None,
             )
@@ -1556,7 +1559,7 @@ class GeminiImageEdit(IO.ComfyNode):
 
             from google.genai import types
 
-            config = types.GenerateContentConfig(
+            config = image_client.request_config(
                 temperature=temperature,
                 seed=seed if seed != -1 else None,
             )

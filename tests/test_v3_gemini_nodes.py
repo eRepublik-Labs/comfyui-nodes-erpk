@@ -2,7 +2,7 @@
 # ABOUTME: Validates V3 compliance, custom types, model COMBO lists, and provider export.
 
 """
-V3 tests for Gemini provider nodes (11 nodes total).
+V3 tests for the Gemini provider nodes in gemini/nodes.py.
 
 Validates:
 - All classes inherit from IO.ComfyNode
@@ -26,7 +26,7 @@ def _import_node(module_name, class_name):
     return getattr(mod, class_name)
 
 
-# --- Parametrized structural data for all 10 nodes ---
+# --- Parametrized structural data for every node in gemini/nodes.py ---
 # (module, class_name, node_id, display_name, category, not_idempotent, is_output_node)
 GEMINI_NODES = [
     ("nodes", "GeminiAPIConfig", "GeminiAPIConfig",
@@ -47,10 +47,6 @@ GEMINI_NODES = [
      "Gemini Image Generation", "ERPK/Gemini", True, False),
     ("nodes", "GeminiImageEdit", "GeminiImageEdit",
      "Gemini Image Edit", "ERPK/Gemini", True, False),
-    ("veo_nodes", "VeoTextToVideo", "VeoTextToVideo",
-     "Veo Text to Video", "ERPK/Gemini/Veo", True, False),
-    ("veo_nodes", "VeoImageToVideo", "VeoImageToVideo",
-     "Veo Image to Video", "ERPK/Gemini/Veo", True, False),
 ]
 
 
@@ -223,33 +219,6 @@ class TestGeminiCustomTypes:
         assert refs[0].optional is True
         assert refs[0].io_type == "ERPK_IMAGE_REFS"
 
-    def test_veo_text_to_video_accepts_optional_client(self):
-        # The client input is optional across all V3 provider nodes — the
-        # key can be resolved from ComfyUI Settings, env var, or config.ini
-        # when no client is connected.
-        cls = _import_node("veo_nodes", "VeoTextToVideo")
-        schema = cls.define_schema()
-        client_inputs = [i for i in schema.inputs if i.id == "client"]
-        assert len(client_inputs) == 1
-        assert client_inputs[0].optional is True
-
-    def test_veo_image_to_video_accepts_image(self):
-        cls = _import_node("veo_nodes", "VeoImageToVideo")
-        schema = cls.define_schema()
-        input_types = [i.io_type for i in schema.inputs]
-        assert "IMAGE" in input_types
-        assert "GEMINI_API_CLIENT" in input_types
-
-
-    @pytest.mark.parametrize("node_name", ["VeoTextToVideo", "VeoImageToVideo"])
-    def test_veo_duration_default_is_an_offered_option(self, node_name):
-        # ComfyUI rejects a Combo value that is not in its option list, and the
-        # duration options are strings ("4", "5", "6", "8").
-        cls = _import_node("veo_nodes", node_name)
-        schema = cls.define_schema()
-        duration = [i for i in schema.inputs if i.id == "duration_seconds"][0]
-        assert duration.default == "8"
-        assert duration.default in duration.options
 
 class TestGeminiModelOptions:
     """Model COMBO options are correctly sourced from GeminiClient constants."""
@@ -319,7 +288,12 @@ class TestGeminiProviderExport:
     def test_nodes_list_has_all_classes(self):
         import importlib
         mod = importlib.import_module("gemini")
-        assert len(mod.NODES) == 13, f"Expected 13 Gemini nodes, got {len(mod.NODES)}"
+        assert [cls.define_schema().node_id for cls in mod.NODES] == [
+            "GeminiAPIConfig", "GeminiTextGeneration", "GeminiChat", "GeminiVision",
+            "GeminiDetect", "GeminiSystemInstruction", "GeminiSafetySettings",
+            "GeminiImageGeneration", "GeminiImageEdit", "GeminiOmniVideoGeneration",
+            "GeminiOmniReferenceToVideo",
+        ]
 
     def test_nodes_list_all_comfy_nodes(self):
         import importlib
