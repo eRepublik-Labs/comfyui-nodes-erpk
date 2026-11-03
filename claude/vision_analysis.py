@@ -1,5 +1,5 @@
 # ABOUTME: ComfyUI V3 node for analyzing images using Claude's multimodal vision capabilities.
-# ABOUTME: Supports single or multiple images (up to 20) with configurable detail levels.
+# ABOUTME: Sends every image of both batches (up to 600) with configurable detail levels.
 
 from comfy_api.latest import IO
 
@@ -8,6 +8,13 @@ from .models import INHERIT_FROM_CLIENT, TEXT_MODELS, effort_input, effort_kwarg
 
 class ClaudeVisionAnalysis(IO.ComfyNode):
     """Analyzes images using Claude's vision capabilities."""
+
+    # Measured 2026-11-03: 600 images returned 200, 601 returned 400. Each side
+    # may be 8000 px, but only 3000 px once a request has more than 20 images.
+    MAX_IMAGES = 600
+    MANY_IMAGES = 20
+    MAX_SIDE = 8000
+    MAX_SIDE_MANY_IMAGES = 3000
 
     @classmethod
     def define_schema(cls):
@@ -20,7 +27,7 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
             inputs=[
                 IO.Image.Input(
                     "image",
-                    tooltip="Primary image to analyze (ComfyUI tensor)",
+                    tooltip="Images to analyze. The node sends every image in the batch.",
                 ),
                 IO.String.Input(
                     "question",
@@ -43,7 +50,7 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
                 IO.Image.Input(
                     "additional_images",
                     optional=True,
-                    tooltip="Optional additional images (up to 19 more, for 20 total)",
+                    tooltip="Optional additional images, all sent after the primary batch. Up to 600 images in total; above 20, each is resized to at most 3000 px on its longest side.",
                 ),
                 IO.Combo.Input(
                     "detail_level",
@@ -54,7 +61,7 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
                 ),
                 IO.Int.Input(
                     "max_tokens",
-                    default=2048,
+                    default=8192,
                     min=256,
                     max=128000,
                     step=128,
@@ -91,7 +98,7 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
         client = kwargs.get("client")
         additional_images = kwargs.get("additional_images")
         detail_level = kwargs.get("detail_level", "high")
-        max_tokens = kwargs.get("max_tokens", 2048)
+        max_tokens = kwargs.get("max_tokens", 8192)
         model = kwargs.get("model", "(inherit from client)")
 
         if client is None:
@@ -131,57 +138,34 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
 
     @classmethod
     def _prepare_images(cls, image_converter, primary_image, additional_images=None):
-        """Prepare images for API by converting to base64."""
-        images = []
-
-        try:
-            pil_image = image_converter.tensor_to_pil(primary_image)
-            w, h = pil_image.size
-            if w > 8000 or h > 8000:
-                print(f"[Claude] Warning: image {w}x{h} exceeds 8000px. Attempting to resize...")
-                pil_image = image_converter.resize_if_needed(pil_image, max_dimension=8000)
-            base64_str, size_warning = image_converter.encode_and_validate_for_claude(pil_image, format="PNG")
-            if size_warning:
-                print(f"[Claude] Warning: {size_warning}")
-            images.append(base64_str)
-        except Exception as e:
-            raise ValueError(f"Failed to process primary image: {str(e)}")
-
+        """Base64-encode every image of both batches, resized to the side limit
+        that applies to this many images."""
+        frames = cls._frames(primary_image)
         if additional_images is not None:
+            frames += cls._frames(additional_images)
+        if len(frames) > cls.MAX_IMAGES:
+            raise ValueError(f"Claude accepts at most {cls.MAX_IMAGES} images per request; got {len(frames)}")
+        max_side = cls.MAX_SIDE if len(frames) <= cls.MANY_IMAGES else cls.MAX_SIDE_MANY_IMAGES
+
+        images = []
+        for number, frame in enumerate(frames, start=1):
+            pil_image = image_converter.tensor_to_pil(frame)
+            width, height = pil_image.size
+            if max(width, height) > max_side:
+                print(f"[Claude] Image {number} of {len(frames)}: resizing {width}x{height} to fit {max_side}px")
+                pil_image = image_converter.resize_if_needed(pil_image, max_dimension=max_side)
             try:
-                import torch
-                if isinstance(additional_images, torch.Tensor):
-                    if len(additional_images.shape) == 4:
-                        batch_size = additional_images.shape[0]
-                        for i in range(min(batch_size, 19)):
-                            single_image = additional_images[i:i+1]
-                            pil_image = image_converter.tensor_to_pil(single_image)
-                            w, h = pil_image.size
-                            if w > 8000 or h > 8000:
-                                print(f"[Claude] Warning for image {i+2}: {w}x{h} exceeds 8000px. Resizing...")
-                                pil_image = image_converter.resize_if_needed(pil_image, max_dimension=8000)
-                            base64_str, size_warning = image_converter.encode_and_validate_for_claude(pil_image, format="PNG")
-                            if size_warning:
-                                print(f"[Claude] Warning for image {i+2}: {size_warning}")
-                            images.append(base64_str)
-                    else:
-                        pil_image = image_converter.tensor_to_pil(additional_images)
-                        w, h = pil_image.size
-                        if w > 8000 or h > 8000:
-                            print(f"[Claude] Warning: image {w}x{h} exceeds 8000px. Resizing...")
-                            pil_image = image_converter.resize_if_needed(pil_image, max_dimension=8000)
-                        base64_str, size_warning = image_converter.encode_and_validate_for_claude(pil_image, format="PNG")
-                        if size_warning:
-                            print(f"[Claude] Warning: {size_warning}")
-                        images.append(base64_str)
-            except Exception as e:
-                print(f"[Claude] Warning: Failed to process additional images: {str(e)}")
-
-        if len(images) > 20:
-            print(f"[Claude] Warning: Too many images ({len(images)}). Using first 20.")
-            images = images[:20]
-
+                images.append(image_converter.encode_and_validate_for_claude(pil_image, format="PNG"))
+            except ValueError as e:
+                raise ValueError(f"Image {number} of {len(frames)}: {e}") from e
         return images
+
+    @staticmethod
+    def _frames(images):
+        """One [H, W, C] tensor per image of a ComfyUI [B, H, W, C] batch."""
+        if len(images.shape) == 4:
+            return [images[i] for i in range(images.shape[0])]
+        return [images]
 
     @classmethod
     def _build_multimodal_content(cls, images_base64, question):

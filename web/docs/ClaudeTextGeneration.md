@@ -13,7 +13,7 @@ General-purpose text generation using Claude for completion, creative writing, a
 | client | CLAUDE_API_CLIENT | (none) | Claude API client (optional if API key is configured in Settings) |
 | system_prompt | String (multiline) | (empty) | System prompt to guide Claude's behavior (optional) |
 | temperature | Float | 0.7 | Ignored (optional). Current Claude models return an error for any temperature, so it is never sent; the widget stays so saved workflows load |
-| max_tokens | Int | 1024 | Maximum length of response; thinking counts toward it (optional). Min: 256, Max: 128000, Step: 128 |
+| max_tokens | Int | 8192 | Maximum length of response; thinking counts toward it (optional). Min: 256, Max: 128000, Step: 128 |
 | use_streaming | Boolean | False | Enable streaming responses (optional) |
 | model | Combo | (inherit from client) | Model override for this call (optional). Choose a model from the list, or inherit the connected client's model. Without a client, inherit means the Claude API client's default model |
 | effort | Combo | (model default) | How much effort Claude spends: thinking depth, tool calls and answer length (optional). Options: (model default), low, medium, high, xhigh, max. (model default) sends nothing, so the model keeps its own default (high; medium on Opus 5.5 and Haiku 5.5). Higher levels cost more tokens and time |

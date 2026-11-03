@@ -165,9 +165,9 @@ PRIOR_WIDGETS = {
 }
 DEFAULT_MAX_TOKENS = {
     "ClaudeTextGeneration": 8192,
-    "ClaudeConversation": 2048,
+    "ClaudeConversation": 8192,
     "ClaudePromptEnhancer": 8192,
-    "ClaudeVisionAnalysis": 2048,
+    "ClaudeVisionAnalysis": 8192,
     "ClaudeStructuredOutput": 4096,
 }
 
@@ -199,7 +199,7 @@ def test_effort_is_appended_after_every_existing_widget(name):
 
 
 @pytest.mark.parametrize("name", PRIOR_WIDGETS)
-def test_max_tokens_reaches_the_128k_output_limit_with_default_unchanged(name):
+def test_max_tokens_reaches_the_128k_output_limit_with_its_default(name):
     spec = next(w for w in _widgets(name) if w.id == "max_tokens")
     assert spec.max == 128_000
     assert spec.default == DEFAULT_MAX_TOKENS[name]
@@ -209,6 +209,16 @@ def _run(name, client, **widgets):
     if name == "ClaudeStructuredOutput":
         return _run_structured(client, **widgets)
     return TEXT_NODES[name](client, **widgets)
+
+
+@pytest.mark.parametrize("name", PRIOR_WIDGETS)
+def test_max_tokens_128000_reaches_claude(monkeypatch, name):
+    # anthropic 2.4.0 refuses a non-streaming send above 21,333 tokens before
+    # any HTTP; measured 2026-11-03, all five nodes raised at 128000.
+    wire = Wire((200, message_body(text="{}")))
+    _run(name, _client(monkeypatch, wire), max_tokens=128_000)
+    assert wire.bodies[-1]["max_tokens"] == 128_000
+    assert wire.bodies[-1]["stream"] is True
 
 
 @pytest.mark.parametrize("name", PRIOR_WIDGETS)
@@ -323,3 +333,73 @@ def test_streamed_reply_cut_off_at_max_tokens_raises(monkeypatch, run):
     with pytest.raises(ValueError, match=TRUNCATED):
         run(client, use_streaming=True, max_tokens=256)
     assert client.get_usage_stats()["output_tokens"] == 5
+
+
+# --- ClaudeVisionAnalysis sends every image ------------------------------------
+# build-with-claude/vision, measured 2026-11-03: a request takes up to 600
+# images (601 returned 400 "too many images and documents: 601 + 0 > 600").
+# Each side may be 8000 px (8001 returned 400), or 3000 px once a request has
+# more than 20 images (21 at 3001 px returned 400 "...for many-image requests:
+# 3000 pixels"; 21 at 3000 px returned 200).
+
+
+def _sent_image_sizes(body):
+    import base64
+    import io
+    from PIL import Image
+    blocks = [block for block in body["messages"][0]["content"] if block["type"] == "image"]
+    return [Image.open(io.BytesIO(base64.b64decode(block["source"]["data"]))).size for block in blocks]
+
+
+def _run_vision_on(client, image, **widgets):
+    from claude.vision_analysis import ClaudeVisionAnalysis
+    return asyncio.run(ClaudeVisionAnalysis.execute(image=image, question="what?", client=client, **widgets)).args[0]
+
+
+def test_vision_sends_every_image_in_the_primary_batch(monkeypatch):
+    wire = Wire()
+    _run_vision_on(_client(monkeypatch, wire), torch.zeros((4, 8, 8, 3)))
+    assert len(_sent_image_sizes(wire.bodies[-1])) == 4
+
+
+def test_vision_sends_every_additional_image_past_20(monkeypatch):
+    wire = Wire()
+    _run_vision_on(_client(monkeypatch, wire), torch.zeros((1, 8, 8, 3)), additional_images=torch.zeros((25, 8, 8, 3)))
+    assert len(_sent_image_sizes(wire.bodies[-1])) == 26
+
+
+def test_vision_sends_600_images(monkeypatch):
+    wire = Wire()
+    _run_vision_on(_client(monkeypatch, wire), torch.zeros((600, 2, 2, 3)))
+    assert len(_sent_image_sizes(wire.bodies[-1])) == 600
+
+
+def test_vision_refuses_601_images_before_sending(monkeypatch):
+    wire = Wire()
+    with pytest.raises(ValueError, match="Claude accepts at most 600 images per request; got 601$"):
+        _run_vision_on(_client(monkeypatch, wire), torch.zeros((1, 2, 2, 3)), additional_images=torch.zeros((600, 2, 2, 3)))
+    assert wire.requests == []
+
+
+@pytest.mark.parametrize("primary, additional, width, sent_width", [
+    (1, 19, 3001, 3001),  # 20 images: the 8000 px limit applies
+    (1, 20, 3001, 3000),  # 21 images: every image, primary included, fits 3000 px
+    (1, 0, 8001, 8000),
+])
+def test_vision_fits_each_image_to_the_side_limit_for_its_image_count(monkeypatch, primary, additional, width, sent_width):
+    wire = Wire()
+    extra = torch.zeros((additional, 8, width, 3)) if additional else None
+    _run_vision_on(_client(monkeypatch, wire), torch.zeros((primary, 8, width, 3)), additional_images=extra)
+    sizes = _sent_image_sizes(wire.bodies[-1])
+    assert len(sizes) == primary + additional
+    assert {max(size) for size in sizes} == {sent_width}
+
+
+def test_vision_refuses_an_image_over_10mb_of_base64_before_sending(monkeypatch):
+    import numpy as np
+    noise = np.random.default_rng(0).integers(0, 256, (1700, 1700, 3), dtype=np.uint8)
+    image = torch.from_numpy(noise.astype(np.float32) / 255.0).unsqueeze(0)
+    wire = Wire()
+    with pytest.raises(ValueError, match=r"Image 2 of 2: Image is \d+ bytes as base64; Claude accepts at most 10485760$"):
+        _run_vision_on(_client(monkeypatch, wire), torch.zeros((1, 8, 8, 3)), additional_images=image)
+    assert wire.requests == []

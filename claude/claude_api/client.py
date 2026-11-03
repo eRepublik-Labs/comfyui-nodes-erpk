@@ -16,6 +16,10 @@ import os
 import threading
 from typing import Dict, Any, Generator, Optional
 from anthropic import Anthropic
+# Private SDK table, read alongside _calculate_nonstreaming_timeout below so the
+# streaming decision is the SDK's own; renaming either fails loudly, at import
+# or on the first send, never silently.
+from anthropic._constants import MODEL_NONSTREAMING_TOKENS
 import configparser
 
 from ..models import DEFAULT_TEXT_MODEL
@@ -241,6 +245,22 @@ class ClaudeClient:
                 self.costs_usd[kind] += count / 1_000_000 * per_mtok[kind]
             self.cache_savings_usd += tokens["cache_read"] / 1_000_000 * (per_mtok["input"] - per_mtok["cache_read"])
 
+    def _sdk_requires_streaming(self, params: Dict[str, Any]) -> bool:
+        """Whether the SDK would refuse params as a non-streaming request.
+
+        messages.create raises "Streaming is required for operations that may
+        take longer than 10 minutes" before any HTTP once it expects the reply
+        to run that long (max_tokens above 21,333 on anthropic 2.4.0). Asking
+        the SDK's own check keeps the threshold in step with SDK upgrades.
+        """
+        try:
+            self.client._calculate_nonstreaming_timeout(
+                params["max_tokens"], MODEL_NONSTREAMING_TOKENS.get(params["model"])
+            )
+        except ValueError:
+            return True
+        return False
+
     def _send_request_sync(
         self,
         messages: list,
@@ -251,7 +271,11 @@ class ClaudeClient:
         **kwargs
     ):
         params = self._build_params(messages, system, max_tokens, model, effort, kwargs)
-        response = self.client.messages.create(**params)
+        if self._sdk_requires_streaming(params):
+            with self.client.messages.stream(**params) as stream:
+                response = stream.get_final_message()
+        else:
+            response = self.client.messages.create(**params)
         self._record_usage(response)
         raise_if_refused(response)
         raise_if_truncated(response, params["max_tokens"])
@@ -268,6 +292,9 @@ class ClaudeClient:
     ):
         """
         Send a request to Claude API (the SDK retries transient errors).
+
+        A max_tokens large enough that the SDK refuses a non-streaming request
+        is sent as a stream and collected into the same Message.
 
         Args:
             messages: List of message dicts with 'role' and 'content'

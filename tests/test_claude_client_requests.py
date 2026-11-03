@@ -346,3 +346,45 @@ def test_default_max_tokens_leaves_room_for_thinking():
     # truncation error before any text is written.
     from claude.claude_api.client import ClaudeClient
     assert ClaudeClient.DEFAULT_MAX_TOKENS == 8192
+
+
+# --- Large max_tokens on a non-streaming send -----------------------------------
+# anthropic 2.4.0 refuses a non-streaming request before any HTTP when it
+# expects it to run past 10 minutes (3600 * max_tokens / 128000 > 600), with
+# "Streaming is required for operations that may take longer than 10 minutes".
+# Measured 2026-11-03: max_tokens=21333 was sent, 21334 raised. The API itself
+# accepts up to 128000 (128001 returned 400).
+
+
+def test_max_tokens_128000_is_streamed_and_returns_the_message(monkeypatch):
+    wire = Wire((200, message_body(text="long answer")))
+    client = _client(monkeypatch, wire)
+    response = asyncio.run(client.send_request(messages=USER, max_tokens=128_000))
+    from claude.claude_api.client import response_text
+    assert response_text(response) == "long answer"
+    body = wire.bodies[-1]
+    assert body["stream"] is True
+    assert body["max_tokens"] == 128_000
+    assert client.get_usage_stats()["output_tokens"] == 5
+
+
+@pytest.mark.parametrize("max_tokens, streamed", [(21_333, False), (21_334, True)])
+def test_streaming_starts_where_the_sdk_refuses_a_non_streaming_send(monkeypatch, max_tokens, streamed):
+    wire = Wire()
+    client = _client(monkeypatch, wire)
+    asyncio.run(client.send_request(messages=USER, max_tokens=max_tokens))
+    assert wire.bodies[-1].get("stream", False) is streamed
+
+
+def test_internally_streamed_reply_cut_off_at_max_tokens_raises(monkeypatch):
+    wire = Wire((200, message_body(text="A half-writ", stop_reason="max_tokens")))
+    client = _client(monkeypatch, wire)
+    with pytest.raises(ValueError, match="^Claude's reply was cut off at max_tokens=128000"):
+        asyncio.run(client.send_request(messages=USER, max_tokens=128_000))
+    assert client.get_usage_stats()["output_tokens"] == 5
+
+
+def test_internally_streamed_refusal_raises_with_its_category(monkeypatch):
+    client = _client(monkeypatch, Wire((200, REFUSED)))
+    with pytest.raises(ValueError, match="^Claude refused this request \\(category: cyber\\): Declined\\.$"):
+        asyncio.run(client.send_request(messages=USER, max_tokens=128_000))
