@@ -26,8 +26,8 @@ ComfyUI-Custom-Nodes/
 │   └── claude_api/                # API integration layer
 ├── gemini/                        # Google Gemini API integration
 │   ├── README.md                  # Package documentation
-│   ├── nodes.py                   # All Gemini nodes
-│   ├── veo_nodes.py               # Veo video generation nodes
+│   ├── nodes.py                   # Text, chat, vision, detect and image nodes
+│   ├── omni_nodes.py              # Omni Flash video nodes
 │   └── gemini_api/                # API integration layer
 ├── openai/                        # OpenAI API integration
 │   ├── README.md                  # Package documentation
@@ -105,7 +105,6 @@ Video nodes return a STRING URL that works directly with the **Preview Anything*
 - **MiniMax H3 Video Edit** / **Video Extend** (open-weights edition) - Rewrite a clip's lighting, style or elements, or append a new segment after its last frame. Both take the source as a video URL, so they chain off any video node's output
 - **MiniMax H3 Text-to-Image** / **Image Edit** / **LoRA Stack** - 1k/2k image generation and identity-preserving edits from up to 9 references. The LoRA Stack config node feeds up to 3 LoRA weights into any H3 node, which then calls the endpoint's `-lora` twin
 - **Alibaba WAN 2.7 Text-to-Video** / **Image-to-Video** / **Video Extend** - WAN 2.7 with extension support for continuing existing clips. Image-to-Video takes its start and end frames as ComfyUI IMAGE inputs (`first_frame`, `last_frame`) or as URLs
-- **WaveSpeed Veo 3.1 Text-to-Video** / **Image-to-Video** - Google Veo 3.1 via WaveSpeed billing (distinct from the Gemini-direct Veo nodes under `ERPK/Gemini/Veo`)
 - **Kling 3.0 Image-to-Video** - Kling v3.0 i2v with Standard and Pro quality tiers
 - **Kling O3 Text-to-Video** / **Image-to-Video** - Kling's flagship O3 with Standard and Pro tiers
 - **Lightricks LTX 2 Pro Text-to-Video** / **Image-to-Video** - LTX 2 Pro with enum durations (6/8/10s) and optional audio
@@ -152,9 +151,9 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 
 ### ERPK/Gemini
 
-Google Gemini API integration for text generation, vision analysis, multi-turn conversations, image generation, image editing, and **Veo video generation**.
+Google Gemini API integration for text generation, vision analysis, multi-turn conversations, image generation, image editing, and **Omni Flash video generation**.
 
-**Category in ComfyUI:** `ERPK/Gemini` and `ERPK/Gemini/Veo`
+**Category in ComfyUI:** `ERPK/Gemini`
 
 #### Nodes
 
@@ -168,17 +167,15 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Gemini System Instruction** - Set persistent system-level instructions to guide model behavior
 - **Gemini Safety Settings** - Configure content safety filters (strict/balanced/permissive presets or custom)
 
-#### Veo Video Generation Nodes
+#### Video Generation Nodes
 
-- **Veo Text to Video** - Generate videos from text prompts using Google's Veo 3.1 models (with synchronized audio; Google shuts these down on 2026-10-22)
-- **Veo Image to Video** - Generate videos from an input image and optional text prompt
 - **Gemini Omni Video Generation** - Generate video of a chosen length, 3-10s (360p to 4k), from a prompt or start image via Gemini Omni Flash (returns in one call; 1080p/4k arrive through the Files API)
 - **Gemini Omni Reference to Video** - Generate video featuring the subjects in reference images via Gemini Omni Flash
 
 **Key Benefits:**
 - Support for Gemini 4 Argon, 3.1 Pro Preview, 3.8 Flash (default), 3.7, 3.6 and 3.5 Flash, and 3.5 Flash-Lite
 - **Thinking level** control across all models (none/minimal/low/medium/high). `none` keeps the model's default thinking; `minimal` is raised to `low` on models that reject it
-- **Veo video generation** with text-to-video and image-to-video (Veo 3.1 includes audio)
+- **Omni Flash video generation** from text, a start image or reference images
 - Each node selects its own model for maximum flexibility
 - State-of-the-art reasoning with Gemini 3.1 Pro Preview
 - Image generation with Nano Banana 2.1 (recommended), 3.1 Flash, 3.1 Flash Lite, and 3 Pro (0.5K to 4K resolution, model-dependent)

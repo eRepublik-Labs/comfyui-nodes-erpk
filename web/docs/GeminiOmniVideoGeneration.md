@@ -5,7 +5,7 @@
 
 Generates 3-10 second video at 24 FPS, 360p to 4k, using Gemini Omni Flash 1.1 (`gemini-omni-1.1-flash`). Connect an image to animate it (image-to-video) instead of generating from text alone.
 
-Unlike the Veo nodes, this model is reached through Google's Interactions API and returns the video directly rather than through a long-running operation, so a generation completes in one call with no polling.
+This model runs on Google's Interactions API and returns the video directly rather than through a long-running operation, so a generation completes in one call with no polling.
 
 ## Parameters
 

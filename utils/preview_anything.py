@@ -572,7 +572,7 @@ def _local_path_to_view_url(value: str):
         rel = os.path.relpath(real, base_real)
         if rel.startswith("..") or os.path.isabs(rel):
             continue
-        # rel is something like "veo_i2v_1234.mp4" or "subdir/clip.mp4"
+        # rel is something like "gemini_omni_1234.mp4" or "subdir/clip.mp4"
         subfolder, fname = os.path.split(rel)
         return _view_url(fname, subfolder, folder_type)
     return None

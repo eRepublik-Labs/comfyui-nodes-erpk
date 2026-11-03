@@ -397,7 +397,7 @@ const GENERAL_SETTINGS = [
         type: "number",
         defaultValue: 300000,
         category: ["ERPK", "General", "Gemini Request Timeout (ms)"],
-        tooltip: "Per-request HTTP timeout for Gemini/Veo calls, in milliseconds. Raise for very long video jobs. Default 300000 (5 min).",
+        tooltip: "Per-request HTTP timeout for Gemini calls, in milliseconds. Raise for very long video jobs. Default 300000 (5 min).",
     },
 ];
 

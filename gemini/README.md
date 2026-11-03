@@ -1,9 +1,9 @@
 # Gemini API Integration for ComfyUI
 
-Complete Google Gemini API integration providing text generation, vision analysis, multi-turn conversations, image generation, image editing, **video generation (Veo)**, and safety controls for ComfyUI workflows.
+Complete Google Gemini API integration providing text generation, vision analysis, multi-turn conversations, image generation, image editing, **video generation (Omni Flash)**, and safety controls for ComfyUI workflows.
 
 **Version:** 2026.10.1
-**Category in ComfyUI:** `ERPK/Gemini` and `ERPK/Gemini/Veo`
+**Category in ComfyUI:** `ERPK/Gemini`
 **SDK requirement:** `google-genai>=2.6.0` (per `gemini/requirements.txt`). Omni Flash needs it: 2.2.0 sends `response_format.aspect_ratio` as `aspectRatio`, which the API rejects
 
 ## Features
@@ -12,7 +12,7 @@ Complete Google Gemini API integration providing text generation, vision analysi
 - **Vision Analysis** - Analyze images with Gemini's multimodal capabilities
 - **Image Generation** - Generate images from text descriptions
 - **Image Editing** - Edit and modify images with natural language prompts (up to 14 reference images)
-- **Video Generation (Veo)** - Generate videos from text or images using Google's Veo models
+- **Video Generation (Omni Flash)** - Generate 3-10 second videos from text, a start image or reference images
 - **Multi-turn Conversations** - Maintain chat history across requests
 - **System Instructions** - Set persistent instructions to guide model behavior
 - **Safety Settings** - Configure content safety filters with presets or custom thresholds
@@ -64,8 +64,8 @@ Complete Google Gemini API integration providing text generation, vision analysi
 5. **Restart ComfyUI**
 
 6. **Verify installation:**
-   - Look for `ERPK/Gemini` and `ERPK/Gemini/Veo` categories in ComfyUI node menu
-   - Should see 13 nodes available (9 Gemini, 2 Veo, 2 Omni)
+   - Look for the `ERPK/Gemini` category in ComfyUI node menu
+   - Should see 11 nodes available (9 Gemini, 2 Omni)
 
 ## Available Nodes
 
@@ -302,7 +302,7 @@ Configure content safety filters.
 
 Generate 3-10 second video at 24 FPS, 360p to 4k, with Gemini Omni Flash 1.1 (`gemini-omni-1.1-flash`).
 
-Unlike Veo, this model is reached through Google's Interactions API and returns the
+This model runs on Google's Interactions API and returns the
 video directly, so a generation completes in a single call with no polling.
 That call gets at least a 15-minute timeout, because a 1080p or 4k render can outlast
 the 5-minute default.
@@ -347,67 +347,6 @@ but `gemini-omni-1.1-flash` rejects it.
 
 ---
 
-### Veo Video Generation Nodes
-
-#### Veo Text to Video
-Generate videos from text prompts using Google's Veo models.
-
-**Inputs:**
-- `client`: Gemini API client (from Gemini API Config node)
-- `prompt`: Text description of the video to generate (max 2500 characters)
-- `reference_images`: Up to 3 reference images (Veo 3.1 and 3.1 Fast only)
-- `model`: veo-3.1-generate-preview (default, includes audio), veo-3.1-fast-generate-preview, or veo-3.1-lite-generate-preview
-- `aspect_ratio`: 16:9 (landscape) or 9:16 (portrait)
-- `resolution`: 720p (default), 1080p or 4k. Lite has no 4k. 1080p and 4k only support 8s
-- `duration_seconds`: 4, 6 or 8 seconds (default 8). The 5 option only exists so older workflows load
-- `person_generation`: allow_adult (default) or allow_all. dont_allow is rejected (Google's docs list allow_all for text-to-video, and allow_adult as the only value in EU/UK/CH/MENA)
-- `seed`: Cache control only, never sent to the API. A fixed seed reuses the video already generated; -1 generates again on every queue
-- `output_directory`: Where to save the video (default: ComfyUI output folder)
-
-**Outputs:**
-- `video_path`: Path to the generated video file (.mp4)
-
-**Features:**
-- Veo 3.1 generates videos with synchronized audio
-- Async generation with automatic polling (may take several minutes)
-- Videos saved directly to disk
-- Configurable aspect ratio and duration
-
-**Example Prompts:**
-- "A cat playing piano in a jazz club, cinematic lighting"
-- "Drone footage of a futuristic city at sunset"
-- "Time-lapse of flowers blooming in a garden"
-
----
-
-#### Veo Image to Video
-Generate videos from an input image and optional text prompt.
-
-**Inputs:**
-- `client`: Gemini API client (from Gemini API Config node)
-- `image`: Input image (ComfyUI IMAGE tensor) - used as the first frame
-- `last_frame_image`: Optional last frame for interpolation (requires 8s)
-- `reference_images`: Up to 3 reference images (Veo 3.1 and 3.1 Fast only; requires 8s and 16:9; not with `last_frame_image`)
-- `prompt`: Optional text description to guide the video generation
-- `model`: veo-3.1-generate-preview (default, includes audio), veo-3.1-fast-generate-preview, or veo-3.1-lite-generate-preview
-- `aspect_ratio`: 16:9 (landscape) or 9:16 (portrait)
-- `resolution`: 720p (default), 1080p or 4k. Lite has no 4k. 1080p and 4k only support 8s
-- `duration_seconds`: 4, 6 or 8 seconds (default 8). The 5 option only exists so older workflows load
-- `person_generation`: allow_adult (default, and the only value Google's docs accept for image-to-video)
-- `seed`: Cache control only, never sent to the API. A fixed seed reuses the video already generated; -1 generates again on every queue
-- `output_directory`: Where to save the video (default: ComfyUI output folder)
-
-**Outputs:**
-- `video_path`: Path to the generated video file (.mp4)
-
-**Example Use Cases:**
-- Animate a still photograph
-- Create video from AI-generated images
-- Turn product shots into video ads
-- Animate artwork or illustrations
-
----
-
 ## Model Comparison
 
 ### Text Generation Models
@@ -431,29 +370,6 @@ Generate videos from an input image and optional text prompt.
 | **gemini-3.1-flash-lite-image** | Fast, low-cost generation | Nano Banana 2 Lite, 1K only, no Google Search grounding |
 
 **Note:** Image generation models output images instead of text. `gemini-3.1-flash-image` outputs 0.5K to 4K, `gemini-nano-banana-2.1` and `gemini-3-pro-image` 1K to 4K, and `gemini-3.1-flash-lite-image` 1K only (other requests are clamped).
-
-### Video Generation Models (Veo)
-
-| Model | Best For | Notes |
-|-------|----------|-------|
-| **veo-3.1-generate-preview** | Highest quality, latest features | Default, generates synchronized audio |
-| **veo-3.1-fast-generate-preview** | Fast generation with audio | Faster variant of Veo 3.1 |
-| **veo-3.1-lite-generate-preview** | Lightweight, lower cost | No reference-image support |
-
-**Pricing** (per second of output, with audio): Veo 3.1 $0.40 (720p, 1080p) / $0.60 (4k); Veo 3.1 Fast $0.10 / $0.12 / $0.30; Veo 3.1 Lite $0.05 (720p) / $0.08 (1080p).
-
-**Shutdown:** Google shuts down all three Veo 3.1 preview models on 2026-10-22; the listed replacement is Gemini Omni Flash.
-
-**Note:** Video generation is asynchronous and may take several minutes. Videos are saved as .mp4 files.
-
-### Veo client-side validators
-
-Both Veo nodes run client-side validators before submitting the long-running job, to avoid eating a 4-5 minute generation just to see an opaque 400 from the API:
-
-- **Duration normalization** — Veo 3.1 accepts `{4, 6, 8}`. Out-of-range values (including the legacy `5` option, kept so older workflows load) are snapped to the nearest valid duration with a warning.
-- **Resolution gating** — Models that don't accept `4k` (Lite) are clamped to `1080p`. `1080p` and `4k` only support 8s, so a shorter duration is raised to 8s with a warning. `720p` is never upscaled.
-- **person_generation** — Per Google's Veo docs, image-to-video accepts `allow_adult` only, and text-to-video accepts `allow_all`, or `allow_adult` in EU/UK/CH/MENA where that is the only allowed value. Anything else raises a `ValueError` before the API call.
-- **i2v feature combos (Veo 3.1)** — `image + last_frame` interpolation requires `duration_seconds=8`; `reference_images` requires `duration_seconds=8` and `aspect_ratio=16:9`; `reference_images` cannot be combined with `image`/`last_frame`. Apart from the 8s rule for reference images, these gates are not in Google's parameter table but are confirmed by Google staff in forum threads — see `gemini/veo_nodes.py` for the linked discussions.
 
 ## Example Workflows
 
@@ -481,17 +397,17 @@ Gemini API Config → Gemini System Instruction → Gemini Safety Settings → G
 
 ### Text to Video
 ```
-Gemini API Config → Veo Text to Video → [video_path output]
+Gemini API Config → Gemini Omni Video Generation → [video_path output]
 ```
 
 ### Image to Video
 ```
-Load Image → Gemini API Config → Veo Image to Video → [video_path output]
+Load Image → Gemini API Config → Gemini Omni Video Generation → [video_path output]
 ```
 
 ### Generate Image then Animate
 ```
-Gemini API Config → Gemini Image Generation → Veo Image to Video → [video_path output]
+Gemini API Config → Gemini Image Generation → Gemini Omni Video Generation → [video_path output]
 ```
 
 ## API Keys and Pricing
@@ -526,15 +442,6 @@ https://ai.google.dev/pricing
 ### Model not available
 - Preview models (like gemini-3.1-pro-preview) may have limited availability
 - Try gemini-3.8-flash (the default) as a stable alternative
-
-### Veo video generation timeout
-- Video generation can take 2-10 minutes depending on duration and model
-- The node polls every 20 seconds and times out after 40 minutes
-- If you consistently get timeouts, try shorter durations or check your API quota
-
-### Veo "person generation not approved" error
-- Some Google Cloud projects need approval for generating videos with people
-- Contact your Google account representative for approval
 
 ### Cannot save video file
 - Ensure the output directory exists and is writable

@@ -12,7 +12,6 @@ from .nodes import (
     GeminiImageGeneration,
     GeminiImageEdit,
 )
-from .veo_nodes import VeoTextToVideo, VeoImageToVideo
 from .omni_nodes import GeminiOmniReferenceToVideo, GeminiOmniVideoGeneration
 
 NODES = [
@@ -25,8 +24,6 @@ NODES = [
     GeminiSafetySettings,
     GeminiImageGeneration,
     GeminiImageEdit,
-    VeoTextToVideo,
-    VeoImageToVideo,
     GeminiOmniVideoGeneration,
     GeminiOmniReferenceToVideo,
 ]
