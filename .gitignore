@@ -36,3 +36,5 @@ CLAUDE.local.md
 .cs/vault-mnt/
 .cs-tmp.*
 .cs/private/
+.cs/session.lock
+.cs/session.mutex.lock
