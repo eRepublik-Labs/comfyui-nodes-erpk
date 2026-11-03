@@ -80,7 +80,7 @@ def test_video_input_nodes_offer_only_grok_imagine_video(node):
 def test_text_to_video_offers_lite_last():
     inp = _input(_video_node("GrokTextToVideo"), "model")
     assert inp.options == ["grok-imagine-video", "grok-imagine-video-1.5", "grok-imagine-video-1.5-lite"]
-    assert inp.default == "grok-imagine-video"
+    assert inp.default == "grok-imagine-video-1.5-lite"
 
 
 def test_reference_to_video_does_not_offer_lite():

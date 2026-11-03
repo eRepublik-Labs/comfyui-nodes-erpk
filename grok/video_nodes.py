@@ -43,7 +43,7 @@ class GrokTextToVideo(IO.ComfyNode):
                 IO.Combo.Input(
                     "model",
                     options=GrokClient.TEXT_TO_VIDEO_MODELS,
-                    default=GrokClient.DEFAULT_VIDEO_MODEL,
+                    default=GrokClient.DEFAULT_TEXT_TO_VIDEO_MODEL,
                     optional=True,
                     tooltip=(
                         "xAI video model. grok-imagine-video-1.5-lite is the cheapest "
@@ -102,7 +102,7 @@ class GrokTextToVideo(IO.ComfyNode):
     async def execute(cls, **kwargs) -> IO.NodeOutput:
         client_dict = kwargs.get("client")
         prompt = kwargs.get("prompt", "")
-        model = kwargs.get("model", GrokClient.DEFAULT_VIDEO_MODEL)
+        model = kwargs.get("model", GrokClient.DEFAULT_TEXT_TO_VIDEO_MODEL)
         aspect_ratio = kwargs.get("aspect_ratio", "16:9")
         resolution = GrokClient.resolve_video_resolution(model, kwargs.get("resolution", "720p"))
         duration = kwargs.get("duration", 5)

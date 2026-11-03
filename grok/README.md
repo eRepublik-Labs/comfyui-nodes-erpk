@@ -12,7 +12,7 @@ Complete xAI Grok integration providing text generation, multi-turn chat, image 
 - **Multi-turn Chat** — Persistent conversation threading via the `GROK_CHAT_SESSION` custom type
 - **Image Generation** — Text-to-image via `grok-imagine-image-2.0` (1k/2k, 13 aspect ratios plus auto, low/medium quality, 1–10 images)
 - **Image Editing** — Single or multi-image editing (up to 5 source images; xAI's documented cap for grok-imagine-image-2.0)
-- **Text-to-Video** — `grok-imagine-video` / `grok-imagine-video-1.5` / `grok-imagine-video-1.5-lite`, 1–15 s clips, 7 aspect ratios, 480p, 720p or 1080p (1080p on 1.5 and 1.5-lite only)
+- **Text-to-Video** — `grok-imagine-video-1.5-lite` (default) / `grok-imagine-video-1.5` / `grok-imagine-video`, 1–15 s clips, 7 aspect ratios, 480p, 720p or 1080p (1080p on 1.5 and 1.5-lite only)
 - **Reference-to-Video** — Guide generation with up to 7 reference images (grok-imagine-video, up to 10 s) or 14 (grok-imagine-video-1.5, up to 15 s); address them inline via `<IMAGE_N>` tokens
 - **Video Edit** — Edit an existing video (URL or data URI) with a text prompt (output capped at 8.7 s and 720p per xAI)
 - **Video Extension** — Append 2–10 seconds of new content to an existing video
@@ -68,7 +68,7 @@ Complete xAI Grok integration providing text generation, multi-turn chat, image 
 | Node | Output | Purpose |
 |---|---|---|
 | **Grok Image Generation** | `IMAGE` (batched, n images) | Text-to-image, 1k/2k, 13 aspect ratios plus auto, low/medium quality, n=1–10 |
-| **Grok Image Edit** | `IMAGE` | Edit 1–5 source images with a text prompt |
+| **Grok Image Edit** | `IMAGE` | Edit 1–5 source images with a text prompt; the node rejects a larger batch before the API call |
 
 ### Video (4)
 
@@ -88,9 +88,9 @@ Complete xAI Grok integration providing text generation, multi-turn chat, image 
 | `grok-4.20-multi-agent-0309` | Text Generation, Chat | 1M context; tighter rate limits (9 rps / 450 rpm) than its siblings; ignores `max_tokens`. `reasoning_effort` low/medium runs 4 agents, high/xhigh 16 agents (about 12x the prompt tokens of the default). At 4 agents the reply can carry the leader's reasoning text after the answer |
 | `grok-build-0.1` | Text Generation, Chat | Coding model (replaces the retired grok-code-fast-1) |
 | `grok-imagine-image-2.0` | Image Generation, Image Edit (default) | Per image: low $0.04 (1k) / $0.06 (2k); medium $0.06 (1k) / $0.08 (2k) |
-| `grok-imagine-video` | All video nodes (default) | The only model with video input, so the only option on Video Edit and Video Extend. Up to 720p |
+| `grok-imagine-video` | Reference to Video, Video Edit, Video Extend (default); Text to Video | The only model with video input, so the only option on Video Edit and Video Extend. Up to 720p |
 | `grok-imagine-video-1.5` | Text to Video, Reference to Video | No video input. Native 1080p on Text to Video |
-| `grok-imagine-video-1.5-lite` | Text to Video | Cheapest video model ($0.02/s). 1080p is upscaled from 720p. Takes no reference images or video input |
+| `grok-imagine-video-1.5-lite` | Text to Video (default) | Cheapest video model ($0.02/s). 1080p is upscaled from 720p. Takes no reference images or video input |
 
 Removed on 2026-10-01: `grok-4.6`, `grok-4.5`, `grok-4.3`, `grok-4.20-0309-reasoning`, `grok-imagine-image` and `grok-imagine-image-quality`. A saved workflow that selected one of them fails ComfyUI's validation until you pick a current model.
 
@@ -110,6 +110,8 @@ Removed on 2026-10-01: `grok-4.6`, `grok-4.5`, `grok-4.3`, `grok-4.20-0309-reaso
 | `No xAI API key found` | Configure via Settings, the node's api_key input, or config.ini (see Installation step 2) |
 | Video node returns empty URL | Check xAI status; the SDK already retried internally |
 | Image edit raises "Could not convert input image to a data URI" | Check that the input IMAGE tensor is a valid (B, H, W, C) float tensor |
+| `Grok Image Edit takes at most 5 source images; got N` | xAI edits from 5 sources at most. Trim the batch to 5 frames before the node |
+| `Grok's reply was cut off at max_tokens=N; raise max_tokens` | The reply hit `max_tokens` before it finished, so Text Generation and Chat raise instead of passing partial text downstream. Reasoning tokens do not count toward the limit. xAI still bills the tokens |
 
 ## Version
 
