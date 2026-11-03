@@ -24,6 +24,14 @@ ASPECT_RATIOS = ["16:9", "9:16"]
 RESOLUTIONS = ["360p", "720p", "1080p", "4k"]
 DEFAULT_RESOLUTION = "720p"
 
+# Clip length bounds from the API's own 400s (measured 2026-11-03): "less than
+# the minimum allowed 3s 0ns" and "exceeds the maximum allowed 10s 0ns". The
+# default matches the length the model picks when no duration is sent (every
+# such clip measured 10.005 s, 2026-10-14).
+MIN_DURATION_SECONDS = 3
+MAX_DURATION_SECONDS = 10
+DEFAULT_DURATION_SECONDS = 10
+
 # Omni docs: "For videos larger than 4MB (>720p when available), use
 # delivery="uri" in response_format to avoid payload size limits."
 _URI_DELIVERY_RESOLUTIONS = {"1080p", "4k"}
@@ -36,20 +44,21 @@ def _generation_task(has_image):
     return "image_to_video" if has_image else "text_to_video"
 
 
-def _build_omni_video_request(task, resolution, aspect_ratio=None):
+def _build_omni_video_request(task, resolution, duration_seconds, aspect_ratio=None):
     """Build the non-content kwargs for an Omni Flash video interaction.
 
     Omni Flash rejects system instructions, temperature, top_p, stop sequences
     and negative prompts, so none of them appear here — put negatives in the
-    prompt itself ("Do not do X"). Output is 3-10s at 24 FPS. aspect_ratio is
-    omitted when None so tasks that start from a source video keep its shape.
+    prompt itself ("Do not do X"). Output is 24 FPS; duration_seconds (3-10)
+    goes on the wire as a string such as "3s". aspect_ratio is omitted when
+    None so tasks that start from a source video keep its shape.
 
     background/store/stream are disabled: that is the documented fast path for
     a single synchronous generation, which is what a node execution wants. URI
     delivery (1080p/4k) is the exception: the API requires store=true for it.
     """
     uri_delivery = resolution in _URI_DELIVERY_RESOLUTIONS
-    response_format = {"type": "video", "resolution": resolution}
+    response_format = {"type": "video", "resolution": resolution, "duration": f"{duration_seconds}s"}
     if aspect_ratio is not None:
         response_format["aspect_ratio"] = aspect_ratio
     if uri_delivery:
@@ -209,6 +218,18 @@ def _resolution_input():
     )
 
 
+def _duration_input():
+    return IO.Int.Input(
+        "duration_seconds",
+        default=DEFAULT_DURATION_SECONDS,
+        min=MIN_DURATION_SECONDS,
+        max=MAX_DURATION_SECONDS,
+        step=1,
+        optional=True,
+        tooltip="Clip length in seconds, 3-10. Output is always 24 FPS.",
+    )
+
+
 def _output_directory_input():
     return IO.String.Input(
         "output_directory",
@@ -273,6 +294,7 @@ class GeminiOmniVideoGeneration(IO.ComfyNode):
                 _output_directory_input(),
                 _seed_input(),
                 _resolution_input(),
+                _duration_input(),
             ],
             outputs=[
                 IO.String.Output("video_path"),
@@ -292,6 +314,7 @@ class GeminiOmniVideoGeneration(IO.ComfyNode):
         aspect_ratio = kwargs.get("aspect_ratio", "16:9")
         output_directory = kwargs.get("output_directory", "")
         resolution = kwargs.get("resolution", DEFAULT_RESOLUTION)
+        duration_seconds = kwargs.get("duration_seconds", DEFAULT_DURATION_SECONDS)
 
         start_image = None
         if image is not None:
@@ -302,8 +325,8 @@ class GeminiOmniVideoGeneration(IO.ComfyNode):
 
         contents = _generation_contents(prompt, start_image)
         task = _generation_task(has_image=start_image is not None)
-        request = _build_omni_video_request(task, resolution, aspect_ratio=aspect_ratio)
-        print(f"[Gemini Omni] {task} — {aspect_ratio}, {resolution}/24fps")
+        request = _build_omni_video_request(task, resolution, duration_seconds, aspect_ratio=aspect_ratio)
+        print(f"[Gemini Omni] {task} — {duration_seconds}s, {aspect_ratio}, {resolution}/24fps")
 
         output_path = await _generate_and_save(client, contents, request, output_directory)
         return IO.NodeOutput(output_path)
@@ -342,6 +365,7 @@ class GeminiOmniReferenceToVideo(IO.ComfyNode):
                 _resolution_input(),
                 _output_directory_input(),
                 _seed_input(),
+                _duration_input(),
             ],
             outputs=[
                 IO.String.Output("video_path"),
@@ -362,10 +386,12 @@ class GeminiOmniReferenceToVideo(IO.ComfyNode):
             raise ValueError("Connect at least one reference image")
         aspect_ratio = kwargs.get("aspect_ratio", "16:9")
         resolution = kwargs.get("resolution", DEFAULT_RESOLUTION)
+        duration_seconds = kwargs.get("duration_seconds", DEFAULT_DURATION_SECONDS)
 
         contents = _image_parts(references) + [_text_part(prompt)]
-        request = _build_omni_video_request("reference_to_video", resolution, aspect_ratio=aspect_ratio)
+        request = _build_omni_video_request("reference_to_video", resolution, duration_seconds,
+                                            aspect_ratio=aspect_ratio)
         print(f"[Gemini Omni] reference_to_video — {len(references)} reference(s), "
-              f"{aspect_ratio}, {resolution}/24fps")
+              f"{duration_seconds}s, {aspect_ratio}, {resolution}/24fps")
         output_path = await _generate_and_save(client, contents, request, kwargs.get("output_directory", ""))
         return IO.NodeOutput(output_path)

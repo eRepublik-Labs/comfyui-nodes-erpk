@@ -13,7 +13,7 @@ Generates text using Gemini models. Supports structured JSON output, thinking/re
 | client | GEMINI_API_CLIENT | - | Gemini API client (optional if API key is configured in Settings) |
 | model | Combo | gemini-3.8-flash | Model to use: gemini-4-argon, gemini-3.1-pro-preview, gemini-3.8-flash, gemini-3.7-flash (deprecated, served by 3.8 Flash), gemini-3.6-flash, gemini-3.5-flash (deprecated, served by 3.6 Flash), gemini-3.5-flash-lite (optional) |
 | temperature | Float | 0.7 | Creativity level, 0.0=focused to 2.0=very creative Ignored by Gemini 4 Argon (optional) |
-| max_tokens | Int | 8192 | Maximum response length, 256-65536. Google recommends at least 32768 for Gemini 4 Argon (optional) |
+| max_tokens | Int | 8192 | Maximum response length, 256-65536. Google recommends at least 32768 for Gemini 4 Argon. Thinking counts toward it, and a reply cut off at the limit raises an error rather than returning partial text (optional) |
 | top_p | Float | 0.95 | Nucleus sampling threshold, 0.0=disabled. Ignored by Gemini 4 Argon (optional) |
 | top_k | Int | 40 | Top-k sampling limit, 0=disabled. Ignored by Gemini 4 Argon (optional) |
 | stop_sequences | String | "" | Stop generation at these sequences, one per line, max 5 (optional) |

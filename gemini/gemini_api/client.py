@@ -32,6 +32,29 @@ def _check_sdk_version():
         pass  # packaging not available, skip check
 
 
+def stop_reason(response) -> Optional[str]:
+    """Why Gemini stopped, as an enum name such as "STOP" or "MAX_TOKENS".
+
+    The first candidate's finish reason, or the prompt's block reason when no
+    candidate came back. None when the response reports neither.
+    """
+    if response.candidates:
+        reason = response.candidates[0].finish_reason
+    else:
+        reason = getattr(getattr(response, "prompt_feedback", None), "block_reason", None)
+    return None if reason is None else str(reason).split(".")[-1].upper()
+
+
+def raise_if_cut_off(response, max_tokens: int) -> None:
+    """Refuse a reply that stopped at max_output_tokens: its text is cut off,
+    or absent when thinking used the whole budget."""
+    if stop_reason(response) == "MAX_TOKENS":
+        raise ValueError(
+            f"Gemini's reply was cut off at max_output_tokens={max_tokens} "
+            "(thinking counts toward it); raise max_output_tokens"
+        )
+
+
 class GeminiClient:
     """
     Client for interacting with Google Gemini API using google-genai SDK.
@@ -169,14 +192,31 @@ class GeminiClient:
         if safety_settings:
             self.safety_settings = safety_settings
 
+    def request_config(self, **params) -> types.GenerateContentConfig:
+        """Build a request config that carries this client's system instruction
+        and safety settings.
+
+        Every request needs both on its own config: a chat's per-message config
+        replaces the session config rather than merging with it (google-genai
+        chats.py, send_message), so settings given only to start_chat are lost.
+        """
+        config = types.GenerateContentConfig(**params)
+        if self.system_instruction:
+            config.system_instruction = self.system_instruction
+        if self.safety_settings:
+            config.safety_settings = self.safety_settings
+        return config
+
     @staticmethod
     def _normalize_usage(usage_metadata):
         """Read the SDK's usage_metadata into {input_tokens, output_tokens, total_tokens}.
 
-        candidates_token_count already includes thinking tokens on the Gemini
-        Developer API, so it is the output total and thoughts_token_count is NOT
-        added (that would double-count). Returns None when no usage is reported.
-        Each field is coerced defensively so a missing or non-int count reads 0.
+        output_tokens is candidates_token_count plus thoughts_token_count.
+        candidates_token_count excludes thinking (measured 2026-11-03: on 55 of
+        55 replies that thought, total = prompt + candidates + thoughts), and
+        Google bills thinking tokens at the output rate. Returns None when no
+        usage is reported. Each field is coerced defensively so a missing or
+        non-int count reads 0.
         """
         if usage_metadata is None:
             return None
@@ -186,7 +226,7 @@ class GeminiClient:
             return value if isinstance(value, int) else 0
 
         input_tokens = _count("prompt_token_count")
-        output_tokens = _count("candidates_token_count")
+        output_tokens = _count("candidates_token_count") + _count("thoughts_token_count")
         total = getattr(usage_metadata, "total_token_count", None)
         total_tokens = total if isinstance(total, int) else input_tokens + output_tokens
         return {
@@ -243,15 +283,7 @@ class GeminiClient:
         timeout_ms = resolve_timeout_ms(model_to_use)
         config_params["http_options"] = types.HttpOptions(timeout=timeout_ms)
 
-        config = types.GenerateContentConfig(**config_params)
-
-        # Add system instruction if set
-        if self.system_instruction:
-            config.system_instruction = self.system_instruction
-
-        # Add safety settings if set
-        if self.safety_settings:
-            config.safety_settings = self.safety_settings
+        config = self.request_config(**config_params)
 
         # Add thinking config if provided
         if thinking_config is not None:
@@ -276,23 +308,35 @@ class GeminiClient:
 
         # Extract text from response
         usage = self._normalize_usage(getattr(response, "usage_metadata", None))
+        raise_if_cut_off(response, max_tokens)
+        finish_reason = stop_reason(response)
         try:
             text = response.text
-            return {
-                "text": text,
-                "blocked": False,
-                "finish_reason": response.candidates[0].finish_reason if response.candidates else "STOP",
-                "usage": usage
-            }
         except Exception as e:
             # Response was blocked or error occurred
             return {
                 "text": "",
                 "blocked": True,
-                "finish_reason": response.candidates[0].finish_reason if response.candidates else "ERROR",
+                "finish_reason": finish_reason or "ERROR",
                 "error": str(e),
                 "usage": usage
             }
+        # The SDK returns None rather than raising when the prompt was blocked
+        # or the candidate came back with no text parts (a SAFETY stop).
+        if text is None:
+            return {
+                "text": "",
+                "blocked": True,
+                "finish_reason": finish_reason or "ERROR",
+                "error": f"Gemini returned no text (reason: {finish_reason})",
+                "usage": usage
+            }
+        return {
+            "text": text,
+            "blocked": False,
+            "finish_reason": finish_reason or "STOP",
+            "usage": usage
+        }
 
     async def generate_content(
         self,
@@ -364,11 +408,7 @@ class GeminiClient:
         model_to_use = model or self.model_name
 
         # Build config
-        config = types.GenerateContentConfig()
-        if self.system_instruction:
-            config.system_instruction = self.system_instruction
-        if self.safety_settings:
-            config.safety_settings = self.safety_settings
+        config = self.request_config()
         if thinking_config is not None:
             config.thinking_config = thinking_config
 

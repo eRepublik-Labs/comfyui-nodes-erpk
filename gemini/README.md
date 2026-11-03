@@ -90,7 +90,7 @@ General-purpose text generation and completion.
 - `prompt`: Text prompt
 - `model`: gemini-3.8-flash (default), gemini-4-argon, gemini-3.1-pro-preview, gemini-3.7-flash (deprecated, served by 3.8 Flash), gemini-3.6-flash, gemini-3.5-flash (deprecated, served by 3.6 Flash), gemini-3.5-flash-lite
 - `temperature`: 0.0-2.0 (creativity level, default: 0.7). Gemini 4 Argon ignores temperature, top_p and top_k
-- `max_tokens`: 256-65536 (output length, default: 8192). Google recommends at least 32768 for Gemini 4 Argon
+- `max_tokens`: 256-65536 (output length, default: 8192). Google recommends at least 32768 for Gemini 4 Argon. Thinking counts toward it; a reply cut off at the limit raises an error
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
 - `top_k`: 0-100 (top-k sampling, default: 40, set 0 to disable)
 - `stop_sequences`: Newline-separated sequences where generation stops (max 5)
@@ -121,7 +121,7 @@ Multi-turn conversation with message history preservation.
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
 - `temperature`: 0.0-2.0 (default: 0.7). Gemini 4 Argon ignores temperature, top_p and top_k
-- `max_tokens`: 256-65536 (default: 8192). Google recommends at least 32768 for Gemini 4 Argon
+- `max_tokens`: 256-65536 (default: 8192). Google recommends at least 32768 for Gemini 4 Argon. Thinking counts toward it; a reply cut off at the limit raises an error
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
 - `top_k`: 0-100 (top-k sampling, default: 40, set 0 to disable)
 - `stop_sequences`: Newline-separated sequences where generation stops (max 5)
@@ -136,6 +136,7 @@ Multi-turn conversation with message history preservation.
 **Features:**
 - Maintains conversation context automatically
 - Connect multiple chat nodes to continue conversations
+- Each turn sends the system instruction and safety settings of the client connected to that node, so connect the configured client to every Chat node in a chain
 - Reset conversation to start fresh
 - Supports JSON mode for structured responses in conversations
 
@@ -149,7 +150,7 @@ Analyze images with questions or instructions.
 - `image`: ComfyUI image tensor (supports batches)
 - `prompt`: Question or instruction about the image(s)
 - `model`: gemini-3.8-flash (default), gemini-4-argon, gemini-3.1-pro-preview, gemini-3.7-flash (deprecated, served by 3.8 Flash), gemini-3.6-flash, gemini-3.5-flash (deprecated, served by 3.6 Flash), gemini-3.5-flash-lite
-- `max_tokens`: 256-65536 (default: 8192). Google recommends at least 32768 for Gemini 4 Argon
+- `max_tokens`: 256-65536 (default: 8192). Google recommends at least 32768 for Gemini 4 Argon. Thinking counts toward it; a reply cut off at the limit raises an error
 - `temperature`: 0.0-2.0 (default: 0.4, lower for more factual). Gemini 4 Argon ignores temperature, top_p and top_k
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
 - `top_k`: 0-100 (top-k sampling, default: 40, set 0 to disable)
@@ -272,7 +273,7 @@ Set a system-level instruction to guide model behavior.
 - "Always respond in a friendly, casual tone."
 - "Focus on technical accuracy and provide code examples."
 
-**Note:** System instructions persist for all subsequent requests with this client.
+**Note:** System instructions persist for all subsequent requests with this client, image generation and editing included. An instruction written for text replies can make an image model refuse. Asked to end every reply with a token, Nano Banana 2.1 returned IMAGE_RECITATION for a prompt it drew without the instruction (one probe). Gemini Chat uses the client connected to each Chat node, so connect this client to every Chat node in a chain.
 
 ---
 
@@ -314,14 +315,14 @@ the 5-minute default.
 - `output_directory`: Where to save the video (default: ComfyUI output folder)
 - `seed`: Cache control only — Omni Flash takes no API seed, so this is never sent. A fixed seed reuses the video you already paid for; -1 regenerates every queue
 - `resolution`: 360p, 720p (default), 1080p or 4k. Google upscales 1080p and 4k; those come back as a Files API download because they exceed the 4MB inline limit. That delivery requires Google to store the interaction (`store=true`); the node deletes the downloaded file right after
+- `duration_seconds`: Clip length, 3-10 seconds (default: 10)
 
 **Outputs:**
 - `video_path`: Path to the generated video file (.mp4)
 
 **Not supported by this model:** system instructions, temperature, top_p, stop
 sequences, negative prompts and audio-reference upload. This node does not expose
-interpolation between first and last frames, and duration is chosen by the model
-(3-10s). All output carries a SynthID watermark.
+interpolation between first and last frames. All output carries a SynthID watermark.
 
 ---
 
@@ -333,7 +334,7 @@ images (`reference_to_video` task).
 **Inputs:**
 - `prompt`: What the video should show. Cite references as `<IMAGE_REF_0>`, `<IMAGE_REF_1>`, ... in batch order
 - `reference_images`: One or more reference images (use Batch Images to combine several)
-- `client`, `aspect_ratio`, `resolution`, `output_directory`, `seed`: as on Gemini Omni Video Generation
+- `client`, `aspect_ratio`, `resolution`, `output_directory`, `seed`, `duration_seconds`: as on Gemini Omni Video Generation
 
 **Outputs:**
 - `video_path`: Path to the generated video file (.mp4)

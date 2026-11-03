@@ -23,8 +23,8 @@ from gemini.omni_nodes import (
 )
 
 
-def _config(aspect_ratio="16:9", has_image=False, resolution="720p"):
-    return _build_omni_video_request(_generation_task(has_image), resolution,
+def _config(aspect_ratio="16:9", has_image=False, resolution="720p", duration_seconds=10):
+    return _build_omni_video_request(_generation_task(has_image), resolution, duration_seconds,
                                      aspect_ratio=aspect_ratio)
 
 
@@ -168,10 +168,43 @@ def test_resolution_widget_offers_the_api_values_and_defaults_to_720p():
     assert spec.default == "720p"
 
 
-def test_resolution_widget_is_appended_last():
+def test_inputs_keep_their_saved_order():
     # widgets_values is positional: saved workflows only stay aligned when a
     # new widget goes after every existing one.
-    assert [i.id for i in _schema().inputs][-1] == "resolution"
+    assert [i.id for i in _schema().inputs] == [
+        "prompt", "client", "image", "aspect_ratio", "output_directory", "seed",
+        "resolution", "duration_seconds",
+    ]
+
+
+# --- Clip length (Interactions API response_format.duration, a string. Measured
+# 2026-11-03: "1s" -> 400 "less than the minimum allowed 3s 0ns", "11s" -> 400
+# "exceeds the maximum allowed 10s 0ns", "3s" at 360p -> a 3.03 s clip) --------
+
+def test_duration_is_sent_as_seconds_string():
+    assert _config(duration_seconds=3)["response_format"]["duration"] == "3s"
+    assert _config(duration_seconds=10)["response_format"]["duration"] == "10s"
+
+
+def test_duration_widget_spans_the_api_range_and_defaults_to_ten_seconds():
+    # Ten seconds is the length the model picks when no duration is sent, so a
+    # saved workflow that loads without a value keeps its clip length.
+    spec = _input("duration_seconds")
+    assert (spec.min, spec.max, spec.default) == (3, 10, 10)
+
+
+def test_execute_sends_the_chosen_duration(tmp_path):
+    sent = {}
+
+    def create(**kwargs):
+        sent.update(kwargs)
+        return SimpleNamespace(output_video=SimpleNamespace(data=base64.b64encode(b"clip").decode()))
+
+    client = SimpleNamespace(client=SimpleNamespace(interactions=SimpleNamespace(create=create)))
+    asyncio.run(GeminiOmniVideoGeneration.execute(prompt="a red kite", client=client,
+                                                  duration_seconds=4,
+                                                  output_directory=str(tmp_path)))
+    assert sent["response_format"]["duration"] == "4s"
 
 
 # --- Fetching the output video ----------------------------------------------

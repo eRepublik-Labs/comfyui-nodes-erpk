@@ -18,6 +18,7 @@ Unlike the Veo nodes, this model is reached through Google's Interactions API an
 | output_directory | String | "" | Directory to save video. Empty uses ComfyUI output folder (optional) |
 | seed | Int | -1 | Cache control only — never sent to the API. Range: -1 to 4294967295 (optional) |
 | resolution | Combo | 720p | Output resolution: 360p, 720p, 1080p or 4k. 1080p and 4k are upscaled by Google and need a stored interaction, so the node downloads, then deletes, the file (optional) |
+| duration_seconds | Int | 10 | Clip length in seconds, 3-10 (optional) |
 
 ## Output
 
@@ -35,7 +36,6 @@ The model rejects several knobs the other Gemini nodes accept, so this node does
 
 - **Negative prompts** — state exclusions inline instead, e.g. "Do not show text on screen"
 - **System instructions, temperature, top_p, stop sequences**
-- **Duration** — the model picks 3-10s; output is always 24 FPS
 
 ## Large outputs
 

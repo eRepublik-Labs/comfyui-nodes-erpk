@@ -248,10 +248,10 @@ def test_argon_chat_turn_carries_the_long_http_timeout():
     class _Session:
         def send_message(self, message, config):
             sent["config"] = config
-            return SimpleNamespace(text="OK")
+            return SimpleNamespace(text="OK", candidates=[])
 
-    asyncio.run(GeminiChat.execute(prompt="Say OK.", client=object(), model=ARGON,
-                                   chat_session=_Session()))
+    asyncio.run(GeminiChat.execute(prompt="Say OK.", client=_client_recording_requests(),
+                                   model=ARGON, chat_session=_Session()))
     assert sent["config"].http_options.timeout == FIFTEEN_MINUTES_MS
 
 

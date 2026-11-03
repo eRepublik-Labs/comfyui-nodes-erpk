@@ -172,7 +172,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 
 - **Veo Text to Video** - Generate videos from text prompts using Google's Veo 3.1 models (with synchronized audio; Google shuts these down on 2026-10-22)
 - **Veo Image to Video** - Generate videos from an input image and optional text prompt
-- **Gemini Omni Video Generation** - Generate 3-10s video (360p to 4k) from a prompt or start image via Gemini Omni Flash (returns in one call; 1080p/4k are downloaded from the Files API)
+- **Gemini Omni Video Generation** - Generate video of a chosen length, 3-10s (360p to 4k), from a prompt or start image via Gemini Omni Flash (returns in one call; 1080p/4k arrive through the Files API)
 - **Gemini Omni Reference to Video** - Generate video featuring the subjects in reference images via Gemini Omni Flash
 
 **Key Benefits:**

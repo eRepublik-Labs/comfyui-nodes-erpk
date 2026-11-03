@@ -20,6 +20,8 @@ Sets a system-level instruction that persists across all subsequent requests for
 
 ## Notes
 
-- System instructions persist for all requests made with the returned client
+- System instructions persist for all requests made with the returned client, including image generation and editing
+- An instruction written for text replies can make an image model refuse. Asked to end every reply with a token, Nano Banana 2.1 returned IMAGE_RECITATION for a prompt it drew without the instruction (one probe)
+- Gemini Chat sends the instruction of the client connected to each Chat node, so connect this client to every Chat node in a chain
 - Place this node between Gemini API Config and generation nodes in your workflow
 - Example instructions: "Respond in JSON format", "Use a casual tone", "Focus on technical accuracy"
