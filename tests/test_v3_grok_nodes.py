@@ -159,7 +159,7 @@ class TestGrokTextToVideo:
         schema = cls.define_schema()
         inp = _schema_input(schema, "model")
         assert inp is not None
-        assert inp.default == GrokClient.DEFAULT_VIDEO_MODEL
+        assert inp.default == GrokClient.DEFAULT_TEXT_TO_VIDEO_MODEL
 
     def test_aspect_ratio_options_match_client_constants(self):
         from erpk.grok.grok_api.client import GrokClient

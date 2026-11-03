@@ -455,7 +455,8 @@ class GrokImageEdit(IO.ComfyNode):
                     "image",
                     tooltip=(
                         "Source image(s) to edit. Pass a batched IMAGE tensor to send "
-                        f"multiple reference images (xAI cap: {GrokClient.MAX_EDIT_IMAGES})."
+                        f"up to {GrokClient.MAX_EDIT_IMAGES} source images; a larger batch "
+                        "is rejected before the API call."
                     ),
                 ),
                 IO.String.Input(
@@ -528,7 +529,7 @@ class GrokImageEdit(IO.ComfyNode):
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty.")
 
-        # Convert tensor(s) to data URIs — capped at MAX_EDIT_IMAGES.
+        GrokClient.validate_edit_request(len(image))
         image_uris = await asyncio.to_thread(
             images_to_data_uris, image, GrokClient.MAX_EDIT_IMAGES
         )

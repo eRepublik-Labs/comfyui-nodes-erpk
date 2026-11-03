@@ -9,7 +9,7 @@ Edits one or more input images using a text prompt. Pass a batched IMAGE tensor 
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| image | IMAGE | — | Source image(s). Batched tensor allowed — up to 5 frames used (xAI cap); extra frames are dropped |
+| image | IMAGE | — | Source image(s). Batched tensor of up to 5 frames (xAI cap); the node rejects a larger batch before the API call |
 | prompt | String | (empty) | Editing instructions |
 | client | GROK_API_CLIENT | — | Grok API client (optional if API key is in Settings) |
 | model | Combo | grok-imagine-image-2.0 | Image model. Only option: grok-imagine-image-2.0 (optional) |

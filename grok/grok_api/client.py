@@ -22,6 +22,9 @@ class GrokClient:
     DEFAULT_TEXT_MODEL = "grok-4.7"
     DEFAULT_IMAGE_MODEL = "grok-imagine-image-2.0"
     DEFAULT_VIDEO_MODEL = "grok-imagine-video"
+    # docs.x.ai video overview recommends 1.5-lite for simple videos. It takes no
+    # reference images or video input, so the other video nodes keep DEFAULT_VIDEO_MODEL.
+    DEFAULT_TEXT_TO_VIDEO_MODEL = "grok-imagine-video-1.5-lite"
     VIDEO_MODELS = ["grok-imagine-video", "grok-imagine-video-1.5"]
     # grok-imagine-video-1.5-lite is text/image-to-video only: it rejects
     # reference images, so it is not in VIDEO_MODELS (reference-to-video).
@@ -178,7 +181,11 @@ class GrokClient:
         max_tokens: Optional[int] = None,
         **kwargs,
     ) -> Dict[str, Any]:
-        """One-shot chat completion. Returns {'text', 'model', 'response_id', 'usage'}."""
+        """One-shot chat completion. Returns {'text', 'model', 'response_id', 'usage'}.
+
+        Raises ValueError when the reply stopped at max_tokens: xAI returns the
+        cut-off text with status 200, and only the finish reason tells it apart.
+        """
         client = self._ensure_client()
         if max_tokens is not None:
             kwargs["max_tokens"] = max_tokens
@@ -193,6 +200,8 @@ class GrokClient:
             else:
                 chat.append(self._xai_sdk.chat.user(content))
         response = chat.sample()
+        if response.finish_reason == "REASON_MAX_LEN":
+            raise ValueError(f"Grok's reply was cut off at max_tokens={max_tokens}; raise max_tokens")
         return {
             "text": getattr(response, "content", str(response)),
             "model": model,
@@ -243,6 +252,15 @@ class GrokClient:
     # ------------------------------------------------------------------
     # Image generation / editing
     # ------------------------------------------------------------------
+
+    @classmethod
+    def validate_edit_request(cls, image_count: int) -> None:
+        """Raise ValueError before any API call when an image edit has more sources than xAI takes."""
+        if image_count > cls.MAX_EDIT_IMAGES:
+            raise ValueError(
+                f"Grok Image Edit takes at most {cls.MAX_EDIT_IMAGES} source images; got {image_count}. "
+                "Trim the batch before this node."
+            )
 
     def _resolve_image_model(self, model: str) -> str:
         """Translate deprecated model aliases to the SDK's canonical IDs."""
@@ -310,16 +328,18 @@ class GrokClient:
         """Edit one or more source images; returns a list of image URLs (length n).
 
         SDK takes `image_url` (singular) for one source and `image_urls` (plural)
-        for multi-image edit — mutually exclusive. Cap: MAX_EDIT_IMAGES sources."""
+        for multi-image edit — mutually exclusive. More than MAX_EDIT_IMAGES
+        sources raise ValueError."""
         if not image_urls:
             raise ValueError("edit_image requires at least one source image URL or data URI")
+        self.validate_edit_request(len(image_urls))
         client = self._ensure_client()
         model = self._resolve_image_model(model)
         call_kwargs: Dict[str, Any] = {}
         if len(image_urls) == 1:
             call_kwargs["image_url"] = image_urls[0]
         else:
-            call_kwargs["image_urls"] = image_urls[: self.MAX_EDIT_IMAGES]
+            call_kwargs["image_urls"] = image_urls
         call_kwargs.update(self._image_request_kwargs(
             aspect_ratio=aspect_ratio, resolution=resolution, quality=quality
         ))
@@ -359,7 +379,7 @@ class GrokClient:
         """Return the text-to-video resolution to send for `model`.
 
         A resolution above the model's maximum is clamped to that maximum and
-        logged, as Veo clamps 4k to 1080p (gemini/veo_nodes.py).
+        logged rather than rejected.
         """
         allowed = cls.TEXT_TO_VIDEO_RESOLUTIONS_BY_MODEL[model]
         if resolution in allowed:

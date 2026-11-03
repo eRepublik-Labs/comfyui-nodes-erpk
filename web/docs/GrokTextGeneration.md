@@ -13,7 +13,7 @@ Sends a single prompt to xAI's Grok and returns the generated text. Stateless �
 | client | GROK_API_CLIENT | — | Grok API client (optional if API key is in Settings) |
 | model | Combo | grok-4.7 | Grok model. Options: grok-4.7, grok-4.20-0309-non-reasoning, grok-4.20-multi-agent-0309, grok-build-0.1 (optional) |
 | temperature | Float | 0.7 | Creativity (0.0 focused → 2.0 very creative). Range: 0.0–2.0 (optional) |
-| max_tokens | Int | 4096 | Maximum visible response tokens; reasoning tokens are not counted. Range: 256–128000. grok-4.20-multi-agent-0309 does not honour it (optional) |
+| max_tokens | Int | 4096 | Maximum visible response tokens; reasoning tokens are not counted. Range: 256–128000. A reply cut off at this limit raises an error instead of returning partial text. grok-4.20-multi-agent-0309 does not honour it (optional) |
 | reasoning_effort | Combo | (model default) | Options: (model default), none, low, medium, high, xhigh. grok-4.7 receives it (low to xhigh; `none` is sent as `low` because grok-4.7 rejects it). On grok-4.20-multi-agent-0309 it sets `agent_count` instead: low/medium = 4 agents, high/xhigh = 16 agents (about 12x the prompt tokens of the default), `none` sends nothing. The other models reject the field, so it is not sent to them. (model default) sends nothing (optional) |
 
 ## Output
