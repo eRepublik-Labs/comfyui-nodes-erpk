@@ -6,8 +6,7 @@ Supports streaming, prompt caching, and error handling with retries.
 
 Public methods that perform HTTP I/O are async so ComfyUI's executor can
 interleave concurrent API nodes. The underlying HTTP work uses the synchronous
-Anthropic SDK via asyncio.to_thread, preserving the existing retry machinery
-while releasing the event loop during network I/O.
+Anthropic SDK via asyncio.to_thread, releasing the event loop during network I/O.
 """
 
 import asyncio
@@ -15,9 +14,8 @@ import functools
 import json
 import os
 import threading
-import time
 from typing import Dict, Any, Generator, Optional
-from anthropic import Anthropic, APIError, RateLimitError, APIConnectionError
+from anthropic import Anthropic
 import configparser
 
 from ..models import DEFAULT_TEXT_MODEL
@@ -82,7 +80,8 @@ class ClaudeClient:
     Features:
     - API key resolution (ComfyUI Settings → api_key → config.ini)
     - Streaming and non-streaming requests
-    - Retry with exponential backoff on 429, connection errors and 5xx
+    - SDK retries (MAX_RETRIES, exponential backoff honouring retry-after) on
+      429, 408/409, connection errors and 5xx, for every request path
     - Automatic prompt caching (top-level cache_control)
     - Token usage tracking
     """
@@ -91,8 +90,7 @@ class ClaudeClient:
     DEFAULT_MODEL = DEFAULT_TEXT_MODEL
     # Thinking counts toward max_tokens; 1024 left short prompts cut off before any text.
     DEFAULT_MAX_TOKENS = 8192
-    MAX_RETRIES = 3
-    INITIAL_RETRY_DELAY = 1.0  # seconds
+    MAX_RETRIES = 2  # SDK retries after the first attempt, for every request path
 
     # Every offered model (Claude 5 and later) runs adaptive thinking and returns
     # 400 on a non-default temperature/top_p/top_k, so none are ever sent.
@@ -124,8 +122,7 @@ class ClaudeClient:
         # Resolve API key from multiple sources
         self.api_key = self._resolve_api_key(api_key, config_path)
 
-        # max_retries=0: the SDK's own 2 retries would stack under MAX_RETRIES.
-        self.client = Anthropic(api_key=self.api_key, max_retries=0)
+        self.client = Anthropic(api_key=self.api_key, max_retries=self.MAX_RETRIES)
 
         # Track usage statistics. When one client is shared across concurrent
         # nodes these counters are updated from asyncio.to_thread worker threads,
@@ -254,26 +251,11 @@ class ClaudeClient:
         **kwargs
     ):
         params = self._build_params(messages, system, max_tokens, model, effort, kwargs)
-
-        # Retry logic with exponential backoff
-        retry_delay = self.INITIAL_RETRY_DELAY
-        for attempt in range(self.MAX_RETRIES):
-            try:
-                response = self.client.messages.create(**params)
-                self._record_usage(response)
-                raise_if_refused(response)
-                raise_if_truncated(response, params["max_tokens"])
-                return response
-
-            except APIError as e:
-                retryable = isinstance(e, (RateLimitError, APIConnectionError)) or not (
-                    400 <= getattr(e, "status_code", 500) < 500
-                )
-                if not retryable or attempt == self.MAX_RETRIES - 1:
-                    raise
-                print(f"[Claude] {type(e).__name__}, retrying in {retry_delay}s... (attempt {attempt + 1}/{self.MAX_RETRIES})")
-                time.sleep(retry_delay)
-                retry_delay *= 2  # Exponential backoff
+        response = self.client.messages.create(**params)
+        self._record_usage(response)
+        raise_if_refused(response)
+        raise_if_truncated(response, params["max_tokens"])
+        return response
 
     async def send_request(
         self,
@@ -285,7 +267,7 @@ class ClaudeClient:
         **kwargs
     ):
         """
-        Send a request to Claude API with retry logic.
+        Send a request to Claude API (the SDK retries transient errors).
 
         Args:
             messages: List of message dicts with 'role' and 'content'

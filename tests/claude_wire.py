@@ -87,11 +87,12 @@ class Wire:
         self.requests.append(request)
         reply = self._replies.pop(0) if len(self._replies) > 1 else self._replies[0]
         status, body = reply
-        if request.url.path.endswith("/count_tokens"):
+        if status == 200 and request.url.path.endswith("/count_tokens"):
             return httpx_mod.Response(200, json=body if "input_tokens" in body else {"input_tokens": 42})
         if status == 200 and json.loads(request.content).get("stream"):
             return httpx_mod.Response(status, text=_sse(body), headers={"content-type": "text/event-stream"})
-        return httpx_mod.Response(status, json=body)
+        # retry-after: 0 lets the SDK retry a 429/5xx without its backoff sleep.
+        return httpx_mod.Response(status, json=body, headers={"retry-after": "0"} if status >= 429 else {})
 
     def install(self, monkeypatch):
         """Make every ClaudeClient built afterwards talk to this wire."""
@@ -102,7 +103,6 @@ class Wire:
             "Anthropic",
             partial(
                 Anthropic,
-                max_retries=0,
                 http_client=DefaultHttpxClient(transport=httpx_mod.MockTransport(self._handle)),
             ),
         )

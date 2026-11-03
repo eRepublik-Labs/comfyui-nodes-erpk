@@ -27,9 +27,7 @@ USER = [{"role": "user", "content": "hi"}]
 def _client(monkeypatch, wire, **kwargs):
     wire.install(monkeypatch)
     from claude.claude_api.client import ClaudeClient
-    client = ClaudeClient(api_key="test-key", **kwargs)
-    client.INITIAL_RETRY_DELAY = 0
-    return client
+    return ClaudeClient(api_key="test-key", **kwargs)
 
 
 def _stream(client, **kwargs):
@@ -164,7 +162,31 @@ def test_exhausted_rate_limit_retries_raise_the_last_error(monkeypatch):
     client = _client(monkeypatch, wire)
     with pytest.raises(anthropic.RateLimitError, match="slow down"):
         asyncio.run(client.send_request(messages=USER))
-    assert len(wire.requests) == client.MAX_RETRIES
+    assert len(wire.requests) == client.MAX_RETRIES + 1
+
+
+def test_rate_limit_then_success_returns_the_reply(monkeypatch):
+    wire = Wire(error_body(429, "rate_limit_error", "slow down"), (200, message_body(text="after retry")))
+    client = _client(monkeypatch, wire)
+    response = asyncio.run(client.send_request(messages=USER))
+    assert response.content[-1].text == "after retry"
+    assert len(wire.requests) == 2
+
+
+def test_streaming_rate_limit_is_retried(monkeypatch):
+    # The retry must live in the SDK: the streaming and count_tokens paths
+    # call it directly and had no retry of their own.
+    wire = Wire(error_body(429, "rate_limit_error", "slow down"), (200, message_body(text="after retry")))
+    client = _client(monkeypatch, wire)
+    assert _stream(client) == "after retry"
+    assert len(wire.requests) == 2
+
+
+def test_server_error_is_retried_on_count_tokens(monkeypatch):
+    wire = Wire(error_body(500, "api_error", "boom"), (200, {"input_tokens": 7}))
+    client = _client(monkeypatch, wire)
+    assert asyncio.run(client.count_tokens(messages=USER)) == 7
+    assert len(wire.requests) == 2
 
 
 def test_streaming_error_raises_the_sdk_error(monkeypatch):
@@ -311,11 +333,12 @@ def test_streaming_refusal_raises_with_its_category(monkeypatch):
         _stream(client)
 
 
-def test_sdk_retries_are_off_so_the_client_loop_is_the_only_retry():
-    # The SDK retries 429/5xx twice on its own; stacked under MAX_RETRIES=3
-    # that was up to 9 HTTP attempts per rate-limited call.
+def test_retries_live_in_the_sdk_so_every_path_gets_them():
+    # The SDK's 2 retries used to stack under a client-side 3-attempt loop
+    # (up to 9 HTTP attempts per 429) that covered non-streaming calls only.
     from claude.claude_api.client import ClaudeClient
-    assert ClaudeClient(api_key="test-key").client.max_retries == 0
+    client = ClaudeClient(api_key="test-key")
+    assert client.client.max_retries == client.MAX_RETRIES == 2
 
 
 def test_default_max_tokens_leaves_room_for_thinking():
