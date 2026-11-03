@@ -93,7 +93,7 @@ Initializes the Claude API client. Optional if API key is configured in ComfyUI 
 - `style`: 51 styles (photorealistic, cinematic, fantasy, cyberpunk, anime, etc.)
 - `detail_level`: minimal, moderate, detailed, ultra-detailed
 - `temperature`: Ignored. Current Claude models reject it, so it is never sent; kept so saved workflows load
-- `max_tokens`: 256-128000 (output length; thinking counts toward it)
+- `max_tokens`: 256-128000 (default 8192; thinking counts toward it)
 - `use_streaming`: Enable streaming
 - `model`: Model override for this call, or inherit the client's model (default)
 - `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
@@ -140,7 +140,7 @@ General-purpose text generation.
 - `prompt`: User prompt
 - `system_prompt`: Optional system prompt
 - `temperature`: Ignored. Current Claude models reject it, so it is never sent; kept so saved workflows load
-- `max_tokens`: 256-128000 (output length; thinking counts toward it)
+- `max_tokens`: 256-128000 (default 8192; thinking counts toward it)
 - `use_streaming`: Enable streaming
 - `model`: Model override for this call, or inherit the client's model (default)
 - `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
@@ -365,7 +365,11 @@ Removed 2026-10-01: claude-opus-4-8, claude-opus-4-7, claude-sonnet-4-6, claude-
 Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**).
 
 ### "Rate limit hit" Errors
-**Solution:** Reduce request frequency. Client auto-retries with exponential backoff.
+**Solution:** Reduce request frequency. The SDK retries 429, 5xx and connection errors twice with exponential backoff (honouring `retry-after`) on every path, including streaming and token counting.
+
+### "Claude refused this request (category: X)"
+**Cause:** Claude's safety classifiers declined the request (HTTP 200, `stop_reason: refusal`). The category and explanation come from the API's `stop_details`. Every Claude node raises this instead of returning an empty reply; input tokens are still billed.
+**Solution:** Rephrase the prompt, or pick another model.
 
 ### Nodes not appearing in ComfyUI
 **Solution:**
@@ -379,7 +383,7 @@ Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**)
 **Solution:** Pick another model, or enable data retention for your organization in the Anthropic Console.
 
 ### "unexpected keyword argument" TypeError
-**Cause:** The installed `anthropic` SDK is older than 1.11.0.
+**Cause:** The installed `anthropic` SDK is older than 2.4.0.
 **Solution:** `pip install -U -r claude/requirements.txt` in ComfyUI's Python environment, then restart ComfyUI.
 
 ### "Claude's reply was cut off at max_tokens=N"
