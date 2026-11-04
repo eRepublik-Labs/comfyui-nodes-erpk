@@ -10,6 +10,8 @@ from typing import List, Optional, Union
 from collections.abc import Iterable
 from pydantic import BaseModel
 
+from ...utils.image_grid import load_grid_images
+
 
 def imageurl2tensor(image_urls: List[str]):
     """
@@ -276,28 +278,43 @@ def images_to_data_uris(tensor, max_count: Optional[int] = None) -> Optional[Lis
     return [f"data:image/jpeg;base64,{b}" for b in b64_list]
 
 
-def input_image_list(images, image_url, max_count: int, model: str) -> Optional[List[str]]:
-    """The images to send to an edit endpoint, from an IMAGE batch or URL text.
+def input_image_list(images, image_url, max_count: int, model: str,
+                     grid: Optional[str] = None, grid_max: Optional[int] = None) -> Optional[List[str]]:
+    """The images to send to an edit endpoint, from an IMAGE batch, the image grid or URL text.
 
-    A connected IMAGE batch wins and each slice becomes one base64 data URI.
-    Otherwise `image_url` is read as one or more URLs separated by newlines or
-    commas, or as a list of URLs when it comes linked from WaveSpeed Upload
-    Image's `all_image_urls`. Returns None when neither holds an image. More
-    than `max_count` images is an error rather than a silent cut, so the caller
-    knows which images the model never saw. `model` names the model in that
-    error.
+    A connected IMAGE batch wins, each slice becomes one base64 data URI, and
+    the grid is not read. Next come the grid's files: `grid` is the JSON list of
+    filenames the grid writes, None for a node without one. Each file becomes a
+    data URI at its own size, in grid order, and more than `grid_max` files
+    (default `max_count`) is an error. Otherwise `image_url` is read as one or
+    more URLs separated by newlines or commas, or as a list of URLs when it
+    comes linked from WaveSpeed Upload Image's `all_image_urls`. Returns None
+    when none of them holds an image. More than `max_count` images is an error
+    rather than a silent cut, so the caller knows which images the model never
+    saw. `model` names the model in that error.
     """
     if images is not None:
         sent = images_to_data_uris(images)
     else:
-        if isinstance(image_url, list):
-            urls = [part.strip() for part in image_url]
-        else:
-            urls = [part.strip() for part in re.split(r"[\n,]", image_url or "")]
-        sent = [url for url in urls if url] or None
+        sent = (_grid_data_uris(grid, max_count if grid_max is None else grid_max)
+                or _url_list(image_url))
     if sent and len(sent) > max_count:
         raise ValueError(f"{model} accepts at most {max_count} input images, got {len(sent)}")
     return sent
+
+
+def _grid_data_uris(grid, grid_max) -> List[str]:
+    if grid is None:
+        return []
+    return [image_to_data_uri(picture) for picture in load_grid_images(grid, grid_max)]
+
+
+def _url_list(image_url) -> Optional[List[str]]:
+    if isinstance(image_url, list):
+        urls = [part.strip() for part in image_url]
+    else:
+        urls = [part.strip() for part in re.split(r"[\n,]", image_url or "")]
+    return [url for url in urls if url] or None
 
 
 class BaseRequest(BaseModel):
