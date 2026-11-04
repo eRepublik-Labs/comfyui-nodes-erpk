@@ -41,7 +41,8 @@ ComfyUI-Custom-Nodes/
 │   └── grok_api/                  # API integration layer
 ├── utils/                         # String and general utilities
 │   ├── __init__.py                # Module exports
-│   └── concat_strings.py          # String concatenation node
+│   ├── concat_strings.py          # String concatenation node
+│   └── image_grid_loader.py       # Image Grid Loader node
 ├── settings.py                    # ComfyUI settings reader for API keys
 ├── shared_workflows.py            # Shared workflows CRUD for multi-user
 ├── shared_workflows/              # Legacy storage fallback (gitignored)
@@ -50,7 +51,9 @@ ComfyUI-Custom-Nodes/
     ├── shared_workflows.js        # Browse/save/delete shared workflows UI
     ├── node_migration.js          # V1→V3 node type rewriting for old workflows
     ├── aspect_ratio.js            # Aspect ratio display in node titles
-    └── concat_strings.js          # Dynamic UI for concat strings node
+    ├── concat_strings.js          # Dynamic UI for concat strings node
+    ├── image_grid_loader.js       # Image Grid Loader node extension
+    └── image_grid/                # Image Grid Loader drop grid widget
 ```
 
 ## Available Node Packages
@@ -92,7 +95,7 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 - **Qwen Image 3.0 Edit** - Qwen Image 3.0 and 3.0 Pro editing with up to 3 reference images, 1k or 2k
 - **Qwen Image Multiple Angles (96 poses)** - Re-renders a subject from one of 8 azimuths, 4 elevations and 3 framing distances ($0.025/image)
 
-Every Qwen edit node (Edit, Edit LoRA, Edit Plus, Edit Plus LoRA, Max Edit, 2.0 Edit, 3.0 Edit, Multiple Angles, Multiple Angles (96 poses), Layered) takes a ComfyUI IMAGE directly, sent inline as base64, so you don't need WaveSpeed Upload Image. The multi-image nodes take an IMAGE batch on `reference_images`; the single-image nodes take one image on `input_image`. Without a connected image, the node reads the URL text.
+Every Qwen edit node (Edit, Edit LoRA, Edit Plus, Edit Plus LoRA, Max Edit, 2.0 Edit, 3.0 Edit, Multiple Angles, Multiple Angles (96 poses), Layered) takes a ComfyUI IMAGE directly, sent inline as base64, so you don't need WaveSpeed Upload Image. The multi-image nodes take an IMAGE batch on `reference_images`; the single-image nodes take one image on `input_image`. Without a connected image, the node reads the URL text. To build an IMAGE batch from files on disk, use the **Image Grid Loader** node.
 
 #### Video Generation
 
@@ -258,6 +261,7 @@ String manipulation and general utility nodes.
 #### Nodes
 
 - **Concatenate Strings** - Combine multiple text inputs with configurable delimiters. Supports up to 10 connectable inputs - drag STRING outputs from other nodes or enter text directly.
+- **Image Grid Loader** - Pick or drop up to 14 image files onto a grid on the node and get them back as one IMAGE batch in grid order, ready for any multi-image edit node. Cell 3 is image 3 in the batch.
 - **Seed** - Generate a seed value with optional min/max range clamping. Connect the output to any node's seed input to share a single seed.
 - **Preview Anything** - Preview any value: text, markdown, image/video/audio/gif URLs, IMAGE tensors, and AUDIO dicts. Includes a Download button that saves the rendered content to your computer.
 - **Regional Prompt Builder** - Draw regions on a canvas and emit a layout-aware prompt for any image generation model: each region becomes a verbal placement plus box_2d coordinates (works with the Gemini, OpenAI, and Grok image nodes). Also outputs pixel-space `BOUNDING_BOX` regions compatible with core SAM3 Detect, Draw BBoxes, and Crop By BBoxes nodes.
@@ -300,6 +304,15 @@ String manipulation and general utility nodes.
 - Label placement options (same line or new line)
 - Add/Remove buttons to dynamically manage inputs
 - Visual separators between configuration and input sections
+
+**Image Grid Loader features:**
+- Pick files with **Choose files…** or the **+ Add** cell, or drop them onto the grid; it takes PNG, JPG, and WEBP
+- The grid uploads each file to ComfyUI's `input` folder through the standard image upload, so the workflow saves file names, not pixels
+- Numbered cells in send order; drag to reorder, hover **×** to remove, **Clear all** with Undo
+- Press Tab to focus a cell; the arrow keys move it and Delete or Backspace removes it
+- `max_images` (1-14, default 10) caps the grid; the grid ignores dropped files past the cap and the overlay says how many free slots remain
+- The node centers mixed sizes on a canvas of the largest height and width with mid-grey padding, since a batch must share one size
+- Calls no API; a missing or out-of-folder file fails when you queue, naming the entry
 
 **Preview Anything features:**
 - Accepts any value via a wildcard input
