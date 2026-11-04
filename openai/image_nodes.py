@@ -738,7 +738,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                 if len(mask.shape) == 4:
                     mask_tensor = mask[0]
                 elif len(mask.shape) == 3:
-                    mask_tensor = mask
+                    mask_tensor = mask[0]
                 else:
                     mask_tensor = mask
 

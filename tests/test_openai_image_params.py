@@ -353,6 +353,36 @@ class TestEditImageMultiImage:
         assert len(params["image"]) == 2
 
 
+class TestEditNodeMask:
+    """The node turns a MASK into the first image's alpha: white (edit) becomes transparent."""
+
+    # ComfyUI's MASK is [B, H, W]; a bare [H, W] also reaches the node.
+    @pytest.mark.parametrize("mask_shape", [(1, 2, 3), (2, 3)])
+    def test_mask_becomes_the_first_images_alpha(self, mask_shape):
+        torch = pytest.importorskip("torch")
+        from io import BytesIO
+        from types import SimpleNamespace
+        from PIL import Image
+        from erpk.openai.image_nodes import OpenAIImageEdit
+
+        seen = {}
+
+        async def edit_image(**kwargs):
+            seen.update(kwargs)
+            return {"blocked": True, "error": "stop here"}
+
+        mask = torch.zeros(mask_shape)
+        mask[..., 0, 1] = 1.0
+        with pytest.raises(ValueError, match="stop here"):
+            asyncio.run(OpenAIImageEdit.execute(
+                image=torch.zeros(1, 2, 3, 3), prompt="x",
+                client=SimpleNamespace(edit_image=edit_image), mask=mask,
+            ))
+        sent = Image.open(BytesIO(seen["mask_data"]))
+        assert (sent.mode, sent.size) == ("RGBA", (3, 2))
+        assert list(sent.getchannel("A").getdata()) == [255, 0, 255, 255, 255, 255]
+
+
 class TestOutputFormat:
     """images.generate and images.edit take output_format (png/jpeg/webp) and
     output_compression (0-100, jpeg/webp only) for GPT Image models, per the
