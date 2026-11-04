@@ -19,7 +19,10 @@ export const EMPTY_H = 150;
 export const FOOTER_GAP = 10;
 export const FOOTER_H = 26;
 export const NOTICE_H = 24;
-export const ROOT_PAD_V = 8;
+export const ROOT_PAD_TOP = 4;
+// The node body ends where the DOM widget ends, so the widget carries the bottom margin.
+export const ROOT_PAD_BOTTOM = 12;
+export const ROOT_PAD_V = ROOT_PAD_TOP + ROOT_PAD_BOTTOM;
 export const MIN_NODE_WIDTH = 300;
 
 const LINE = "#2a2a33";
@@ -34,7 +37,7 @@ const sheet = document.createElement("style");
 sheet.textContent = `
 .erpk-grid-root {
     box-sizing: border-box;
-    padding: ${ROOT_PAD_V / 2}px 0;
+    padding: ${ROOT_PAD_TOP}px 0 ${ROOT_PAD_BOTTOM}px;
     color: ${TEXT};
     font: 12px/1.4 'Segoe UI', system-ui, sans-serif;
     touch-action: manipulation;
