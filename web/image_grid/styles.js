@@ -112,6 +112,21 @@ sheet.textContent = `
     font-size: 11px;
 }
 .erpk-grid-is-missing > img { visibility: hidden; }
+.erpk-grid-cell.erpk-grid-pending { cursor: default; }
+.erpk-grid-cell.erpk-grid-uploading { background: ${LINE}; }
+.erpk-grid-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    border: 2px solid #3a3a46;
+    border-top-color: ${TEXT};
+    border-radius: 50%;
+    animation: erpk-grid-spin 800ms linear infinite;
+}
+@keyframes erpk-grid-spin { to { transform: rotate(360deg); } }
 .erpk-grid-is-missing > .erpk-grid-missing { display: flex; }
 .erpk-grid-badge, .erpk-grid-remove {
     position: absolute;
@@ -262,6 +277,9 @@ sheet.textContent = `
     clip: rect(0 0 0 0);
     white-space: nowrap;
 }
-@media (prefers-reduced-motion: reduce) { .erpk-grid-remove { transition: none; } }
+@media (prefers-reduced-motion: reduce) {
+    .erpk-grid-remove { transition: none; }
+    .erpk-grid-spinner { animation: none; }
+}
 `;
 document.head.appendChild(sheet);

@@ -41,6 +41,9 @@ let gridSerial = 0;
 /**
  * @typedef {{ text: string, tone: "info" | "error", undo?: string[] }} Notice
  * @typedef {{ upload: (file: File) => Promise<string>, imageUrl: (stored: string) => string }} GridIO
+ * @typedef {{ name: string, stored: string | null }} Upload
+ *   A picked file on its way to ComfyUI's input folder. `stored` is the name the
+ *   upload route answered with, null until it answers.
  */
 
 /** @type {Notice} */
@@ -94,7 +97,8 @@ export function createImageGrid(node, io, caps, nodeName) {
     const state = {
         /** @type {string[]} */
         names: [],
-        uploading: 0,
+        /** @type {Upload[]} Shown after `names`, in drop order, until each lands in it. */
+        uploads: [],
         /** @type {Notice | null} */
         notice: null,
         /** @type {number | null} */
@@ -104,8 +108,10 @@ export function createImageGrid(node, io, caps, nodeName) {
         ready: false,
         socketLinked: false,
     };
-    // Upload batches run in parallel but land in the order they were dropped.
-    let landing = Promise.resolve();
+    // Uploads run in parallel, but a finished one joins `names` only once every
+    // earlier one has, so the list keeps drop order. Batch summaries follow the
+    // same order.
+    let summaries = Promise.resolve();
 
     function requireWidget(name) {
         const widget = findWidget(node, name);
@@ -124,6 +130,11 @@ export function createImageGrid(node, io, caps, nodeName) {
 
     function maxImages() {
         return currentLimit().cap;
+    }
+
+    /** Slots taken: stored images plus the uploads still on their way. */
+    function filled() {
+        return state.names.length + state.uploads.length;
     }
 
     function setup() {
@@ -167,16 +178,19 @@ export function createImageGrid(node, io, caps, nodeName) {
 
     function render() {
         const cap = maxImages();
-        const count = state.names.length;
+        const count = filled();
         empty.root.hidden = count > 0;
         list.hidden = count === 0;
         footer.hidden = count === 0;
         empty.limit.textContent = `Up to ${plural(cap, "image")} · ${ACCEPTED_LABEL}`;
-        list.replaceChildren(...state.names.map((name, index) => buildCell(name, index, count)));
+        list.replaceChildren(
+            ...state.names.map((name, index) => buildCell(name, index, count)),
+            ...state.uploads.map((upload, index) => buildUploadCell(upload, state.names.length + index, count)),
+        );
         if (remainingSlots(count, cap) > 0) list.append(buildAddCell());
         capacity.textContent = capacityText(count, cap);
         capacity.classList.toggle("erpk-grid-over-cap", count > cap);
-        clearButton.disabled = state.uploading > 0;
+        clearButton.disabled = state.uploads.length > 0;
         zone.classList.toggle("erpk-grid-ignored", state.socketLinked);
         setDisabled(empty.choose, state.socketLinked);
         const shown = currentNotice();
@@ -199,7 +213,7 @@ export function createImageGrid(node, io, caps, nodeName) {
     /** @returns {Notice | null} */
     function currentNotice() {
         if (state.socketLinked) return state.notice ?? SOCKET_NOTICE;
-        const overCap = state.ready ? overCapText(state.names.length, currentLimit()) : null;
+        const overCap = state.ready ? overCapText(filled(), currentLimit()) : null;
         return overCap ? { text: overCap, tone: "error" } : state.notice;
     }
 
@@ -225,7 +239,7 @@ export function createImageGrid(node, io, caps, nodeName) {
     // a time as images arrive. Mirrors the CSS box model in styles.js.
     function desiredHeight() {
         const noticeH = currentNotice() ? NOTICE_H : 0;
-        const count = state.names.length;
+        const count = filled();
         if (count === 0) return EMPTY_H + noticeH + ROOT_PAD_V;
         const inner = rootWidth() - 2 * ZONE_PAD - 2 * ZONE_BORDER;
         const cell = (inner - GAP * (COLUMNS - 1)) / COLUMNS;
@@ -245,7 +259,7 @@ export function createImageGrid(node, io, caps, nodeName) {
     function titleCount() {
         if (!state.ready || state.socketLinked) return null;
         const cap = maxImages();
-        return { text: countLabel(state.names.length, cap), overCap: state.names.length > cap };
+        return { text: countLabel(filled(), cap), overCap: filled() > cap };
     }
 
     function buildCell(name, index, count) {
@@ -256,6 +270,37 @@ export function createImageGrid(node, io, caps, nodeName) {
         cell.title = name;
         cell.setAttribute("aria-label", `Image ${index + 1} of ${count}, ${name}`);
         cell.setAttribute("aria-describedby", hintId);
+        const missing = el("span", "erpk-grid-missing");
+        missing.textContent = "Missing";
+        const remove = button("erpk-grid-remove", "×");
+        remove.tabIndex = -1;
+        remove.dataset.remove = String(index);
+        remove.setAttribute("aria-label", `Remove image ${index + 1}`);
+        cell.append(thumbnail(name, cell), missing, cellBadge(index), remove);
+        return cell;
+    }
+
+    // Not focusable or draggable, and it has no data-index, so a reorder drop
+    // on it appends after the stored images.
+    /** @param {Upload} upload @param {number} index @param {number} count */
+    function buildUploadCell(upload, index, count) {
+        const cell = el("li", "erpk-grid-cell erpk-grid-pending");
+        cell.title = upload.name;
+        cell.setAttribute("aria-busy", "true");
+        cell.setAttribute("aria-label", `Image ${index + 1} of ${count}, ${upload.name}, uploading`);
+        if (upload.stored === null) {
+            cell.classList.add("erpk-grid-uploading");
+            const spinner = el("span", "erpk-grid-spinner");
+            spinner.setAttribute("aria-hidden", "true");
+            cell.append(spinner, cellBadge(index));
+        } else {
+            cell.append(thumbnail(upload.stored, cell), cellBadge(index));
+        }
+        return cell;
+    }
+
+    /** @param {string} stored @param {HTMLElement} cell */
+    function thumbnail(stored, cell) {
         const img = document.createElement("img");
         img.alt = "";
         img.decoding = "async";
@@ -271,18 +316,16 @@ export function createImageGrid(node, io, caps, nodeName) {
             }
             cell.classList.add("erpk-grid-is-missing");
         });
-        img.src = io.imageUrl(name);
-        const missing = el("span", "erpk-grid-missing");
-        missing.textContent = "Missing";
+        img.src = io.imageUrl(stored);
+        return img;
+    }
+
+    /** @param {number} index */
+    function cellBadge(index) {
         const badge = el("span", "erpk-grid-badge");
         badge.setAttribute("aria-hidden", "true");
         badge.textContent = String(index + 1);
-        const remove = button("erpk-grid-remove", "×");
-        remove.tabIndex = -1;
-        remove.dataset.remove = String(index);
-        remove.setAttribute("aria-label", `Remove image ${index + 1}`);
-        cell.append(img, missing, badge, remove);
-        return cell;
+        return badge;
     }
 
     function buildAddCell() {
@@ -306,30 +349,49 @@ export function createImageGrid(node, io, caps, nodeName) {
     /** @param {File[]} files */
     function addFiles(files) {
         if (files.length === 0 || state.socketLinked) return;
-        const plan = planAdd(files, state.names.length + state.uploading, maxImages());
+        const plan = planAdd(files, filled(), maxImages());
         if (plan.take.length === 0) {
             state.notice = { text: addSummary({ added: 0, ...plan, failures: [] }), tone: "error" };
             render();
             return;
         }
-        state.uploading += plan.take.length;
-        state.notice = { text: `Uploading ${plural(plan.take.length, "image")}…`, tone: "info" };
+        /** @type {Upload[]} */
+        const batch = plan.take.map((file) => ({ name: file.name, stored: null }));
+        /** @type {(string | null)[]} */
+        const failed = batch.map(() => null);
+        state.uploads.push(...batch);
+        state.notice = { text: `Uploading ${plural(batch.length, "image")}…`, tone: "info" };
         render();
-        const uploads = Promise.allSettled(plan.take.map((file) => io.upload(file)));
-        landing = landing.then(() => uploads).then((results) => {
-            state.uploading -= plan.take.length;
-            const added = [];
-            const failures = [];
-            for (const result of results) {
-                if (result.status === "fulfilled") added.push(result.value);
-                else failures.push(String(result.reason?.message ?? result.reason));
-            }
-            const text = addSummary({ added: added.length, overflow: plan.overflow, wrongType: plan.wrongType, failures });
-            commit([...state.names, ...added], {
-                notice: { text, tone: failures.length > 0 ? "error" : "info" },
-                announce: text,
-            });
+        const settled = plan.take.map((file, i) => io.upload(file).then(
+            (stored) => {
+                batch[i].stored = stored;
+                landUploads();
+            },
+            (error) => {
+                failed[i] = String(error?.message ?? error);
+                state.uploads = state.uploads.filter((upload) => upload !== batch[i]);
+                state.notice = { text: failed[i], tone: "error" };
+                landUploads();
+            },
+        ));
+        summaries = summaries.then(() => Promise.all(settled)).then(() => {
+            const failures = failed.filter((text) => text !== null);
+            const added = batch.length - failures.length;
+            const text = addSummary({ added, overflow: plan.overflow, wrongType: plan.wrongType, failures });
+            state.notice = { text, tone: failures.length > 0 ? "error" : "info" };
+            announcer.textContent = text;
+            render();
         });
+    }
+
+    // Moves finished uploads at the head of the queue into the list.
+    function landUploads() {
+        const landed = [];
+        while (state.uploads.length > 0 && state.uploads[0].stored !== null) {
+            landed.push(state.uploads.shift().stored);
+        }
+        if (landed.length > 0) commit([...state.names, ...landed], { notice: state.notice });
+        else render();
     }
 
     function removeImage(index, { keepFocus }) {
@@ -481,7 +543,7 @@ export function createImageGrid(node, io, caps, nodeName) {
             e.dataTransfer.dropEffect = "none";
             return;
         }
-        const prompt = dropPrompt(draggedImageCount(e.dataTransfer), state.names.length + state.uploading, maxImages());
+        const prompt = dropPrompt(draggedImageCount(e.dataTransfer), filled(), maxImages());
         e.dataTransfer.dropEffect = prompt.full ? "none" : "copy";
         overlayTitle.textContent = prompt.title;
         overlayDetail.textContent = prompt.detail;
