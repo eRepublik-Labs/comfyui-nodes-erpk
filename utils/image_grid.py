@@ -6,6 +6,8 @@ import os
 
 from comfy_api.latest import IO
 
+NO_GRID_IMAGE = "Connect an image or add images to the grid"
+
 
 def grid_inputs(max_default, max_cap, max_tooltip):
     """The `grid_images` list the grid writes and the `grid_max_images` cap, in widget order.

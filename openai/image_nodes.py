@@ -6,7 +6,7 @@ from io import BytesIO
 
 from comfy_api.latest import IO
 from .openai_api.client import OpenAIClient
-from ..utils.image_grid import grid_inputs, load_grid_images, validate_grid
+from ..utils.image_grid import NO_GRID_IMAGE, grid_inputs, load_grid_images, validate_grid
 
 IMAGE_MODELS = list(OpenAIClient.IMAGE_MODELS.keys())
 EDIT_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"]
@@ -17,7 +17,6 @@ GENERATION_DEFAULT_MODEL = "gpt-image-2.5-flare"
 EDIT_DEFAULT_MODEL = "gpt-image-2.5-sunburst"
 EDIT_GRID_DEFAULT = 10
 EDIT_GRID_CAP = 16
-NO_EDIT_IMAGE = "Connect an image or add images to the grid"
 
 # Mainline (text/reasoning) models for the Responses API call. Each returned
 # 200 on responses.create with the image_generation tool attached (measured
@@ -552,7 +551,7 @@ def _grid_pngs(raw, max_images):
     """
     pictures = load_grid_images(raw, max_images)
     if not pictures:
-        raise ValueError(NO_EDIT_IMAGE)
+        raise ValueError(NO_GRID_IMAGE)
     pngs = []
     for picture in pictures:
         buffer = BytesIO()
