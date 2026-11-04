@@ -42,6 +42,8 @@ Keyboard: press Tab to focus a cell. The arrow keys move the focused image one p
 
 The grid uploads each picked or dropped file to ComfyUI's `input` folder through ComfyUI's standard image upload. If a file with the same name and different content is already there, ComfyUI saves the new file as `name (1).png`. If the same file is already there, ComfyUI reuses it. Removing a cell or clearing the grid does not delete files from `input`.
 
+Each cell shows a PNG file through ComfyUI's WebP preview, which keeps the full size but takes a fraction of the bytes. JPEG and WebP files show as stored, because the preview often makes them larger. If ComfyUI cannot build the preview, for example for a PNG wider or taller than 16383 px, the cell shows the stored file instead.
+
 ## Mixed sizes
 
 All images in an `IMAGE` batch must share one height and width. When the files differ in size, the node places each image, unscaled and centered, on a canvas as tall as the tallest image and as wide as the widest. Mid-grey (0.5) fills the rest of the canvas. The node uses mid-grey rather than black so an edit model is less likely to read the bars as dark content. For the cleanest results, use images of the same size.

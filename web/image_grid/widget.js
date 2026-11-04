@@ -261,7 +261,16 @@ export function createImageGrid(node, io, caps, nodeName) {
         img.decoding = "async";
         img.loading = "lazy";
         img.draggable = false;
-        img.addEventListener("error", () => cell.classList.add("erpk-grid-is-missing"));
+        img.addEventListener("error", () => {
+            // ComfyUI cannot preview a PNG with an edge over WebP's 16383 px; show it as stored.
+            const url = new URL(img.src);
+            if (url.searchParams.has("preview")) {
+                url.searchParams.delete("preview");
+                img.src = url.href;
+                return;
+            }
+            cell.classList.add("erpk-grid-is-missing");
+        });
         img.src = io.imageUrl(name);
         const missing = el("span", "erpk-grid-missing");
         missing.textContent = "Missing";
