@@ -1,4 +1,4 @@
-// ABOUTME: Layout constants and the stylesheet for the Image Grid Loader widget.
+// ABOUTME: Layout constants and the stylesheet for the image grid widget.
 // ABOUTME: The node height arithmetic and the CSS read the same numbers, so they cannot drift.
 // @ts-check
 

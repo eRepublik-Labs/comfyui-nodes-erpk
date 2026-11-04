@@ -1,4 +1,4 @@
-// ABOUTME: The Image Grid Loader's DOM widget: a numbered thumbnail grid that picks, drops, reorders,
+// ABOUTME: The image grid DOM widget: a numbered thumbnail grid that picks, drops, reorders,
 // ABOUTME: and removes images, and writes the ordered filename list back to the node's `images` widget.
 // @ts-check
 
@@ -101,7 +101,7 @@ export function createImageGrid(node, io) {
 
     function requireWidget(name) {
         const widget = findWidget(node, name);
-        if (!widget) throw new Error(`Image Grid Loader node ${node.id} has no ${name} widget`);
+        if (!widget) throw new Error(`${node.type} node ${node.id} has no ${name} widget`);
         return widget;
     }
 

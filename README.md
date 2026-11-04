@@ -42,6 +42,7 @@ ComfyUI-Custom-Nodes/
 ├── utils/                         # String and general utilities
 │   ├── __init__.py                # Module exports
 │   ├── concat_strings.py          # String concatenation node
+│   ├── image_grid.py              # Image grid inputs and file loading, shared by grid nodes
 │   └── image_grid_loader.py       # Image Grid Loader node
 ├── settings.py                    # ComfyUI settings reader for API keys
 ├── shared_workflows.py            # Shared workflows CRUD for multi-user
@@ -52,8 +53,8 @@ ComfyUI-Custom-Nodes/
     ├── node_migration.js          # V1→V3 node type rewriting for old workflows
     ├── aspect_ratio.js            # Aspect ratio display in node titles
     ├── concat_strings.js          # Dynamic UI for concat strings node
-    ├── image_grid_loader.js       # Image Grid Loader node extension
-    └── image_grid/                # Image Grid Loader drop grid widget
+    ├── image_grid.js              # Registers the drop grid on the grid nodes
+    └── image_grid/                # Drop grid widget and its node mount
 ```
 
 ## Available Node Packages

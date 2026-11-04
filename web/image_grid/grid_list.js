@@ -1,4 +1,4 @@
-// ABOUTME: Pure operations on the Image Grid Loader's ordered filename list, plus the text it shows.
+// ABOUTME: Pure operations on the image grid's ordered filename list, plus the text it shows.
 // ABOUTME: No DOM, app, or api imports, so plain node can exercise every function here.
 // @ts-check
 

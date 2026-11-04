@@ -6,7 +6,8 @@ import types
 
 import pytest
 
-from utils.image_grid_loader import ImageGridLoader, resolve_grid_images
+from utils.image_grid import resolve_grid_images
+from utils.image_grid_loader import ImageGridLoader
 
 
 @pytest.fixture
@@ -19,9 +20,14 @@ def input_dir(monkeypatch, tmp_path):
     return inp
 
 
-def test_empty_list_is_rejected(input_dir):
+def test_empty_list_resolves_to_no_files(input_dir):
+    assert resolve_grid_images("[]", str(input_dir)) == []
+
+
+def test_loader_rejects_an_empty_grid_before_and_during_the_run(input_dir):
+    assert ImageGridLoader.validate_inputs(images="[]") == "Add at least one image"
     with pytest.raises(ValueError) as exc:
-        resolve_grid_images("[]", str(input_dir))
+        ImageGridLoader.execute(images="[]", max_images=10)
     assert str(exc.value) == "Add at least one image"
 
 

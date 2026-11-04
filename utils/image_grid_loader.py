@@ -1,14 +1,14 @@
 # ABOUTME: Image Grid Loader node: turns an ordered list of files in ComfyUI's input/ directory
 # ABOUTME: into one IMAGE batch, letterboxing mixed sizes so the batch shares one height and width.
 
-import json
-import os
-
 from comfy_api.latest import IO
+
+from .image_grid import grid_inputs, load_grid_images, resolve_grid_images
 
 # The largest batch any edit node here accepts (Gemini Image Edit, 14).
 MAX_GRID_IMAGES = 14
 DEFAULT_MAX_IMAGES = 10
+EMPTY_GRID = "Add at least one image"
 # Mid-grey rather than black, so an edit model reads the bars as padding and
 # not as dark content belonging to the picture.
 LETTERBOX_GREY = 0.5
@@ -29,58 +29,40 @@ class ImageGridLoader(IO.ComfyNode):
                 "Files are copied into ComfyUI's input folder; mixed sizes are letterboxed "
                 "with mid-grey onto the largest height and width."
             ),
-            inputs=[
-                IO.String.Input(
-                    "images",
-                    default="[]",
-                    socketless=True,
-                    tooltip="Managed by the grid; JSON list of filenames in ComfyUI's input folder.",
-                ),
-                IO.Int.Input(
-                    "max_images",
-                    default=DEFAULT_MAX_IMAGES,
-                    min=1,
-                    max=MAX_GRID_IMAGES,
-                    step=1,
-                    tooltip="Most images the grid accepts. Seedream edit nodes take up to 10, "
-                            "Gemini Image Edit up to 14.",
-                ),
-            ],
+            inputs=grid_inputs(
+                DEFAULT_MAX_IMAGES,
+                MAX_GRID_IMAGES,
+                "Most images the grid accepts. Seedream edit nodes take up to 10, "
+                "Gemini Image Edit up to 14.",
+            ),
             outputs=[IO.Image.Output(display_name="IMAGE")],
         )
 
     @classmethod
-    def validate_inputs(cls, images):
+    def validate_inputs(cls, images="[]"):
         # max_images stays out of this signature: naming it here would switch off
         # ComfyUI's own min/max check for it. The cap is enforced in execute.
         import folder_paths
 
         try:
-            resolve_grid_images(images, folder_paths.get_input_directory())
+            paths = resolve_grid_images(images, folder_paths.get_input_directory())
         except ValueError as e:
             return str(e)
-        return True
+        return True if paths else EMPTY_GRID
 
     @classmethod
-    def execute(cls, images, max_images) -> IO.NodeOutput:
-        import folder_paths
-
-        paths = resolve_grid_images(images, folder_paths.get_input_directory())
-        if len(paths) > max_images:
-            raise ValueError(
-                f"The grid holds {len(paths)} images but max_images is {max_images}; "
-                f"remove {len(paths) - max_images} or raise max_images")
-        return IO.NodeOutput(_letterbox_batch([_load_rgb(path) for path in paths]))
+    def execute(cls, images="[]", max_images=DEFAULT_MAX_IMAGES) -> IO.NodeOutput:
+        pictures = load_grid_images(images, max_images)
+        if not pictures:
+            raise ValueError(EMPTY_GRID)
+        return IO.NodeOutput(_letterbox_batch([_to_tensor(picture) for picture in pictures]))
 
 
-def _load_rgb(path):
+def _to_tensor(picture):
     import numpy as np
     import torch
-    from PIL import Image, ImageOps
 
-    with Image.open(path) as img:
-        rgb = ImageOps.exif_transpose(img).convert("RGB")
-    return torch.from_numpy(np.array(rgb).astype(np.float32) / 255.0)
+    return torch.from_numpy(np.array(picture).astype(np.float32) / 255.0)
 
 
 def _letterbox_batch(images):
@@ -94,39 +76,3 @@ def _letterbox_batch(images):
         top, left = (height - h) // 2, (width - w) // 2
         batch[index, top:top + h, left:left + w] = image
     return batch
-
-
-def resolve_grid_images(raw, input_dir):
-    """Parse the `images` widget JSON into absolute paths of files under input_dir."""
-    names = _parse_names(raw)
-    root = os.path.realpath(input_dir)
-    return [_resolve_input_file(position, name, root)
-            for position, name in enumerate(names, start=1)]
-
-
-def _parse_names(raw):
-    try:
-        names = json.loads(raw)
-    except json.JSONDecodeError:
-        raise ValueError(f"images must be a JSON list of filenames, got {raw!r}") from None
-    if not isinstance(names, list):
-        raise ValueError(f"images must be a JSON list of filenames, got {names!r}")
-    if not names:
-        raise ValueError("Add at least one image")
-    for position, name in enumerate(names, start=1):
-        if not isinstance(name, str) or not name:
-            raise ValueError(f"images entry {position} is not a filename: {name!r}")
-    return names
-
-
-def _resolve_input_file(position, name, root):
-    # realpath follows symlinks, so a link inside input/ that points elsewhere
-    # is judged by where it lands, not where it sits.
-    path = os.path.realpath(os.path.join(root, name)) if "\x00" not in name else None
-    if path is None or os.path.isabs(name) or os.path.commonpath((root, path)) != root:
-        raise ValueError(
-            f"images entry {position} is outside ComfyUI's input directory: {name!r}")
-    if not os.path.isfile(path):
-        raise ValueError(
-            f"images entry {position} not found in ComfyUI's input directory: {name!r}")
-    return path
