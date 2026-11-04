@@ -2,7 +2,7 @@
 
 Complete Google Gemini API integration providing text generation, vision analysis, multi-turn conversations, image generation, image editing, **video generation (Omni Flash)**, and safety controls for ComfyUI workflows.
 
-**Version:** 2026.11.3
+**Version:** 2026.11.4
 **Category in ComfyUI:** `ERPK/Gemini`
 **SDK requirement:** `google-genai>=2.6.0` (per `gemini/requirements.txt`). Omni Flash needs it: 2.2.0 sends `response_format.aspect_ratio` as `aspectRatio`, which the API rejects
 
