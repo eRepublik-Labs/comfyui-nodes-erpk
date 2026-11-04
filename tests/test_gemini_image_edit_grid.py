@@ -121,19 +121,22 @@ def test_grid_files_reach_the_model_at_their_own_size_in_grid_order(input_dir, m
     assert _sent_images(models) == [((3, 9), (0, 0, 255)), ((7, 2), (255, 255, 255))]
 
 
-def test_refs_then_additional_images_follow_the_grid(input_dir, models):
+def test_refs_follow_the_first_grid_image_then_the_rest_then_additional(input_dir, models):
     _write(input_dir / "first.png", (4, 4), (255, 0, 0))
     _write(input_dir / "second.png", (5, 3), (0, 255, 0))
+    _write(input_dir / "third.png", (2, 2), (128, 128, 128))
     _edit(
-        grid_images='["first.png", "second.png"]',
+        grid_images='["first.png", "second.png", "third.png"]',
         image_refs=[_tensor(2, 6, (0, 0, 255)), _tensor(6, 2, (255, 255, 0))],
         additional_images=_tensor(3, 3, (0, 255, 255)),
     )
+    # The Regional Prompt Builder's prompt calls its refs image 2 and 3.
     assert _sent_images(models) == [
         ((4, 4), (255, 0, 0)),
-        ((5, 3), (0, 255, 0)),
         ((2, 6), (0, 0, 255)),
         ((6, 2), (255, 255, 0)),
+        ((5, 3), (0, 255, 0)),
+        ((2, 2), (128, 128, 128)),
         ((3, 3), (0, 255, 255)),
     ]
 

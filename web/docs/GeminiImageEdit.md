@@ -36,7 +36,7 @@ With nothing connected to `image`, the node sends the files on its grid instead.
 
 - Each file goes to the model as its own image, at its own size, in cell order. The node does not batch or letterbox them.
 - The node applies EXIF orientation, drops any alpha channel, and sends each file as PNG.
-- The grid files take the place of the `image` input, so `image_refs` follow them, then `additional_images`.
+- The grid files take the place of the `image` input. `image_refs` go right after the first grid file, then the remaining grid files, then `additional_images`.
 - When you queue, ComfyUI checks that every grid file exists in the `input` folder, even with `image` connected. Clear the grid if it names a missing file.
 
 Grid errors name what is at fault:
@@ -51,6 +51,6 @@ Grid errors name what is at fault:
 - Reference images in prompts by order ("the first image"), content ("the logo"), or role ("the style reference")
 - Gemini 3 Pro supports up to 14 reference images (up to 6 objects, up to 5 humans for character consistency)
 - Nano Banana 2.1 supports up to 14 reference images (up to 10 objects, up to 4 characters)
-- Images are sent in order: the primary input (the `image` socket, or the grid files when nothing is connected), then image_refs, then additional_images. The first primary image is "the first image" in positional prompts
-- A Regional Prompt Builder numbers its refs from image 2, after one base image. With two or more grid files (or a batched `image`), the refs come later in the request than the prompt says
+- Images are sent in order: the first primary image (the `image` socket's first frame, or grid cell 1), then image_refs, then the remaining primary images, then additional_images. The first primary image is "the first image" in positional prompts
+- A Regional Prompt Builder numbers its refs from image 2, after one base image. That stays true with any number of grid files or batch frames, because the refs always follow the first primary image
 - API key resolved from ComfyUI Settings or config.ini — connect a `client` from Gemini API Config only when you need shared safety/system-instruction state across nodes

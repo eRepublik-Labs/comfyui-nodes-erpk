@@ -1565,11 +1565,11 @@ class GeminiImageEdit(IO.ComfyNode):
                     model=model,
                 )
 
-            pil_images = grid_images if image is None else ImageConverter.tensors_to_pil_list(image)
-            # Refs precede additional_images so the prompt's image numbering
-            # (base image is 1, refs follow in region order) holds.
-            for ref in image_refs or []:
-                pil_images.extend(ImageConverter.tensors_to_pil_list(ref))
+            primaries = grid_images if image is None else ImageConverter.tensors_to_pil_list(image)
+            # The Regional Prompt Builder numbers its refs from image 2, so they
+            # go right after the first primary image whatever the grid or batch holds.
+            refs = [pil for ref in image_refs or [] for pil in ImageConverter.tensors_to_pil_list(ref)]
+            pil_images = primaries[:1] + refs + primaries[1:]
             if additional_images is not None:
                 pil_images.extend(ImageConverter.tensors_to_pil_list(additional_images))
             num_images = len(pil_images)
