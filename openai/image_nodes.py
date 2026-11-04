@@ -6,7 +6,9 @@ from io import BytesIO
 
 from comfy_api.latest import IO
 from .openai_api.client import OpenAIClient
-from ..utils.image_grid import NO_GRID_IMAGE, grid_inputs, load_grid_images, validate_grid
+from ..utils.image_grid import (
+    NO_GRID_IMAGE, ModelCap, grid_cap_for, grid_inputs, load_grid_images, register_grid_caps, validate_grid,
+)
 
 IMAGE_MODELS = list(OpenAIClient.IMAGE_MODELS.keys())
 EDIT_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"]
@@ -15,8 +17,12 @@ EDIT_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"]
 # prompts that omit the input.
 GENERATION_DEFAULT_MODEL = "gpt-image-2.5-flare"
 EDIT_DEFAULT_MODEL = "gpt-image-2.5-sunburst"
-EDIT_GRID_DEFAULT = 10
-EDIT_GRID_CAP = 16
+
+# One limit for every GPT Image model, "For GPT image models, you can provide up to 16 images":
+# https://developers.openai.com/api/reference/resources/images/methods/edit
+EDIT_GRID_CAPS = {"*": 16}
+EDIT_GRID_CAP = max(EDIT_GRID_CAPS.values())
+register_grid_caps("OpenAIImageEdit", EDIT_GRID_CAPS, model_widget="model")
 
 # Mainline (text/reasoning) models for the Responses API call. Each returned
 # 200 on responses.create with the image_generation tool attached (measured
@@ -544,12 +550,12 @@ class OpenAIImageResponses(IO.ComfyNode):
             raise ValueError(error_msg)
 
 
-def _grid_pngs(raw, max_images):
+def _grid_pngs(raw, max_images, model):
     """The grid's files as PNG bytes at their own size, in grid order.
 
     Re-encoded rather than sent as stored: the client labels every image image/png.
     """
-    pictures = load_grid_images(raw, max_images)
+    pictures = load_grid_images(raw, max_images, ModelCap(model, grid_cap_for("OpenAIImageEdit", model)))
     if not pictures:
         raise ValueError(NO_GRID_IMAGE)
     pngs = []
@@ -687,9 +693,10 @@ class OpenAIImageEdit(IO.ComfyNode):
                     tooltip="Compression level 0-100 (100 = least compression). Applied only to jpeg and webp.",
                 ),
                 *grid_inputs(
-                    EDIT_GRID_DEFAULT,
                     EDIT_GRID_CAP,
-                    "Most images the grid accepts. gpt-image-2 takes up to 16 reference images.",
+                    EDIT_GRID_CAP,
+                    "Most images the grid accepts; the selected model's own limit also applies. "
+                    "Every GPT Image edit model takes up to 16 images.",
                 ),
             ],
             outputs=[
@@ -736,7 +743,8 @@ class OpenAIImageEdit(IO.ComfyNode):
             grid_pngs = await asyncio.to_thread(
                 _grid_pngs,
                 kwargs.get("grid_images", "[]"),
-                kwargs.get("grid_max_images", EDIT_GRID_DEFAULT),
+                kwargs.get("grid_max_images", EDIT_GRID_CAP),
+                model,
             )
 
         try:

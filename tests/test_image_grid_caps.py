@@ -111,3 +111,12 @@ def test_the_route_serves_caps_registered_after_it_was_defined(routes_app):
     assert body["CapsProbe"] == {"model_widget": "model", "caps": {"model-a": 4, "*": 6}}
     assert body["CapsLoaderProbe"] == {"model_widget": None, "caps": {"*": 14}}
 
+
+def test_the_route_serves_the_openai_edit_and_loader_caps(routes_app):
+    import erpk.openai.image_nodes  # noqa: F401
+    import erpk.utils.image_grid_loader  # noqa: F401
+
+    status, body = _get_grid_caps(routes_app)
+    assert status == 200
+    assert body["OpenAIImageEdit"] == {"model_widget": "model", "caps": {"*": 16}}
+    assert body["ImageGridLoader"] == {"model_widget": None, "caps": {"*": 14}}
