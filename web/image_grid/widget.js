@@ -287,7 +287,8 @@ export function createImageGrid(node, io, caps, nodeName) {
         const cell = el("li", "erpk-grid-cell erpk-grid-pending");
         cell.title = upload.name;
         cell.setAttribute("aria-busy", "true");
-        cell.setAttribute("aria-label", `Image ${index + 1} of ${count}, ${upload.name}, uploading`);
+        const status = upload.stored === null ? "uploading" : "uploaded, waiting for earlier files";
+        cell.setAttribute("aria-label", `Image ${index + 1} of ${count}, ${upload.name}, ${status}`);
         if (upload.stored === null) {
             cell.classList.add("erpk-grid-uploading");
             const spinner = el("span", "erpk-grid-spinner");
