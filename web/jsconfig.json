@@ -10,5 +10,5 @@
         "strict": false,
         "skipLibCheck": true
     },
-    "include": ["region_editor.js", "regions/**/*.js"]
+    "include": ["region_editor.js", "regions/**/*.js", "image_grid_loader.js", "image_grid/**/*.js"]
 }
