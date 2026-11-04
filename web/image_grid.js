@@ -23,6 +23,13 @@ const GRID_NODES = [
     { nodeId: "QwenImageEditPlusNode", socket: "reference_images" },
     { nodeId: "QwenImageEditPlusLoraNode", socket: "reference_images" },
     { nodeId: "QwenImageMultipleAnglesNode", socket: "reference_images" },
+    { nodeId: "SeedreamV4EditNode", socket: "images" },
+    { nodeId: "SeedreamV4EditSequentialNode", socket: "images" },
+    { nodeId: "SeedreamV4_5EditNode", socket: "images" },
+    { nodeId: "SeedreamV4_5EditSequentialNode", socket: "images" },
+    { nodeId: "SeedreamV5LiteEditNode", socket: "images" },
+    { nodeId: "SeedreamV5LiteEditSequentialNode", socket: "images" },
+    { nodeId: "SeedreamV5ProEditNode", socket: "images" },
 ];
 
 /** @param {File} file */

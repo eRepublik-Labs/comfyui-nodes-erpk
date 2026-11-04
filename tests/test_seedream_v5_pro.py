@@ -146,7 +146,7 @@ def test_edit_node_sends_an_image_batch_inline():
 
 def test_edit_node_without_images_is_an_error():
     node = _node("seedream_v5_pro_edit", "SeedreamV5ProEditNode")
-    with pytest.raises(ValueError, match="^Connect images or enter at least one image URL$"):
+    with pytest.raises(ValueError, match="^Connect an image or add images to the grid, or enter at least one image URL$"):
         _run(node, [], prompt="x")
 
 

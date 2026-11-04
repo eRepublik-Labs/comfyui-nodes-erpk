@@ -128,6 +128,11 @@ class Node:
 
 
 QWEN_SIZE_WIDGETS = ["width", "height", "seed", "output_format", "enable_sync_mode", "enable_base64_output"]
+SEEDREAM_ORDER = ["prompt", "image_url", "size_preset", "seed", "width", "height",
+                  "show_aspect_ratio", "enable_sync_mode", "enable_base64_output"]
+SEEDREAM_SEQUENTIAL_ORDER = ["prompt", "max_images", "size_preset", "seed", "image_url", "width",
+                             "height", "show_aspect_ratio", "enable_sync_mode", "enable_base64_output"]
+SEEDREAM_RUN = {**PROMPT, "size_preset": "Custom"}
 
 NODES = [
     Node("qwen_image_max_edit", "QwenImageMaxEditNode", "reference_images", "images", 6,
@@ -145,8 +150,21 @@ NODES = [
          run_kwargs={**PROMPT, "lora_1_path": "https://example.com/style.safetensors"}),
     Node("qwen_image_multiple_angles", "QwenImageMultipleAnglesNode", "reference_images", "images", 3,
          ["images", "prompt", "horizontal_angle", "vertical_angle", "distance", *QWEN_SIZE_WIDGETS]),
+    *[Node(module, name, "images", "image_url", 10, SEEDREAM_ORDER, run_kwargs=SEEDREAM_RUN)
+      for module, name in [("seedream_v4_edit", "SeedreamV4EditNode"),
+                           ("seedream_v4_5_edit", "SeedreamV4_5EditNode"),
+                           ("seedream_v5_lite_edit", "SeedreamV5LiteEditNode")]],
+    *[Node(module, name, "images", "image_url", 10, SEEDREAM_SEQUENTIAL_ORDER,
+           run_kwargs={**SEEDREAM_RUN, "max_images": 2}, needs_image=False)
+      for module, name in [("seedream_v4_edit_sequential", "SeedreamV4EditSequentialNode"),
+                           ("seedream_v4_5_edit_sequential", "SeedreamV4_5EditSequentialNode"),
+                           ("seedream_v5_lite_edit_sequential", "SeedreamV5LiteEditSequentialNode")]],
+    Node("seedream_v5_pro_edit", "SeedreamV5ProEditNode", "images", "image_url", 10,
+         ["prompt", "image_url", "aspect_ratio", "resolution", "seed", "output_format",
+          "prompt_optimization_mode", "enable_sync_mode", "enable_base64_output"]),
 ]
 NEEDS_IMAGE = [node for node in NODES if node.needs_image]
+IMAGE_OPTIONAL = [node for node in NODES if not node.needs_image]
 WIDGET_TYPES = ("STRING", "INT", "FLOAT", "BOOLEAN", "COMBO")
 
 
@@ -227,6 +245,11 @@ def test_the_node_sends_a_connected_batch_and_not_the_grid(node, input_dir):
 @pytest.mark.parametrize("node", NEEDS_IMAGE, ids=repr)
 def test_no_socket_no_grid_and_no_url_names_every_way_in(node, input_dir):
     assert _refused(node, grid_images="[]") == NO_INPUT_IMAGE
+
+
+@pytest.mark.parametrize("node", IMAGE_OPTIONAL, ids=repr)
+def test_a_node_that_takes_no_image_sends_none_from_an_empty_grid(node, input_dir):
+    assert _sent(node, grid_images="[]") is None
 
 
 @pytest.mark.parametrize("node", NODES, ids=repr)
