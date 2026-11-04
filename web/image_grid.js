@@ -17,6 +17,7 @@ import { installImageGrid } from "./image_grid/mount.js";
 const GRID_NODES = [
     { nodeId: "ImageGridLoader" },
     { nodeId: "OpenAIImageEdit", socket: "image" },
+    { nodeId: "GrokImageEdit", socket: "image" },
 ];
 
 /** @param {File} file */
