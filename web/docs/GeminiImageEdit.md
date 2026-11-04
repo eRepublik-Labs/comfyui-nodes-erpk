@@ -34,7 +34,7 @@ Edits and modifies existing images using text prompts. Supports up to 14 referen
 With nothing connected to `image`, the node sends the files on its grid instead. While `image` is connected, the grid dims, shows `Image socket connected, grid ignored`, and takes no new files, but keeps the files it has. The grid works as on the Image Grid Loader node: pick or drop PNG, JPG, or WEBP files, drag a cell to reorder it, and hover a cell and click **×** to remove it. The number on each cell is the image's position in the request.
 
 - Each file goes to the model as its own image, at its own size, in cell order. The node does not batch or letterbox them.
-- The grid holds up to 14 files on every model, Gemini 3 Pro's limit.
+- The grid holds up to 14 files on every model (Google documents 14 for Nano Banana 2.1, 3.1 Flash and 3 Pro). 3.1 Flash Lite has no documented limit and Google says it is not optimized for multiple reference inputs, so expect weaker results with many files there.
 - The node applies EXIF orientation, drops any alpha channel, and sends each file as PNG.
 - The grid files take the place of the `image` input. `image_refs` go right after the first grid file, then the remaining grid files, then `additional_images`.
 - When you queue, ComfyUI checks that every grid file exists in the `input` folder, even with `image` connected. Clear the grid if it names a missing file.
