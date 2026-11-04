@@ -8,7 +8,7 @@ from comfy_api.latest import IO
 
 
 def grid_inputs(max_default, max_cap, max_tooltip):
-    """The `images` list the grid writes and the `max_images` cap, in widget order.
+    """The `grid_images` list the grid writes and the `grid_max_images` cap, in widget order.
 
     They go after every other input. Both are optional because the frontend lays
     out required widgets before optional ones and widgets_values is positional:
@@ -17,14 +17,14 @@ def grid_inputs(max_default, max_cap, max_tooltip):
     """
     return [
         IO.String.Input(
-            "images",
+            "grid_images",
             default="[]",
             socketless=True,
             optional=True,
             tooltip="Managed by the grid; JSON list of filenames in ComfyUI's input folder.",
         ),
         IO.Int.Input(
-            "max_images",
+            "grid_max_images",
             default=max_default,
             min=1,
             max=max_cap,
@@ -36,7 +36,7 @@ def grid_inputs(max_default, max_cap, max_tooltip):
 
 
 def validate_grid(raw):
-    """A validate_inputs answer for the `images` list: True, or why its files cannot load.
+    """A validate_inputs answer for the `grid_images` list: True, or why its files cannot load.
 
     An empty list passes, for nodes where a connected socket can stand in for the grid.
     """
@@ -56,8 +56,8 @@ def load_grid_images(raw, max_images):
     paths = resolve_grid_images(raw, folder_paths.get_input_directory())
     if len(paths) > max_images:
         raise ValueError(
-            f"The grid holds {len(paths)} images but max_images is {max_images}; "
-            f"remove {len(paths) - max_images} or raise max_images")
+            f"The grid holds {len(paths)} images but grid_max_images is {max_images}; "
+            f"remove {len(paths) - max_images} or raise grid_max_images")
     return [_load_upright_rgb(path) for path in paths]
 
 
@@ -69,7 +69,7 @@ def _load_upright_rgb(path):
 
 
 def resolve_grid_images(raw, input_dir):
-    """Parse the `images` widget JSON into absolute paths of files under input_dir."""
+    """Parse the `grid_images` widget JSON into absolute paths of files under input_dir."""
     names = _parse_names(raw)
     root = os.path.realpath(input_dir)
     return [_resolve_input_file(position, name, root)
@@ -80,12 +80,12 @@ def _parse_names(raw):
     try:
         names = json.loads(raw)
     except json.JSONDecodeError:
-        raise ValueError(f"images must be a JSON list of filenames, got {raw!r}") from None
+        raise ValueError(f"grid_images must be a JSON list of filenames, got {raw!r}") from None
     if not isinstance(names, list):
-        raise ValueError(f"images must be a JSON list of filenames, got {names!r}")
+        raise ValueError(f"grid_images must be a JSON list of filenames, got {names!r}")
     for position, name in enumerate(names, start=1):
         if not isinstance(name, str) or not name:
-            raise ValueError(f"images entry {position} is not a filename: {name!r}")
+            raise ValueError(f"grid_images entry {position} is not a filename: {name!r}")
     return names
 
 
@@ -95,8 +95,8 @@ def _resolve_input_file(position, name, root):
     path = os.path.realpath(os.path.join(root, name)) if "\x00" not in name else None
     if path is None or os.path.isabs(name) or os.path.commonpath((root, path)) != root:
         raise ValueError(
-            f"images entry {position} is outside ComfyUI's input directory: {name!r}")
+            f"grid_images entry {position} is outside ComfyUI's input directory: {name!r}")
     if not os.path.isfile(path):
         raise ValueError(
-            f"images entry {position} not found in ComfyUI's input directory: {name!r}")
+            f"grid_images entry {position} not found in ComfyUI's input directory: {name!r}")
     return path

@@ -704,10 +704,10 @@ class OpenAIImageEdit(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    def validate_inputs(cls, images="[]"):
-        # Only `images` is named: ComfyUI skips its own type and range checks for
-        # every input named here, and max_images keeps its min/max that way.
-        return validate_grid(images)
+    def validate_inputs(cls, grid_images="[]"):
+        # Only `grid_images` is named: ComfyUI skips its own type and range checks for
+        # every input named here, and grid_max_images keeps its min/max that way.
+        return validate_grid(grid_images)
 
     @classmethod
     async def execute(cls, prompt, image=None, **kwargs) -> IO.NodeOutput:
@@ -736,8 +736,8 @@ class OpenAIImageEdit(IO.ComfyNode):
         if image is None:
             grid_pngs = await asyncio.to_thread(
                 _grid_pngs,
-                kwargs.get("images", "[]"),
-                kwargs.get("max_images", EDIT_GRID_DEFAULT),
+                kwargs.get("grid_images", "[]"),
+                kwargs.get("grid_max_images", EDIT_GRID_DEFAULT),
             )
 
         try:

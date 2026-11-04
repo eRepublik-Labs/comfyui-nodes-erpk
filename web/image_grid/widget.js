@@ -1,5 +1,5 @@
 // ABOUTME: The image grid DOM widget: a numbered thumbnail grid that picks, drops, reorders,
-// ABOUTME: and removes images, and writes the ordered filename list back to the node's `images` widget.
+// ABOUTME: and removes images, and writes the ordered filename list back to the node's `grid_images` widget.
 // @ts-check
 
 import { CHROME_HORIZONTAL_INSET } from "../regions/constants.js";
@@ -110,11 +110,11 @@ export function createImageGrid(node, io) {
     }
 
     function imagesWidget() {
-        return requireWidget("images");
+        return requireWidget("grid_images");
     }
 
     function maxImages() {
-        return Number(requireWidget("max_images").value);
+        return Number(requireWidget("grid_max_images").value);
     }
 
     function setup() {
@@ -125,7 +125,7 @@ export function createImageGrid(node, io) {
         images.computeSize = () => [0, -4];
         if (images.inputEl) images.inputEl.style.display = "none";
         if (images.element) images.element.style.display = "none";
-        const cap = requireWidget("max_images");
+        const cap = requireWidget("grid_max_images");
         const onCapChange = cap.callback;
         cap.callback = function () {
             const r = onCapChange?.apply(this, arguments);

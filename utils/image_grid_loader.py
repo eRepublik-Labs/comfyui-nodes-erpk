@@ -39,20 +39,20 @@ class ImageGridLoader(IO.ComfyNode):
         )
 
     @classmethod
-    def validate_inputs(cls, images="[]"):
-        # max_images stays out of this signature: naming it here would switch off
+    def validate_inputs(cls, grid_images="[]"):
+        # grid_max_images stays out of this signature: naming it here would switch off
         # ComfyUI's own min/max check for it. The cap is enforced in execute.
         import folder_paths
 
         try:
-            paths = resolve_grid_images(images, folder_paths.get_input_directory())
+            paths = resolve_grid_images(grid_images, folder_paths.get_input_directory())
         except ValueError as e:
             return str(e)
         return True if paths else EMPTY_GRID
 
     @classmethod
-    def execute(cls, images="[]", max_images=DEFAULT_MAX_IMAGES) -> IO.NodeOutput:
-        pictures = load_grid_images(images, max_images)
+    def execute(cls, grid_images="[]", grid_max_images=DEFAULT_MAX_IMAGES) -> IO.NodeOutput:
+        pictures = load_grid_images(grid_images, grid_max_images)
         if not pictures:
             raise ValueError(EMPTY_GRID)
         return IO.NodeOutput(_letterbox_batch([_to_tensor(picture) for picture in pictures]))

@@ -25,8 +25,8 @@ Edits existing images based on text prompts using OpenAI's image editing API. Su
 | seed | Int | -1 | Cache control only, not sent to the API. -1 randomizes (re-runs every queue); a fixed value reuses the cached result |
 | output_format | Combo | png | Output file format: png, jpeg, webp (optional). `transparent` background needs png or webp |
 | output_compression | Int | 100 | Compression 0–100 (optional). Sent only with jpeg or webp; png sends neither field |
-| max_images | Int | 10 | The most images the grid accepts, from 1 to 16 (optional) |
-| images | String | `[]` | Hidden. The grid stores its ordered file list here as a JSON array of names in the `input` folder |
+| grid_max_images | Int | 10 | The most images the grid accepts, from 1 to 16 (optional) |
+| grid_images | String | `[]` | Hidden. The grid stores its ordered file list here as a JSON array of names in the `input` folder |
 
 ## Output
 
@@ -46,9 +46,9 @@ With nothing connected to `image`, the node sends the files on its grid instead.
 Grid errors name what is at fault:
 
 - `Connect an image or add images to the grid`: `image` is not connected and the grid is empty.
-- `images entry 2 not found in ComfyUI's input directory: 'cat.png'`: the file no longer exists under that name in `input`.
-- `images entry 1 is outside ComfyUI's input directory: '../cat.png'`: the entry leaves the `input` folder.
-- `The grid holds 12 images but max_images is 10; remove 2 or raise max_images`: you lowered `max_images` below the number of images in the grid.
+- `grid_images entry 2 not found in ComfyUI's input directory: 'cat.png'`: the file no longer exists under that name in `input`.
+- `grid_images entry 1 is outside ComfyUI's input directory: '../cat.png'`: the entry leaves the `input` folder.
+- `The grid holds 12 images but grid_max_images is 10; remove 2 or raise grid_max_images`: you lowered `grid_max_images` below the number of images in the grid.
 
 ## Notes
 

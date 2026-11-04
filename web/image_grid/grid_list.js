@@ -6,7 +6,7 @@ export const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"];
 export const ACCEPTED_LABEL = "PNG, JPG, WEBP";
 
 /**
- * Read the `images` widget value. A value that is not a JSON list of filenames
+ * Read the `grid_images` widget value. A value that is not a JSON list of filenames
  * is reported rather than repaired, so a broken workflow stays visible.
  * @param {unknown} value
  * @returns {{ names: string[], error: string | null }}
@@ -97,7 +97,7 @@ export function countLabel(count, cap) {
 }
 
 export function capacityText(count, cap) {
-    if (count > cap) return `${countLabel(count, cap)} · remove ${count - cap} or raise max_images`;
+    if (count > cap) return `${countLabel(count, cap)} · remove ${count - cap} or raise grid_max_images`;
     const left = remainingSlots(count, cap);
     if (left === 0) return `${countLabel(count, cap)} · grid is full`;
     return `${countLabel(count, cap)} · ${left} more can be dropped`;

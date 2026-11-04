@@ -6,7 +6,7 @@ import { MIN_NODE_WIDTH, TITLE_COUNT_COLOR, TITLE_COUNT_FULL_COLOR } from "./sty
 import { createImageGrid } from "./widget.js";
 
 /**
- * The node type must declare the `images` and `max_images` widgets
+ * The node type must declare the `grid_images` and `grid_max_images` widgets
  * (utils/image_grid.py grid_inputs) as its last Python inputs.
  * @param {any} nodeType
  * @param {import("./widget.js").GridIO} io

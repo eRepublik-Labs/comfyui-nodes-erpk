@@ -27,15 +27,15 @@ def test_grid_widgets_follow_every_saved_widget():
     assert frontend_widget_order(OpenAIImageEdit.define_schema()) == [
         "prompt", "seed", "model", "size", "custom_width", "custom_height",
         "quality", "moderation", "n", "background", "input_fidelity",
-        "output_format", "output_compression", "images", "max_images",
+        "output_format", "output_compression", "grid_images", "grid_max_images",
     ]
 
 
 def test_image_socket_is_optional_and_the_grid_caps_at_sixteen():
     inputs = {i.id: i for i in OpenAIImageEdit.define_schema().inputs}
     assert inputs["image"].optional is True
-    assert inputs["images"].default == "[]"
-    assert (inputs["max_images"].default, inputs["max_images"].min, inputs["max_images"].max) == (10, 1, 16)
+    assert inputs["grid_images"].default == "[]"
+    assert (inputs["grid_max_images"].default, inputs["grid_max_images"].min, inputs["grid_max_images"].max) == (10, 1, 16)
 
 
 @pytest.fixture
@@ -60,7 +60,7 @@ def _edit(seen, **inputs):
         asyncio.run(OpenAIImageEdit.execute(prompt="add a hat", client=_recording_client(seen), **inputs))
 
 
-@pytest.mark.parametrize("grid", [{"images": "[]"}, {}])
+@pytest.mark.parametrize("grid", [{"grid_images": "[]"}, {}])
 def test_no_socket_and_an_empty_grid_names_both_ways_in(input_dir, grid):
     seen = {}
     with pytest.raises(ValueError) as exc:
@@ -86,7 +86,7 @@ def test_grid_files_reach_the_api_one_png_each_at_their_own_size_in_grid_order(i
     _write(input_dir / "wide.jpg", (7, 2), (255, 255, 255), quality=100)
     _write(input_dir / "tall.webp", (3, 9), (0, 0, 255), lossless=True)
     seen = {}
-    _edit(seen, images='["tall.webp", "wide.jpg"]')
+    _edit(seen, grid_images='["tall.webp", "wide.jpg"]')
     assert [_decoded(payload) for payload in seen["image_data"]] == [
         ("PNG", (3, 9), (0, 0, 255)),
         ("PNG", (7, 2), (255, 255, 255)),
@@ -100,9 +100,9 @@ def test_more_files_than_max_images_names_both_counts(input_dir):
     with pytest.raises(ValueError) as exc:
         asyncio.run(OpenAIImageEdit.execute(
             prompt="add a hat", client=_recording_client(seen),
-            images='["a.png", "b.png", "c.png"]', max_images=2,
+            grid_images='["a.png", "b.png", "c.png"]', grid_max_images=2,
         ))
-    assert str(exc.value) == "The grid holds 3 images but max_images is 2; remove 1 or raise max_images"
+    assert str(exc.value) == "The grid holds 3 images but grid_max_images is 2; remove 1 or raise grid_max_images"
     assert seen == {}
 
 
@@ -111,9 +111,9 @@ def test_an_entry_outside_the_input_folder_is_refused(input_dir):
     seen = {}
     with pytest.raises(ValueError) as exc:
         asyncio.run(OpenAIImageEdit.execute(
-            prompt="add a hat", client=_recording_client(seen), images='["../outside.png"]',
+            prompt="add a hat", client=_recording_client(seen), grid_images='["../outside.png"]',
         ))
-    assert str(exc.value) == "images entry 1 is outside ComfyUI's input directory: '../outside.png'"
+    assert str(exc.value) == "grid_images entry 1 is outside ComfyUI's input directory: '../outside.png'"
     assert seen == {}
 
 
@@ -123,7 +123,7 @@ def test_a_connected_image_is_sent_and_the_grid_not_read(input_dir):
     _write(input_dir / "b.png", (5, 3), (255, 0, 0))
     seen = {}
     # Over its cap, so reading the grid would raise.
-    _edit(seen, image=torch.zeros(1, 8, 6, 3), images='["a.png", "b.png"]', max_images=1)
+    _edit(seen, image=torch.zeros(1, 8, 6, 3), grid_images='["a.png", "b.png"]', grid_max_images=1)
     assert _decoded(seen["image_data"]) == ("PNG", (6, 8), (0, 0, 0))
 
 
@@ -136,7 +136,7 @@ def test_a_mask_shapes_the_first_grid_image(input_dir):
     mask = torch.zeros(1, 2, 3)
     mask[0, 0, 1] = 1.0
     seen = {}
-    _edit(seen, mask=mask, images='["first.png", "second.png"]')
+    _edit(seen, mask=mask, grid_images='["first.png", "second.png"]')
     with Image.open(io.BytesIO(seen["mask_data"])) as sent:
         assert (sent.mode, sent.size) == ("RGBA", (3, 2))
         assert list(sent.getdata()) == [
@@ -148,7 +148,7 @@ def test_a_mask_shapes_the_first_grid_image(input_dir):
 def test_validation_passes_an_empty_grid_and_names_a_missing_file(input_dir):
     _write(input_dir / "a.png", (2, 2), (0, 0, 0))
     assert OpenAIImageEdit.validate_inputs() is True
-    assert OpenAIImageEdit.validate_inputs(images="[]") is True
-    assert OpenAIImageEdit.validate_inputs(images='["a.png"]') is True
-    assert OpenAIImageEdit.validate_inputs(images='["a.png", "gone.png"]') == (
-        "images entry 2 not found in ComfyUI's input directory: 'gone.png'")
+    assert OpenAIImageEdit.validate_inputs(grid_images="[]") is True
+    assert OpenAIImageEdit.validate_inputs(grid_images='["a.png"]') is True
+    assert OpenAIImageEdit.validate_inputs(grid_images='["a.png", "gone.png"]') == (
+        "grid_images entry 2 not found in ComfyUI's input directory: 'gone.png'")
