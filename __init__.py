@@ -171,6 +171,22 @@ try:
 except Exception as e:
     print(f"[ERPK] Warning: Could not register version route: {e}")
 
+# Register the image grid caps route (read by the grid to cap each node by its selected model)
+try:
+    from server import PromptServer
+    from aiohttp import web
+    from .utils.image_grid import GRID_CAPS
+
+    @PromptServer.instance.routes.get("/erpk/grid_caps")
+    async def erpk_grid_caps(request):
+        # Read per request: node modules register their caps when get_node_list
+        # imports them, after this route is defined.
+        return web.json_response(GRID_CAPS)
+
+    print("[ERPK] Registered image grid caps route")
+except Exception as e:
+    print(f"[ERPK] Warning: Could not register image grid caps route: {e}")
+
 # Register shared workflows API routes
 try:
     from server import PromptServer

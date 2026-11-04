@@ -10,10 +10,11 @@ import { createImageGrid } from "./widget.js";
  * (utils/image_grid.py grid_inputs) as its last Python inputs.
  * @param {any} nodeType
  * @param {import("./widget.js").GridIO} io
- * @param {{ socket?: string }} options `socket` names the input that, when
- *   linked, the node sends instead of the grid.
+ * @param {{ socket?: string, caps?: import("./grid_list.js").GridCaps }} options `socket` names
+ *   the input that, when linked, the node sends instead of the grid; `caps` is the node's
+ *   entry from /erpk/grid_caps, absent for a node that registers none.
  */
-export function installImageGrid(nodeType, io, { socket }) {
+export function installImageGrid(nodeType, io, { socket, caps }) {
     const origComputeSize = nodeType.prototype.computeSize;
     nodeType.prototype.computeSize = function () {
         const size = origComputeSize?.apply(this, arguments) ?? [MIN_NODE_WIDTH, 0];
@@ -23,7 +24,7 @@ export function installImageGrid(nodeType, io, { socket }) {
     const onNodeCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function () {
         const r = onNodeCreated?.apply(this, arguments);
-        const grid = createImageGrid(this, io);
+        const grid = createImageGrid(this, io, caps);
         this._erpkImageGrid = grid;
         this.addDOMWidget("image_grid", "erpk_image_grid", grid.root, {
             serialize: false,

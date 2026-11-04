@@ -1396,7 +1396,6 @@ class GeminiImageGeneration(IO.ComfyNode):
             raise ValueError(error_msg)
 
 
-EDIT_GRID_DEFAULT = 10
 EDIT_GRID_CAP = 14
 
 
@@ -1497,7 +1496,7 @@ class GeminiImageEdit(IO.ComfyNode):
                     tooltip="Seed for reproducible outputs. Randomizes by default.",
                 ),
                 *grid_inputs(
-                    EDIT_GRID_DEFAULT,
+                    EDIT_GRID_CAP,
                     EDIT_GRID_CAP,
                     "Most images the grid accepts. Gemini 3 Pro takes up to 14 reference images.",
                 ),
@@ -1544,7 +1543,7 @@ class GeminiImageEdit(IO.ComfyNode):
             grid_images = await asyncio.to_thread(
                 load_grid_images,
                 kwargs.get("grid_images", "[]"),
-                kwargs.get("grid_max_images", EDIT_GRID_DEFAULT),
+                kwargs.get("grid_max_images", EDIT_GRID_CAP),
             )
             if not grid_images:
                 raise ValueError(NO_GRID_IMAGE)

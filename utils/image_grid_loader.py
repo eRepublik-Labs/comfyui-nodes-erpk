@@ -3,11 +3,11 @@
 
 from comfy_api.latest import IO
 
-from .image_grid import grid_inputs, load_grid_images, resolve_grid_images
+from .image_grid import grid_inputs, load_grid_images, register_grid_caps, resolve_grid_images
 
 # The largest batch any edit node here accepts (Gemini Image Edit, 14).
 MAX_GRID_IMAGES = 14
-DEFAULT_MAX_IMAGES = 10
+register_grid_caps("ImageGridLoader", {"*": MAX_GRID_IMAGES}, model_widget=None)
 EMPTY_GRID = "Add at least one image"
 # Mid-grey rather than black, so an edit model reads the bars as padding and
 # not as dark content belonging to the picture.
@@ -30,7 +30,7 @@ class ImageGridLoader(IO.ComfyNode):
                 "with mid-grey onto the largest height and width."
             ),
             inputs=grid_inputs(
-                DEFAULT_MAX_IMAGES,
+                MAX_GRID_IMAGES,
                 MAX_GRID_IMAGES,
                 "Most images the grid accepts. Seedream edit nodes take up to 10, "
                 "Gemini Image Edit up to 14.",
@@ -51,7 +51,7 @@ class ImageGridLoader(IO.ComfyNode):
         return True if paths else EMPTY_GRID
 
     @classmethod
-    def execute(cls, grid_images="[]", grid_max_images=DEFAULT_MAX_IMAGES) -> IO.NodeOutput:
+    def execute(cls, grid_images="[]", grid_max_images=MAX_GRID_IMAGES) -> IO.NodeOutput:
         pictures = load_grid_images(grid_images, grid_max_images)
         if not pictures:
             raise ValueError(EMPTY_GRID)

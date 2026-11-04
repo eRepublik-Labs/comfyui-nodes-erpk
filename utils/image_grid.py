@@ -1,12 +1,48 @@
 # ABOUTME: Server side of the image grid, shared by Image Grid Loader and the edit nodes that embed it:
-# ABOUTME: the two inputs every grid node declares, and loading the grid's files from ComfyUI's input/.
+# ABOUTME: the inputs every grid node declares, each node's per-model image caps, and loading the files.
 
 import json
 import os
+from typing import NamedTuple
 
 from comfy_api.latest import IO
 
 NO_GRID_IMAGE = "Connect an image or add images to the grid"
+ANY_MODEL = "*"
+
+
+class ModelCap(NamedTuple):
+    """The most images the selected model takes, named so an over-cap error can say which model."""
+
+    model: str
+    cap: int
+
+
+# node_id -> {"model_widget": combo name or None, "caps": {model id or "*": most images}}.
+# Each grid node's module fills it at import; /erpk/grid_caps serves it to the grid.
+GRID_CAPS = {}
+
+
+def register_grid_caps(node_id, caps, model_widget):
+    """Record the most images each model on `node_id` takes; "*" covers models not listed.
+
+    `model_widget` names the node's model combo, or is None for a node with no model
+    choice, whose caps are then {"*": n} alone.
+    """
+    if not caps or any(not isinstance(n, int) or n < 1 for n in caps.values()):
+        raise ValueError(f"Grid caps for {node_id} must map models to positive counts, got {caps!r}")
+    if model_widget is None and set(caps) != {ANY_MODEL}:
+        raise ValueError(f"{node_id} has no model widget, so its grid caps must be {{'*': n}}, got {caps!r}")
+    GRID_CAPS[node_id] = {"model_widget": model_widget, "caps": dict(caps)}
+
+
+def grid_cap_for(node_id, model):
+    """The most images `model` on `node_id` takes: its own entry, else "*", else the node's largest."""
+    entry = GRID_CAPS.get(node_id)
+    if entry is None:
+        raise ValueError(f"No grid caps registered for {node_id}")
+    caps = entry["caps"]
+    return caps.get(model, caps.get(ANY_MODEL, max(caps.values())))
 
 
 def grid_inputs(max_default, max_cap, max_tooltip):
@@ -51,15 +87,25 @@ def validate_grid(raw):
     return True
 
 
-def load_grid_images(raw, max_images):
-    """The grid's files as upright RGB PIL images in grid order; an empty grid gives []."""
+def load_grid_images(raw, max_images, model_cap=None):
+    """The grid's files as upright RGB PIL images in grid order; an empty grid gives [].
+
+    The grid holds at most min(max_images, model_cap.cap). On a tie the model is named,
+    since raising grid_max_images past the model's limit would not help.
+    """
     import folder_paths
 
     paths = resolve_grid_images(raw, folder_paths.get_input_directory())
-    if len(paths) > max_images:
+    count = len(paths)
+    if model_cap is not None and model_cap.cap <= max_images:
+        if count > model_cap.cap:
+            raise ValueError(
+                f"The grid holds {count} images but {model_cap.model} takes up to {model_cap.cap}; "
+                f"remove {count - model_cap.cap}")
+    elif count > max_images:
         raise ValueError(
-            f"The grid holds {len(paths)} images but grid_max_images is {max_images}; "
-            f"remove {len(paths) - max_images} or raise grid_max_images")
+            f"The grid holds {count} images but grid_max_images is {max_images}; "
+            f"remove {count - max_images} or raise grid_max_images")
     return [_load_upright_rgb(path) for path in paths]
 
 

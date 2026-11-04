@@ -33,12 +33,12 @@ def test_grid_widgets_follow_every_saved_widget():
     ]
 
 
-def test_image_socket_is_optional_and_the_grid_caps_at_fourteen():
+def test_image_socket_is_optional_and_the_grid_holds_fourteen_by_default():
     inputs = {i.id: i for i in GeminiImageEdit.define_schema().inputs}
     assert inputs["image"].optional is True
     assert inputs["grid_images"].default == "[]"
     assert (inputs["grid_max_images"].default, inputs["grid_max_images"].min,
-            inputs["grid_max_images"].max) == (10, 1, 14)
+            inputs["grid_max_images"].max) == (14, 1, 14)
 
 
 @pytest.fixture

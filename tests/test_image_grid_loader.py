@@ -20,6 +20,12 @@ def input_dir(monkeypatch, tmp_path):
     return inp
 
 
+def test_the_grid_holds_fourteen_by_default():
+    inputs = {i.id: i for i in ImageGridLoader.define_schema().inputs}
+    assert (inputs["grid_max_images"].default, inputs["grid_max_images"].min,
+            inputs["grid_max_images"].max) == (14, 1, 14)
+
+
 def test_empty_list_resolves_to_no_files(input_dir):
     assert resolve_grid_images("[]", str(input_dir)) == []
 

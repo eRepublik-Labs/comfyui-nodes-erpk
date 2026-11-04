@@ -11,6 +11,8 @@ import {
     capacityText,
     countLabel,
     dropPrompt,
+    gridLimit,
+    modelLimitText,
     moveBy,
     moveItem,
     parseStoredList,
@@ -47,8 +49,10 @@ const SOCKET_NOTICE = { text: "Image socket connected, grid ignored", tone: "inf
 /**
  * @param {any} node
  * @param {GridIO} io
+ * @param {import("./grid_list.js").GridCaps} [caps] the node's per-model caps; without
+ *   them grid_max_images alone limits the grid.
  */
-export function createImageGrid(node, io) {
+export function createImageGrid(node, io, caps) {
     const hintId = `erpk-grid-hint-${++gridSerial}`;
 
     const root = el("div", "erpk-grid-root");
@@ -113,8 +117,22 @@ export function createImageGrid(node, io) {
         return requireWidget("grid_images");
     }
 
+    function currentLimit() {
+        const model = caps?.model_widget ? requireWidget(caps.model_widget).value : undefined;
+        return gridLimit(Number(requireWidget("grid_max_images").value), caps, model);
+    }
+
     function maxImages() {
-        return Number(requireWidget("grid_max_images").value);
+        return currentLimit().cap;
+    }
+
+    function rerenderOnChange(widget) {
+        const onChange = widget.callback;
+        widget.callback = function () {
+            const r = onChange?.apply(this, arguments);
+            render();
+            return r;
+        };
     }
 
     function setup() {
@@ -125,13 +143,8 @@ export function createImageGrid(node, io) {
         images.computeSize = () => [0, -4];
         if (images.inputEl) images.inputEl.style.display = "none";
         if (images.element) images.element.style.display = "none";
-        const cap = requireWidget("grid_max_images");
-        const onCapChange = cap.callback;
-        cap.callback = function () {
-            const r = onCapChange?.apply(this, arguments);
-            render();
-            return r;
-        };
+        rerenderOnChange(requireWidget("grid_max_images"));
+        if (caps?.model_widget) rerenderOnChange(requireWidget(caps.model_widget));
         loadFromWidget();
     }
 
@@ -155,7 +168,8 @@ export function createImageGrid(node, io) {
     }
 
     function render() {
-        const cap = maxImages();
+        const limit = currentLimit();
+        const cap = limit.cap;
         const count = state.names.length;
         empty.root.hidden = count > 0;
         list.hidden = count === 0;
@@ -163,7 +177,7 @@ export function createImageGrid(node, io) {
         empty.limit.textContent = `Up to ${plural(cap, "image")} · ${ACCEPTED_LABEL}`;
         list.replaceChildren(...state.names.map((name, index) => buildCell(name, index, count)));
         if (remainingSlots(count, cap) > 0) list.append(buildAddCell());
-        capacity.textContent = capacityText(count, cap);
+        capacity.textContent = capacityText(count, limit);
         capacity.classList.toggle("erpk-grid-over-cap", count > cap);
         clearButton.disabled = state.uploading > 0;
         zone.classList.toggle("erpk-grid-ignored", state.socketLinked);
@@ -182,9 +196,14 @@ export function createImageGrid(node, io) {
     }
 
     // A notice from the user's last action outranks the socket notice, so
-    // Clear all keeps its Undo while the socket is linked.
+    // Clear all keeps its Undo while the socket is linked. While the grid is
+    // live, holding more than the model takes outranks both: it is why drops
+    // are refused, and it stays until the list fits.
+    /** @returns {Notice | null} */
     function currentNotice() {
-        return state.notice ?? (state.socketLinked ? SOCKET_NOTICE : null);
+        if (state.socketLinked) return state.notice ?? SOCKET_NOTICE;
+        const overModel = state.ready ? modelLimitText(state.names.length, currentLimit()) : null;
+        return overModel ? { text: overModel, tone: "error" } : state.notice;
     }
 
     /** @param {boolean} linked */
