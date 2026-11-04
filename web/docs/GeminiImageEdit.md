@@ -3,13 +3,13 @@
 
 # Gemini Image Edit
 
-Edits and modifies existing images using text prompts. Supports up to 14 reference images for multi-image editing tasks like style transfer and character consistency.
+Edits and modifies existing images using text prompts. Supports up to 14 reference images for multi-image editing tasks like style transfer and character consistency. Connect an image, or pick or drop image files onto the grid on the node.
 
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| image | IMAGE | - | Reference image(s) to edit. Use Batch Images node to combine multiple (up to 14). |
+| image | IMAGE | - | Reference image(s) to edit (optional). Use Batch Images node to combine multiple (up to 14). When connected, the node sends it and ignores the grid |
 | prompt | String | "" | Describe the edit. Reference images by order, content, or role. |
 | client | GEMINI_API_CLIENT | - | Gemini API client (optional, uses API key from config) |
 | model | Combo | gemini-nano-banana-2.1 | Image model: gemini-nano-banana-2.1, gemini-3.1-flash-image (deprecated in favour of Nano Banana 2.1), gemini-3.1-flash-lite-image, gemini-3-pro-image (optional) |
@@ -20,6 +20,8 @@ Edits and modifies existing images using text prompts. Supports up to 14 referen
 | enable_google_search | Boolean | false | Enable Google Search grounding on Nano Banana 2.1, 3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it (optional) |
 | additional_images | IMAGE | - | Additional reference images, combined with primary input up to 14 total (optional) |
 | image_refs | ERPK_IMAGE_REFS | - | Ordered reference images from a Regional Prompt Builder; sent right after the primary image so the prompt's image numbers line up (optional) |
+| grid_max_images | Int | 10 | The most images the grid accepts, from 1 to 14 (optional) |
+| grid_images | String | `[]` | Hidden. The grid stores its ordered file list here as a JSON array of names in the `input` folder |
 
 ## Output
 
@@ -28,10 +30,27 @@ Edits and modifies existing images using text prompts. Supports up to 14 referen
 | image | IMAGE | Edited image tensor |
 | description | String | Text description (only populated when response_modalities is TEXT+IMAGE) |
 
+## Image grid
+
+With nothing connected to `image`, the node sends the files on its grid instead. While `image` is connected, the grid dims, shows `Image socket connected, grid ignored`, and takes no new files, but keeps the files it has. The grid works as on the Image Grid Loader node: pick or drop PNG, JPG, or WEBP files, drag a cell to reorder it, and hover a cell and click **×** to remove it. The number on each cell is the image's position in the request.
+
+- Each file goes to the model as its own image, at its own size, in cell order. The node does not batch or letterbox them.
+- The node applies EXIF orientation, drops any alpha channel, and sends each file as PNG.
+- The grid files take the place of the `image` input, so `image_refs` follow them, then `additional_images`.
+- When you queue, ComfyUI checks that every grid file exists in the `input` folder, even with `image` connected. Clear the grid if it names a missing file.
+
+Grid errors name what is at fault:
+
+- `Connect an image or add images to the grid`: `image` is not connected and the grid is empty.
+- `grid_images entry 2 not found in ComfyUI's input directory: 'cat.png'`: the file no longer exists under that name in `input`.
+- `grid_images entry 1 is outside ComfyUI's input directory: '../cat.png'`: the entry leaves the `input` folder.
+- `The grid holds 12 images but grid_max_images is 10; remove 2 or raise grid_max_images`: you lowered `grid_max_images` below the number of images in the grid.
+
 ## Notes
 
 - Reference images in prompts by order ("the first image"), content ("the logo"), or role ("the style reference")
 - Gemini 3 Pro supports up to 14 reference images (up to 6 objects, up to 5 humans for character consistency)
 - Nano Banana 2.1 supports up to 14 reference images (up to 10 objects, up to 4 characters)
-- Images are sent in order: primary image, then image_refs, then additional_images. The primary image is "the first image" in positional prompts
+- Images are sent in order: the primary input (the `image` socket, or the grid files when nothing is connected), then image_refs, then additional_images. The first primary image is "the first image" in positional prompts
+- A Regional Prompt Builder numbers its refs from image 2, after one base image. With two or more grid files (or a batched `image`), the refs come later in the request than the prompt says
 - API key resolved from ComfyUI Settings or config.ini — connect a `client` from Gemini API Config only when you need shared safety/system-instruction state across nodes

@@ -167,7 +167,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Gemini Vision** - Analyze images with multimodal capabilities
 - **Gemini Detect** - Open-vocabulary object detection: name objects (or leave empty to detect everything prominent) and get normalized regions on an `ERPK_REGIONS` output that wires into the Regional Prompt Builder's `regions` input
 - **Gemini Image Generation** - Generate images from text descriptions (Nano Banana 2.1, 3.1 Flash, 3.1 Flash Lite, 3 Pro; 0.5K to 4K resolution, up to 14 aspect ratios, Google Search grounding on all but 3.1 Flash Lite)
-- **Gemini Image Edit** - Edit and modify images with natural language prompts (up to 14 reference images, same model and resolution options)
+- **Gemini Image Edit** - Edit and modify images with natural language prompts (up to 14 reference images, same model and resolution options). Connect an IMAGE, or pick or drop up to 14 files onto the grid on the node, and each file goes to the model at its own size
 - **Gemini System Instruction** - Set persistent system-level instructions to guide model behavior
 - **Gemini Safety Settings** - Configure content safety filters (strict/balanced/permissive presets or custom)
 
