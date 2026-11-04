@@ -314,6 +314,7 @@ String manipulation and general utility nodes.
 - Pick files with **Choose files…** or the **+ Add** cell, or drop them onto the grid; it takes PNG, JPG, and WEBP
 - The grid uploads each file to ComfyUI's `input` folder through the standard image upload, so the workflow saves file names, not pixels
 - Numbered cells in send order; drag to reorder, hover **×** to remove, **Clear all** with Undo
+- Each file shows as a numbered placeholder with a spinner while it uploads, and lands in drop order; PNG thumbnails load through ComfyUI's WebP preview
 - Press Tab to focus a cell; the arrow keys move it and Delete or Backspace removes it
 - The grid holds up to 14 files; it ignores dropped files past that and the overlay says how many free slots remain
 - The node centers mixed sizes on a canvas of the largest height and width with mid-grey padding, since a batch must share one size
