@@ -95,7 +95,7 @@ def test_edit_rejects_a_fourth_image():
 
 
 def test_edit_requires_an_image():
-    with pytest.raises(ValueError, match="^Connect reference_images or enter at least one image URL$"):
+    with pytest.raises(ValueError, match="^Connect an image or add images to the grid, or enter at least one image URL$"):
         _send(_edit(), model="Qwen Image 3.0", prompt="p")
 
 

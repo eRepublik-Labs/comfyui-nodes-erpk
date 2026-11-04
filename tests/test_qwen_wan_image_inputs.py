@@ -29,19 +29,21 @@ SINGLE_NODES = [
 
 # Widget order as saved in workflows before the IMAGE sockets existed, captured
 # from these nodes on main. ComfyUI lists required widgets before optional ones,
-# so flipping a widget's optional flag would misplace saved values.
+# so flipping a widget's optional flag would misplace saved values. The
+# multi-image nodes then gained the image grid's two inputs, appended last.
+GRID = ["grid_images", "grid_max_images"]
 SAVED_WIDGET_ORDER = {
     "QwenImageMultipleAnglesNode": ["images", "prompt", "horizontal_angle", "vertical_angle", "distance",
                                     "width", "height", "seed", "output_format", "enable_sync_mode",
-                                    "enable_base64_output"],
+                                    "enable_base64_output", *GRID],
     "QwenImageEditPlusNode": ["model", "prompt", "images", "width", "height", "seed", "output_format",
-                              "enable_sync_mode", "enable_base64_output"],
+                              "enable_sync_mode", "enable_base64_output", *GRID],
     "QwenImageEditPlusLoraNode": ["model", "prompt", "images", "lora_1_path", "lora_1_scale", "lora_2_path",
                                   "lora_2_scale", "lora_3_path", "lora_3_scale", "width", "height", "seed",
-                                  "output_format", "enable_sync_mode", "enable_base64_output"],
-    "QwenImageMaxEditNode": ["prompt", "images", "width", "height", "seed"],
+                                  "output_format", "enable_sync_mode", "enable_base64_output", *GRID],
+    "QwenImageMaxEditNode": ["prompt", "images", "width", "height", "seed", *GRID],
     "QwenImage20EditNode": ["model", "prompt", "images", "width", "height", "seed", "output_format",
-                            "enable_sync_mode", "enable_base64_output"],
+                            "enable_sync_mode", "enable_base64_output", *GRID],
     "QwenImageEditNode": ["prompt", "image", "width", "height", "seed", "output_format", "enable_sync_mode",
                           "enable_base64_output"],
     "QwenImageEditLoraNode": ["prompt", "image", "lora_1_path", "lora_1_scale", "lora_2_path", "lora_2_scale",
@@ -160,7 +162,7 @@ def test_multi_node_rejects_a_batch_over_its_limit(module, name, max_images):
 
 @pytest.mark.parametrize("module,name,_max", MULTI_NODES)
 def test_multi_node_without_any_image_is_an_error(module, name, _max):
-    with pytest.raises(ValueError, match="^Connect reference_images or enter at least one image URL$"):
+    with pytest.raises(ValueError, match="^Connect an image or add images to the grid, or enter at least one image URL$"):
         _run(_node(module, name), **_kwargs(name))
 
 

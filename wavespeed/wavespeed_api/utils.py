@@ -10,7 +10,7 @@ from typing import List, Optional, Union
 from collections.abc import Iterable
 from pydantic import BaseModel
 
-from ...utils.image_grid import load_grid_images
+from ...utils.image_grid import NO_GRID_IMAGE, load_grid_images
 
 
 def imageurl2tensor(image_urls: List[str]):
@@ -276,6 +276,9 @@ def images_to_data_uris(tensor, max_count: Optional[int] = None) -> Optional[Lis
     if max_count is not None:
         b64_list = b64_list[:max_count]
     return [f"data:image/jpeg;base64,{b}" for b in b64_list]
+
+
+NO_INPUT_IMAGE = f"{NO_GRID_IMAGE}, or enter at least one image URL"
 
 
 def input_image_list(images, image_url, max_count: int, model: str,

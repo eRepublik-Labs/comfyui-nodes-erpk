@@ -17,6 +17,12 @@ import { installImageGrid } from "./image_grid/mount.js";
 const GRID_NODES = [
     { nodeId: "ImageGridLoader" },
     { nodeId: "OpenAIImageEdit", socket: "image" },
+    { nodeId: "QwenImageMaxEditNode", socket: "reference_images" },
+    { nodeId: "QwenImage20EditNode", socket: "reference_images" },
+    { nodeId: "QwenImage30EditNode", socket: "reference_images" },
+    { nodeId: "QwenImageEditPlusNode", socket: "reference_images" },
+    { nodeId: "QwenImageEditPlusLoraNode", socket: "reference_images" },
+    { nodeId: "QwenImageMultipleAnglesNode", socket: "reference_images" },
 ];
 
 /** @param {File} file */
