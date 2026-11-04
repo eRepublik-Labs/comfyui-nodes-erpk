@@ -8,6 +8,8 @@ import types
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
+import erpk.openai.image_nodes  # noqa: F401  (registers OpenAIImageEdit before any snapshot)
+import erpk.utils.image_grid_loader  # noqa: F401  (registers ImageGridLoader)
 from erpk.utils import image_grid
 from erpk.utils.image_grid import ModelCap, grid_cap_for, load_grid_images, register_grid_caps
 from tests.test_shared_workflow_routes import routes_app  # noqa: F401  (pytest fixture)
@@ -113,9 +115,6 @@ def test_the_route_serves_caps_registered_after_it_was_defined(routes_app):
 
 
 def test_the_route_serves_the_openai_edit_and_loader_caps(routes_app):
-    import erpk.openai.image_nodes  # noqa: F401
-    import erpk.utils.image_grid_loader  # noqa: F401
-
     status, body = _get_grid_caps(routes_app)
     assert status == 200
     assert body["OpenAIImageEdit"] == {"model_widget": "model", "caps": {"*": 16}}
