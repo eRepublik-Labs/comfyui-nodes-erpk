@@ -206,7 +206,7 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 - **OpenAI System Instruction** - Set persistent system-level instructions to guide model behavior
 - **OpenAI Image Generation** - Generate images with GPT-Image-2.5 Flare (default), GPT-Image-2.5 Sunburst and GPT-Image-2, with png / jpeg / webp output
 - **OpenAI Image Generation (Responses)** - Generate images via the Responses API with a mainline reasoning model (gpt-6.1-sol default) driving the `image_generation` hosted tool (GPT-Image-2.5 Flare by default). Adds optional web search grounding and prompt revision.
-- **OpenAI Image Edit** - Edit and inpaint images with natural language prompts (GPT-Image-2.5 Sunburst default)
+- **OpenAI Image Edit** - Edit and inpaint images with natural language prompts (GPT-Image-2.5 Sunburst default). Connect an IMAGE, or pick or drop up to 16 files onto the grid on the node, and each file goes to the API at its own size
 
 **Key Benefits:**
 - Support for GPT-6.1 Sol (default: 1.05M context, 128K output, $2/$10 per MTok) and GPT-6.1 Terra (same context and output, $1/$5 per MTok), the GPT-6 Astra/Sol/Luna and GPT-5.6 Sol/Terra/Luna tiers, and chat-latest. The GPT-5.5 and older text models were removed on 2026-10-01

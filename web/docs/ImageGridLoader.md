@@ -7,6 +7,8 @@ Pick or drop image files onto the grid on the node, and get them back as one `IM
 
 This node does not call any API. It reads files from ComfyUI's `input` folder. The edit node you connect it to sends the images.
 
+OpenAI Image Edit has the same grid built in. There, each file goes to the API at its own size, so the node does not letterbox mixed sizes.
+
 ## Parameters
 
 | Parameter | Type | Default | Description |
