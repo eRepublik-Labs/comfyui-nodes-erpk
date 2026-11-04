@@ -9,7 +9,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from wavespeed.wavespeed_api.utils import input_image_list
+from erpk.wavespeed.wavespeed_api.utils import input_image_list
 
 DATA_URI = "data:image/jpeg;base64,"
 

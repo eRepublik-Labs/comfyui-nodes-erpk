@@ -5,7 +5,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from wavespeed.wavespeed_api.utils import input_image_list
+from erpk.wavespeed.wavespeed_api.utils import input_image_list
 
 
 def test_single_url_becomes_one_item_list():

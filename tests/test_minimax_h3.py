@@ -23,22 +23,22 @@ import pytest
 
 IO = pytest.importorskip("comfy_api.latest").IO
 
-from wavespeed.minimax_h3_text_to_video import MinimaxH3TextToVideoNode
-from wavespeed.minimax_h3_image_to_video import MinimaxH3ImageToVideoNode
-from wavespeed.minimax_h3_reference_to_video import MinimaxH3ReferenceToVideoNode
+from erpk.wavespeed.minimax_h3_text_to_video import MinimaxH3TextToVideoNode
+from erpk.wavespeed.minimax_h3_image_to_video import MinimaxH3ImageToVideoNode
+from erpk.wavespeed.minimax_h3_reference_to_video import MinimaxH3ReferenceToVideoNode
 
-from wavespeed.wavespeed_api.requests.minimax_h3_text_to_video import MinimaxH3TextToVideo
-from wavespeed.wavespeed_api.requests.minimax_h3_image_to_video import MinimaxH3ImageToVideo
-from wavespeed.wavespeed_api.requests.minimax_h3_reference_to_video import MinimaxH3ReferenceToVideo
-from wavespeed.minimax_h3_lora_stack import MinimaxH3LoraStackNode
-from wavespeed.minimax_h3_text_to_image import MinimaxH3TextToImageNode
-from wavespeed.minimax_h3_image_edit import MinimaxH3ImageEditNode
-from wavespeed.minimax_h3_video_edit import MinimaxH3VideoEditNode
-from wavespeed.minimax_h3_video_extend import MinimaxH3VideoExtendNode
-from wavespeed.wavespeed_api.requests.minimax_h3_text_to_image import MinimaxH3TextToImage
-from wavespeed.wavespeed_api.requests.minimax_h3_image_edit import MinimaxH3ImageEdit
-from wavespeed.wavespeed_api.requests.minimax_h3_video_edit import MinimaxH3VideoEdit
-from wavespeed.wavespeed_api.requests.minimax_h3_video_extend import MinimaxH3VideoExtend
+from erpk.wavespeed.wavespeed_api.requests.minimax_h3_text_to_video import MinimaxH3TextToVideo
+from erpk.wavespeed.wavespeed_api.requests.minimax_h3_image_to_video import MinimaxH3ImageToVideo
+from erpk.wavespeed.wavespeed_api.requests.minimax_h3_reference_to_video import MinimaxH3ReferenceToVideo
+from erpk.wavespeed.minimax_h3_lora_stack import MinimaxH3LoraStackNode
+from erpk.wavespeed.minimax_h3_text_to_image import MinimaxH3TextToImageNode
+from erpk.wavespeed.minimax_h3_image_edit import MinimaxH3ImageEditNode
+from erpk.wavespeed.minimax_h3_video_edit import MinimaxH3VideoEditNode
+from erpk.wavespeed.minimax_h3_video_extend import MinimaxH3VideoExtendNode
+from erpk.wavespeed.wavespeed_api.requests.minimax_h3_text_to_image import MinimaxH3TextToImage
+from erpk.wavespeed.wavespeed_api.requests.minimax_h3_image_edit import MinimaxH3ImageEdit
+from erpk.wavespeed.wavespeed_api.requests.minimax_h3_video_edit import MinimaxH3VideoEdit
+from erpk.wavespeed.wavespeed_api.requests.minimax_h3_video_extend import MinimaxH3VideoExtend
 
 
 ALL_NODES = [
@@ -189,7 +189,7 @@ def test_reference_to_video_exposes_all_three_reference_kinds():
 
 @pytest.mark.parametrize("node", ALL_NODES)
 def test_node_is_registered(node):
-    from wavespeed import NODES
+    from erpk.wavespeed import NODES
     assert node in NODES
 
 

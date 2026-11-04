@@ -21,14 +21,14 @@ IO = pytest.importorskip("comfy_api.latest").IO
 def _import_request(module_name, class_name):
     """Import a request class from the wavespeed_api.requests package."""
     import importlib
-    mod = importlib.import_module(f"wavespeed.wavespeed_api.requests.{module_name}")
+    mod = importlib.import_module(f"erpk.wavespeed.wavespeed_api.requests.{module_name}")
     return getattr(mod, class_name)
 
 
 def _import_node(module_name, class_name):
     """Import a node class from the wavespeed package."""
     import importlib
-    mod = importlib.import_module(f"wavespeed.{module_name}")
+    mod = importlib.import_module(f"erpk.wavespeed.{module_name}")
     return getattr(mod, class_name)
 
 
@@ -349,10 +349,10 @@ class TestSeedance20TextToVideoDispatch:
 
     def test_model_maps_to_request_class(self):
         """Verify the internal model_map returns correct class per tier."""
-        from wavespeed.seedance_2_0_text_to_video import Seedance20TextToVideoNode
-        from wavespeed.wavespeed_api.requests.seedance_2_0_text_to_video import Seedance20TextToVideo
-        from wavespeed.wavespeed_api.requests.seedance_2_0_text_to_video_fast import Seedance20TextToVideoFast
-        from wavespeed.wavespeed_api.requests.seedance_2_0_text_to_video_turbo import Seedance20TextToVideoTurbo
+        from erpk.wavespeed.seedance_2_0_text_to_video import Seedance20TextToVideoNode
+        from erpk.wavespeed.wavespeed_api.requests.seedance_2_0_text_to_video import Seedance20TextToVideo
+        from erpk.wavespeed.wavespeed_api.requests.seedance_2_0_text_to_video_fast import Seedance20TextToVideoFast
+        from erpk.wavespeed.wavespeed_api.requests.seedance_2_0_text_to_video_turbo import Seedance20TextToVideoTurbo
 
         mapping = Seedance20TextToVideoNode._request_class_for("Seedance 2.0")
         assert mapping is Seedance20TextToVideo
@@ -364,10 +364,10 @@ class TestSeedance20ImageToVideoDispatch:
     """Node execute() dispatches to the correct request class for each model tier."""
 
     def test_model_maps_to_request_class(self):
-        from wavespeed.seedance_2_0_image_to_video import Seedance20ImageToVideoNode
-        from wavespeed.wavespeed_api.requests.seedance_2_0_image_to_video import Seedance20ImageToVideo
-        from wavespeed.wavespeed_api.requests.seedance_2_0_image_to_video_fast import Seedance20ImageToVideoFast
-        from wavespeed.wavespeed_api.requests.seedance_2_0_image_to_video_turbo import Seedance20ImageToVideoTurbo
+        from erpk.wavespeed.seedance_2_0_image_to_video import Seedance20ImageToVideoNode
+        from erpk.wavespeed.wavespeed_api.requests.seedance_2_0_image_to_video import Seedance20ImageToVideo
+        from erpk.wavespeed.wavespeed_api.requests.seedance_2_0_image_to_video_fast import Seedance20ImageToVideoFast
+        from erpk.wavespeed.wavespeed_api.requests.seedance_2_0_image_to_video_turbo import Seedance20ImageToVideoTurbo
 
         assert Seedance20ImageToVideoNode._request_class_for("Seedance 2.0") is Seedance20ImageToVideo
         assert Seedance20ImageToVideoNode._request_class_for("Seedance 2.0 Fast") is Seedance20ImageToVideoFast
