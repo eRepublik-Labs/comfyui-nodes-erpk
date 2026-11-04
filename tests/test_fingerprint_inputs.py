@@ -155,6 +155,7 @@ CONFIG_NODES = [
     ("gemini.nodes", "GeminiSystemInstruction"),
     ("gemini.nodes", "GeminiSafetySettings"),
     ("utils.regional_prompt", "RegionalPromptBuilder"),
+    ("utils.image_grid_loader", "ImageGridLoader"),
     ("openai.nodes", "OpenAIAPIConfig"),
     ("openai.nodes", "OpenAISystemInstruction"),
     ("wavespeed.minimax_h3_lora_stack", "MinimaxH3LoraStackNode"),
