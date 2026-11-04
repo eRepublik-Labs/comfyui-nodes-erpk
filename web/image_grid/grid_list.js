@@ -31,23 +31,21 @@ function unreadable(value) {
 /**
  * @typedef {{ model_widget: string | null, caps: Record<string, number> }} GridCaps
  *   One node's entry from /erpk/grid_caps: the model combo's name and the most images each model takes.
- * @typedef {{ cap: number, model: string | null }} GridLimit
- *   The most images the grid takes, and the model when that model's own limit is what sets it.
+ * @typedef {{ cap: number, name: string }} GridLimit
+ *   The most images the grid takes, and what an over-cap notice names as taking no more:
+ *   the selected model, or the node when it has no model choice.
  */
 
 /**
- * The grid_max_images value, lowered to the selected model's cap. On a tie the model
- * is named, as utils/image_grid.py load_grid_images does: raising grid_max_images would not help.
- * @param {number} widgetCap
- * @param {GridCaps | undefined} caps
+ * @param {GridCaps} caps
  * @param {unknown} model the model widget's value; unused when the node has no model widget
+ * @param {string} nodeName
  * @returns {GridLimit}
  */
-export function gridLimit(widgetCap, caps, model) {
-    if (!caps) return { cap: widgetCap, model: null };
-    const cap = modelCap(caps.caps, String(model));
-    if (caps.model_widget === null || cap > widgetCap) return { cap: Math.min(cap, widgetCap), model: null };
-    return { cap, model: String(model) };
+export function gridLimit(caps, model, nodeName) {
+    if (caps.model_widget === null) return { cap: modelCap(caps.caps, "*"), name: nodeName };
+    const id = String(model);
+    return { cap: modelCap(caps.caps, id), name: id };
 }
 
 /**
@@ -61,12 +59,12 @@ function modelCap(table, model) {
 }
 
 /**
- * The red notice while the grid holds more images than the selected model takes, else null.
+ * The red notice while the grid holds more images than its limit, else null.
  * @param {number} count @param {GridLimit} limit
  */
-export function modelLimitText(count, { cap, model }) {
-    if (model === null || count <= cap) return null;
-    return `${model} takes up to ${plural(cap, "image")}, remove ${count - cap}`;
+export function overCapText(count, { cap, name }) {
+    if (count <= cap) return null;
+    return `${name} takes up to ${plural(cap, "image")}, remove ${count - cap}`;
 }
 
 export function remainingSlots(count, cap) {
@@ -137,12 +135,8 @@ export function countLabel(count, cap) {
     return `${count} of ${cap}`;
 }
 
-/** @param {number} count @param {GridLimit} limit */
-export function capacityText(count, { cap, model }) {
-    if (count > cap) {
-        const fix = model === null ? `remove ${count - cap} or raise grid_max_images` : `remove ${count - cap}`;
-        return `${countLabel(count, cap)} · ${fix}`;
-    }
+export function capacityText(count, cap) {
+    if (count > cap) return `${countLabel(count, cap)} · remove ${count - cap}`;
     const left = remainingSlots(count, cap);
     if (left === 0) return `${countLabel(count, cap)} · grid is full`;
     return `${countLabel(count, cap)} · ${left} more can be dropped`;

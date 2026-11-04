@@ -17,7 +17,6 @@ Edits one or more input images using a text prompt. Pass a batched IMAGE tensor 
 | resolution | Combo | auto | auto, 1k (~1024px) or 2k (~2048px). "auto" sends nothing and lets xAI choose (optional) |
 | n | Int | 1 | Number of edited variations, 1-10. Each one is billed (optional) |
 | quality | Combo | auto | auto, low or medium. "auto" sends nothing; xAI then serves medium for edits. Billed at the quality served (optional) |
-| grid_max_images | Int | 5 | The most images the grid accepts, from 1 to 5 (optional) |
 | grid_images | String | `[]` | Hidden. The grid stores its ordered file list here as a JSON array of names in the `input` folder |
 
 ## Output
@@ -31,6 +30,7 @@ Edits one or more input images using a text prompt. Pass a batched IMAGE tensor 
 With nothing connected to `image`, the node sends the files on its grid instead. While `image` is connected, the grid dims, shows `Image socket connected, grid ignored`, and takes no new files, but keeps the files it has. The grid works as on the Image Grid Loader node: pick or drop PNG, JPG, or WEBP files, drag a cell to reorder it, and hover a cell and click **×** to remove it. The number on each cell is the image's position in the request: cell 1 is `<IMAGE_0>` in the prompt, cell 2 is `<IMAGE_1>`, and so on.
 
 - Each file goes to xAI as its own source image, in cell order. The node does not batch or letterbox them.
+- The grid holds up to 5 files, grok-imagine-image-2.0's limit.
 - The node applies EXIF orientation, drops any alpha channel, and sends each file as a JPEG data URI. A file keeps its size unless its longest edge is over 2048 px or the request would pass the xai-sdk's 20 MiB limit; then the node scales it down, as it does a connected image.
 - When you queue, ComfyUI checks that every grid file exists in the `input` folder, even with `image` connected. Clear the grid if it names a missing file.
 
@@ -39,7 +39,7 @@ Grid errors name what is at fault:
 - `Connect an image or add images to the grid`: `image` is not connected and the grid is empty.
 - `grid_images entry 2 not found in ComfyUI's input directory: 'cat.png'`: the file no longer exists under that name in `input`.
 - `grid_images entry 1 is outside ComfyUI's input directory: '../cat.png'`: the entry leaves the `input` folder.
-- `The grid holds 5 images but grid_max_images is 3; remove 2 or raise grid_max_images`: you lowered `grid_max_images` below the number of images in the grid.
+- `The grid holds 6 images but grok-imagine-image-2.0 takes up to 5 images; remove 1`: the grid holds more images than the selected model takes.
 
 ## Notes
 

@@ -20,7 +20,6 @@ Edits and modifies existing images using text prompts. Supports up to 14 referen
 | enable_google_search | Boolean | false | Enable Google Search grounding on Nano Banana 2.1, 3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it (optional) |
 | additional_images | IMAGE | - | Additional reference images, combined with primary input up to 14 total (optional) |
 | image_refs | ERPK_IMAGE_REFS | - | Ordered reference images from a Regional Prompt Builder; sent right after the primary image so the prompt's image numbers line up (optional) |
-| grid_max_images | Int | 14 | The most images the grid accepts, from 1 to 14 (optional) |
 | grid_images | String | `[]` | Hidden. The grid stores its ordered file list here as a JSON array of names in the `input` folder |
 
 ## Output
@@ -35,6 +34,7 @@ Edits and modifies existing images using text prompts. Supports up to 14 referen
 With nothing connected to `image`, the node sends the files on its grid instead. While `image` is connected, the grid dims, shows `Image socket connected, grid ignored`, and takes no new files, but keeps the files it has. The grid works as on the Image Grid Loader node: pick or drop PNG, JPG, or WEBP files, drag a cell to reorder it, and hover a cell and click **×** to remove it. The number on each cell is the image's position in the request.
 
 - Each file goes to the model as its own image, at its own size, in cell order. The node does not batch or letterbox them.
+- The grid holds up to 14 files on every model, Gemini 3 Pro's limit.
 - The node applies EXIF orientation, drops any alpha channel, and sends each file as PNG.
 - The grid files take the place of the `image` input. `image_refs` go right after the first grid file, then the remaining grid files, then `additional_images`.
 - When you queue, ComfyUI checks that every grid file exists in the `input` folder, even with `image` connected. Clear the grid if it names a missing file.
@@ -44,7 +44,7 @@ Grid errors name what is at fault:
 - `Connect an image or add images to the grid`: `image` is not connected and the grid is empty.
 - `grid_images entry 2 not found in ComfyUI's input directory: 'cat.png'`: the file no longer exists under that name in `input`.
 - `grid_images entry 1 is outside ComfyUI's input directory: '../cat.png'`: the entry leaves the `input` folder.
-- `The grid holds 12 images but grid_max_images is 10; remove 2 or raise grid_max_images`: you lowered `grid_max_images` below the number of images in the grid.
+- `The grid holds 15 images but gemini-3-pro-image takes up to 14 images; remove 1`: the grid holds more images than the selected model takes.
 
 ## Notes
 

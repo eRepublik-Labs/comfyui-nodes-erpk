@@ -3,6 +3,7 @@
 
 import asyncio
 import io
+import json
 import sys
 import types
 from types import SimpleNamespace
@@ -29,16 +30,14 @@ def frontend_widget_order(schema):
 def test_grid_widgets_follow_every_saved_widget():
     assert frontend_widget_order(GeminiImageEdit.define_schema()) == [
         "prompt", "seed", "model", "temperature", "aspect_ratio", "image_size",
-        "response_modalities", "enable_google_search", "grid_images", "grid_max_images",
+        "response_modalities", "enable_google_search", "grid_images",
     ]
 
 
-def test_image_socket_is_optional_and_the_grid_holds_fourteen_by_default():
+def test_image_socket_is_optional_and_the_grid_starts_empty():
     inputs = {i.id: i for i in GeminiImageEdit.define_schema().inputs}
     assert inputs["image"].optional is True
     assert inputs["grid_images"].default == "[]"
-    assert (inputs["grid_max_images"].default, inputs["grid_max_images"].min,
-            inputs["grid_max_images"].max) == (14, 1, 14)
 
 
 @pytest.fixture
@@ -143,22 +142,22 @@ def test_refs_follow_the_first_grid_image_then_the_rest_then_additional(input_di
 
 def test_a_connected_image_is_sent_and_the_grid_not_read(input_dir, models):
     _write(input_dir / "a.png", (5, 3), (255, 0, 0))
-    _write(input_dir / "b.png", (5, 3), (255, 0, 0))
-    # Over its cap, so reading the grid would raise.
+    # The second entry is missing, so reading the grid would raise.
     _edit(
         image=_tensor(6, 8, (0, 0, 0)),
-        grid_images='["a.png", "b.png"]', grid_max_images=1,
+        grid_images='["a.png", "gone.png"]',
         additional_images=_tensor(3, 3, (0, 255, 255)),
     )
     assert _sent_images(models) == [((6, 8), (0, 0, 0)), ((3, 3), (0, 255, 255))]
 
 
-def test_more_files_than_max_images_names_both_counts(input_dir, models):
-    for name in ("a.png", "b.png", "c.png"):
+def test_more_files_than_the_model_takes_names_the_model(input_dir, models):
+    names = [f"{i}.png" for i in range(15)]
+    for name in names:
         _write(input_dir / name, (2, 2), (0, 0, 0))
     with pytest.raises(ValueError) as exc:
-        _edit(grid_images='["a.png", "b.png", "c.png"]', grid_max_images=2)
-    assert str(exc.value) == "The grid holds 3 images but grid_max_images is 2; remove 1 or raise grid_max_images"
+        _edit(model="gemini-3-pro-image", grid_images=json.dumps(names))
+    assert str(exc.value) == "The grid holds 15 images but gemini-3-pro-image takes up to 14 images; remove 1"
     assert models.contents == []
 
 

@@ -276,7 +276,7 @@ def test_new_nodes_follow_the_seed_contract(node):
 
 IMAGE_NODE_LAST_INPUTS = {
     MinimaxH3TextToImageNode: ["loras"],
-    MinimaxH3ImageEditNode: ["loras", "grid_images", "grid_max_images"],
+    MinimaxH3ImageEditNode: ["loras", "grid_images"],
 }
 
 

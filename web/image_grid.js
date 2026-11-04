@@ -11,8 +11,8 @@ import { api } from "../../../scripts/api.js";
 import { storedName, viewPath } from "./image_grid/grid_list.js";
 import { installImageGrid } from "./image_grid/mount.js";
 
-// Each node here declares the grid's inputs with grid_inputs() from utils/image_grid.py,
-// and may register per-model caps there with register_grid_caps().
+// Each node here declares the grid's input with grid_input() from utils/image_grid.py
+// and registers its caps there with register_grid_caps().
 // `socket` names the input that, when linked, the node sends instead of the grid.
 /** @type {{ nodeId: string, socket?: string }[]} */
 const GRID_NODES = [
@@ -78,6 +78,7 @@ app.registerExtension({
         const gridNode = GRID_NODES.find((entry) => entry.nodeId === nodeData?.name);
         if (!gridNode) return;
         const caps = (await loadGridCaps())[gridNode.nodeId];
-        installImageGrid(nodeType, gridIO, { socket: gridNode.socket, caps });
+        if (!caps) throw new Error(`${gridNode.nodeId} registers no image grid caps; see register_grid_caps.`);
+        installImageGrid(nodeType, gridIO, { socket: gridNode.socket, caps, nodeName: nodeData.display_name ?? nodeData.name });
     },
 });

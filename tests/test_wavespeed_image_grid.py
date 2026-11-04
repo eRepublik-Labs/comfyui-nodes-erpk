@@ -2,6 +2,7 @@
 # ABOUTME: connected IMAGE batch, else the grid's files at their own size, else the URL text.
 
 import asyncio
+import json
 import base64
 import importlib
 import io
@@ -62,9 +63,8 @@ def test_a_connected_batch_is_sent_and_the_grid_not_read(input_dir):
     import torch
 
     _write(input_dir / "a.png", (4, 4), (0, 0, 0))
-    _write(input_dir / "b.png", (4, 4), (0, 0, 0))
-    # Over grid_max, so reading the grid would raise.
-    uris = input_image_list(torch.zeros(2, 8, 6, 3), "", 3, "Qwen", grid='["a.png", "b.png"]', grid_max=1)
+    # The second entry is missing, so reading the grid would raise.
+    uris = input_image_list(torch.zeros(2, 8, 6, 3), "", 3, "Qwen", grid='["a.png", "gone.png"]')
     assert [_decoded(uri) for uri in uris] == [("data:image/jpeg;base64", "JPEG", (6, 8))] * 2
 
 
@@ -78,20 +78,12 @@ def test_an_empty_grid_and_no_url_send_nothing(input_dir):
     assert input_image_list(None, "", 3, "Qwen", grid="[]") is None
 
 
-def test_more_grid_files_than_grid_max_names_both_counts(input_dir):
-    for name in ("a.png", "b.png", "c.png"):
-        _write(input_dir / name, (2, 2), (0, 0, 0))
-    with pytest.raises(ValueError) as exc:
-        input_image_list(None, "", 10, "Seedream", grid='["a.png", "b.png", "c.png"]', grid_max=2)
-    assert str(exc.value) == "The grid holds 3 images but grid_max_images is 2; remove 1 or raise grid_max_images"
-
-
-def test_grid_max_defaults_to_the_model_cap(input_dir):
+def test_more_grid_files_than_the_model_takes_names_the_model(input_dir):
     for name in ("a.png", "b.png", "c.png"):
         _write(input_dir / name, (2, 2), (0, 0, 0))
     with pytest.raises(ValueError) as exc:
         input_image_list(None, "", 2, "Qwen", grid='["a.png", "b.png", "c.png"]')
-    assert str(exc.value) == "The grid holds 3 images but grid_max_images is 2; remove 1 or raise grid_max_images"
+    assert str(exc.value) == "The grid holds 3 images but Qwen takes up to 2 images; remove 1"
 
 
 def test_a_grid_entry_outside_the_input_folder_is_refused(input_dir):
@@ -108,15 +100,15 @@ def test_no_grid_reads_nothing_from_comfyui(monkeypatch):
 
 # ---- the edit nodes --------------------------------------------------------
 
-GRID = ["grid_images", "grid_max_images"]
+GRID = ["grid_images"]
 NO_INPUT_IMAGE = "Connect an image or add images to the grid, or enter at least one image URL"
 PROMPT = {"prompt": "edit it"}
 
 
 class Node:
-    def __init__(self, module, name, socket, url, cap, order, run_kwargs=PROMPT, needs_image=True):
+    def __init__(self, module, name, socket, url, cap, label, order, run_kwargs=PROMPT, needs_image=True):
         self.module, self.name, self.socket, self.url, self.cap = module, name, socket, url, cap
-        self.order, self.run_kwargs, self.needs_image = order, run_kwargs, needs_image
+        self.label, self.order, self.run_kwargs, self.needs_image = label, order, run_kwargs, needs_image
 
     def __repr__(self):
         return self.name
@@ -135,34 +127,37 @@ SEEDREAM_SEQUENTIAL_ORDER = ["prompt", "max_images", "size_preset", "seed", "ima
 SEEDREAM_RUN = {**PROMPT, "size_preset": "Custom"}
 
 NODES = [
-    Node("qwen_image_max_edit", "QwenImageMaxEditNode", "reference_images", "images", 6,
+    Node("qwen_image_max_edit", "QwenImageMaxEditNode", "reference_images", "images", 6, "Qwen Image Max Edit",
          ["prompt", "images", "width", "height", "seed"]),
-    Node("qwen_image_2_0_edit", "QwenImage20EditNode", "reference_images", "images", 3,
+    Node("qwen_image_2_0_edit", "QwenImage20EditNode", "reference_images", "images", 3, "Qwen Image 2.0",
          ["model", "prompt", "images", *QWEN_SIZE_WIDGETS]),
     Node("qwen_image_3_0_edit", "QwenImage30EditNode", "reference_images", "reference_images_url", 3,
+         "Qwen Image 3.0",
          ["model", "prompt", "reference_images_url", "aspect_ratio", "resolution",
           "enable_prompt_expansion", "seed"]),
-    Node("qwen_image_edit_plus", "QwenImageEditPlusNode", "reference_images", "images", 3,
+    Node("qwen_image_edit_plus", "QwenImageEditPlusNode", "reference_images", "images", 3, "Qwen Edit Plus",
          ["model", "prompt", "images", *QWEN_SIZE_WIDGETS]),
     Node("qwen_image_edit_plus_lora", "QwenImageEditPlusLoraNode", "reference_images", "images", 3,
+         "Qwen Edit Plus LoRA",
          ["model", "prompt", "images", "lora_1_path", "lora_1_scale", "lora_2_path", "lora_2_scale",
           "lora_3_path", "lora_3_scale", *QWEN_SIZE_WIDGETS],
          run_kwargs={**PROMPT, "lora_1_path": "https://example.com/style.safetensors"}),
     Node("qwen_image_multiple_angles", "QwenImageMultipleAnglesNode", "reference_images", "images", 3,
+         "Qwen Image Multiple Angles",
          ["images", "prompt", "horizontal_angle", "vertical_angle", "distance", *QWEN_SIZE_WIDGETS]),
-    *[Node(module, name, "images", "image_url", 10, SEEDREAM_ORDER, run_kwargs=SEEDREAM_RUN)
+    *[Node(module, name, "images", "image_url", 10, "Seedream", SEEDREAM_ORDER, run_kwargs=SEEDREAM_RUN)
       for module, name in [("seedream_v4_edit", "SeedreamV4EditNode"),
                            ("seedream_v4_5_edit", "SeedreamV4_5EditNode"),
                            ("seedream_v5_lite_edit", "SeedreamV5LiteEditNode")]],
-    *[Node(module, name, "images", "image_url", 10, SEEDREAM_SEQUENTIAL_ORDER,
+    *[Node(module, name, "images", "image_url", 10, "Seedream", SEEDREAM_SEQUENTIAL_ORDER,
            run_kwargs={**SEEDREAM_RUN, "max_images": 2}, needs_image=False)
       for module, name in [("seedream_v4_edit_sequential", "SeedreamV4EditSequentialNode"),
                            ("seedream_v4_5_edit_sequential", "SeedreamV4_5EditSequentialNode"),
                            ("seedream_v5_lite_edit_sequential", "SeedreamV5LiteEditSequentialNode")]],
-    Node("seedream_v5_pro_edit", "SeedreamV5ProEditNode", "images", "image_url", 10,
+    Node("seedream_v5_pro_edit", "SeedreamV5ProEditNode", "images", "image_url", 10, "Seedream",
          ["prompt", "image_url", "aspect_ratio", "resolution", "seed", "output_format",
           "prompt_optimization_mode", "enable_sync_mode", "enable_base64_output"]),
-    Node("minimax_h3_image_edit", "MinimaxH3ImageEditNode", "images", "image_urls", 9,
+    Node("minimax_h3_image_edit", "MinimaxH3ImageEditNode", "images", "image_urls", 9, "MiniMax H3 Image Edit",
          ["prompt", "image_urls", "aspect_ratio", "resolution", "output_format", "seed"]),
 ]
 NEEDS_IMAGE = [node for node in NODES if node.needs_image]
@@ -183,12 +178,10 @@ def test_grid_widgets_follow_every_saved_widget(node):
 
 
 @pytest.mark.parametrize("node", NODES, ids=repr)
-def test_the_socket_is_optional_and_the_grid_caps_at_the_model_limit(node):
+def test_the_socket_is_optional_and_the_grid_starts_empty(node):
     inputs = {i.id: i for i in node.cls.define_schema().inputs}
     assert (inputs[node.socket].io_type, inputs[node.socket].optional) == ("IMAGE", True)
     assert inputs["grid_images"].default == "[]"
-    grid_max = inputs["grid_max_images"]
-    assert (grid_max.default, grid_max.min, grid_max.max) == (node.cap, 1, node.cap)
 
 
 def _sent(node, **inputs):
@@ -237,10 +230,8 @@ def test_the_node_sends_a_connected_batch_and_not_the_grid(node, input_dir):
     import torch
 
     _write(input_dir / "a.png", (4, 4), (0, 0, 0))
-    _write(input_dir / "b.png", (4, 4), (0, 0, 0))
-    # Over grid_max_images, so reading the grid would raise.
-    sent = _sent(node, grid_images='["a.png", "b.png"]', grid_max_images=1,
-                 **{node.socket: torch.zeros(1, 8, 6, 3)})
+    # The second entry is missing, so reading the grid would raise.
+    sent = _sent(node, grid_images='["a.png", "gone.png"]', **{node.socket: torch.zeros(1, 8, 6, 3)})
     assert [_decoded(uri) for uri in sent] == [("data:image/jpeg;base64", "JPEG", (6, 8))]
 
 
@@ -255,11 +246,12 @@ def test_a_node_that_takes_no_image_sends_none_from_an_empty_grid(node, input_di
 
 
 @pytest.mark.parametrize("node", NODES, ids=repr)
-def test_more_grid_files_than_grid_max_images_names_both_counts(node, input_dir):
-    _write(input_dir / "a.png", (2, 2), (0, 0, 0))
-    _write(input_dir / "b.png", (2, 2), (0, 0, 0))
-    assert _refused(node, grid_images='["a.png", "b.png"]', grid_max_images=1) == (
-        "The grid holds 2 images but grid_max_images is 1; remove 1 or raise grid_max_images")
+def test_one_grid_file_over_the_cap_names_the_model_or_node(node, input_dir):
+    names = [f"{i}.png" for i in range(node.cap + 1)]
+    for name in names:
+        _write(input_dir / name, (2, 2), (0, 0, 0))
+    assert _refused(node, grid_images=json.dumps(names)) == (
+        f"The grid holds {node.cap + 1} images but {node.label} takes up to {node.cap} images; remove 1")
 
 
 @pytest.mark.parametrize("node", NODES, ids=repr)

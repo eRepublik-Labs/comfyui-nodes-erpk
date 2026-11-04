@@ -7,7 +7,7 @@ from io import BytesIO
 from comfy_api.latest import IO
 from .openai_api.client import OpenAIClient
 from ..utils.image_grid import (
-    NO_GRID_IMAGE, ModelCap, grid_cap_for, grid_inputs, load_grid_images, register_grid_caps, validate_grid,
+    NO_GRID_IMAGE, grid_input, load_grid_images, model_grid_cap, register_grid_caps, validate_grid,
 )
 
 IMAGE_MODELS = list(OpenAIClient.IMAGE_MODELS.keys())
@@ -21,7 +21,6 @@ EDIT_DEFAULT_MODEL = "gpt-image-2.5-sunburst"
 # One limit for every GPT Image model, "For GPT image models, you can provide up to 16 images":
 # https://developers.openai.com/api/reference/resources/images/methods/edit
 EDIT_GRID_CAPS = {"*": 16}
-EDIT_GRID_CAP = max(EDIT_GRID_CAPS.values())
 register_grid_caps("OpenAIImageEdit", EDIT_GRID_CAPS, model_widget="model")
 
 # Mainline (text/reasoning) models for the Responses API call. Each returned
@@ -550,12 +549,12 @@ class OpenAIImageResponses(IO.ComfyNode):
             raise ValueError(error_msg)
 
 
-def _grid_pngs(raw, max_images, model):
+def _grid_pngs(raw, model):
     """The grid's files as PNG bytes at their own size, in grid order.
 
     Re-encoded rather than sent as stored: the client labels every image image/png.
     """
-    pictures = load_grid_images(raw, max_images, ModelCap(model, grid_cap_for("OpenAIImageEdit", model)))
+    pictures = load_grid_images(raw, model_grid_cap("OpenAIImageEdit", model))
     if not pictures:
         raise ValueError(NO_GRID_IMAGE)
     pngs = []
@@ -692,12 +691,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                     optional=True,
                     tooltip="Compression level 0-100 (100 = least compression). Applied only to jpeg and webp.",
                 ),
-                *grid_inputs(
-                    EDIT_GRID_CAP,
-                    EDIT_GRID_CAP,
-                    "Most images the grid accepts; the selected model's own limit also applies. "
-                    "Every GPT Image edit model takes up to 16 images.",
-                ),
+                grid_input(),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -712,7 +706,7 @@ class OpenAIImageEdit(IO.ComfyNode):
     @classmethod
     def validate_inputs(cls, grid_images="[]"):
         # Only `grid_images` is named: ComfyUI skips its own type and range checks for
-        # every input named here, and grid_max_images keeps its min/max that way.
+        # every input named here.
         return validate_grid(grid_images)
 
     @classmethod
@@ -743,7 +737,6 @@ class OpenAIImageEdit(IO.ComfyNode):
             grid_pngs = await asyncio.to_thread(
                 _grid_pngs,
                 kwargs.get("grid_images", "[]"),
-                kwargs.get("grid_max_images", EDIT_GRID_CAP),
                 model,
             )
 

@@ -3,7 +3,7 @@
 
 from comfy_api.latest import IO
 
-from .image_grid import grid_inputs, load_grid_images, register_grid_caps, resolve_grid_images
+from .image_grid import GridCap, grid_cap_for, grid_input, load_grid_images, register_grid_caps, resolve_grid_images
 
 # The largest batch any edit node here accepts (Gemini Image Edit, 14).
 MAX_GRID_IMAGES = 14
@@ -29,19 +29,12 @@ class ImageGridLoader(IO.ComfyNode):
                 "Files are copied into ComfyUI's input folder; mixed sizes are letterboxed "
                 "with mid-grey onto the largest height and width."
             ),
-            inputs=grid_inputs(
-                MAX_GRID_IMAGES,
-                MAX_GRID_IMAGES,
-                "Most images the grid accepts. Seedream edit nodes take up to 10, "
-                "Gemini Image Edit up to 14.",
-            ),
+            inputs=[grid_input()],
             outputs=[IO.Image.Output(display_name="IMAGE")],
         )
 
     @classmethod
     def validate_inputs(cls, grid_images="[]"):
-        # grid_max_images stays out of this signature: naming it here would switch off
-        # ComfyUI's own min/max check for it. The cap is enforced in execute.
         import folder_paths
 
         try:
@@ -51,8 +44,8 @@ class ImageGridLoader(IO.ComfyNode):
         return True if paths else EMPTY_GRID
 
     @classmethod
-    def execute(cls, grid_images="[]", grid_max_images=MAX_GRID_IMAGES) -> IO.NodeOutput:
-        pictures = load_grid_images(grid_images, grid_max_images)
+    def execute(cls, grid_images="[]") -> IO.NodeOutput:
+        pictures = load_grid_images(grid_images, GridCap("Image Grid Loader", grid_cap_for("ImageGridLoader", None)))
         if not pictures:
             raise ValueError(EMPTY_GRID)
         return IO.NodeOutput(_letterbox_batch([_to_tensor(picture) for picture in pictures]))

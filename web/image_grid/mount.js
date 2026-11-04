@@ -6,15 +6,16 @@ import { MIN_NODE_WIDTH, TITLE_COUNT_COLOR, TITLE_COUNT_FULL_COLOR } from "./sty
 import { createImageGrid } from "./widget.js";
 
 /**
- * The node type must declare the `grid_images` and `grid_max_images` widgets
- * (utils/image_grid.py grid_inputs) as its last Python inputs.
+ * The node type must declare the `grid_images` widget (utils/image_grid.py
+ * grid_input) as its last Python input.
  * @param {any} nodeType
  * @param {import("./widget.js").GridIO} io
- * @param {{ socket?: string, caps?: import("./grid_list.js").GridCaps }} options `socket` names
- *   the input that, when linked, the node sends instead of the grid; `caps` is the node's
- *   entry from /erpk/grid_caps, absent for a node that registers none.
+ * @param {{ socket?: string, caps: import("./grid_list.js").GridCaps, nodeName: string }} options
+ *   `socket` names the input that, when linked, the node sends instead of the grid; `caps` is
+ *   the node's entry from /erpk/grid_caps; `nodeName` is what an over-cap notice names when the
+ *   node has no model choice.
  */
-export function installImageGrid(nodeType, io, { socket, caps }) {
+export function installImageGrid(nodeType, io, { socket, caps, nodeName }) {
     const origComputeSize = nodeType.prototype.computeSize;
     nodeType.prototype.computeSize = function () {
         const size = origComputeSize?.apply(this, arguments) ?? [MIN_NODE_WIDTH, 0];
@@ -24,7 +25,7 @@ export function installImageGrid(nodeType, io, { socket, caps }) {
     const onNodeCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function () {
         const r = onNodeCreated?.apply(this, arguments);
-        const grid = createImageGrid(this, io, caps);
+        const grid = createImageGrid(this, io, caps, nodeName);
         this._erpkImageGrid = grid;
         this.addDOMWidget("image_grid", "erpk_image_grid", grid.root, {
             serialize: false,

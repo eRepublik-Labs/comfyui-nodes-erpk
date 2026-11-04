@@ -3,7 +3,7 @@
 
 from comfy_api.latest import IO
 
-from ..utils.image_grid import grid_inputs, validate_grid
+from ..utils.image_grid import grid_cap_for, grid_input, register_grid_caps, validate_grid
 
 
 class QwenImageEditPlusNode(IO.ComfyNode):
@@ -52,8 +52,7 @@ class QwenImageEditPlusNode(IO.ComfyNode):
                                  tooltip="Wait for completion before returning response"),
                 IO.Boolean.Input("enable_base64_output", optional=True, default=False,
                                  tooltip="Return BASE64-encoded output instead of URL"),
-                *grid_inputs(cls.MAX_IMAGES, cls.MAX_IMAGES,
-                             "Most images the grid accepts. Qwen Image Edit Plus takes up to 3 reference images."),
+                grid_input(),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -87,9 +86,8 @@ class QwenImageEditPlusNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        images_param = input_image_list(reference_images, images, cls.MAX_IMAGES, model,
-                                        grid=kwargs.get("grid_images"),
-                                        grid_max=kwargs.get("grid_max_images"))
+        images_param = input_image_list(reference_images, images, grid_cap_for("QwenImageEditPlusNode", model), model,
+                                        grid=kwargs.get("grid_images"))
         if not images_param:
             raise ValueError(NO_INPUT_IMAGE)
 
@@ -116,3 +114,6 @@ class QwenImageEditPlusNode(IO.ComfyNode):
 
         result_images = imageurl2tensor(image_urls)
         return IO.NodeOutput(result_images)
+
+
+register_grid_caps("QwenImageEditPlusNode", {"*": QwenImageEditPlusNode.MAX_IMAGES}, model_widget="model")

@@ -13,7 +13,6 @@ OpenAI Image Edit has the same grid built in. There, each file goes to the API a
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| grid_max_images | Int | 14 | The most images the grid accepts, from 1 to 14. This node has no model, so this value alone sets the limit. Seedream edit nodes take up to 10 images and Gemini Image Edit takes up to 14. |
 | grid_images | String | `[]` | Hidden. The grid stores its ordered file list here as a JSON array of names in the `input` folder, for example `["cat.png", "pasted/dog.jpg"]`. |
 
 ## Output
@@ -31,7 +30,7 @@ The number on each cell is the image's position in the batch. Cell 1 is the firs
 - **Choose files…** in the empty grid, or the **+ Add** cell, opens a file picker that accepts more than one file at a time.
 - You can drop files from your file manager onto the grid.
 - The grid accepts PNG, JPG, and WEBP files. It skips other file types and says how many it skipped.
-- When you drop more files than the grid has free slots, it adds files up to `grid_max_images` and ignores the rest. The drop overlay shows how many free slots remain. It turns red when the grid is full.
+- The grid holds up to 14 files, the most any edit node here takes. Gemini Image Edit takes up to 14 images and the Seedream edit nodes up to 10. When you drop more files than the grid has free slots, it adds files up to that limit and ignores the rest. The drop overlay shows how many free slots remain. It turns red when the grid is full.
 - Drag a cell to reorder it. A green bar shows where it lands.
 - Hover a cell and click **×** to remove it.
 - **Clear all** empties the grid. Click **Undo** in the notice under the grid to bring the images back.
@@ -49,15 +48,15 @@ All images in an `IMAGE` batch must share one height and width. When the files d
 
 ## Errors
 
-Each error names what is at fault. ComfyUI reports the first three when you queue the prompt, before any node runs. It reports the `grid_max_images` error when this node runs.
+Each error names what is at fault. ComfyUI reports the first three when you queue the prompt, before any node runs. It reports the over-cap error when this node runs.
 
 - `Add at least one image`: the grid is empty.
 - `grid_images entry 2 not found in ComfyUI's input directory: 'cat.png'`: the file no longer exists under that name in `input`. The cell shows **Missing**.
 - `grid_images entry 1 is outside ComfyUI's input directory: '../cat.png'`: the entry is an absolute path, or it leaves the `input` folder through `..` or a symbolic link. The node only reads files inside `input`.
-- `The grid holds 12 images but grid_max_images is 10; remove 2 or raise grid_max_images`: you lowered `grid_max_images` below the number of images in the grid. The footer turns red when this happens.
+- `The grid holds 15 images but Image Grid Loader takes up to 14 images; remove 1`: the saved list holds more than 14 files, for example in a workflow edited by hand. The footer turns red when this happens.
 
 ## Notes
 
 - Images load as RGB. The node drops any alpha channel, and an animated file contributes its first frame.
 - The node applies EXIF orientation, so a photo taken in portrait loads upright.
-- The node has no seed. ComfyUI reuses its cached output until the file list or `grid_max_images` changes. If you replace a file in `input` under the same name outside ComfyUI, change the list or restart ComfyUI to load the new file.
+- The node has no seed. ComfyUI reuses its cached output until the file list changes. If you replace a file in `input` under the same name outside ComfyUI, change the list or restart ComfyUI to load the new file.

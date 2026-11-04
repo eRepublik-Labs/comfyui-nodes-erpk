@@ -400,7 +400,7 @@ class TestOutputFormat:
     }
     WIDGETS_AFTER = {
         "OpenAIImageGeneration": [],
-        "OpenAIImageEdit": ["grid_images", "grid_max_images"],
+        "OpenAIImageEdit": ["grid_images"],
     }
 
     @pytest.mark.parametrize("class_name", sorted(WIDGETS_BEFORE))

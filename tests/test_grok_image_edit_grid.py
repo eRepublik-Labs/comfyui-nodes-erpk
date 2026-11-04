@@ -29,16 +29,14 @@ def frontend_widget_order(schema):
 def test_grid_widgets_follow_every_saved_widget():
     assert frontend_widget_order(GrokImageEdit.define_schema()) == [
         "prompt", "model", "aspect_ratio", "resolution", "n", "quality",
-        "grid_images", "grid_max_images",
+        "grid_images",
     ]
 
 
-def test_image_socket_is_optional_and_the_grid_caps_at_five():
+def test_image_socket_is_optional_and_the_grid_starts_empty():
     inputs = {i.id: i for i in GrokImageEdit.define_schema().inputs}
     assert inputs["image"].optional is True
     assert inputs["grid_images"].default == "[]"
-    cap = inputs["grid_max_images"]
-    assert (cap.default, cap.min, cap.max) == (5, 1, 5)
 
 
 @pytest.fixture
@@ -105,15 +103,6 @@ def test_grid_files_reach_the_api_one_data_uri_each_at_their_own_size_in_grid_or
     ]
 
 
-def test_more_files_than_grid_max_images_names_both_counts(input_dir, sent):
-    for name in ("a.png", "b.png", "c.png"):
-        _write(input_dir / name, (2, 2), (0, 0, 0))
-    with pytest.raises(ValueError) as exc:
-        _edit(grid_images='["a.png", "b.png", "c.png"]', grid_max_images=2)
-    assert str(exc.value) == "The grid holds 3 images but grid_max_images is 2; remove 1 or raise grid_max_images"
-    assert sent == {}
-
-
 def test_an_entry_outside_the_input_folder_is_refused(input_dir, sent):
     _write(input_dir.parent / "outside.png", (2, 2), (0, 0, 0))
     with pytest.raises(ValueError) as exc:
@@ -125,9 +114,8 @@ def test_an_entry_outside_the_input_folder_is_refused(input_dir, sent):
 def test_a_connected_image_is_sent_and_the_grid_not_read(input_dir, sent):
     torch = pytest.importorskip("torch")
     _write(input_dir / "a.png", (5, 3), (255, 0, 0))
-    _write(input_dir / "b.png", (5, 3), (255, 0, 0))
-    # Over its cap, so reading the grid would raise.
-    _edit_until_sent(image=torch.zeros(1, 8, 6, 3), grid_images='["a.png", "b.png"]', grid_max_images=1)
+    # The second entry is missing, so reading the grid would raise.
+    _edit_until_sent(image=torch.zeros(1, 8, 6, 3), grid_images='["a.png", "gone.png"]')
     assert [_decoded(uri) for uri in sent["image_urls"]] == [("data:image/jpeg;base64", "JPEG", (6, 8))]
 
 
@@ -145,6 +133,6 @@ def test_more_grid_files_than_xai_takes_are_refused_not_dropped(input_dir, sent)
     for name in names:
         _write(input_dir / name, (2, 2), (0, 0, 0))
     with pytest.raises(ValueError) as exc:
-        _edit(grid_images=json.dumps(names), grid_max_images=6)
-    assert str(exc.value) == "Grok Image Edit takes at most 5 source images; got 6. Trim the batch before this node."
+        _edit(model="grok-imagine-image-2.0", grid_images=json.dumps(names))
+    assert str(exc.value) == "The grid holds 6 images but grok-imagine-image-2.0 takes up to 5 images; remove 1"
     assert sent == {}

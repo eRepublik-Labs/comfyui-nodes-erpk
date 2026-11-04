@@ -3,7 +3,7 @@
 
 from comfy_api.latest import IO
 
-from ..utils.image_grid import grid_inputs, validate_grid
+from ..utils.image_grid import grid_cap_for, grid_input, register_grid_caps, validate_grid
 
 
 class QwenImageMaxEditNode(IO.ComfyNode):
@@ -39,8 +39,7 @@ class QwenImageMaxEditNode(IO.ComfyNode):
                              tooltip="Image height (256 to 1536)"),
                 IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647, control_after_generate="randomize",
                              tooltip="Random seed for reproducibility (-1 for random)"),
-                *grid_inputs(cls.MAX_IMAGES, cls.MAX_IMAGES,
-                             "Most images the grid accepts. Qwen Image Max Edit takes up to 6 reference images."),
+                grid_input(),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -72,9 +71,8 @@ class QwenImageMaxEditNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        images_param = input_image_list(reference_images, images, cls.MAX_IMAGES, "Qwen Image Max Edit",
-                                        grid=kwargs.get("grid_images"),
-                                        grid_max=kwargs.get("grid_max_images"))
+        images_param = input_image_list(reference_images, images, grid_cap_for("QwenImageMaxEditNode", None), "Qwen Image Max Edit",
+                                        grid=kwargs.get("grid_images"))
         if not images_param:
             raise ValueError(NO_INPUT_IMAGE)
 
@@ -96,3 +94,6 @@ class QwenImageMaxEditNode(IO.ComfyNode):
 
         result_images = imageurl2tensor(image_urls)
         return IO.NodeOutput(result_images)
+
+
+register_grid_caps("QwenImageMaxEditNode", {"*": QwenImageMaxEditNode.MAX_IMAGES}, model_widget=None)

@@ -8,7 +8,9 @@ from typing import List
 from comfy_api.latest import IO
 
 from .grok_api.client import GrokClient
-from ..utils.image_grid import NO_GRID_IMAGE, grid_inputs, load_grid_images, validate_grid
+from ..utils.image_grid import (
+    NO_GRID_IMAGE, grid_input, load_grid_images, model_grid_cap, register_grid_caps, validate_grid,
+)
 from ..utils.safe_fetch import fetch_remote_bytes
 
 # Current Grok chat/code models per the catalog embedded in docs.x.ai/docs/models.
@@ -441,6 +443,9 @@ class GrokImageGeneration(IO.ComfyNode):
             raise ValueError(f"Grok image generation failed: {e}")
 
 
+register_grid_caps("GrokImageEdit", {"*": GrokClient.MAX_EDIT_IMAGES}, model_widget="model")
+
+
 class GrokImageEdit(IO.ComfyNode):
     """Edits one or more input images using a text prompt via xAI's Grok image model."""
 
@@ -512,12 +517,7 @@ class GrokImageEdit(IO.ComfyNode):
                         "medium for edits. Billed at the quality served."
                     ),
                 ),
-                *grid_inputs(
-                    GrokClient.MAX_EDIT_IMAGES,
-                    GrokClient.MAX_EDIT_IMAGES,
-                    f"Most images the grid accepts. grok-imagine-image-2.0 takes up to "
-                    f"{GrokClient.MAX_EDIT_IMAGES} source images.",
-                ),
+                grid_input(),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -527,7 +527,7 @@ class GrokImageEdit(IO.ComfyNode):
     @classmethod
     def validate_inputs(cls, grid_images="[]"):
         # Only `grid_images` is named: ComfyUI skips its own type and range checks
-        # for every input named here, and grid_max_images keeps its min/max that way.
+        # for every input named here.
         return validate_grid(grid_images)
 
     @classmethod
@@ -550,7 +550,7 @@ class GrokImageEdit(IO.ComfyNode):
             sources = await asyncio.to_thread(
                 load_grid_images,
                 kwargs.get("grid_images", "[]"),
-                kwargs.get("grid_max_images", GrokClient.MAX_EDIT_IMAGES),
+                model_grid_cap("GrokImageEdit", model),
             )
             if not sources:
                 raise ValueError(NO_GRID_IMAGE)

@@ -28,15 +28,14 @@ def test_grid_widgets_follow_every_saved_widget():
     assert frontend_widget_order(OpenAIImageEdit.define_schema()) == [
         "prompt", "seed", "model", "size", "custom_width", "custom_height",
         "quality", "moderation", "n", "background", "input_fidelity",
-        "output_format", "output_compression", "grid_images", "grid_max_images",
+        "output_format", "output_compression", "grid_images",
     ]
 
 
-def test_image_socket_is_optional_and_the_grid_holds_sixteen_by_default():
+def test_image_socket_is_optional_and_the_grid_starts_empty():
     inputs = {i.id: i for i in OpenAIImageEdit.define_schema().inputs}
     assert inputs["image"].optional is True
     assert inputs["grid_images"].default == "[]"
-    assert (inputs["grid_max_images"].default, inputs["grid_max_images"].min, inputs["grid_max_images"].max) == (16, 1, 16)
 
 
 @pytest.fixture
@@ -94,19 +93,6 @@ def test_grid_files_reach_the_api_one_png_each_at_their_own_size_in_grid_order(i
     ]
 
 
-def test_more_files_than_max_images_names_both_counts(input_dir):
-    for name in ("a.png", "b.png", "c.png"):
-        _write(input_dir / name, (2, 2), (0, 0, 0))
-    seen = {}
-    with pytest.raises(ValueError) as exc:
-        asyncio.run(OpenAIImageEdit.execute(
-            prompt="add a hat", client=_recording_client(seen),
-            grid_images='["a.png", "b.png", "c.png"]', grid_max_images=2,
-        ))
-    assert str(exc.value) == "The grid holds 3 images but grid_max_images is 2; remove 1 or raise grid_max_images"
-    assert seen == {}
-
-
 @pytest.mark.parametrize("model", ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"])
 def test_more_files_than_the_model_takes_names_the_model(input_dir, model):
     names = [f"{i}.png" for i in range(17)]
@@ -116,9 +102,9 @@ def test_more_files_than_the_model_takes_names_the_model(input_dir, model):
     with pytest.raises(ValueError) as exc:
         asyncio.run(OpenAIImageEdit.execute(
             prompt="add a hat", client=_recording_client(seen), model=model,
-            grid_images=json.dumps(names), grid_max_images=16,
+            grid_images=json.dumps(names),
         ))
-    assert str(exc.value) == f"The grid holds 17 images but {model} takes up to 16; remove 1"
+    assert str(exc.value) == f"The grid holds 17 images but {model} takes up to 16 images; remove 1"
     assert seen == {}
 
 
@@ -136,10 +122,9 @@ def test_an_entry_outside_the_input_folder_is_refused(input_dir):
 def test_a_connected_image_is_sent_and_the_grid_not_read(input_dir):
     torch = pytest.importorskip("torch")
     _write(input_dir / "a.png", (5, 3), (255, 0, 0))
-    _write(input_dir / "b.png", (5, 3), (255, 0, 0))
     seen = {}
-    # Over its cap, so reading the grid would raise.
-    _edit(seen, image=torch.zeros(1, 8, 6, 3), grid_images='["a.png", "b.png"]', grid_max_images=1)
+    # The second entry is missing, so reading the grid would raise.
+    _edit(seen, image=torch.zeros(1, 8, 6, 3), grid_images='["a.png", "gone.png"]')
     assert _decoded(seen["image_data"]) == ("PNG", (6, 8), (0, 0, 0))
 
 

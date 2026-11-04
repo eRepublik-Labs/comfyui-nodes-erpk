@@ -3,7 +3,7 @@
 
 from comfy_api.latest import IO
 
-from ..utils.image_grid import grid_inputs, validate_grid
+from ..utils.image_grid import grid_cap_for, grid_input, register_grid_caps, validate_grid
 
 
 class QwenImage30EditNode(IO.ComfyNode):
@@ -52,8 +52,7 @@ class QwenImage30EditNode(IO.ComfyNode):
                              control_after_generate="randomize",
                              tooltip="Generation seed, sent to the API. A fixed seed reproduces the same result and "
                                      "lets ComfyUI reuse the cached output; -1 generates a new one each queue."),
-                *grid_inputs(cls.MAX_IMAGES, cls.MAX_IMAGES,
-                             "Most images the grid accepts. Qwen Image 3.0 takes up to 3 reference images."),
+                grid_input(),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -85,9 +84,8 @@ class QwenImage30EditNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        images_param = input_image_list(reference_images, reference_images_url, cls.MAX_IMAGES, model,
-                                        grid=kwargs.get("grid_images"),
-                                        grid_max=kwargs.get("grid_max_images"))
+        images_param = input_image_list(reference_images, reference_images_url, grid_cap_for("QwenImage30EditNode", model), model,
+                                        grid=kwargs.get("grid_images"))
         if not images_param:
             raise ValueError(NO_INPUT_IMAGE)
 
@@ -110,3 +108,6 @@ class QwenImage30EditNode(IO.ComfyNode):
 
         images = imageurl2tensor(image_urls)
         return IO.NodeOutput(images)
+
+
+register_grid_caps("QwenImage30EditNode", {"*": QwenImage30EditNode.MAX_IMAGES}, model_widget="model")

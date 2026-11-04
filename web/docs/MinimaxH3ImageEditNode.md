@@ -18,7 +18,6 @@ Re-renders the subject of 1 to 9 reference images into a new scene, outfit, pose
 | output_format | Combo | jpeg | jpeg, png or webp (optional) |
 | seed | Int | -1 | Generation seed, sent to the API (optional) |
 | loras | MINIMAX_H3_LORAS | (none) | LoRA stack from the MiniMax H3 LoRA Stack node. When connected the call goes to the -lora twin (optional) |
-| grid_max_images | Int | 9 | The most images the grid accepts, from 1 to 9 (optional) |
 | grid_images | String | `[]` | Hidden. The grid stores its ordered file list here as a JSON array of names in the `input` folder |
 
 ## Output
@@ -45,7 +44,7 @@ With nothing connected to `images`, the node sends the files on its grid. Pick o
 
 - Each file goes to the API as its own image, at its own size, in cell order.
 - The node applies EXIF orientation, drops any alpha channel, and sends each file as JPEG.
-- The grid holds up to 9 files, the model's limit. Lower `grid_max_images` to cap it further.
+- The grid holds up to 9 files, the model's limit.
 - The grid wins over `image_urls`, so the node reads the URL text only when the grid is empty.
 - When you queue, ComfyUI checks that every grid file exists in the `input` folder, even with `images` connected.
 - `Connect an image or add images to the grid, or enter at least one image URL` means `images`, the grid and `image_urls` are all empty.

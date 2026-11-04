@@ -10,7 +10,7 @@ from typing import List, Optional, Union
 from collections.abc import Iterable
 from pydantic import BaseModel
 
-from ...utils.image_grid import NO_GRID_IMAGE, load_grid_images
+from ...utils.image_grid import NO_GRID_IMAGE, GridCap, load_grid_images
 
 
 def imageurl2tensor(image_urls: List[str]):
@@ -282,14 +282,14 @@ NO_INPUT_IMAGE = f"{NO_GRID_IMAGE}, or enter at least one image URL"
 
 
 def input_image_list(images, image_url, max_count: int, model: str,
-                     grid: Optional[str] = None, grid_max: Optional[int] = None) -> Optional[List[str]]:
+                     grid: Optional[str] = None) -> Optional[List[str]]:
     """The images to send to an edit endpoint, from an IMAGE batch, the image grid or URL text.
 
     A connected IMAGE batch wins, each slice becomes one base64 data URI, and
     the grid is not read. Next come the grid's files: `grid` is the JSON list of
     filenames the grid writes, None for a node without one. Each file becomes a
-    data URI at its own size, in grid order, and more than `grid_max` files
-    (default `max_count`) is an error. Otherwise `image_url` is read as one or
+    data URI at its own size, in grid order, and more than `max_count` files
+    is an error. Otherwise `image_url` is read as one or
     more URLs separated by newlines or commas, or as a list of URLs when it
     comes linked from WaveSpeed Upload Image's `all_image_urls`. Returns None
     when none of them holds an image. More than `max_count` images is an error
@@ -299,17 +299,16 @@ def input_image_list(images, image_url, max_count: int, model: str,
     if images is not None:
         sent = images_to_data_uris(images)
     else:
-        sent = (_grid_data_uris(grid, max_count if grid_max is None else grid_max)
-                or _url_list(image_url))
+        sent = _grid_data_uris(grid, GridCap(model, max_count)) or _url_list(image_url)
     if sent and len(sent) > max_count:
         raise ValueError(f"{model} accepts at most {max_count} input images, got {len(sent)}")
     return sent
 
 
-def _grid_data_uris(grid, grid_max) -> List[str]:
+def _grid_data_uris(grid, cap: GridCap) -> List[str]:
     if grid is None:
         return []
-    return [image_to_data_uri(picture) for picture in load_grid_images(grid, grid_max)]
+    return [image_to_data_uri(picture) for picture in load_grid_images(grid, cap)]
 
 
 def _url_list(image_url) -> Optional[List[str]]:

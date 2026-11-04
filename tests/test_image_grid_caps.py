@@ -1,17 +1,22 @@
 # ABOUTME: Tests for the per-model image grid caps: the registry each grid node fills at import,
-# ABOUTME: the over-cap errors that name the model or the grid_max_images widget, and the /erpk/grid_caps route.
+# ABOUTME: the over-cap error that names the model or node setting the cap, and the /erpk/grid_caps route.
 
 import asyncio
+import pathlib
+import re
 import sys
 import types
 
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
-import erpk.openai.image_nodes  # noqa: F401  (registers OpenAIImageEdit before any snapshot)
-import erpk.utils.image_grid_loader  # noqa: F401  (registers ImageGridLoader)
+import erpk.gemini  # noqa: F401  (each grid node module registers its caps on import)
+import erpk.grok  # noqa: F401
+import erpk.openai  # noqa: F401
+import erpk.utils  # noqa: F401
+import erpk.wavespeed  # noqa: F401
 from erpk.utils import image_grid
-from erpk.utils.image_grid import ModelCap, grid_cap_for, load_grid_images, register_grid_caps
+from erpk.utils.image_grid import GridCap, grid_cap_for, load_grid_images, register_grid_caps
 from tests.test_shared_workflow_routes import routes_app  # noqa: F401  (pytest fixture)
 
 
@@ -74,21 +79,18 @@ def five_files(monkeypatch, tmp_path):
     return '["' + '", "'.join(names) + '"]'
 
 
-@pytest.mark.parametrize("max_images", [10, 4])
-def test_a_model_cap_at_or_below_the_widget_names_the_model(five_files, max_images):
+@pytest.mark.parametrize("name,cap,message", [
+    ("gpt-image-2.5-flare", 4, "The grid holds 5 images but gpt-image-2.5-flare takes up to 4 images; remove 1"),
+    ("Seedream", 1, "The grid holds 5 images but Seedream takes up to 1 image; remove 4"),
+])
+def test_a_grid_over_its_cap_names_what_sets_the_cap(five_files, name, cap, message):
     with pytest.raises(ValueError) as exc:
-        load_grid_images(five_files, max_images, model_cap=ModelCap("gpt-image-2.5-flare", 4))
-    assert str(exc.value) == "The grid holds 5 images but gpt-image-2.5-flare takes up to 4; remove 1"
+        load_grid_images(five_files, GridCap(name, cap))
+    assert str(exc.value) == message
 
 
-def test_a_widget_below_the_model_cap_names_the_widget(five_files):
-    with pytest.raises(ValueError) as exc:
-        load_grid_images(five_files, 3, model_cap=ModelCap("gpt-image-2.5-flare", 4))
-    assert str(exc.value) == "The grid holds 5 images but grid_max_images is 3; remove 2 or raise grid_max_images"
-
-
-def test_a_grid_within_both_caps_loads_every_image(five_files):
-    pictures = load_grid_images(five_files, 5, model_cap=ModelCap("gpt-image-2.5-flare", 5))
+def test_a_grid_at_its_cap_loads_every_image(five_files):
+    pictures = load_grid_images(five_files, GridCap("gpt-image-2.5-flare", 5))
     assert [(p.mode, p.size) for p in pictures] == [("RGB", (2, 2))] * 5
 
 
@@ -119,3 +121,35 @@ def test_the_route_serves_the_openai_edit_and_loader_caps(routes_app):
     assert status == 200
     assert body["OpenAIImageEdit"] == {"model_widget": "model", "caps": {"*": 16}}
     assert body["ImageGridLoader"] == {"model_widget": None, "caps": {"*": 14}}
+
+
+GRID_NODE_IDS = re.findall(
+    r'nodeId: "(\w+)"', (pathlib.Path(__file__).parents[1] / "web" / "image_grid.js").read_text())
+
+
+def _schema_of(node_id):
+    import erpk.gemini, erpk.grok, erpk.openai, erpk.utils, erpk.wavespeed  # noqa: E401
+
+    for module in (erpk.gemini, erpk.grok, erpk.openai, erpk.utils, erpk.wavespeed):
+        for node in module.NODES:
+            schema = node.define_schema()
+            if schema.node_id == node_id:
+                return schema
+    raise AssertionError(f"No node class has node_id {node_id}")
+
+
+def test_every_grid_node_in_the_frontend_has_caps():
+    assert len(GRID_NODE_IDS) == 18
+    assert sorted(set(GRID_NODE_IDS) - set(image_grid.GRID_CAPS)) == []
+
+
+@pytest.mark.parametrize("node_id", GRID_NODE_IDS)
+def test_a_model_widget_is_a_combo_on_the_node_and_lists_every_capped_model(node_id):
+    entry = image_grid.GRID_CAPS[node_id]
+    inputs = {i.id: i for i in _schema_of(node_id).inputs}
+    if entry["model_widget"] is None:
+        assert "model" not in inputs
+        return
+    combo = inputs[entry["model_widget"]]
+    assert combo.io_type == "COMBO"
+    assert sorted(set(entry["caps"]) - {"*"} - set(combo.options)) == []

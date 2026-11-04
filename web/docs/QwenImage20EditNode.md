@@ -20,7 +20,6 @@ Image editing with multiple reference images using Qwen Image 2.0 models. Accept
 | output_format | Combo | jpeg | Output image format: jpeg, png, webp (optional) |
 | enable_sync_mode | Boolean | false | Wait for completion before returning response (optional) |
 | enable_base64_output | Boolean | false | Return BASE64-encoded output instead of URL (optional) |
-| grid_max_images | Int | 3 | The most images the grid accepts, from 1 to 3 (optional) |
 | grid_images | String | `[]` | Hidden. The grid stores its ordered file list here as a JSON array of names in the `input` folder |
 
 ## Output
@@ -35,7 +34,7 @@ With nothing connected to `reference_images`, the node sends the files on its gr
 
 - Each file goes to the API as its own image, at its own size, in cell order.
 - The node applies EXIF orientation, drops any alpha channel, and sends each file as JPEG.
-- The grid holds up to 3 files, the model's limit. Lower `grid_max_images` to cap it further.
+- The grid holds up to 3 files, the model's limit.
 - The grid wins over `images`, so the node reads the URL text only when the grid is empty.
 - When you queue, ComfyUI checks that every grid file exists in the `input` folder, even with `reference_images` connected.
 - `Connect an image or add images to the grid, or enter at least one image URL` means `reference_images`, the grid and `images` are all empty.

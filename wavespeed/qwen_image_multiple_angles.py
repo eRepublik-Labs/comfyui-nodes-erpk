@@ -3,7 +3,7 @@
 
 from comfy_api.latest import IO
 
-from ..utils.image_grid import grid_inputs, validate_grid
+from ..utils.image_grid import grid_cap_for, grid_input, register_grid_caps, validate_grid
 
 
 class QwenImageMultipleAnglesNode(IO.ComfyNode):
@@ -54,8 +54,7 @@ class QwenImageMultipleAnglesNode(IO.ComfyNode):
                                  tooltip="Wait for completion before returning response"),
                 IO.Boolean.Input("enable_base64_output", optional=True, default=False,
                                  tooltip="Return BASE64-encoded output instead of URL"),
-                *grid_inputs(cls.MAX_IMAGES, cls.MAX_IMAGES,
-                             "Most images the grid accepts. Qwen Image Multiple Angles takes up to 3 reference images."),
+                grid_input(),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -86,9 +85,8 @@ class QwenImageMultipleAnglesNode(IO.ComfyNode):
             from .nodes import WaveSpeedAIAPIClient
             client = WaveSpeedAIAPIClient.execute()[0]
 
-        images_list = input_image_list(reference_images, images, cls.MAX_IMAGES, "Qwen Image Multiple Angles",
-                                       grid=kwargs.get("grid_images"),
-                                       grid_max=kwargs.get("grid_max_images"))
+        images_list = input_image_list(reference_images, images, grid_cap_for("QwenImageMultipleAnglesNode", None), "Qwen Image Multiple Angles",
+                                       grid=kwargs.get("grid_images"))
         if not images_list:
             raise ValueError(NO_INPUT_IMAGE)
 
@@ -124,3 +122,6 @@ class QwenImageMultipleAnglesNode(IO.ComfyNode):
 
         result_images = imageurl2tensor(image_urls)
         return IO.NodeOutput(result_images)
+
+
+register_grid_caps("QwenImageMultipleAnglesNode", {"*": QwenImageMultipleAnglesNode.MAX_IMAGES}, model_widget=None)

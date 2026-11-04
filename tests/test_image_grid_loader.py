@@ -1,6 +1,7 @@
 # ABOUTME: Tests for ImageGridLoader: parsing the grid's filename list, the input/ containment
-# ABOUTME: guard, the grid_max_images cap, and batching mixed-size files into one IMAGE tensor.
+# ABOUTME: guard, the node's image cap, and batching mixed-size files into one IMAGE tensor.
 
+import json
 import sys
 import types
 
@@ -20,10 +21,8 @@ def input_dir(monkeypatch, tmp_path):
     return inp
 
 
-def test_the_grid_holds_fourteen_by_default():
-    inputs = {i.id: i for i in ImageGridLoader.define_schema().inputs}
-    assert (inputs["grid_max_images"].default, inputs["grid_max_images"].min,
-            inputs["grid_max_images"].max) == (14, 1, 14)
+def test_the_grid_list_is_the_only_input():
+    assert [(i.id, i.default) for i in ImageGridLoader.define_schema().inputs] == [("grid_images", "[]")]
 
 
 def test_empty_list_resolves_to_no_files(input_dir):
@@ -33,7 +32,7 @@ def test_empty_list_resolves_to_no_files(input_dir):
 def test_loader_rejects_an_empty_grid_before_and_during_the_run(input_dir):
     assert ImageGridLoader.validate_inputs(grid_images="[]") == "Add at least one image"
     with pytest.raises(ValueError) as exc:
-        ImageGridLoader.execute(grid_images="[]", grid_max_images=10)
+        ImageGridLoader.execute(grid_images="[]")
     assert str(exc.value) == "Add at least one image"
 
 
@@ -121,16 +120,17 @@ def test_names_resolve_in_order_including_subfolder_entries(input_dir):
     assert paths == [str(real / "b.png"), str(real / "pasted" / "a.png")]
 
 
-def test_more_images_than_max_images_is_rejected(input_dir):
-    for name in ("a.png", "b.png", "c.png"):
+def test_more_images_than_the_node_takes_is_rejected(input_dir):
+    names = [f"{i}.png" for i in range(15)]
+    for name in names:
         _write_png(input_dir / name, (2, 2), (0, 0, 0))
     with pytest.raises(ValueError) as exc:
-        ImageGridLoader.execute(grid_images='["a.png", "b.png", "c.png"]', grid_max_images=2)
-    assert str(exc.value) == "The grid holds 3 images but grid_max_images is 2; remove 1 or raise grid_max_images"
+        ImageGridLoader.execute(grid_images=json.dumps(names))
+    assert str(exc.value) == "The grid holds 15 images but Image Grid Loader takes up to 14 images; remove 1"
 
 
-def _output(images, max_images=10):
-    return ImageGridLoader.execute(grid_images=images, grid_max_images=max_images)[0]
+def _output(images):
+    return ImageGridLoader.execute(grid_images=images)[0]
 
 
 def test_same_size_images_batch_in_list_order(input_dir):

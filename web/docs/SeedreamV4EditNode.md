@@ -19,7 +19,6 @@ Edits images based on text prompts using ByteDance's Seedream V4 Edit model. Acc
 | show_aspect_ratio | Boolean | true | Show aspect ratio in node title (optional) |
 | enable_sync_mode | Boolean | false | Wait for result before returning response (optional) |
 | enable_base64_output | Boolean | false | Return BASE64 encoded output instead of URLs (optional) |
-| grid_max_images | Int | 10 | The most images the grid accepts, from 1 to 10 (optional) |
 | grid_images | String | `[]` | Hidden. The grid stores its ordered file list here as a JSON array of names in the `input` folder |
 
 ## Output
@@ -34,7 +33,7 @@ With nothing connected to `images`, the node sends the files on its grid. Pick o
 
 - Each file goes to the API as its own image, at its own size, in cell order.
 - The node applies EXIF orientation, drops any alpha channel, and sends each file as JPEG.
-- The grid holds up to 10 files, the model's limit. Lower `grid_max_images` to cap it further.
+- The grid holds up to 10 files, the model's limit.
 - The grid wins over `image_url`, so the node reads the URL text only when the grid is empty.
 - When you queue, ComfyUI checks that every grid file exists in the `input` folder, even with `images` connected.
 - `Connect an image or add images to the grid, or enter at least one image URL` means `images`, the grid and `image_url` are all empty.

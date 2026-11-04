@@ -8,7 +8,9 @@ import math
 from comfy_api.latest import IO
 
 from .gemini_api.client import GeminiClient, raise_if_cut_off, stop_reason
-from ..utils.image_grid import NO_GRID_IMAGE, grid_inputs, load_grid_images, validate_grid
+from ..utils.image_grid import (
+    NO_GRID_IMAGE, grid_input, load_grid_images, model_grid_cap, register_grid_caps, validate_grid,
+)
 
 # Degenerate-box floor for detections, mirroring utils/regional_prompt's
 # MIN_REGION_EXTENT (the regions contract). It is duplicated rather than imported
@@ -1396,7 +1398,8 @@ class GeminiImageGeneration(IO.ComfyNode):
             raise ValueError(error_msg)
 
 
-EDIT_GRID_CAP = 14
+# Gemini 3 Pro takes up to 14 reference images.
+register_grid_caps("GeminiImageEdit", {"*": 14}, model_widget="model")
 
 
 class GeminiImageEdit(IO.ComfyNode):
@@ -1495,11 +1498,7 @@ class GeminiImageEdit(IO.ComfyNode):
                     control_after_generate="randomize",
                     tooltip="Seed for reproducible outputs. Randomizes by default.",
                 ),
-                *grid_inputs(
-                    EDIT_GRID_CAP,
-                    EDIT_GRID_CAP,
-                    "Most images the grid accepts. Gemini 3 Pro takes up to 14 reference images.",
-                ),
+                grid_input(),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -1515,7 +1514,7 @@ class GeminiImageEdit(IO.ComfyNode):
     @classmethod
     def validate_inputs(cls, grid_images="[]"):
         # Only `grid_images` is named: ComfyUI skips its own type and range checks for
-        # every input named here, and grid_max_images keeps its min/max that way.
+        # every input named here.
         return validate_grid(grid_images)
 
     @classmethod
@@ -1543,7 +1542,7 @@ class GeminiImageEdit(IO.ComfyNode):
             grid_images = await asyncio.to_thread(
                 load_grid_images,
                 kwargs.get("grid_images", "[]"),
-                kwargs.get("grid_max_images", EDIT_GRID_CAP),
+                model_grid_cap("GeminiImageEdit", model),
             )
             if not grid_images:
                 raise ValueError(NO_GRID_IMAGE)

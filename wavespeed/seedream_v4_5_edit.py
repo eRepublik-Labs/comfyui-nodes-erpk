@@ -3,10 +3,11 @@
 
 from comfy_api.latest import IO
 
-from ..utils.image_grid import grid_inputs, validate_grid
+from ..utils.image_grid import grid_cap_for, grid_input, register_grid_caps, validate_grid
 
 # WaveSpeed accepts up to 10 input images on every Seedream edit endpoint.
 MAX_INPUT_IMAGES = 10
+register_grid_caps("SeedreamV4_5EditNode", {"*": MAX_INPUT_IMAGES}, model_widget=None)
 from .seedream_v4_5 import SEEDREAM_V4_5_SIZE_PRESETS
 
 
@@ -51,8 +52,7 @@ class SeedreamV4_5EditNode(IO.ComfyNode):
                 IO.Int.Input("seed", default=-1, min=-1, max=2**31 - 1,
                              control_after_generate="randomize",
                              tooltip="Seed for cache control. Randomizes by default."),
-                *grid_inputs(MAX_INPUT_IMAGES, MAX_INPUT_IMAGES,
-                             "Most images the grid accepts. Seedream takes up to 10 input images."),
+                grid_input(),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -85,9 +85,8 @@ class SeedreamV4_5EditNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        images_param = input_image_list(images, image_url, MAX_INPUT_IMAGES, "Seedream",
-                                        grid=kwargs.get("grid_images"),
-                                        grid_max=kwargs.get("grid_max_images"))
+        images_param = input_image_list(images, image_url, grid_cap_for("SeedreamV4_5EditNode", None), "Seedream",
+                                        grid=kwargs.get("grid_images"))
         if images_param is None:
             raise ValueError(NO_INPUT_IMAGE)
 

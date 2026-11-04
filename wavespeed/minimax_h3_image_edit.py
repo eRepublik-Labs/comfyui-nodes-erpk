@@ -3,7 +3,7 @@
 
 from comfy_api.latest import IO
 
-from ..utils.image_grid import grid_inputs, validate_grid
+from ..utils.image_grid import grid_cap_for, grid_input, register_grid_caps, validate_grid
 
 
 class MinimaxH3ImageEditNode(IO.ComfyNode):
@@ -49,8 +49,7 @@ class MinimaxH3ImageEditNode(IO.ComfyNode):
                              tooltip="Generation seed, sent to the API. A fixed seed reproduces the same result and lets ComfyUI reuse the cached output; -1 generates a new one each queue."),
                 IO.Custom("MINIMAX_H3_LORAS").Input("loras", optional=True,
                     tooltip="LoRA stack from the MiniMax H3 LoRA Stack node. When connected, the call goes to the endpoint's -lora twin (+$0.015 per image)."),
-                *grid_inputs(cls.MAX_IMAGES, cls.MAX_IMAGES,
-                             "Most images the grid accepts. MiniMax H3 takes up to 9 reference images."),
+                grid_input(),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -82,9 +81,8 @@ class MinimaxH3ImageEditNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        images_value = input_image_list(images, image_urls, cls.MAX_IMAGES, "MiniMax H3 Image Edit",
-                                        grid=kwargs.get("grid_images"),
-                                        grid_max=kwargs.get("grid_max_images"))
+        images_value = input_image_list(images, image_urls, grid_cap_for("MinimaxH3ImageEditNode", None), "MiniMax H3 Image Edit",
+                                        grid=kwargs.get("grid_images"))
         if not images_value:
             raise ValueError(NO_INPUT_IMAGE)
 
@@ -107,3 +105,6 @@ class MinimaxH3ImageEditNode(IO.ComfyNode):
 
         images = imageurl2tensor(image_urls)
         return IO.NodeOutput(images)
+
+
+register_grid_caps("MinimaxH3ImageEditNode", {"*": MinimaxH3ImageEditNode.MAX_IMAGES}, model_widget=None)

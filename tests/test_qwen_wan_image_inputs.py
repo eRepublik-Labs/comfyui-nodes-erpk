@@ -30,8 +30,8 @@ SINGLE_NODES = [
 # Widget order as saved in workflows before the IMAGE sockets existed, captured
 # from these nodes on main. ComfyUI lists required widgets before optional ones,
 # so flipping a widget's optional flag would misplace saved values. The
-# multi-image nodes then gained the image grid's two inputs, appended last.
-GRID = ["grid_images", "grid_max_images"]
+# multi-image nodes then gained the image grid's input, appended last.
+GRID = ["grid_images"]
 SAVED_WIDGET_ORDER = {
     "QwenImageMultipleAnglesNode": ["images", "prompt", "horizontal_angle", "vertical_angle", "distance",
                                     "width", "height", "seed", "output_format", "enable_sync_mode",

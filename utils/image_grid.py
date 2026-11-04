@@ -1,5 +1,5 @@
 # ABOUTME: Server side of the image grid, shared by Image Grid Loader and the edit nodes that embed it:
-# ABOUTME: the inputs every grid node declares, each node's per-model image caps, and loading the files.
+# ABOUTME: the input every grid node declares, each node's per-model image caps, and loading the files.
 
 import json
 import os
@@ -11,10 +11,11 @@ NO_GRID_IMAGE = "Connect an image or add images to the grid"
 ANY_MODEL = "*"
 
 
-class ModelCap(NamedTuple):
-    """The most images the selected model takes, named so an over-cap error can say which model."""
+class GridCap(NamedTuple):
+    """The most images a grid holds, and what an over-cap error names as setting it:
+    the selected model on a node with a model choice, else the node."""
 
-    model: str
+    name: str
     cap: int
 
 
@@ -45,32 +46,26 @@ def grid_cap_for(node_id, model):
     return caps.get(model, caps.get(ANY_MODEL, max(caps.values())))
 
 
-def grid_inputs(max_default, max_cap, max_tooltip):
-    """The `grid_images` list the grid writes and the `grid_max_images` cap, in widget order.
+def model_grid_cap(node_id, model):
+    """The cap `model` sets on `node_id`'s grid, named by the model."""
+    return GridCap(model, grid_cap_for(node_id, model))
 
-    They go after every other input. Both are optional because the frontend lays
-    out required widgets before optional ones and widgets_values is positional:
-    a required grid input on a node that already has optional widgets would land
-    mid-list and shift every saved value after it.
+
+def grid_input():
+    """The `grid_images` list the grid writes, declared after every other input.
+
+    It is optional because the frontend lays out required widgets before optional
+    ones and widgets_values is positional: a required grid input on a node that
+    already has optional widgets would land mid-list and shift every saved value
+    after it.
     """
-    return [
-        IO.String.Input(
-            "grid_images",
-            default="[]",
-            socketless=True,
-            optional=True,
-            tooltip="Managed by the grid; JSON list of filenames in ComfyUI's input folder.",
-        ),
-        IO.Int.Input(
-            "grid_max_images",
-            default=max_default,
-            min=1,
-            max=max_cap,
-            step=1,
-            optional=True,
-            tooltip=max_tooltip,
-        ),
-    ]
+    return IO.String.Input(
+        "grid_images",
+        default="[]",
+        socketless=True,
+        optional=True,
+        tooltip="Managed by the grid; JSON list of filenames in ComfyUI's input folder.",
+    )
 
 
 def validate_grid(raw):
@@ -87,25 +82,20 @@ def validate_grid(raw):
     return True
 
 
-def load_grid_images(raw, max_images, model_cap=None):
+def load_grid_images(raw, cap):
     """The grid's files as upright RGB PIL images in grid order; an empty grid gives [].
 
-    The grid holds at most min(max_images, model_cap.cap). On a tie the model is named,
-    since raising grid_max_images past the model's limit would not help.
+    More files than `cap.cap` is an error naming `cap.name`.
     """
     import folder_paths
 
     paths = resolve_grid_images(raw, folder_paths.get_input_directory())
     count = len(paths)
-    if model_cap is not None and model_cap.cap <= max_images:
-        if count > model_cap.cap:
-            raise ValueError(
-                f"The grid holds {count} images but {model_cap.model} takes up to {model_cap.cap}; "
-                f"remove {count - model_cap.cap}")
-    elif count > max_images:
+    if count > cap.cap:
+        noun = "image" if cap.cap == 1 else "images"
         raise ValueError(
-            f"The grid holds {count} images but grid_max_images is {max_images}; "
-            f"remove {count - max_images} or raise grid_max_images")
+            f"The grid holds {count} images but {cap.name} takes up to {cap.cap} {noun}; "
+            f"remove {count - cap.cap}")
     return [_load_upright_rgb(path) for path in paths]
 
 

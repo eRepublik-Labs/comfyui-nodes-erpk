@@ -318,10 +318,10 @@ def test_edit_output_widgets_are_appended_after_aspect_ratio():
     # Appended last so saved GrokImageEdit workflows keep their slots; "auto"
     # defaults keep the request unchanged for existing workflows.
     inputs = _node("GrokImageEdit").define_schema().inputs
-    tail = [(i.id, i.default) for i in inputs[-6:]]
+    tail = [(i.id, i.default) for i in inputs[-5:]]
     assert tail == [
         ("aspect_ratio", "auto"), ("resolution", "auto"), ("n", 1), ("quality", "auto"),
-        ("grid_images", "[]"), ("grid_max_images", 5),
+        ("grid_images", "[]"),
     ]
     n = next(i for i in inputs if i.id == "n")
     assert (n.min, n.max) == (1, 10)

@@ -91,8 +91,8 @@ WIDGET_TYPES = ("STRING", "INT", "FLOAT", "BOOLEAN", "COMBO")
 # Widget order as saved in workflows before the IMAGE socket existed (captured
 # from the nodes on main). ComfyUI lists required widgets before optional ones,
 # so flipping a widget's optional flag moves it and misplaces saved values. The
-# image grid's two inputs were then appended last.
-GRID = ["grid_images", "grid_max_images"]
+# image grid's input was then appended last.
+GRID = ["grid_images"]
 PLAIN_ORDER = ["prompt", "image_url", "size_preset", "seed", "width", "height",
                "show_aspect_ratio", "enable_sync_mode", "enable_base64_output", *GRID]
 SEQUENTIAL_ORDER = ["prompt", "max_images", "size_preset", "seed", "image_url", "width",
