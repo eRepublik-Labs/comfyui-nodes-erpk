@@ -19,10 +19,13 @@ export const EMPTY_H = 150;
 export const FOOTER_GAP = 10;
 export const FOOTER_H = 26;
 export const NOTICE_H = 24;
-export const ROOT_PAD_TOP = 4;
-// The node body ends where the DOM widget ends, so the widget carries the bottom margin.
-export const ROOT_PAD_BOTTOM = 12;
-export const ROOT_PAD_V = ROOT_PAD_TOP + ROOT_PAD_BOTTOM;
+export const ROOT_PAD_TOP = 0;
+export const ROOT_PAD_BOTTOM = 4;
+// The frontend wraps a DOM widget in 10px top and bottom margins and sizes the
+// element to the declared height minus those margins (measured, frontend 1.57.6),
+// so the declared height must carry them or the zone overflows the root.
+export const DOM_WIDGET_MARGIN_V = 20;
+export const ROOT_PAD_V = ROOT_PAD_TOP + ROOT_PAD_BOTTOM + DOM_WIDGET_MARGIN_V;
 export const MIN_NODE_WIDTH = 300;
 
 const LINE = "#2a2a33";
