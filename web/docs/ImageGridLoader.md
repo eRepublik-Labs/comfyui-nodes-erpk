@@ -7,13 +7,13 @@ Pick or drop image files onto the grid on the node, and get them back as one `IM
 
 This node does not call any API. It reads files from ComfyUI's `input` folder. The edit node you connect it to sends the images.
 
-OpenAI Image Edit has the same grid built in. There, each file goes to the API at its own size, so the node does not letterbox mixed sizes. While that node's `image` input is connected, its grid dims and takes no new files, because the node sends the connected image instead.
+OpenAI Image Edit has the same grid built in. There, each file goes to the API at its own size, so the node does not letterbox mixed sizes. While that node's `image` input is connected, its grid dims and takes no new files, because the node sends the connected image instead. On an edit node, the grid also holds no more images than the selected model takes. On OpenAI Image Edit that is 16 for every model.
 
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| grid_max_images | Int | 10 | The most images the grid accepts, from 1 to 14. Seedream edit nodes take up to 10 images and Gemini Image Edit takes up to 14. |
+| grid_max_images | Int | 14 | The most images the grid accepts, from 1 to 14. This node has no model, so this value alone sets the limit. Seedream edit nodes take up to 10 images and Gemini Image Edit takes up to 14. |
 | grid_images | String | `[]` | Hidden. The grid stores its ordered file list here as a JSON array of names in the `input` folder, for example `["cat.png", "pasted/dog.jpg"]`. |
 
 ## Output
@@ -35,7 +35,7 @@ The number on each cell is the image's position in the batch. Cell 1 is the firs
 - Drag a cell to reorder it. A green bar shows where it lands.
 - Hover a cell and click **×** to remove it.
 - **Clear all** empties the grid. Click **Undo** in the notice under the grid to bring the images back.
-- The title bar and the footer show the count, for example `7 of 10`.
+- The title bar and the footer show the count, for example `7 of 14`.
 
 Keyboard: press Tab to focus a cell. The arrow keys move the focused image one place left or right, or one row up or down. Delete or Backspace removes it.
 

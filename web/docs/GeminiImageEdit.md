@@ -20,7 +20,7 @@ Edits and modifies existing images using text prompts. Supports up to 14 referen
 | enable_google_search | Boolean | false | Enable Google Search grounding on Nano Banana 2.1, 3.1 Flash and 3 Pro; ignored on 3.1 Flash Lite, which does not support it (optional) |
 | additional_images | IMAGE | - | Additional reference images, combined with primary input up to 14 total (optional) |
 | image_refs | ERPK_IMAGE_REFS | - | Ordered reference images from a Regional Prompt Builder; sent right after the primary image so the prompt's image numbers line up (optional) |
-| grid_max_images | Int | 10 | The most images the grid accepts, from 1 to 14 (optional) |
+| grid_max_images | Int | 14 | The most images the grid accepts, from 1 to 14 (optional) |
 | grid_images | String | `[]` | Hidden. The grid stores its ordered file list here as a JSON array of names in the `input` folder |
 
 ## Output

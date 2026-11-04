@@ -278,7 +278,7 @@ Edit and modify existing images using text prompts with optional masking.
 - `seed`: Cache control only, not sent to the API (-1 randomizes)
 - `output_format`: png (default), jpeg, webp
 - `output_compression`: 0-100 (default 100), sent only with jpeg or webp
-- `grid_max_images`: The most files the grid accepts, 1-16 (default 10)
+- `grid_max_images`: The most files the grid accepts, 1-16 (default 16). The selected model's limit also applies; every GPT Image model takes up to 16
 - `grid_images`: Hidden; the grid's ordered list of file names in ComfyUI's `input` folder
 
 **Outputs:**

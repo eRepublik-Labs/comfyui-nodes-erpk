@@ -315,7 +315,7 @@ String manipulation and general utility nodes.
 - The grid uploads each file to ComfyUI's `input` folder through the standard image upload, so the workflow saves file names, not pixels
 - Numbered cells in send order; drag to reorder, hover **×** to remove, **Clear all** with Undo
 - Press Tab to focus a cell; the arrow keys move it and Delete or Backspace removes it
-- `grid_max_images` (1-14, default 10) caps the grid; the grid ignores dropped files past the cap and the overlay says how many free slots remain
+- `grid_max_images` (1-14, default 14) caps the grid; the grid ignores dropped files past the cap and the overlay says how many free slots remain
 - The node centers mixed sizes on a canvas of the largest height and width with mid-grey padding, since a batch must share one size
 - Calls no API; a missing or out-of-folder file fails when you queue, naming the entry
 
