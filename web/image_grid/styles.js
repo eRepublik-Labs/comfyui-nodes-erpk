@@ -56,6 +56,7 @@ sheet.textContent = `
 .erpk-grid-zone.erpk-grid-over { border-style: solid; border-color: ${ACTIVE_GREEN}; background: #0f1713; }
 .erpk-grid-zone.erpk-grid-over.erpk-grid-refuse { border-color: ${DANGER_RED}; background: #170f10; }
 .erpk-grid-zone.erpk-grid-over .erpk-grid-list { opacity: 0.35; }
+.erpk-grid-zone.erpk-grid-ignored { opacity: 0.5; cursor: default; }
 .erpk-grid-list {
     display: grid;
     grid-template-columns: repeat(${COLUMNS}, minmax(0, 1fr));
@@ -164,7 +165,8 @@ sheet.textContent = `
     cursor: pointer;
 }
 .erpk-grid-add .erpk-grid-plus { font-size: 22px; line-height: 1; color: ${TEXT}; }
-.erpk-grid-add:hover { border-color: ${ACTIVE_GREEN_BORDER}; color: ${TEXT}; }
+.erpk-grid-add:hover:not(:disabled) { border-color: ${ACTIVE_GREEN_BORDER}; color: ${TEXT}; }
+.erpk-grid-add:disabled { cursor: default; }
 .erpk-grid-empty {
     min-height: ${EMPTY_H - 2 * ZONE_PAD - 2 * ZONE_BORDER}px;
     display: flex;

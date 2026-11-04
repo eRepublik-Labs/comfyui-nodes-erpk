@@ -12,7 +12,12 @@ import { storedName, viewPath } from "./image_grid/grid_list.js";
 import { installImageGrid } from "./image_grid/mount.js";
 
 // Each node here declares the grid's inputs with grid_inputs() from utils/image_grid.py.
-const GRID_NODES = ["ImageGridLoader", "OpenAIImageEdit"];
+// `socket` names the input that, when linked, the node sends instead of the grid.
+/** @type {{ nodeId: string, socket?: string }[]} */
+const GRID_NODES = [
+    { nodeId: "ImageGridLoader" },
+    { nodeId: "OpenAIImageEdit", socket: "image" },
+];
 
 /** @param {File} file */
 async function uploadToInput(file) {
@@ -37,6 +42,7 @@ app.registerExtension({
     name: "erpk.imageGrid",
 
     async beforeRegisterNodeDef(nodeType, nodeData) {
-        if (GRID_NODES.includes(nodeData?.name)) installImageGrid(nodeType, gridIO);
+        const gridNode = GRID_NODES.find((entry) => entry.nodeId === nodeData?.name);
+        if (gridNode) installImageGrid(nodeType, gridIO, { socket: gridNode.socket });
     },
 });

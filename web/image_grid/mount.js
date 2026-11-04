@@ -1,5 +1,5 @@
 // ABOUTME: Installs the image grid on a node type: mounts the DOM widget after the Python widgets,
-// ABOUTME: rebuilds it on load, takes file drops on the title bar, and draws the count in the title bar.
+// ABOUTME: rebuilds it on load, tracks the image socket that overrides it, and handles the title bar.
 // @ts-check
 
 import { MIN_NODE_WIDTH, TITLE_COUNT_COLOR, TITLE_COUNT_FULL_COLOR } from "./styles.js";
@@ -10,8 +10,10 @@ import { createImageGrid } from "./widget.js";
  * (utils/image_grid.py grid_inputs) as its last Python inputs.
  * @param {any} nodeType
  * @param {import("./widget.js").GridIO} io
+ * @param {{ socket?: string }} options `socket` names the input that, when
+ *   linked, the node sends instead of the grid.
  */
-export function installImageGrid(nodeType, io) {
+export function installImageGrid(nodeType, io, { socket }) {
     const origComputeSize = nodeType.prototype.computeSize;
     nodeType.prototype.computeSize = function () {
         const size = origComputeSize?.apply(this, arguments) ?? [MIN_NODE_WIDTH, 0];
@@ -47,9 +49,21 @@ export function installImageGrid(nodeType, io) {
             // widgets_values are assigned by now; rebuild before anything can queue.
             grid.setup();
             grid.loadFromWidget();
+            if (socket) grid.setSocketLinked(isSocketLinked(this, socket));
         }
         return r;
     };
+
+    if (socket) {
+        // While a node loads, LiteGraph reports every input as connected, linked
+        // or not, so read the socket's link rather than trusting the arguments.
+        const onConnectionsChange = nodeType.prototype.onConnectionsChange;
+        nodeType.prototype.onConnectionsChange = function () {
+            const r = onConnectionsChange?.apply(this, arguments);
+            this._erpkImageGrid?.setSocketLinked(isSocketLinked(this, socket));
+            return r;
+        };
+    }
 
     const onResize = nodeType.prototype.onResize;
     nodeType.prototype.onResize = function () {
@@ -88,4 +102,11 @@ export function installImageGrid(nodeType, io) {
         ctx.restore();
         return r;
     };
+}
+
+/** @param {any} node @param {string} socket */
+function isSocketLinked(node, socket) {
+    const slot = node.findInputSlot(socket);
+    if (slot === -1) throw new Error(`${node.type} node ${node.id} has no "${socket}" input`);
+    return node.isInputConnected(slot);
 }

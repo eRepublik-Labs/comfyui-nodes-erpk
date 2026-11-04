@@ -36,7 +36,7 @@ Edits existing images based on text prompts using OpenAI's image editing API. Su
 
 ## Image grid
 
-With nothing connected to `image`, the node sends the files on its grid instead. The grid works as on the Image Grid Loader node: pick or drop PNG, JPG, or WEBP files, drag a cell to reorder it, and hover a cell and click **×** to remove it. The number on each cell is the image's position in the request.
+With nothing connected to `image`, the node sends the files on its grid instead. While `image` is connected, the grid dims, shows `Image socket connected, grid ignored`, and takes no new files, but keeps the files it has. The grid works as on the Image Grid Loader node: pick or drop PNG, JPG, or WEBP files, drag a cell to reorder it, and hover a cell and click **×** to remove it. The number on each cell is the image's position in the request.
 
 - Each file goes to the API as its own image, at its own size, in cell order. The node does not batch or letterbox them.
 - The node applies EXIF orientation, drops any alpha channel, and sends each file as PNG.

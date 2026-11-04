@@ -41,6 +41,9 @@ let gridSerial = 0;
  * @typedef {{ upload: (file: File) => Promise<string>, imageUrl: (stored: string) => string }} GridIO
  */
 
+/** @type {Notice} */
+const SOCKET_NOTICE = { text: "Image socket connected, grid ignored", tone: "info" };
+
 /**
  * @param {any} node
  * @param {GridIO} io
@@ -95,6 +98,7 @@ export function createImageGrid(node, io) {
         /** @type {(() => void) | null} */
         refocus: null,
         ready: false,
+        socketLinked: false,
     };
     // Upload batches run in parallel but land in the order they were dropped.
     let landing = Promise.resolve();
@@ -162,16 +166,35 @@ export function createImageGrid(node, io) {
         capacity.textContent = capacityText(count, cap);
         capacity.classList.toggle("erpk-grid-over-cap", count > cap);
         clearButton.disabled = state.uploading > 0;
-        notice.hidden = state.notice === null;
-        noticeText.textContent = state.notice?.text ?? "";
-        noticeText.title = state.notice?.text ?? "";
-        notice.classList.toggle("erpk-grid-error", state.notice?.tone === "error");
-        undoButton.hidden = !state.notice?.undo;
+        zone.classList.toggle("erpk-grid-ignored", state.socketLinked);
+        setDisabled(empty.choose, state.socketLinked);
+        const shown = currentNotice();
+        notice.hidden = shown === null;
+        noticeText.textContent = shown?.text ?? "";
+        noticeText.title = shown?.text ?? "";
+        notice.classList.toggle("erpk-grid-error", shown?.tone === "error");
+        undoButton.hidden = !shown?.undo;
         layout();
         fitNodeHeight();
         const refocus = state.refocus;
         state.refocus = null;
         refocus?.();
+    }
+
+    // A notice from the user's last action outranks the socket notice, so
+    // Clear all keeps its Undo while the socket is linked.
+    function currentNotice() {
+        return state.notice ?? (state.socketLinked ? SOCKET_NOTICE : null);
+    }
+
+    /** @param {boolean} linked */
+    function setSocketLinked(linked) {
+        if (state.socketLinked === linked) return;
+        state.socketLinked = linked;
+        if (linked) state.notice = null;
+        if (!state.ready) return;
+        render();
+        node.setDirtyCanvas?.(true, true);
     }
 
     function layout() {
@@ -185,7 +208,7 @@ export function createImageGrid(node, io) {
     // The DOM widget pins min == max height to this, so the node grows a row at
     // a time as images arrive. Mirrors the CSS box model in styles.js.
     function desiredHeight() {
-        const noticeH = state.notice ? NOTICE_H : 0;
+        const noticeH = currentNotice() ? NOTICE_H : 0;
         const count = state.names.length;
         if (count === 0) return EMPTY_H + noticeH + ROOT_PAD_V;
         const inner = rootWidth() - 2 * ZONE_PAD - 2 * ZONE_BORDER;
@@ -202,9 +225,9 @@ export function createImageGrid(node, io) {
         if (size && node.size && node.size[1] !== size[1]) node.setSize([node.size[0], size[1]]);
     }
 
-    /** Null until setup has found the node's widgets. */
+    /** Null until setup has found the node's widgets, and while the socket is linked. */
     function titleCount() {
-        if (!state.ready) return null;
+        if (!state.ready || state.socketLinked) return null;
         const cap = maxImages();
         return { text: countLabel(state.names.length, cap), overCap: state.names.length > cap };
     }
@@ -245,6 +268,7 @@ export function createImageGrid(node, io) {
         plus.setAttribute("aria-hidden", "true");
         plus.textContent = "+";
         add.append(plus, "Add");
+        setDisabled(add, state.socketLinked);
         add.addEventListener("click", openPicker);
         item.append(add);
         return item;
@@ -256,7 +280,7 @@ export function createImageGrid(node, io) {
 
     /** @param {File[]} files */
     function addFiles(files) {
-        if (files.length === 0) return;
+        if (files.length === 0 || state.socketLinked) return;
         const plan = planAdd(files, state.names.length + state.uploading, maxImages());
         if (plan.take.length === 0) {
             state.notice = { text: addSummary({ added: 0, ...plan, failures: [] }), tone: "error" };
@@ -428,6 +452,10 @@ export function createImageGrid(node, io) {
         if (!isFileDrag(e)) return;
         e.preventDefault();
         e.stopPropagation();
+        if (state.socketLinked) {
+            e.dataTransfer.dropEffect = "none";
+            return;
+        }
         const prompt = dropPrompt(draggedImageCount(e.dataTransfer), state.names.length + state.uploading, maxImages());
         e.dataTransfer.dropEffect = prompt.full ? "none" : "copy";
         overlayTitle.textContent = prompt.title;
@@ -472,7 +500,14 @@ export function createImageGrid(node, io) {
     root.addEventListener("dragleave", onFileDragLeave);
     root.addEventListener("drop", onFileDrop);
 
-    return { root, setup, loadFromWidget, layout, desiredHeight, titleCount, addFiles };
+    return { root, setup, loadFromWidget, layout, desiredHeight, titleCount, addFiles, setSocketLinked };
+}
+
+/** @param {HTMLButtonElement} control @param {boolean} disabled */
+function setDisabled(control, disabled) {
+    control.disabled = disabled;
+    if (disabled) control.setAttribute("aria-disabled", "true");
+    else control.removeAttribute("aria-disabled");
 }
 
 function buildEmptyState() {
