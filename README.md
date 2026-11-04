@@ -238,7 +238,7 @@ xAI Grok integration — text, multi-turn chat, image generation/editing (up to 
 #### Image Nodes
 
 - **Grok Image Generation** - Text-to-image via `grok-imagine-image-2.0`, 13 aspect ratios plus auto, 1k/2k resolution, low/medium quality, n=1..10 batched output
-- **Grok Image Edit** - Single or multi-image editing (up to 5 source images per xAI's cap; the node rejects a larger batch)
+- **Grok Image Edit** - Single or multi-image editing (up to 5 source images per xAI's cap; the node rejects a larger batch). Connect an IMAGE, or pick or drop up to 5 files onto the grid on the node, and each file goes to xAI as its own source image in grid order
 
 #### Video Nodes
 
