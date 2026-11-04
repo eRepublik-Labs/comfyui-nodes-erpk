@@ -219,7 +219,7 @@ def test_lora_stack_feeds_the_image_nodes():
     # The official video edition has no -lora twin; only the open-weights image
     # endpoints do, so only those nodes expose the socket.
     assert _schema(MinimaxH3TextToImageNode).inputs[-1].io_type == "MINIMAX_H3_LORAS"
-    assert _schema(MinimaxH3ImageEditNode).inputs[-1].io_type == "MINIMAX_H3_LORAS"
+    assert _input(MinimaxH3ImageEditNode, "loras").io_type == "MINIMAX_H3_LORAS"
 
 
 def test_lora_stack_is_a_config_node():
@@ -274,11 +274,18 @@ def test_new_nodes_follow_the_seed_contract(node):
     assert inspect.iscoroutinefunction(node.execute.__func__)
 
 
+IMAGE_NODE_LAST_INPUTS = {
+    MinimaxH3TextToImageNode: ["loras"],
+    MinimaxH3ImageEditNode: ["loras", "grid_images", "grid_max_images"],
+}
+
+
 @pytest.mark.parametrize("node", IMAGE_NODES)
 def test_image_nodes_output_an_image(node):
     assert [o.io_type for o in _schema(node).outputs] == ["IMAGE"]
     assert list(_input(node, "resolution").options) == ["1k", "2k"]
-    assert _schema(node).inputs[-1].id == "loras"
+    last = IMAGE_NODE_LAST_INPUTS[node]
+    assert [spec.id for spec in _schema(node).inputs][-len(last):] == last
 
 
 def test_text_to_image_offers_all_fifteen_ratios():

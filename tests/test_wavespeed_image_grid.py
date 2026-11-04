@@ -162,6 +162,8 @@ NODES = [
     Node("seedream_v5_pro_edit", "SeedreamV5ProEditNode", "images", "image_url", 10,
          ["prompt", "image_url", "aspect_ratio", "resolution", "seed", "output_format",
           "prompt_optimization_mode", "enable_sync_mode", "enable_base64_output"]),
+    Node("minimax_h3_image_edit", "MinimaxH3ImageEditNode", "images", "image_urls", 9,
+         ["prompt", "image_urls", "aspect_ratio", "resolution", "output_format", "seed"]),
 ]
 NEEDS_IMAGE = [node for node in NODES if node.needs_image]
 IMAGE_OPTIONAL = [node for node in NODES if not node.needs_image]

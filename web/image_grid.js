@@ -30,6 +30,7 @@ const GRID_NODES = [
     { nodeId: "SeedreamV5LiteEditNode", socket: "images" },
     { nodeId: "SeedreamV5LiteEditSequentialNode", socket: "images" },
     { nodeId: "SeedreamV5ProEditNode", socket: "images" },
+    { nodeId: "MinimaxH3ImageEditNode", socket: "images" },
 ];
 
 /** @param {File} file */
