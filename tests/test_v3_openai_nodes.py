@@ -22,7 +22,7 @@ IO = pytest.importorskip("comfy_api.latest").IO
 def _import_node(module_name, class_name):
     """Import a node class from the openai package."""
     import importlib
-    mod = importlib.import_module(f"openai.{module_name}")
+    mod = importlib.import_module(f"erpk.openai.{module_name}")
     return getattr(mod, class_name)
 
 
@@ -247,15 +247,15 @@ class TestResolveSize:
     """resolve_size turns the three size widgets into the one API string."""
 
     def test_preset_passes_through(self):
-        from openai.image_nodes import resolve_size
+        from erpk.openai.image_nodes import resolve_size
         assert resolve_size("1536x1024", 800, 600) == "1536x1024"
 
     def test_auto_passes_through(self):
-        from openai.image_nodes import resolve_size
+        from erpk.openai.image_nodes import resolve_size
         assert resolve_size("auto", 800, 600) == "auto"
 
     def test_custom_joins_dimensions(self):
-        from openai.image_nodes import resolve_size
+        from erpk.openai.image_nodes import resolve_size
         assert resolve_size("Custom", 1536, 864) == "1536x864"
 
 
@@ -263,7 +263,7 @@ class TestOpenAIModelOptions:
     """Model COMBO options are correctly sourced from OpenAIClient constants."""
 
     def test_text_gen_model_options(self):
-        from openai.openai_api.client import OpenAIClient
+        from erpk.openai.openai_api.client import OpenAIClient
         cls = _import_node("nodes", "OpenAITextGeneration")
         schema = cls.define_schema()
         model_inputs = [i for i in schema.inputs if i.id == "model"]
@@ -271,7 +271,7 @@ class TestOpenAIModelOptions:
         assert set(model_inputs[0].options) == set(OpenAIClient.MODELS.keys())
 
     def test_chat_model_options(self):
-        from openai.openai_api.client import OpenAIClient
+        from erpk.openai.openai_api.client import OpenAIClient
         cls = _import_node("nodes", "OpenAIChat")
         schema = cls.define_schema()
         model_inputs = [i for i in schema.inputs if i.id == "model"]
@@ -279,7 +279,7 @@ class TestOpenAIModelOptions:
         assert set(model_inputs[0].options) == set(OpenAIClient.MODELS.keys())
 
     def test_vision_model_options(self):
-        from openai.openai_api.client import OpenAIClient
+        from erpk.openai.openai_api.client import OpenAIClient
         cls = _import_node("nodes", "OpenAIVision")
         schema = cls.define_schema()
         model_inputs = [i for i in schema.inputs if i.id == "model"]
@@ -288,7 +288,7 @@ class TestOpenAIModelOptions:
         assert set(model_inputs[0].options) == expected
 
     def test_image_gen_model_options(self):
-        from openai.openai_api.client import OpenAIClient
+        from erpk.openai.openai_api.client import OpenAIClient
         cls = _import_node("image_nodes", "OpenAIImageGeneration")
         schema = cls.define_schema()
         model_inputs = [i for i in schema.inputs if i.id == "model"]
@@ -321,18 +321,18 @@ class TestOpenAIProviderExport:
 
     def test_nodes_list_exported(self):
         import importlib
-        mod = importlib.import_module("openai")
+        mod = importlib.import_module("erpk.openai")
         assert hasattr(mod, "NODES"), "openai package must export NODES"
         assert isinstance(mod.NODES, list)
 
     def test_nodes_list_has_all_classes(self):
         import importlib
-        mod = importlib.import_module("openai")
+        mod = importlib.import_module("erpk.openai")
         assert len(mod.NODES) == 8, f"Expected 8 OpenAI nodes, got {len(mod.NODES)}"
 
     def test_nodes_list_all_comfy_nodes(self):
         import importlib
-        mod = importlib.import_module("openai")
+        mod = importlib.import_module("erpk.openai")
         for cls in mod.NODES:
             assert issubclass(cls, IO.ComfyNode), \
                 f"{cls.__name__} in NODES must inherit IO.ComfyNode"

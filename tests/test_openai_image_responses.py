@@ -21,12 +21,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-# Stub APIError on the local openai package (which shadows the SDK in tests)
-import openai as _local_openai
-if not hasattr(_local_openai, "APIError"):
-    _local_openai.APIError = type("APIError", (Exception,), {})
-
-from openai.openai_api.client import OpenAIClient  # noqa: E402
+from erpk.openai.openai_api.client import OpenAIClient  # noqa: E402
 from tests.openai_sdk_signature import assert_binds  # noqa: E402
 
 
@@ -419,7 +414,7 @@ class TestNodeSchema:
 
     @pytest.fixture
     def schema(self):
-        from openai.image_nodes import OpenAIImageResponses
+        from erpk.openai.image_nodes import OpenAIImageResponses
         return OpenAIImageResponses.define_schema()
 
     def test_node_id(self, schema):
@@ -463,7 +458,7 @@ class TestNodeSchema:
 
     def test_text_nodes_never_offer_max(self):
         # max returns 400 on chat.completions on all 7 (measured 2026-10-14).
-        from openai.nodes import REASONING_EFFORT_OPTIONS
+        from erpk.openai.nodes import REASONING_EFFORT_OPTIONS
         assert "max" not in REASONING_EFFORT_OPTIONS
 
     def test_size_offers_auto(self, schema):
@@ -496,7 +491,7 @@ class TestOpenAIPackageRegistration:
 
     def test_responses_node_in_nodes_list(self):
         import importlib
-        mod = importlib.import_module("openai")
+        mod = importlib.import_module("erpk.openai")
         node_names = [cls.__name__ for cls in mod.NODES]
         assert "OpenAIImageResponses" in node_names
 

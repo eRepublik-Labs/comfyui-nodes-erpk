@@ -26,11 +26,11 @@ API_NODES = [
     ("gemini.omni_nodes", "GeminiOmniVideoGeneration"),
     ("gemini.omni_nodes", "GeminiOmniReferenceToVideo"),
     # OpenAI
-    ("openai.nodes", "OpenAITextGeneration"),
-    ("openai.nodes", "OpenAIChat"),
-    ("openai.nodes", "OpenAIVision"),
-    ("openai.image_nodes", "OpenAIImageGeneration"),
-    ("openai.image_nodes", "OpenAIImageEdit"),
+    ("erpk.openai.nodes", "OpenAITextGeneration"),
+    ("erpk.openai.nodes", "OpenAIChat"),
+    ("erpk.openai.nodes", "OpenAIVision"),
+    ("erpk.openai.image_nodes", "OpenAIImageGeneration"),
+    ("erpk.openai.image_nodes", "OpenAIImageEdit"),
     # Claude
     ("claude.text_generation", "ClaudeTextGeneration"),
     ("claude.conversation", "ClaudeConversation"),
@@ -156,8 +156,8 @@ CONFIG_NODES = [
     ("gemini.nodes", "GeminiSafetySettings"),
     ("utils.regional_prompt", "RegionalPromptBuilder"),
     ("utils.image_grid_loader", "ImageGridLoader"),
-    ("openai.nodes", "OpenAIAPIConfig"),
-    ("openai.nodes", "OpenAISystemInstruction"),
+    ("erpk.openai.nodes", "OpenAIAPIConfig"),
+    ("erpk.openai.nodes", "OpenAISystemInstruction"),
     ("wavespeed.minimax_h3_lora_stack", "MinimaxH3LoraStackNode"),
 ]
 

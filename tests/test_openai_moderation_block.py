@@ -22,17 +22,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import openai as _local_openai
-if not hasattr(_local_openai, "APIError"):
-    _local_openai.APIError = type("APIError", (Exception,), {})
+import openai as sdk_stub
 
-from openai.openai_api.client import OpenAIClient  # noqa: E402
+from erpk.openai.openai_api.client import OpenAIClient  # noqa: E402
 
 
 def _refusal(code="moderation_blocked", stage="input", categories=("other",),
              message="Your request was rejected by the safety system."):
     """Build an APIError shaped like a real moderation refusal."""
-    error = _local_openai.APIError(message)
+    error = sdk_stub.APIError(message)
     error.code = code
     payload = {"message": message, "type": "image_generation_user_error", "code": code}
     if stage is not None or categories is not None:

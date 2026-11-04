@@ -12,15 +12,7 @@ import pytest
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _REPO)
 
-# In the test environment our local openai/ package shadows the SDK's openai package.
-# The client does `from openai import APIError, RateLimitError, APIConnectionError`
-# (lazy import inside methods) — inject stubs so the import resolves.
-import openai as _local_openai
-for _name in ("APIError", "RateLimitError", "APIConnectionError"):
-    if not hasattr(_local_openai, _name):
-        setattr(_local_openai, _name, type(_name, (Exception,), {}))
-
-from openai.openai_api.client import OpenAIClient
+from erpk.openai.openai_api.client import OpenAIClient
 
 
 def test_generate_content_runs_two_calls_concurrently():

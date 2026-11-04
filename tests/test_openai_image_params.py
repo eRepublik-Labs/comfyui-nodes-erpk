@@ -7,14 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# In the test environment, our local openai/ package shadows the SDK's openai package.
-# The client does `from openai import APIError` (lazy import inside methods), which
-# resolves to our local package. Inject a mock APIError so the import succeeds.
-import openai as _local_openai
-if not hasattr(_local_openai, "APIError"):
-    _local_openai.APIError = type("APIError", (Exception,), {})
-
-from openai.openai_api.client import OpenAIClient
+from erpk.openai.openai_api.client import OpenAIClient
 from tests.openai_sdk_signature import assert_binds
 
 
@@ -380,7 +373,7 @@ class TestOutputFormat:
     def test_new_widgets_are_appended_last(self, class_name):
         # widgets_values is positional: existing widgets keep their slots.
         import importlib
-        cls = getattr(importlib.import_module("openai.image_nodes"), class_name)
+        cls = getattr(importlib.import_module("erpk.openai.image_nodes"), class_name)
         inputs = cls.define_schema().inputs
         widget_ids = [i.id for i in inputs
                       if i.io_type in ("STRING", "INT", "FLOAT", "BOOLEAN", "COMBO")]
@@ -423,7 +416,7 @@ class TestOutputFormat:
         assert "output_compression" not in params
 
     def test_generation_node_forwards_widgets(self):
-        from openai.image_nodes import OpenAIImageGeneration
+        from erpk.openai.image_nodes import OpenAIImageGeneration
         seen = {}
 
         class RecordingClient:
