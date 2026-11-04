@@ -116,8 +116,8 @@ sheet.textContent = `
 .erpk-grid-badge, .erpk-grid-remove {
     position: absolute;
     top: 4px;
-    height: 18px;
-    border-radius: 9px;
+    height: 22px;
+    border-radius: 11px;
     background: rgba(13, 13, 18, 0.85);
     border: 1px solid ${LINE};
     font-size: 11px;
@@ -127,8 +127,8 @@ sheet.textContent = `
 }
 .erpk-grid-badge {
     left: 4px;
-    min-width: 18px;
-    padding: 0 5px;
+    min-width: 22px;
+    padding: 0 6px;
     color: ${TEXT};
     font-weight: 600;
     font-variant-numeric: tabular-nums;
@@ -136,21 +136,21 @@ sheet.textContent = `
 }
 .erpk-grid-remove {
     right: 4px;
-    width: 18px;
+    width: 22px;
     padding: 0;
-    color: ${MUTED};
+    color: ${TEXT};
     cursor: pointer;
-    font-size: 13px;
+    font-size: 15px;
     line-height: 1;
-    opacity: 0;
-    transition: opacity 130ms cubic-bezier(0.16, 1, 0.3, 1), color 130ms, border-color 130ms;
+    transition: color 130ms, background-color 130ms, border-color 130ms;
 }
-/* The glyph is 18px; the hit area extends to 24px. */
-.erpk-grid-remove::before { content: ""; position: absolute; inset: -3px; }
-.erpk-grid-cell:hover .erpk-grid-remove,
-.erpk-grid-cell:focus-within .erpk-grid-remove { opacity: 1; }
-.erpk-grid-remove:hover, .erpk-grid-remove:focus-visible { color: ${DANGER_RED}; border-color: ${DANGER_RED_BORDER}; }
-@media (hover: none) { .erpk-grid-remove { opacity: 1; } }
+/* The glyph is 22px; the hit area extends to 24px. */
+.erpk-grid-remove::before { content: ""; position: absolute; inset: -1px; }
+.erpk-grid-remove:hover, .erpk-grid-remove:focus-visible {
+    color: #fff;
+    background: ${DANGER_RED};
+    border-color: ${DANGER_RED};
+}
 .erpk-grid-add {
     aspect-ratio: 1;
     width: 100%;
