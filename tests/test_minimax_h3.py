@@ -18,7 +18,10 @@ Reference-to-video accepts more references than any other node here: 9 images
 against the 4 the Seedance helpers cap at.
 """
 
+import asyncio
 import inspect
+from unittest.mock import patch
+
 import pytest
 
 IO = pytest.importorskip("comfy_api.latest").IO
@@ -288,6 +291,32 @@ def test_image_edit_follows_the_first_reference_by_default():
         spec = _input(node, "aspect_ratio")
         assert spec.options[0] == "auto" and spec.default == "auto"
     assert MinimaxH3ImageEdit(prompt="x", images=["u"], aspect_ratio=None).build_payload().get("aspect_ratio") is None
+
+
+def _image_edit_sends(**inputs):
+    sent = {}
+
+    async def fake_send(self, request, *args, **kwargs):
+        sent["images"] = request.images
+        return {"outputs": ["https://example.com/out.png"]}
+
+    with patch("erpk.wavespeed.wavespeed_api.client.WaveSpeedClient.send_request", fake_send), \
+         patch("erpk.wavespeed.wavespeed_api.utils.imageurl2tensor", return_value=None):
+        asyncio.run(MinimaxH3ImageEditNode.execute(prompt="p", client={"api_key": "test-key"}, **inputs))
+    return sent["images"]
+
+
+def test_image_edit_sends_each_url_on_its_own_line():
+    assert _image_edit_sends(image_urls="https://example.com/a.png\nhttps://example.com/b.png") == [
+        "https://example.com/a.png", "https://example.com/b.png"]
+
+
+def test_image_edit_refuses_more_than_nine_references():
+    urls = [f"https://example.com/{n}.png" for n in range(10)]
+    with patch("erpk.wavespeed.wavespeed_api.client.WaveSpeedClient.send_request") as send:
+        with pytest.raises(ValueError, match="^MiniMax H3 Image Edit accepts at most 9 input images, got 10$"):
+            asyncio.run(MinimaxH3ImageEditNode.execute(prompt="p", client={"api_key": "test-key"}, image_urls=urls))
+    assert not send.called
 
 
 @pytest.mark.parametrize("node", CHAIN_NODES)
