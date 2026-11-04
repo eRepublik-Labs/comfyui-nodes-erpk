@@ -3,6 +3,8 @@
 
 from comfy_api.latest import IO
 
+from ..utils.image_grid import grid_inputs, validate_grid
+
 # WaveSpeed accepts up to 10 input images on every Seedream edit endpoint.
 MAX_INPUT_IMAGES = 10
 from .seedream_v4 import SEEDREAM_V4_SIZE_PRESETS
@@ -35,10 +37,10 @@ class SeedreamV4EditSequentialNode(IO.ComfyNode):
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
                 IO.String.Input("image_url", optional=True, default="", multiline=True,
                                 tooltip="Image URL(s) to edit, one per line or comma separated. Up to 10. "
-                                         "Ignored when `images` is connected."),
+                                         "Ignored when `images` is connected or the grid holds images."),
                 IO.Image.Input("images", optional=True,
                                tooltip="Images to edit as a ComfyUI IMAGE batch. Each slice is one image, up to 10. "
-                                       "Takes precedence over `image_url`. Sent inline as base64, no upload."),
+                                       "Takes precedence over the grid and `image_url`. Sent inline as base64, no upload."),
                 IO.Int.Input("width", optional=True, default=1408, min=320, max=4096, step=8,
                              tooltip="Custom width (only used when size_preset is 'Custom')"),
                 IO.Int.Input("height", optional=True, default=1408, min=320, max=4096, step=8,
@@ -52,6 +54,8 @@ class SeedreamV4EditSequentialNode(IO.ComfyNode):
                 IO.Int.Input("seed", default=-1, min=-1, max=2**31 - 1,
                              control_after_generate="randomize",
                              tooltip="Seed for cache control. Randomizes by default."),
+                *grid_inputs(MAX_INPUT_IMAGES, MAX_INPUT_IMAGES,
+                             "Most images the grid accepts. Seedream takes up to 10 input images."),
             ],
             outputs=[
                 IO.Image.Output("images"),
@@ -64,6 +68,10 @@ class SeedreamV4EditSequentialNode(IO.ComfyNode):
     def fingerprint_inputs(cls, **kwargs):
         seed = kwargs.get("seed", -1)
         return float("NaN") if seed == -1 else seed
+
+    @classmethod
+    def validate_inputs(cls, grid_images="[]"):
+        return validate_grid(grid_images)
 
     @classmethod
     async def execute(cls, prompt, max_images, size_preset, client=None, image_url="", images=None,
@@ -83,7 +91,9 @@ class SeedreamV4EditSequentialNode(IO.ComfyNode):
         if max_images < 1 or max_images > 15:
             raise ValueError("max_images must be between 1 and 15")
 
-        images_param = input_image_list(images, image_url, MAX_INPUT_IMAGES, "Seedream")
+        images_param = input_image_list(images, image_url, MAX_INPUT_IMAGES, "Seedream",
+                                        grid=kwargs.get("grid_images"),
+                                        grid_max=kwargs.get("grid_max_images"))
 
         preset_dims = SEEDREAM_V4_SIZE_PRESETS.get(size_preset)
         if preset_dims:

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from openai.openai_api.client import OpenAIClient
+from erpk.openai.openai_api.client import OpenAIClient
 
 
 class TestOpenAIModels:
@@ -14,7 +14,7 @@ class TestOpenAIModels:
 
     def test_all_reasoning_models_in_new_token_param(self):
         """Every reasoning model should also use max_completion_tokens."""
-        from openai.openai_api.client import OpenAIClient
+        from erpk.openai.openai_api.client import OpenAIClient
         for model in OpenAIClient.REASONING_MODELS:
             assert model in OpenAIClient.NEW_TOKEN_PARAM_MODELS, (
                 f"{model} is in REASONING_MODELS but not NEW_TOKEN_PARAM_MODELS"
@@ -22,7 +22,7 @@ class TestOpenAIModels:
 
     def test_all_reasoning_models_in_models_dict(self):
         """Every reasoning model should appear in the main MODELS dict."""
-        from openai.openai_api.client import OpenAIClient
+        from erpk.openai.openai_api.client import OpenAIClient
         for model in OpenAIClient.REASONING_MODELS:
             assert model in OpenAIClient.MODELS, (
                 f"{model} is in REASONING_MODELS but not MODELS"
@@ -30,11 +30,11 @@ class TestOpenAIModels:
 
     def test_default_model_is_gpt_6_1_sol(self):
         """Alex's call (2026-10-01): gpt-6.1-sol is the default text model."""
-        from openai.openai_api.client import OpenAIClient
+        from erpk.openai.openai_api.client import OpenAIClient
         assert OpenAIClient.DEFAULT_MODEL == "gpt-6.1-sol"
 
     def test_every_text_node_defaults_to_gpt_6_1_sol(self):
-        from openai.nodes import OpenAITextGeneration, OpenAIChat, OpenAIVision
+        from erpk.openai.nodes import OpenAITextGeneration, OpenAIChat, OpenAIVision
         for node in (OpenAITextGeneration, OpenAIChat, OpenAIVision):
             model = next(i for i in node.define_schema().inputs if i.id == "model")
             assert model.default == "gpt-6.1-sol", node.__name__
@@ -44,7 +44,7 @@ class TestOpenAIModels:
         """gpt-6.1-sol, measured on chat.completions 2026-10-01: effort
         low/medium/high/xhigh 200, none/minimal/max 400; verbosity 200;
         legacy max_tokens 400 (needs max_completion_tokens)."""
-        from openai.openai_api.client import OpenAIClient
+        from erpk.openai.openai_api.client import OpenAIClient
         m = "gpt-6.1-sol"
         assert m in OpenAIClient.MODELS
         assert m in OpenAIClient.REASONING_MODELS
@@ -62,7 +62,7 @@ class TestOpenAIModels:
         verbosity low/medium/high 200; max_tokens 400 (needs
         max_completion_tokens); response.model echoed "gpt-6.1-terra". On
         Responses with the image tool, effort none to max 200, minimal 400."""
-        from openai.image_nodes import RESPONSES_MAINLINE_MODELS
+        from erpk.openai.image_nodes import RESPONSES_MAINLINE_MODELS
         m = "gpt-6.1-terra"
         assert m in OpenAIClient.MODELS
         assert m in OpenAIClient.REASONING_MODELS
@@ -82,13 +82,13 @@ class TestOpenAIModels:
 
     def test_gpt_56_tiers_present(self):
         """GPT-5.6 Sol/Terra/Luna are selectable in MODELS."""
-        from openai.openai_api.client import OpenAIClient
+        from erpk.openai.openai_api.client import OpenAIClient
         for m in ("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"):
             assert m in OpenAIClient.MODELS, f"{m} missing from MODELS"
 
     def test_gpt_56_sol_in_config_sets(self):
         """GPT-5.6 Sol is a gpt-5.x flagship: reasoning + new token param + verbosity."""
-        from openai.openai_api.client import OpenAIClient
+        from erpk.openai.openai_api.client import OpenAIClient
         assert "gpt-5.6-sol" in OpenAIClient.REASONING_MODELS
         assert "gpt-5.6-sol" in OpenAIClient.NEW_TOKEN_PARAM_MODELS
         assert "gpt-5.6-sol" in OpenAIClient.VERBOSITY_MODELS
@@ -98,7 +98,7 @@ class TestOpenAIModels:
         low/medium/high/xhigh, max_completion_tokens family. verbosity=low
         returned 200 on chat.completions (measured 2026-09-23), so the
         node's verbosity choice must reach it rather than being dropped."""
-        from openai.openai_api.client import OpenAIClient
+        from erpk.openai.openai_api.client import OpenAIClient
         assert "gpt-6-astra" in OpenAIClient.MODELS
         assert "gpt-6-astra" in OpenAIClient.REASONING_MODELS
         assert "gpt-6-astra" in OpenAIClient.NEW_TOKEN_PARAM_MODELS
@@ -108,7 +108,7 @@ class TestOpenAIModels:
         """gpt-6-sol / gpt-6-luna, measured on chat.completions 2026-09-23:
         reasoning_effort none/low/medium/high/xhigh accepted, verbosity=low
         accepted, temperature=0.7 rejected (reasoning models omit it)."""
-        from openai.openai_api.client import OpenAIClient
+        from erpk.openai.openai_api.client import OpenAIClient
         for m in ("gpt-6-sol", "gpt-6-luna"):
             assert m in OpenAIClient.MODELS, m
             assert m in OpenAIClient.REASONING_MODELS, m
@@ -133,7 +133,7 @@ class TestGptImage25:
         # model, but also say: "Select it directly in the Image API or as the
         # model of the Responses API image generation tool." The tool accepted
         # both IDs on 2026-10-01 while rejecting a bogus one.
-        from openai.image_nodes import RESPONSES_IMAGE_MODELS
+        from erpk.openai.image_nodes import RESPONSES_IMAGE_MODELS
         for m in self.MODELS_25:
             assert m in RESPONSES_IMAGE_MODELS
 
@@ -183,7 +183,7 @@ class TestOfferedCatalog:
     KEPT_IMAGE = {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"}
 
     def test_text_dropdowns_offer_exactly_the_kept_models(self):
-        from openai.nodes import TEXT_MODELS, VISION_MODELS
+        from erpk.openai.nodes import TEXT_MODELS, VISION_MODELS
         assert set(TEXT_MODELS) == self.KEPT_TEXT
         assert set(VISION_MODELS) == self.KEPT_TEXT
 
@@ -194,7 +194,7 @@ class TestOfferedCatalog:
         assert set(OpenAIClient.UNSUPPORTED_EFFORT) <= self.KEPT_TEXT
 
     def test_image_nodes_offer_exactly_the_kept_models(self):
-        from openai.image_nodes import IMAGE_MODELS, EDIT_MODELS
+        from erpk.openai.image_nodes import IMAGE_MODELS, EDIT_MODELS
         assert set(IMAGE_MODELS) == self.KEPT_IMAGE
         assert set(EDIT_MODELS) == self.KEPT_IMAGE
         assert set(OpenAIClient.GPT_IMAGE_MODELS) == self.KEPT_IMAGE
@@ -202,14 +202,14 @@ class TestOfferedCatalog:
     def test_generation_quality_drops_dalle_only_values(self):
         # The images reference marks hd and standard "only supported by
         # retired DALL-E models"; no kept model accepts them.
-        from openai.image_nodes import OpenAIImageGeneration
+        from erpk.openai.image_nodes import OpenAIImageGeneration
         quality = next(i for i in OpenAIImageGeneration.define_schema().inputs if i.id == "quality")
         assert quality.options == ["auto", "low", "medium", "high", "xhigh", "max"]
 
     def test_every_responses_size_fits_the_gpt_image_2_envelope(self):
         # All kept image models share gpt-image-2's envelope, so a size the
         # preflight rejects (256x256, 512x512) can never succeed.
-        from openai.image_nodes import GEN_SIZES
+        from erpk.openai.image_nodes import GEN_SIZES
         client = OpenAIClient.__new__(OpenAIClient)
         for size in GEN_SIZES:
             client._validate_size_for_gpt_image_2(size)
@@ -220,7 +220,7 @@ class TestMaxTokensCap:
     was 16384, which hid most of that. The default stays at 4096."""
 
     def test_text_nodes_allow_the_vendor_max_output(self):
-        from openai.nodes import OpenAITextGeneration, OpenAIChat, OpenAIVision
+        from erpk.openai.nodes import OpenAITextGeneration, OpenAIChat, OpenAIVision
         for node in (OpenAITextGeneration, OpenAIChat, OpenAIVision):
             inp = next(i for i in node.define_schema().inputs if i.id == "max_tokens")
             assert inp.max == 128000, node.__name__
@@ -239,7 +239,7 @@ class TestImageModelDefaults:
         ("OpenAIImageEdit", "model", "gpt-image-2.5-sunburst"),
     ])
     def test_new_node_starts_on_the_documented_model(self, node_name, input_id, expected):
-        import openai.image_nodes as image_nodes
+        import erpk.openai.image_nodes as image_nodes
         inputs = getattr(image_nodes, node_name).define_schema().inputs
         model = next(i for i in inputs if i.id == input_id)
         assert model.default == expected
@@ -253,7 +253,7 @@ class TestImageModelDefaults:
         return SimpleNamespace(**{method_name: record})
 
     def test_generation_without_a_model_sends_flare(self):
-        from openai.image_nodes import OpenAIImageGeneration
+        from erpk.openai.image_nodes import OpenAIImageGeneration
         seen = {}
         with pytest.raises(ValueError, match="stop here"):
             asyncio.run(OpenAIImageGeneration.execute(
@@ -262,7 +262,7 @@ class TestImageModelDefaults:
         assert seen["model"] == "gpt-image-2.5-flare"
 
     def test_responses_without_an_image_model_sends_flare(self):
-        from openai.image_nodes import OpenAIImageResponses
+        from erpk.openai.image_nodes import OpenAIImageResponses
         seen = {}
         with pytest.raises(ValueError, match="stop here"):
             asyncio.run(OpenAIImageResponses.execute(
@@ -272,11 +272,11 @@ class TestImageModelDefaults:
 
     def test_edit_without_a_model_sends_sunburst(self):
         torch = pytest.importorskip("torch")
-        from openai.image_nodes import OpenAIImageEdit
+        from erpk.openai.image_nodes import OpenAIImageEdit
         seen = {}
         with pytest.raises(ValueError, match="stop here"):
             asyncio.run(OpenAIImageEdit.execute(
-                torch.zeros(1, 8, 8, 3), "add a hat",
+                image=torch.zeros(1, 8, 8, 3), prompt="add a hat",
                 client=self._recording_client("edit_image", seen),
             ))
         assert seen["model"] == "gpt-image-2.5-sunburst"

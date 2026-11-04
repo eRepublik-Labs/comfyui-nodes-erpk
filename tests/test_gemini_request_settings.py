@@ -17,8 +17,8 @@ import pytest
 from google import genai
 from google.genai import types
 
-from gemini.gemini_api.client import GeminiClient
-from gemini.nodes import (
+from erpk.gemini.gemini_api.client import GeminiClient
+from erpk.gemini.nodes import (
     GeminiChat,
     GeminiImageEdit,
     GeminiImageGeneration,

@@ -13,8 +13,8 @@ supported" for it, and the text path here calls chat.completions.create, so
 listing it would put a dropdown entry in front of users that 404s on every call.
 """
 
-from openai.openai_api.client import OpenAIClient
-from openai.nodes import TEXT_MODELS, VISION_MODELS
+from erpk.openai.openai_api.client import OpenAIClient
+from erpk.openai.nodes import TEXT_MODELS, VISION_MODELS
 
 
 CHAT_LATEST = "chat-latest"

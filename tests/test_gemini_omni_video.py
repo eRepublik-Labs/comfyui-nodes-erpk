@@ -15,7 +15,7 @@ carries a cache-control-only seed that is deliberately never sent to the API.
 
 import pytest
 
-from gemini.omni_nodes import (
+from erpk.gemini.omni_nodes import (
     OMNI_MODEL,
     GeminiOmniVideoGeneration,
     _build_omni_video_request,
@@ -73,14 +73,14 @@ def test_uri_delivery_stores_the_interaction(resolution):
 def test_text_only_input_is_one_text_part():
     # Measured 2026-10-14 on google-genai 2.6.0: a bare string inside the input
     # list -> 400 "'input' must be a Content[], string, Turn[], Step[], or Content".
-    from gemini.omni_nodes import _generation_contents
+    from erpk.gemini.omni_nodes import _generation_contents
     assert _generation_contents("a red kite", None) == [{"type": "text", "text": "a red kite"}]
 
 
 def test_start_image_precedes_the_prompt_as_an_inline_png_part():
     import base64
     from PIL import Image
-    from gemini.omni_nodes import _generation_contents
+    from erpk.gemini.omni_nodes import _generation_contents
     parts = _generation_contents("it flies away", Image.new("RGB", (4, 4), "blue"))
     assert [p["type"] for p in parts] == ["image", "text"]
     assert parts[0]["mime_type"] == "image/png"
@@ -138,7 +138,7 @@ def test_node_exposes_async_execute():
 
 
 def test_node_is_registered():
-    from gemini import NODES
+    from erpk.gemini import NODES
     assert GeminiOmniVideoGeneration in NODES
 
 
@@ -213,7 +213,7 @@ import asyncio
 import base64
 from types import SimpleNamespace
 
-from gemini import omni_nodes
+from erpk.gemini import omni_nodes
 
 _URI = "https://generativelanguage.googleapis.com/v1beta/files/abc123:download?alt=media"
 
@@ -277,7 +277,7 @@ FIFTEEN_MINUTES_MS = 15 * 60 * 1000
 
 
 def test_omni_gets_a_fifteen_minute_timeout():
-    from gemini.gemini_api.cooperative_call import resolve_timeout_ms
+    from erpk.gemini.gemini_api.cooperative_call import resolve_timeout_ms
     assert resolve_timeout_ms(OMNI_MODEL) == FIFTEEN_MINUTES_MS
 
 

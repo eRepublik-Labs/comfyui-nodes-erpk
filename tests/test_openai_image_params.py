@@ -7,14 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-# In the test environment, our local openai/ package shadows the SDK's openai package.
-# The client does `from openai import APIError` (lazy import inside methods), which
-# resolves to our local package. Inject a mock APIError so the import succeeds.
-import openai as _local_openai
-if not hasattr(_local_openai, "APIError"):
-    _local_openai.APIError = type("APIError", (Exception,), {})
-
-from openai.openai_api.client import OpenAIClient
+from erpk.openai.openai_api.client import OpenAIClient
 from tests.openai_sdk_signature import assert_binds
 
 
@@ -360,6 +353,36 @@ class TestEditImageMultiImage:
         assert len(params["image"]) == 2
 
 
+class TestEditNodeMask:
+    """The node turns a MASK into the first image's alpha: white (edit) becomes transparent."""
+
+    # ComfyUI's MASK is [B, H, W]; a bare [H, W] also reaches the node.
+    @pytest.mark.parametrize("mask_shape", [(1, 2, 3), (2, 3)])
+    def test_mask_becomes_the_first_images_alpha(self, mask_shape):
+        torch = pytest.importorskip("torch")
+        from io import BytesIO
+        from types import SimpleNamespace
+        from PIL import Image
+        from erpk.openai.image_nodes import OpenAIImageEdit
+
+        seen = {}
+
+        async def edit_image(**kwargs):
+            seen.update(kwargs)
+            return {"blocked": True, "error": "stop here"}
+
+        mask = torch.zeros(mask_shape)
+        mask[..., 0, 1] = 1.0
+        with pytest.raises(ValueError, match="stop here"):
+            asyncio.run(OpenAIImageEdit.execute(
+                image=torch.zeros(1, 2, 3, 3), prompt="x",
+                client=SimpleNamespace(edit_image=edit_image), mask=mask,
+            ))
+        sent = Image.open(BytesIO(seen["mask_data"]))
+        assert (sent.mode, sent.size) == ("RGBA", (3, 2))
+        assert list(sent.getchannel("A").getdata()) == [255, 0, 255, 255, 255, 255]
+
+
 class TestOutputFormat:
     """images.generate and images.edit take output_format (png/jpeg/webp) and
     output_compression (0-100, jpeg/webp only) for GPT Image models, per the
@@ -375,16 +398,21 @@ class TestOutputFormat:
             "quality", "moderation", "n", "background", "input_fidelity", "seed",
         ],
     }
+    WIDGETS_AFTER = {
+        "OpenAIImageGeneration": [],
+        "OpenAIImageEdit": ["grid_images", "grid_max_images"],
+    }
 
     @pytest.mark.parametrize("class_name", sorted(WIDGETS_BEFORE))
     def test_new_widgets_are_appended_last(self, class_name):
         # widgets_values is positional: existing widgets keep their slots.
         import importlib
-        cls = getattr(importlib.import_module("openai.image_nodes"), class_name)
+        cls = getattr(importlib.import_module("erpk.openai.image_nodes"), class_name)
         inputs = cls.define_schema().inputs
         widget_ids = [i.id for i in inputs
                       if i.io_type in ("STRING", "INT", "FLOAT", "BOOLEAN", "COMBO")]
-        assert widget_ids == self.WIDGETS_BEFORE[class_name] + ["output_format", "output_compression"]
+        assert widget_ids == (self.WIDGETS_BEFORE[class_name] + ["output_format", "output_compression"]
+                              + self.WIDGETS_AFTER[class_name])
         fmt = next(i for i in inputs if i.id == "output_format")
         assert fmt.options == ["png", "jpeg", "webp"] and fmt.default == "png"
         comp = next(i for i in inputs if i.id == "output_compression")
@@ -423,7 +451,7 @@ class TestOutputFormat:
         assert "output_compression" not in params
 
     def test_generation_node_forwards_widgets(self):
-        from openai.image_nodes import OpenAIImageGeneration
+        from erpk.openai.image_nodes import OpenAIImageGeneration
         seen = {}
 
         class RecordingClient:

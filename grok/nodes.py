@@ -8,6 +8,7 @@ from typing import List
 from comfy_api.latest import IO
 
 from .grok_api.client import GrokClient
+from ..utils.image_grid import NO_GRID_IMAGE, grid_inputs, load_grid_images, validate_grid
 from ..utils.safe_fetch import fetch_remote_bytes
 
 # Current Grok chat/code models per the catalog embedded in docs.x.ai/docs/models.
@@ -453,10 +454,12 @@ class GrokImageEdit(IO.ComfyNode):
             inputs=[
                 IO.Image.Input(
                     "image",
+                    optional=True,
                     tooltip=(
                         "Source image(s) to edit. Pass a batched IMAGE tensor to send "
                         f"up to {GrokClient.MAX_EDIT_IMAGES} source images; a larger batch "
-                        "is rejected before the API call."
+                        "is rejected before the API call. When connected, the grid on the "
+                        "node is ignored."
                     ),
                 ),
                 IO.String.Input(
@@ -509,6 +512,12 @@ class GrokImageEdit(IO.ComfyNode):
                         "medium for edits. Billed at the quality served."
                     ),
                 ),
+                *grid_inputs(
+                    GrokClient.MAX_EDIT_IMAGES,
+                    GrokClient.MAX_EDIT_IMAGES,
+                    f"Most images the grid accepts. grok-imagine-image-2.0 takes up to "
+                    f"{GrokClient.MAX_EDIT_IMAGES} source images.",
+                ),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -516,7 +525,13 @@ class GrokImageEdit(IO.ComfyNode):
         )
 
     @classmethod
-    async def execute(cls, image, prompt, **kwargs) -> IO.NodeOutput:
+    def validate_inputs(cls, grid_images="[]"):
+        # Only `grid_images` is named: ComfyUI skips its own type and range checks
+        # for every input named here, and grid_max_images keeps its min/max that way.
+        return validate_grid(grid_images)
+
+    @classmethod
+    async def execute(cls, prompt, image=None, **kwargs) -> IO.NodeOutput:
         from .grok_api.utils import images_to_data_uris
 
         client_dict = kwargs.get("client")
@@ -529,9 +544,19 @@ class GrokImageEdit(IO.ComfyNode):
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty.")
 
-        GrokClient.validate_edit_request(len(image))
+        if image is not None:
+            sources = image
+        else:
+            sources = await asyncio.to_thread(
+                load_grid_images,
+                kwargs.get("grid_images", "[]"),
+                kwargs.get("grid_max_images", GrokClient.MAX_EDIT_IMAGES),
+            )
+            if not sources:
+                raise ValueError(NO_GRID_IMAGE)
+        GrokClient.validate_edit_request(len(sources))
         image_uris = await asyncio.to_thread(
-            images_to_data_uris, image, GrokClient.MAX_EDIT_IMAGES
+            images_to_data_uris, sources, GrokClient.MAX_EDIT_IMAGES
         )
         if not image_uris:
             raise ValueError("Could not convert input image to a data URI.")

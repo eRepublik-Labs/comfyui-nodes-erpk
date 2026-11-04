@@ -3,6 +3,8 @@
 
 from comfy_api.latest import IO
 
+from ..utils.image_grid import grid_inputs, validate_grid
+
 
 class QwenImageMaxEditNode(IO.ComfyNode):
     """
@@ -11,6 +13,8 @@ class QwenImageMaxEditNode(IO.ComfyNode):
     Edits images using Qwen Image Max with up to 6 reference images.
     Simplified interface with fewer output options.
     """
+
+    MAX_IMAGES = 6
 
     @classmethod
     def define_schema(cls):
@@ -23,10 +27,10 @@ class QwenImageMaxEditNode(IO.ComfyNode):
                                 tooltip="Text description of the desired image modifications"),
                 IO.String.Input("images", default="",
                                 tooltip="Reference image URLs to edit, up to 6, separated by commas or newlines. "
-                                        "Ignored when `reference_images` is connected."),
+                                        "Ignored when `reference_images` is connected or the grid holds images."),
                 IO.Image.Input("reference_images", optional=True,
                                tooltip="Reference images as a ComfyUI IMAGE batch, up to 6. Each slice is one image. "
-                                       "Takes precedence over `images`. Sent inline as base64, no upload."),
+                                       "Takes precedence over the grid and `images`. Sent inline as base64, no upload."),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
                 IO.Int.Input("width", optional=True, default=1024, min=256, max=1536, step=8,
@@ -35,6 +39,8 @@ class QwenImageMaxEditNode(IO.ComfyNode):
                              tooltip="Image height (256 to 1536)"),
                 IO.Int.Input("seed", optional=True, default=-1, min=-1, max=2147483647, control_after_generate="randomize",
                              tooltip="Random seed for reproducibility (-1 for random)"),
+                *grid_inputs(cls.MAX_IMAGES, cls.MAX_IMAGES,
+                             "Most images the grid accepts. Qwen Image Max Edit takes up to 6 reference images."),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -49,10 +55,14 @@ class QwenImageMaxEditNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
+    def validate_inputs(cls, grid_images="[]"):
+        return validate_grid(grid_images)
+
+    @classmethod
     async def execute(cls, prompt="", images="", reference_images=None, client=None,
                 width=1024, height=1024, seed=-1, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
-        from .wavespeed_api.utils import imageurl2tensor, input_image_list
+        from .wavespeed_api.utils import NO_INPUT_IMAGE, imageurl2tensor, input_image_list
         from .wavespeed_api.requests.qwen_image_max_edit import QwenImageMaxEdit
 
         if client is None:
@@ -62,9 +72,11 @@ class QwenImageMaxEditNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        images_param = input_image_list(reference_images, images, 6, "Qwen Image Max Edit")
+        images_param = input_image_list(reference_images, images, cls.MAX_IMAGES, "Qwen Image Max Edit",
+                                        grid=kwargs.get("grid_images"),
+                                        grid_max=kwargs.get("grid_max_images"))
         if not images_param:
-            raise ValueError("Connect reference_images or enter at least one image URL")
+            raise ValueError(NO_INPUT_IMAGE)
 
         size = f"{width}*{height}" if width and height else None
 

@@ -2,6 +2,8 @@
 # ABOUTME: Edits from up to 10 images, taken from an IMAGE batch or from URLs.
 
 from comfy_api.latest import IO
+
+from ..utils.image_grid import grid_inputs, validate_grid
 from .wavespeed_api.requests.seedream_v5_pro import (
     ASPECT_RATIOS, OUTPUT_FORMATS, PROMPT_OPTIMIZATION_MODES, RESOLUTIONS,
 )
@@ -32,10 +34,10 @@ class SeedreamV5ProEditNode(IO.ComfyNode):
                                 tooltip="Text description of the desired modifications"),
                 IO.Image.Input("images", optional=True,
                                tooltip="Images to edit as a ComfyUI IMAGE batch. Each slice is one image, up to 10. "
-                                       "Takes precedence over `image_url`. Sent inline as base64, no upload."),
+                                       "Takes precedence over the grid and `image_url`. Sent inline as base64, no upload."),
                 IO.String.Input("image_url", default="", multiline=True,
                                 tooltip="Image URL(s) to edit, one per line or comma separated. Up to 10. "
-                                        "Ignored when `images` is connected."),
+                                        "Ignored when `images` is connected or the grid holds images."),
                 IO.Combo.Input("aspect_ratio", options=[AUTO_ASPECT] + ASPECT_RATIOS, default=AUTO_ASPECT,
                                tooltip="Aspect ratio of the result. auto follows the first image."),
                 IO.Combo.Input("resolution", options=RESOLUTIONS, default="1k",
@@ -56,6 +58,8 @@ class SeedreamV5ProEditNode(IO.ComfyNode):
                 IO.Int.Input("seed", default=-1, min=-1, max=2**31 - 1,
                              control_after_generate="randomize",
                              tooltip="Cache control only, not sent to the API. -1 generates again every run."),
+                *grid_inputs(MAX_INPUT_IMAGES, MAX_INPUT_IMAGES,
+                             "Most images the grid accepts. Seedream takes up to 10 input images."),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -69,11 +73,15 @@ class SeedreamV5ProEditNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
+    def validate_inputs(cls, grid_images="[]"):
+        return validate_grid(grid_images)
+
+    @classmethod
     async def execute(cls, prompt, image_url="", images=None, aspect_ratio=AUTO_ASPECT, resolution="1k",
                       client=None, output_format="jpeg", prompt_optimization_mode="standard",
                       enable_sync_mode=False, enable_base64_output=False, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
-        from .wavespeed_api.utils import imageurl2tensor, input_image_list
+        from .wavespeed_api.utils import NO_INPUT_IMAGE, imageurl2tensor, input_image_list
         from .wavespeed_api.requests.seedream_v5_pro_edit import SeedreamV5ProEdit
 
         if client is None:
@@ -83,9 +91,11 @@ class SeedreamV5ProEditNode(IO.ComfyNode):
         if not prompt or not prompt.strip():
             raise ValueError("Prompt is required")
 
-        images_param = input_image_list(images, image_url, MAX_INPUT_IMAGES, "Seedream")
+        images_param = input_image_list(images, image_url, MAX_INPUT_IMAGES, "Seedream",
+                                        grid=kwargs.get("grid_images"),
+                                        grid_max=kwargs.get("grid_max_images"))
         if images_param is None:
-            raise ValueError("Connect images or enter at least one image URL")
+            raise ValueError(NO_INPUT_IMAGE)
 
         request = SeedreamV5ProEdit(
             prompt=prompt,

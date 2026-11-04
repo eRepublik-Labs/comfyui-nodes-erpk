@@ -13,7 +13,7 @@ sys.path.insert(0, _REPO)
 pytest.importorskip("requests")
 Image = pytest.importorskip("PIL.Image")
 
-from wavespeed.wavespeed_api.client import WaveSpeedClient
+from erpk.wavespeed.wavespeed_api.client import WaveSpeedClient
 
 
 # Shape taken from the worked example at https://wavespeed.ai/docs/upload-files-api

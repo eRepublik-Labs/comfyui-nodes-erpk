@@ -17,9 +17,9 @@ import pytest
 
 IO = pytest.importorskip("comfy_api.latest").IO
 
-from gemini.nodes import GeminiDetect, detection_prompt, detections_to_regions
-from gemini.nodes import MIN_REGION_EXTENT as DETECT_MIN_REGION_EXTENT
-from gemini.gemini_api.client import GeminiClient
+from erpk.gemini.nodes import GeminiDetect, detection_prompt, detections_to_regions
+from erpk.gemini.nodes import MIN_REGION_EXTENT as DETECT_MIN_REGION_EXTENT
+from erpk.gemini.gemini_api.client import GeminiClient
 from utils.regional_prompt import MIN_REGION_EXTENT, parse_regions
 
 

@@ -41,7 +41,9 @@ ComfyUI-Custom-Nodes/
 │   └── grok_api/                  # API integration layer
 ├── utils/                         # String and general utilities
 │   ├── __init__.py                # Module exports
-│   └── concat_strings.py          # String concatenation node
+│   ├── concat_strings.py          # String concatenation node
+│   ├── image_grid.py              # Image grid inputs and file loading, shared by grid nodes
+│   └── image_grid_loader.py       # Image Grid Loader node
 ├── settings.py                    # ComfyUI settings reader for API keys
 ├── shared_workflows.py            # Shared workflows CRUD for multi-user
 ├── shared_workflows/              # Legacy storage fallback (gitignored)
@@ -50,7 +52,9 @@ ComfyUI-Custom-Nodes/
     ├── shared_workflows.js        # Browse/save/delete shared workflows UI
     ├── node_migration.js          # V1→V3 node type rewriting for old workflows
     ├── aspect_ratio.js            # Aspect ratio display in node titles
-    └── concat_strings.js          # Dynamic UI for concat strings node
+    ├── concat_strings.js          # Dynamic UI for concat strings node
+    ├── image_grid.js              # Registers the drop grid on the grid nodes
+    └── image_grid/                # Drop grid widget and its node mount
 ```
 
 ## Available Node Packages
@@ -75,11 +79,15 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 - **Seedream V4.5 Edit** - Image editing with enhanced text rendering (up to 10 reference images)
 - **Seedream V4.5 Edit Sequential** - Multi-image editing with typography (1-15 images, $0.027/image)
 
+Every Seedream edit node, Sequential included, also has an image grid. With nothing on `images`, the node sends up to 10 grid files at their own size. It reads the URL text only when the grid is empty.
+
 #### MiniMax H3 Image Models
 
 - **MiniMax H3 Text-to-Image** - 1k/2k images in 15 aspect ratios ($0.02-$0.06/image)
 - **MiniMax H3 Image Edit** - Identity-preserving re-render from 1-9 reference images cited as `<Picture N>` ($0.03-$0.09/image)
 - **MiniMax H3 LoRA Stack** - Config node holding up to 3 LoRA weights; connect to any H3 node to call its `-lora` twin
+
+MiniMax H3 Image Edit also has an image grid. With nothing on `images`, it sends up to 9 grid files at their own size. It reads the URL text only when the grid is empty.
 
 #### Qwen Image Models
 
@@ -92,7 +100,7 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 - **Qwen Image 3.0 Edit** - Qwen Image 3.0 and 3.0 Pro editing with up to 3 reference images, 1k or 2k
 - **Qwen Image Multiple Angles (96 poses)** - Re-renders a subject from one of 8 azimuths, 4 elevations and 3 framing distances ($0.025/image)
 
-Every Qwen edit node (Edit, Edit LoRA, Edit Plus, Edit Plus LoRA, Max Edit, 2.0 Edit, 3.0 Edit, Multiple Angles, Multiple Angles (96 poses), Layered) takes a ComfyUI IMAGE directly, sent inline as base64, so you don't need WaveSpeed Upload Image. The multi-image nodes take an IMAGE batch on `reference_images`; the single-image nodes take one image on `input_image`. Without a connected image, the node reads the URL text.
+Every Qwen edit node (Edit, Edit LoRA, Edit Plus, Edit Plus LoRA, Max Edit, 2.0 Edit, 3.0 Edit, Multiple Angles, Multiple Angles (96 poses), Layered) takes a ComfyUI IMAGE directly, sent inline as base64, so you don't need WaveSpeed Upload Image. The multi-image nodes take an IMAGE batch on `reference_images`; the single-image nodes take one image on `input_image`. Max Edit, 2.0 Edit, 3.0 Edit, Edit Plus, Edit Plus LoRA and Multiple Angles also have an image grid. With nothing on `reference_images`, they send the grid files at their own size. They read the URL text only when the grid is empty. The other nodes read the URL text when their image socket is empty. To build an IMAGE batch from files on disk for those, use the **Image Grid Loader** node.
 
 #### Video Generation
 
@@ -163,7 +171,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Gemini Vision** - Analyze images with multimodal capabilities
 - **Gemini Detect** - Open-vocabulary object detection: name objects (or leave empty to detect everything prominent) and get normalized regions on an `ERPK_REGIONS` output that wires into the Regional Prompt Builder's `regions` input
 - **Gemini Image Generation** - Generate images from text descriptions (Nano Banana 2.1, 3.1 Flash, 3.1 Flash Lite, 3 Pro; 0.5K to 4K resolution, up to 14 aspect ratios, Google Search grounding on all but 3.1 Flash Lite)
-- **Gemini Image Edit** - Edit and modify images with natural language prompts (up to 14 reference images, same model and resolution options)
+- **Gemini Image Edit** - Edit and modify images with natural language prompts (up to 14 reference images, same model and resolution options). Connect an IMAGE, or pick or drop up to 14 files onto the grid on the node, and each file goes to the model at its own size
 - **Gemini System Instruction** - Set persistent system-level instructions to guide model behavior
 - **Gemini Safety Settings** - Configure content safety filters (strict/balanced/permissive presets or custom)
 
@@ -202,7 +210,7 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 - **OpenAI System Instruction** - Set persistent system-level instructions to guide model behavior
 - **OpenAI Image Generation** - Generate images with GPT-Image-2.5 Flare (default), GPT-Image-2.5 Sunburst and GPT-Image-2, with png / jpeg / webp output
 - **OpenAI Image Generation (Responses)** - Generate images via the Responses API with a mainline reasoning model (gpt-6.1-sol default) driving the `image_generation` hosted tool (GPT-Image-2.5 Flare by default). Adds optional web search grounding and prompt revision.
-- **OpenAI Image Edit** - Edit and inpaint images with natural language prompts (GPT-Image-2.5 Sunburst default)
+- **OpenAI Image Edit** - Edit and inpaint images with natural language prompts (GPT-Image-2.5 Sunburst default). Connect an IMAGE, or pick or drop up to 16 files onto the grid on the node, and each file goes to the API at its own size
 
 **Key Benefits:**
 - Support for GPT-6.1 Sol (default: 1.05M context, 128K output, $2/$10 per MTok) and GPT-6.1 Terra (same context and output, $1/$5 per MTok), the GPT-6 Astra/Sol/Luna and GPT-5.6 Sol/Terra/Luna tiers, and chat-latest. The GPT-5.5 and older text models were removed on 2026-10-01
@@ -234,7 +242,7 @@ xAI Grok integration — text, multi-turn chat, image generation/editing (up to 
 #### Image Nodes
 
 - **Grok Image Generation** - Text-to-image via `grok-imagine-image-2.0`, 13 aspect ratios plus auto, 1k/2k resolution, low/medium quality, n=1..10 batched output
-- **Grok Image Edit** - Single or multi-image editing (up to 5 source images per xAI's cap; the node rejects a larger batch)
+- **Grok Image Edit** - Single or multi-image editing (up to 5 source images per xAI's cap; the node rejects a larger batch). Connect an IMAGE, or pick or drop up to 5 files onto the grid on the node, and each file goes to xAI as its own source image in grid order
 
 #### Video Nodes
 
@@ -258,6 +266,7 @@ String manipulation and general utility nodes.
 #### Nodes
 
 - **Concatenate Strings** - Combine multiple text inputs with configurable delimiters. Supports up to 10 connectable inputs - drag STRING outputs from other nodes or enter text directly.
+- **Image Grid Loader** - Pick or drop up to 14 image files onto a grid on the node and get them back as one IMAGE batch in grid order, ready for any multi-image edit node. Cell 3 is image 3 in the batch.
 - **Seed** - Generate a seed value with optional min/max range clamping. Connect the output to any node's seed input to share a single seed.
 - **Preview Anything** - Preview any value: text, markdown, image/video/audio/gif URLs, IMAGE tensors, and AUDIO dicts. Includes a Download button that saves the rendered content to your computer.
 - **Regional Prompt Builder** - Draw regions on a canvas and emit a layout-aware prompt for any image generation model: each region becomes a verbal placement plus box_2d coordinates (works with the Gemini, OpenAI, and Grok image nodes). Also outputs pixel-space `BOUNDING_BOX` regions compatible with core SAM3 Detect, Draw BBoxes, and Crop By BBoxes nodes.
@@ -300,6 +309,15 @@ String manipulation and general utility nodes.
 - Label placement options (same line or new line)
 - Add/Remove buttons to dynamically manage inputs
 - Visual separators between configuration and input sections
+
+**Image Grid Loader features:**
+- Pick files with **Choose files…** or the **+ Add** cell, or drop them onto the grid; it takes PNG, JPG, and WEBP
+- The grid uploads each file to ComfyUI's `input` folder through the standard image upload, so the workflow saves file names, not pixels
+- Numbered cells in send order; drag to reorder, hover **×** to remove, **Clear all** with Undo
+- Press Tab to focus a cell; the arrow keys move it and Delete or Backspace removes it
+- `grid_max_images` (1-14, default 10) caps the grid; the grid ignores dropped files past the cap and the overlay says how many free slots remain
+- The node centers mixed sizes on a canvas of the largest height and width with mid-grey padding, since a batch must share one size
+- Calls no API; a missing or out-of-folder file fails when you queue, naming the entry
 
 **Preview Anything features:**
 - Accepts any value via a wildcard input

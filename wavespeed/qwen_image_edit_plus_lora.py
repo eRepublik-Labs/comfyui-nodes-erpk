@@ -3,6 +3,8 @@
 
 from comfy_api.latest import IO
 
+from ..utils.image_grid import grid_inputs, validate_grid
+
 
 class QwenImageEditPlusLoraNode(IO.ComfyNode):
     """
@@ -13,6 +15,8 @@ class QwenImageEditPlusLoraNode(IO.ComfyNode):
     """
 
     MODELS = ["Qwen Edit Plus LoRA", "Qwen Edit 2511 LoRA"]
+
+    MAX_IMAGES = 3
 
     @classmethod
     def define_schema(cls):
@@ -28,10 +32,10 @@ class QwenImageEditPlusLoraNode(IO.ComfyNode):
                                 tooltip="Text description of the desired image modifications (Chinese or English)"),
                 IO.String.Input("images", default="",
                                 tooltip="Reference image URLs to edit, up to 3, separated by commas or newlines. "
-                                        "Ignored when `reference_images` is connected."),
+                                        "Ignored when `reference_images` is connected or the grid holds images."),
                 IO.Image.Input("reference_images", optional=True,
                                tooltip="Reference images as a ComfyUI IMAGE batch, up to 3. Each slice is one image. "
-                                       "Takes precedence over `images`. Sent inline as base64, no upload."),
+                                       "Takes precedence over the grid and `images`. Sent inline as base64, no upload."),
                 IO.String.Input("lora_1_path",
                                 tooltip="URL to first LoRA model file (required)"),
                 IO.Float.Input("lora_1_scale", default=1.0, min=0.0, max=4.0, step=0.1,
@@ -60,6 +64,8 @@ class QwenImageEditPlusLoraNode(IO.ComfyNode):
                                  tooltip="Wait for completion before returning response"),
                 IO.Boolean.Input("enable_base64_output", optional=True, default=False,
                                  tooltip="Return BASE64-encoded output instead of URL"),
+                *grid_inputs(cls.MAX_IMAGES, cls.MAX_IMAGES,
+                             "Most images the grid accepts. Qwen Image Edit Plus LoRA takes up to 3 reference images."),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -74,6 +80,10 @@ class QwenImageEditPlusLoraNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
+    def validate_inputs(cls, grid_images="[]"):
+        return validate_grid(grid_images)
+
+    @classmethod
     async def execute(cls, model="Qwen Edit Plus LoRA", prompt="", images="", reference_images=None,
                 lora_1_path="", lora_1_scale=1.0,
                 lora_2_path="", lora_2_scale=1.0, lora_3_path="", lora_3_scale=1.0,
@@ -81,7 +91,7 @@ class QwenImageEditPlusLoraNode(IO.ComfyNode):
                 output_format="jpeg", enable_sync_mode=False,
                 enable_base64_output=False, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
-        from .wavespeed_api.utils import imageurl2tensor, input_image_list
+        from .wavespeed_api.utils import NO_INPUT_IMAGE, imageurl2tensor, input_image_list
         from .wavespeed_api.requests.qwen_image_edit_plus_lora import QwenImageEditPlusLora
         from .wavespeed_api.requests.qwen_image_edit_2511_lora import QwenImageEdit2511Lora
 
@@ -92,9 +102,11 @@ class QwenImageEditPlusLoraNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        images_param = input_image_list(reference_images, images, 3, model)
+        images_param = input_image_list(reference_images, images, cls.MAX_IMAGES, model,
+                                        grid=kwargs.get("grid_images"),
+                                        grid_max=kwargs.get("grid_max_images"))
         if not images_param:
-            raise ValueError("Connect reference_images or enter at least one image URL")
+            raise ValueError(NO_INPUT_IMAGE)
 
         if not lora_1_path or not lora_1_path.strip():
             raise ValueError("At least one LoRA path is required")

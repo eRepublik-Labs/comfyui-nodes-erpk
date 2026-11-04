@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 
 def test_schema_has_additional_images():
     """additional_images must be declared as an optional IMAGE input in the V3 schema."""
-    from gemini.nodes import GeminiImageEdit
+    from erpk.gemini.nodes import GeminiImageEdit
 
     schema = GeminiImageEdit.define_schema()
     addl = [i for i in schema.inputs if i.id == "additional_images"]
@@ -22,7 +22,7 @@ def test_execute_is_classmethod_accepting_kwargs():
     The schema is the contract for which kwargs are accepted; this test just
     pins the V3 callable shape so V2-style refactors don't silently regress."""
     import inspect
-    from gemini.nodes import GeminiImageEdit
+    from erpk.gemini.nodes import GeminiImageEdit
 
     assert hasattr(GeminiImageEdit, "execute"), "V3 nodes must expose execute()"
     sig = inspect.signature(GeminiImageEdit.execute)
@@ -32,10 +32,10 @@ def test_execute_is_classmethod_accepting_kwargs():
     assert has_var_kw, "execute() must accept **kwargs so the schema can drive inputs"
 
 
-@patch("gemini.nodes.GeminiClient")
+@patch("erpk.gemini.nodes.GeminiClient")
 def test_additional_images_merged_into_contents(mock_client_cls):
     """When additional_images is provided, all images appear in the API call."""
-    from gemini.nodes import GeminiImageEdit
+    from erpk.gemini.nodes import GeminiImageEdit
 
     # Create fake image tensors (B, H, W, C) — 1 primary + 2 additional
     primary = torch.rand(1, 64, 64, 3)

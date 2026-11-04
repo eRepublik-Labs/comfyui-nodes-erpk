@@ -3,8 +3,8 @@
 
 import pytest
 
-from gemini.gemini_api.client import GeminiClient
-from gemini.nodes import GeminiImageGeneration, GeminiImageEdit
+from erpk.gemini.gemini_api.client import GeminiClient
+from erpk.gemini.nodes import GeminiImageGeneration, GeminiImageEdit
 
 
 class TestImageModelsConstant:

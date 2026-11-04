@@ -39,3 +39,13 @@ if "erpk" not in sys.modules:
     erpk_pkg = types.ModuleType("erpk")
     erpk_pkg.__path__ = [project_root]
     sys.modules["erpk"] = erpk_pkg
+
+# Our openai/ package would shadow the OpenAI SDK here (the project root is on
+# sys.path). Tests load it as `erpk.openai`, as ComfyUI loads it, so relative
+# imports that leave the package resolve. The name `openai` gets stand-ins for
+# the SDK exception types the client imports lazily inside its methods.
+if "openai" not in sys.modules:
+    openai_sdk = types.ModuleType("openai")
+    for _name in ("APIError", "RateLimitError", "APIConnectionError"):
+        setattr(openai_sdk, _name, type(_name, (Exception,), {}))
+    sys.modules["openai"] = openai_sdk

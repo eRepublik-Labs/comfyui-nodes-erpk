@@ -49,7 +49,7 @@ class TestPrice:
 
     def test_loads_rates_from_file_when_none_given(self):
         # Falls back to the shipped pricing.json; the default scan model must price.
-        from gemini.gemini_api.client import GeminiClient
+        from erpk.gemini.gemini_api.client import GeminiClient
         result = price(GeminiClient.DEFAULT_MODEL, 1_000_000, 0)
         assert result is not None and result > 0
 
@@ -61,7 +61,7 @@ class TestLoadPricing:
         assert isinstance(last_updated, str) and last_updated != "unknown"
 
     def test_default_model_is_priced(self):
-        from gemini.gemini_api.client import GeminiClient
+        from erpk.gemini.gemini_api.client import GeminiClient
         rates, _ = load_pricing()
         assert GeminiClient.DEFAULT_MODEL in rates
         rate = rates[GeminiClient.DEFAULT_MODEL]
@@ -70,7 +70,7 @@ class TestLoadPricing:
     def test_every_client_model_has_a_rate(self):
         # A model selectable in the picker but absent from pricing.json would
         # silently read as "cost unavailable" for that scan.
-        from gemini.gemini_api.client import GeminiClient
+        from erpk.gemini.gemini_api.client import GeminiClient
         rates, _ = load_pricing()
         missing = [m for m in GeminiClient.MODELS if m not in rates]
         assert not missing, f"models in MODELS but not priced: {missing}"

@@ -9,15 +9,7 @@ import pytest
 
 IO = pytest.importorskip("comfy_api.latest").IO
 
-# In the test environment, our local openai/ package shadows the SDK's openai package.
-# The client does `from openai import APIError, RateLimitError, APIConnectionError`
-# (lazy import inside methods) — inject stubs so the import resolves.
-import openai as _local_openai
-for _name in ("APIError", "RateLimitError", "APIConnectionError"):
-    if not hasattr(_local_openai, _name):
-        setattr(_local_openai, _name, type(_name, (Exception,), {}))
-
-from openai.openai_api.client import OpenAIClient
+from erpk.openai.openai_api.client import OpenAIClient
 from tests.openai_sdk_signature import assert_binds
 
 
@@ -29,14 +21,14 @@ VERBOSITY_OPTIONS = ["default", "low", "medium", "high"]
 
 def _import_node(module_name, class_name):
     """Import a node class from the openai package."""
-    mod = importlib.import_module(f"openai.{module_name}")
+    mod = importlib.import_module(f"erpk.openai.{module_name}")
     return getattr(mod, class_name)
 
 
 class TestDropdownOrder:
     def test_default_model_appears_first_in_dropdown(self):
         """The default text model leads the model dropdown."""
-        from openai.nodes import TEXT_MODELS
+        from erpk.openai.nodes import TEXT_MODELS
         assert TEXT_MODELS[0] == OpenAIClient.DEFAULT_MODEL
 
 
@@ -44,14 +36,14 @@ class TestVisionModelsDerivedFromModels:
     """VISION_MODELS is derived from MODELS and excludes o-series."""
 
     def test_vision_models_subset_of_models(self):
-        from openai.nodes import VISION_MODELS
+        from erpk.openai.nodes import VISION_MODELS
         for m in VISION_MODELS:
             assert m in OpenAIClient.MODELS, (
                 f"{m} in VISION_MODELS but not in MODELS"
             )
 
     def test_vision_models_excludes_o_series(self):
-        from openai.nodes import VISION_MODELS
+        from erpk.openai.nodes import VISION_MODELS
         for m in VISION_MODELS:
             assert not m.startswith("o"), (
                 f"{m} is an o-series reasoning model and should not be in VISION_MODELS"
@@ -59,7 +51,7 @@ class TestVisionModelsDerivedFromModels:
 
     def test_vision_models_includes_all_non_o_models(self):
         """Every non-o model in MODELS should appear in VISION_MODELS."""
-        from openai.nodes import VISION_MODELS
+        from erpk.openai.nodes import VISION_MODELS
         expected = {m for m in OpenAIClient.MODELS if not m.startswith("o")}
         assert set(VISION_MODELS) == expected
 

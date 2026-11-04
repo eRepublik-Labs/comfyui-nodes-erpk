@@ -3,7 +3,7 @@
 
 import pytest
 
-from wavespeed.wavespeed_api.requests.seedream_v5_pro import SeedreamV5Pro
+from erpk.wavespeed.wavespeed_api.requests.seedream_v5_pro import SeedreamV5Pro
 
 
 def test_text_to_image_payload_carries_the_pro_settings():
@@ -26,7 +26,7 @@ def test_text_to_image_payload_carries_the_pro_settings():
     }
 
 
-from wavespeed.wavespeed_api.requests.seedream_v5_pro_edit import SeedreamV5ProEdit
+from erpk.wavespeed.wavespeed_api.requests.seedream_v5_pro_edit import SeedreamV5ProEdit
 
 
 def test_edit_without_an_aspect_ratio_follows_the_first_image():
@@ -46,7 +46,7 @@ def test_edit_rejects_more_than_ten_images():
         SeedreamV5ProEdit(prompt="x", images=[f"https://example.com/{i}.png" for i in range(11)])
 
 
-from wavespeed.wavespeed_api.requests.seedream_v5_pro_layers import SeedreamV5ProLayers
+from erpk.wavespeed.wavespeed_api.requests.seedream_v5_pro_layers import SeedreamV5ProLayers
 
 
 def test_layers_request_always_asks_for_png():
@@ -146,7 +146,7 @@ def test_edit_node_sends_an_image_batch_inline():
 
 def test_edit_node_without_images_is_an_error():
     node = _node("seedream_v5_pro_edit", "SeedreamV5ProEditNode")
-    with pytest.raises(ValueError, match="^Connect images or enter at least one image URL$"):
+    with pytest.raises(ValueError, match="^Connect an image or add images to the grid, or enter at least one image URL$"):
         _run(node, [], prompt="x")
 
 

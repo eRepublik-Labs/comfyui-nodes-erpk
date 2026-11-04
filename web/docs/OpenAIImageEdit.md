@@ -3,13 +3,13 @@
 
 # OpenAI Image Edit
 
-Edits existing images based on text prompts using OpenAI's image editing API. Supports optional masking for targeted inpainting.
+Edits existing images based on text prompts using OpenAI's image editing API. Supports optional masking for targeted inpainting. Connect an image, or pick or drop image files onto the grid on the node.
 
 ## Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| image | Image | — | Input image to edit |
+| image | Image | — | Input image to edit (optional). When connected, the node sends it and ignores the grid |
 | prompt | String | (empty) | Description of how to modify the image |
 | client | OPENAI_API_CLIENT | — | OpenAI API client (optional if API key is configured in Settings) |
 | mask | Mask | — | Areas to edit: white=edit, black=keep (optional). Enables inpainting |
@@ -25,12 +25,30 @@ Edits existing images based on text prompts using OpenAI's image editing API. Su
 | seed | Int | -1 | Cache control only, not sent to the API. -1 randomizes (re-runs every queue); a fixed value reuses the cached result |
 | output_format | Combo | png | Output file format: png, jpeg, webp (optional). `transparent` background needs png or webp |
 | output_compression | Int | 100 | Compression 0–100 (optional). Sent only with jpeg or webp; png sends neither field |
+| grid_max_images | Int | 10 | The most images the grid accepts, from 1 to 16 (optional) |
+| grid_images | String | `[]` | Hidden. The grid stores its ordered file list here as a JSON array of names in the `input` folder |
 
 ## Output
 
 | Output | Type | Description |
 |--------|------|-------------|
 | image | Image | Edited image tensor |
+
+## Image grid
+
+With nothing connected to `image`, the node sends the files on its grid instead. While `image` is connected, the grid dims, shows `Image socket connected, grid ignored`, and takes no new files, but keeps the files it has. The grid works as on the Image Grid Loader node: pick or drop PNG, JPG, or WEBP files, drag a cell to reorder it, and hover a cell and click **×** to remove it. The number on each cell is the image's position in the request.
+
+- Each file goes to the API as its own image, at its own size, in cell order. The node does not batch or letterbox them.
+- The node applies EXIF orientation, drops any alpha channel, and sends each file as PNG.
+- A mask applies to the first image and must have that image's height and width.
+- When you queue, ComfyUI checks that every grid file exists in the `input` folder, even with `image` connected. Clear the grid if it names a missing file.
+
+Grid errors name what is at fault:
+
+- `Connect an image or add images to the grid`: `image` is not connected and the grid is empty.
+- `grid_images entry 2 not found in ComfyUI's input directory: 'cat.png'`: the file no longer exists under that name in `input`.
+- `grid_images entry 1 is outside ComfyUI's input directory: '../cat.png'`: the entry leaves the `input` folder.
+- `The grid holds 12 images but grid_max_images is 10; remove 2 or raise grid_max_images`: you lowered `grid_max_images` below the number of images in the grid.
 
 ## Notes
 
