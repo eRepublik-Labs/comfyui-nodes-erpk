@@ -79,7 +79,7 @@ Pro Layers outputs its layers and masks as lists rather than batches, because ea
 | **Qwen Image Edit Plus LoRA** | Qwen Edit Plus LoRA,<br>Qwen Edit 2511 LoRA | Multi-image editing with LoRA influences | 256-1536px (step 8)<br>Default: 1024×1024 | Up to 3 required, IMAGE batch or URLs | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-edit-plus-lora) |
 | **Qwen Image Layered** | Qwen Layered | Image decomposition into RGBA layers | N/A | 1 required, IMAGE or URL | 🇨🇳 🇬🇧 | 2-8 RGBA layers | $0.025/layer | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-layered) |
 | **Qwen Image Max** | Qwen Image Max | Premium 20B text-to-image generation | 256-1536px (step 8)<br>Default: 1024x1024 | N/A | 🇨🇳 🇬🇧 | Single image | $0.07/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-max-text-to-image) |
-| **Qwen Image Max Edit** | Qwen Image Max | Premium 20B multi-reference editing | 256-1536px (step 8) | Up to 6 required, IMAGE batch or URLs | 🇨🇳 🇬🇧 | Single image | $0.07/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-max-edit) |
+| **Qwen Image Max Edit** | Qwen Image Max | Premium 20B multi-reference editing | 256-1536px (step 8) | Up to 3 required, IMAGE batch or URLs | 🇨🇳 🇬🇧 | Single image | $0.07/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/qwen-image-max-edit) |
 | **JibMix Qwen Image** | JibMix Qwen | Portrait-optimized text-to-image | 256-1536px (step 8)<br>Default: 1024x1024 | N/A | 🇨🇳 🇬🇧 | Single image | $0.02/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/jib-mix-qwen-image-text-to-image) |
 
 ### MiniMax H3 Image Models

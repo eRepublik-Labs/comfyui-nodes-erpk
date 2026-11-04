@@ -127,7 +127,7 @@ SEEDREAM_SEQUENTIAL_ORDER = ["prompt", "max_images", "size_preset", "seed", "ima
 SEEDREAM_RUN = {**PROMPT, "size_preset": "Custom"}
 
 NODES = [
-    Node("qwen_image_max_edit", "QwenImageMaxEditNode", "reference_images", "images", 6, "Qwen Image Max Edit",
+    Node("qwen_image_max_edit", "QwenImageMaxEditNode", "reference_images", "images", 3, "Qwen Image Max Edit",
          ["prompt", "images", "width", "height", "seed"]),
     Node("qwen_image_2_0_edit", "QwenImage20EditNode", "reference_images", "images", 3, "Qwen Image 2.0",
          ["model", "prompt", "images", *QWEN_SIZE_WIDGETS]),

@@ -18,7 +18,7 @@ MULTI_NODES = [
     ("qwen_image_multiple_angles", "QwenImageMultipleAnglesNode", 3),
     ("qwen_image_edit_plus", "QwenImageEditPlusNode", 3),
     ("qwen_image_edit_plus_lora", "QwenImageEditPlusLoraNode", 3),
-    ("qwen_image_max_edit", "QwenImageMaxEditNode", 6),
+    ("qwen_image_max_edit", "QwenImageMaxEditNode", 3),
     ("qwen_image_2_0_edit", "QwenImage20EditNode", 3),
 ]
 SINGLE_NODES = [

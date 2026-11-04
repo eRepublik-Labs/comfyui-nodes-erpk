@@ -1,5 +1,5 @@
 # ABOUTME: Qwen Image Max Edit node for multi-reference image editing via WaveSpeed AI.
-# ABOUTME: Accepts up to 6 reference images with no output_format, sync_mode, or base64 options.
+# ABOUTME: Accepts up to 3 reference images with no output_format, sync_mode, or base64 options.
 
 from comfy_api.latest import IO
 
@@ -10,11 +10,11 @@ class QwenImageMaxEditNode(IO.ComfyNode):
     """
     Qwen Image Max Edit Node
 
-    Edits images using Qwen Image Max with up to 6 reference images.
+    Edits images using Qwen Image Max with up to 3 reference images.
     Simplified interface with fewer output options.
     """
 
-    MAX_IMAGES = 6
+    MAX_IMAGES = 3  # measured 2026-11-04: the endpoint rejects a 4th image; the docs prose says 6, the schema 3
 
     @classmethod
     def define_schema(cls):
@@ -26,10 +26,10 @@ class QwenImageMaxEditNode(IO.ComfyNode):
                 IO.String.Input("prompt", multiline=True, default="",
                                 tooltip="Text description of the desired image modifications"),
                 IO.String.Input("images", default="",
-                                tooltip="Reference image URLs to edit, up to 6, separated by commas or newlines. "
+                                tooltip="Reference image URLs to edit, up to 3, separated by commas or newlines. "
                                         "Ignored when `reference_images` is connected or the grid holds images."),
                 IO.Image.Input("reference_images", optional=True,
-                               tooltip="Reference images as a ComfyUI IMAGE batch, up to 6. Each slice is one image. "
+                               tooltip="Reference images as a ComfyUI IMAGE batch, up to 3. Each slice is one image. "
                                        "Takes precedence over the grid and `images`. Sent inline as base64, no upload."),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
