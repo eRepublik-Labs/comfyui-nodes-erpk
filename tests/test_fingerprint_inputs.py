@@ -17,14 +17,14 @@ IO = pytest.importorskip("comfy_api.latest").IO
 # (module_path, class_name) for every node that makes API calls
 API_NODES = [
     # Gemini
-    ("gemini.nodes", "GeminiTextGeneration"),
-    ("gemini.nodes", "GeminiChat"),
-    ("gemini.nodes", "GeminiVision"),
-    ("gemini.nodes", "GeminiDetect"),
-    ("gemini.nodes", "GeminiImageGeneration"),
-    ("gemini.nodes", "GeminiImageEdit"),
-    ("gemini.omni_nodes", "GeminiOmniVideoGeneration"),
-    ("gemini.omni_nodes", "GeminiOmniReferenceToVideo"),
+    ("erpk.gemini.nodes", "GeminiTextGeneration"),
+    ("erpk.gemini.nodes", "GeminiChat"),
+    ("erpk.gemini.nodes", "GeminiVision"),
+    ("erpk.gemini.nodes", "GeminiDetect"),
+    ("erpk.gemini.nodes", "GeminiImageGeneration"),
+    ("erpk.gemini.nodes", "GeminiImageEdit"),
+    ("erpk.gemini.omni_nodes", "GeminiOmniVideoGeneration"),
+    ("erpk.gemini.omni_nodes", "GeminiOmniReferenceToVideo"),
     # OpenAI
     ("erpk.openai.nodes", "OpenAITextGeneration"),
     ("erpk.openai.nodes", "OpenAIChat"),
@@ -151,9 +151,9 @@ class TestCacheBusting:
 # root, that cascades cache invalidation into every downstream node, re-billing
 # the whole graph. These rely on ComfyUI's default input-based caching instead.
 CONFIG_NODES = [
-    ("gemini.nodes", "GeminiAPIConfig"),
-    ("gemini.nodes", "GeminiSystemInstruction"),
-    ("gemini.nodes", "GeminiSafetySettings"),
+    ("erpk.gemini.nodes", "GeminiAPIConfig"),
+    ("erpk.gemini.nodes", "GeminiSystemInstruction"),
+    ("erpk.gemini.nodes", "GeminiSafetySettings"),
     ("utils.regional_prompt", "RegionalPromptBuilder"),
     ("utils.image_grid_loader", "ImageGridLoader"),
     ("erpk.openai.nodes", "OpenAIAPIConfig"),

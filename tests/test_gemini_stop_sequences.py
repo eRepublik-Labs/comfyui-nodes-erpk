@@ -3,7 +3,7 @@
 
 import pytest
 
-from gemini.nodes import _parse_stop_sequences
+from erpk.gemini.nodes import _parse_stop_sequences
 
 
 class TestParseStopSequences:

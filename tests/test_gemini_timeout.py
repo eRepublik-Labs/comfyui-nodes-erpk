@@ -14,9 +14,9 @@ sys.path.insert(0, _REPO)
 
 def _reload_client_module():
     """Reload the client module to get a fresh import for timeout assertions."""
-    if "gemini.gemini_api.client" in sys.modules:
-        return importlib.reload(sys.modules["gemini.gemini_api.client"])
-    return importlib.import_module("gemini.gemini_api.client")
+    if "erpk.gemini.gemini_api.client" in sys.modules:
+        return importlib.reload(sys.modules["erpk.gemini.gemini_api.client"])
+    return importlib.import_module("erpk.gemini.gemini_api.client")
 
 
 def test_genai_client_constructed_with_http_options_timeout():

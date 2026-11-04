@@ -11,7 +11,7 @@ import pytest
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _REPO)
 
-from gemini.gemini_api.cooperative_call import (
+from erpk.gemini.gemini_api.cooperative_call import (
     GeminiCallInterrupted,
     call_with_interrupt,
     call_with_retry,
@@ -47,7 +47,7 @@ def test_raises_interrupted_when_flag_flips_mid_call():
         return flips["n"] >= 3
 
     with patch(
-        "gemini.gemini_api.cooperative_call._resolve_interrupt_checker",
+        "erpk.gemini.gemini_api.cooperative_call._resolve_interrupt_checker",
         return_value=fake_interrupted,
     ):
         with pytest.raises(GeminiCallInterrupted):
@@ -114,7 +114,7 @@ def test_no_retry_on_user_interrupt():
         time.sleep(10)
 
     with patch(
-        "gemini.gemini_api.cooperative_call._resolve_interrupt_checker",
+        "erpk.gemini.gemini_api.cooperative_call._resolve_interrupt_checker",
         return_value=fake_interrupted,
     ):
         with pytest.raises(GeminiCallInterrupted):

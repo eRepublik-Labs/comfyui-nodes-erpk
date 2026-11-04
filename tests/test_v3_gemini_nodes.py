@@ -22,7 +22,7 @@ IO = pytest.importorskip("comfy_api.latest").IO
 def _import_node(module_name, class_name):
     """Import a node class from the gemini package."""
     import importlib
-    mod = importlib.import_module(f"gemini.{module_name}")
+    mod = importlib.import_module(f"erpk.gemini.{module_name}")
     return getattr(mod, class_name)
 
 
@@ -224,7 +224,7 @@ class TestGeminiModelOptions:
     """Model COMBO options are correctly sourced from GeminiClient constants."""
 
     def test_text_gen_model_options(self):
-        from gemini.gemini_api.client import GeminiClient
+        from erpk.gemini.gemini_api.client import GeminiClient
         cls = _import_node("nodes", "GeminiTextGeneration")
         schema = cls.define_schema()
         model_inputs = [i for i in schema.inputs if i.id == "model"]
@@ -232,7 +232,7 @@ class TestGeminiModelOptions:
         assert set(model_inputs[0].options) == set(GeminiClient.MODELS.keys())
 
     def test_chat_model_options(self):
-        from gemini.gemini_api.client import GeminiClient
+        from erpk.gemini.gemini_api.client import GeminiClient
         cls = _import_node("nodes", "GeminiChat")
         schema = cls.define_schema()
         model_inputs = [i for i in schema.inputs if i.id == "model"]
@@ -240,7 +240,7 @@ class TestGeminiModelOptions:
         assert set(model_inputs[0].options) == set(GeminiClient.MODELS.keys())
 
     def test_vision_model_options(self):
-        from gemini.gemini_api.client import GeminiClient
+        from erpk.gemini.gemini_api.client import GeminiClient
         cls = _import_node("nodes", "GeminiVision")
         schema = cls.define_schema()
         model_inputs = [i for i in schema.inputs if i.id == "model"]
@@ -248,7 +248,7 @@ class TestGeminiModelOptions:
         assert set(model_inputs[0].options) == set(GeminiClient.MODELS.keys())
 
     def test_image_gen_model_options(self):
-        from gemini.gemini_api.client import GeminiClient
+        from erpk.gemini.gemini_api.client import GeminiClient
         cls = _import_node("nodes", "GeminiImageGeneration")
         schema = cls.define_schema()
         model_inputs = [i for i in schema.inputs if i.id == "model"]
@@ -256,7 +256,7 @@ class TestGeminiModelOptions:
         assert set(model_inputs[0].options) == set(GeminiClient.IMAGE_MODELS)
 
     def test_image_edit_model_options(self):
-        from gemini.gemini_api.client import GeminiClient
+        from erpk.gemini.gemini_api.client import GeminiClient
         cls = _import_node("nodes", "GeminiImageEdit")
         schema = cls.define_schema()
         model_inputs = [i for i in schema.inputs if i.id == "model"]
@@ -281,13 +281,13 @@ class TestGeminiProviderExport:
 
     def test_nodes_list_exported(self):
         import importlib
-        mod = importlib.import_module("gemini")
+        mod = importlib.import_module("erpk.gemini")
         assert hasattr(mod, "NODES"), "gemini package must export NODES"
         assert isinstance(mod.NODES, list)
 
     def test_nodes_list_has_all_classes(self):
         import importlib
-        mod = importlib.import_module("gemini")
+        mod = importlib.import_module("erpk.gemini")
         assert [cls.define_schema().node_id for cls in mod.NODES] == [
             "GeminiAPIConfig", "GeminiTextGeneration", "GeminiChat", "GeminiVision",
             "GeminiDetect", "GeminiSystemInstruction", "GeminiSafetySettings",
@@ -297,7 +297,7 @@ class TestGeminiProviderExport:
 
     def test_nodes_list_all_comfy_nodes(self):
         import importlib
-        mod = importlib.import_module("gemini")
+        mod = importlib.import_module("erpk.gemini")
         for cls in mod.NODES:
             assert issubclass(cls, IO.ComfyNode), \
                 f"{cls.__name__} in NODES must inherit IO.ComfyNode"

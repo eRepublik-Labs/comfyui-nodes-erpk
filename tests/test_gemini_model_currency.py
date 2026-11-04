@@ -14,8 +14,8 @@ cannot express a third rule.
 import json
 import os
 
-from gemini.gemini_api.client import GeminiClient
-from gemini.nodes import (
+from erpk.gemini.gemini_api.client import GeminiClient
+from erpk.gemini.nodes import (
     IMAGE_MODELS,
     TEXT_MODELS,
     _google_search_supported,
@@ -55,7 +55,7 @@ def test_gemini_3_7_and_3_8_flash_offered():
 
 def test_3_7_and_3_8_flash_clamp_minimal_thinking_to_low():
     # Both model pages: "minimal is not supported and returns an error."
-    from gemini.nodes import _build_thinking_config
+    from erpk.gemini.nodes import _build_thinking_config
     for model in (FLASH_3_7, FLASH_3_8):
         assert _build_thinking_config("minimal", model).thinking_level == "LOW"
     assert _build_thinking_config("minimal", FLASH_3_6).thinking_level == "MINIMAL"
@@ -165,7 +165,7 @@ def test_argon_offered_on_text_nodes():
 def test_argon_clamps_minimal_thinking_to_low():
     # 400 "Thinking level MINIMAL is not supported for this model" (probed
     # 2026-10-14); the thinking page lists low/medium/high only.
-    from gemini.nodes import _build_thinking_config
+    from erpk.gemini.nodes import _build_thinking_config
     assert _build_thinking_config("minimal", ARGON).thinking_level == "LOW"
     for level in ("low", "medium", "high"):
         assert _build_thinking_config(level, ARGON).thinking_level == level.upper()
@@ -186,12 +186,12 @@ FIVE_MINUTES_MS = 5 * 60 * 1000
 
 
 def test_argon_gets_a_fifteen_minute_timeout():
-    from gemini.gemini_api.cooperative_call import resolve_timeout_ms
+    from erpk.gemini.gemini_api.cooperative_call import resolve_timeout_ms
     assert resolve_timeout_ms(ARGON) == FIFTEEN_MINUTES_MS
 
 
 def test_other_models_keep_the_five_minute_default():
-    from gemini.gemini_api.cooperative_call import resolve_timeout_ms
+    from erpk.gemini.gemini_api.cooperative_call import resolve_timeout_ms
     assert resolve_timeout_ms(FLASH_3_8) == FIVE_MINUTES_MS
     assert resolve_timeout_ms() == FIVE_MINUTES_MS
 
@@ -241,7 +241,7 @@ def test_argon_request_carries_the_long_http_timeout():
 def test_argon_chat_turn_carries_the_long_http_timeout():
     import asyncio
     from types import SimpleNamespace
-    from gemini.nodes import GeminiChat
+    from erpk.gemini.nodes import GeminiChat
 
     sent = {}
 
@@ -262,7 +262,7 @@ def _text_input(node_cls, name):
 def test_argon_guidance_is_in_the_text_node_tooltips():
     # Google: raise max_output_tokens to at least 32,768; temperature, top_p
     # and top_k "are ignored" by Argon.
-    from gemini.nodes import GeminiChat, GeminiTextGeneration, GeminiVision
+    from erpk.gemini.nodes import GeminiChat, GeminiTextGeneration, GeminiVision
     for node_cls in (GeminiTextGeneration, GeminiChat, GeminiVision):
         assert "32768" in _text_input(node_cls, "max_tokens").tooltip
         assert _text_input(node_cls, "max_tokens").max >= 65536
@@ -315,7 +315,7 @@ def test_3_pro_image_clamps_extreme_ratios_to_nearest():
 
 
 def test_aspect_ratio_tooltips_name_both_ten_ratio_models():
-    from gemini.nodes import GeminiImageEdit, GeminiImageGeneration
+    from erpk.gemini.nodes import GeminiImageEdit, GeminiImageGeneration
     for node_cls in (GeminiImageGeneration, GeminiImageEdit):
         tooltip = [i for i in node_cls.define_schema().inputs if i.id == "aspect_ratio"][0].tooltip
         assert "3.1 Flash Lite and 3 Pro have no 1:4, 4:1, 1:8 or 8:1" in tooltip
@@ -325,7 +325,7 @@ def test_image_temperature_tooltip_states_the_1_0_ceiling():
     # models.get reports max_temperature 1.0 for the image models, yet 1.5 is
     # accepted with a 200 (probed 2026-10-14), so the widget's 1.0-2.0 range is
     # a silent no-op the tooltip must name.
-    from gemini.nodes import GeminiImageEdit, GeminiImageGeneration
+    from erpk.gemini.nodes import GeminiImageEdit, GeminiImageGeneration
     for node_cls in (GeminiImageGeneration, GeminiImageEdit):
         temp = [i for i in node_cls.define_schema().inputs if i.id == "temperature"][0]
         assert temp.max == 2.0

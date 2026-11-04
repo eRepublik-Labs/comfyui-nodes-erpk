@@ -13,7 +13,7 @@ object.
 
 import types
 
-from gemini.gemini_api.client import GeminiClient
+from erpk.gemini.gemini_api.client import GeminiClient
 
 
 def _usage(**fields):

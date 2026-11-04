@@ -3,7 +3,7 @@
 
 import pytest
 
-from gemini.gemini_api.client import GeminiClient
+from erpk.gemini.gemini_api.client import GeminiClient
 
 
 class TestModelsDict:

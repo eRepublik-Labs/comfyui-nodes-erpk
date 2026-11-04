@@ -15,8 +15,8 @@ from types import SimpleNamespace
 import pytest
 from google.genai import types
 
-from gemini.gemini_api.client import GeminiClient
-from gemini.nodes import GeminiChat, GeminiDetect, GeminiTextGeneration, GeminiVision
+from erpk.gemini.gemini_api.client import GeminiClient
+from erpk.gemini.nodes import GeminiChat, GeminiDetect, GeminiTextGeneration, GeminiVision
 
 CUT_OFF_TEXT = " we use $N = 4 p_"
 

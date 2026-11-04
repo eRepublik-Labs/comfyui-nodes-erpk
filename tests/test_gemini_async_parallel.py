@@ -13,7 +13,7 @@ sys.path.insert(0, _REPO)
 # google.genai is a transitive dep; skip cleanly if absent.
 pytest.importorskip("google.genai")
 
-from gemini.nodes import GeminiTextGeneration
+from erpk.gemini.nodes import GeminiTextGeneration
 
 
 class _FakeGeminiClient:

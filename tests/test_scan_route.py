@@ -303,7 +303,7 @@ class TestScanModels:
         return handle_scan_models
 
     def test_returns_models_and_default(self):
-        from gemini.gemini_api.client import GeminiClient
+        from erpk.gemini.gemini_api.client import GeminiClient
 
         resp = asyncio.run(self._handler()(FakeRequest({})))
         assert resp.status == 200

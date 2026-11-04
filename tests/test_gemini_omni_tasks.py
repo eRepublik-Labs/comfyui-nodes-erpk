@@ -18,7 +18,7 @@ import math
 import pytest
 from PIL import Image
 
-from gemini.omni_nodes import (
+from erpk.gemini.omni_nodes import (
     RESOLUTIONS,
     GeminiOmniReferenceToVideo,
     _build_omni_video_request,
@@ -109,5 +109,5 @@ def test_execute_is_async(node_cls):
 
 @pytest.mark.parametrize("node_cls", [GeminiOmniReferenceToVideo])
 def test_registered(node_cls):
-    from gemini import NODES
+    from erpk.gemini import NODES
     assert node_cls in NODES

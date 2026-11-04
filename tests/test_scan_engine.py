@@ -197,7 +197,7 @@ class TestResolveModel:
         assert resolve_model("totally-bogus-model", {"a", "b"}, "a") == "a"
 
     def test_real_client_models_accept_their_default(self):
-        from gemini.gemini_api.client import GeminiClient
+        from erpk.gemini.gemini_api.client import GeminiClient
         assert (resolve_model(GeminiClient.DEFAULT_MODEL, GeminiClient.MODELS,
                               GeminiClient.DEFAULT_MODEL)
                 == GeminiClient.DEFAULT_MODEL)
