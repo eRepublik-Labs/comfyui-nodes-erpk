@@ -19,7 +19,7 @@ import pytest
 torch = pytest.importorskip("torch")
 av = pytest.importorskip("av")
 
-from wavespeed.wavespeed_api.media import audio_to_bytes, video_to_bytes
+from erpk.wavespeed.wavespeed_api.media import audio_to_bytes, video_to_bytes
 
 
 class _VideoFromPath:

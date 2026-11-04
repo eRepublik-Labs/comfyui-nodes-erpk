@@ -3,6 +3,8 @@
 
 from comfy_api.latest import IO
 
+from ..utils.image_grid import grid_inputs, validate_grid
+
 
 class MinimaxH3ImageEditNode(IO.ComfyNode):
     """
@@ -18,17 +20,6 @@ class MinimaxH3ImageEditNode(IO.ComfyNode):
     RESOLUTIONS = ["1k", "2k"]
     MAX_IMAGES = 9
 
-    @staticmethod
-    def _normalize_url_list(value, max_count):
-        if value is None or value == "":
-            return None
-        if isinstance(value, list):
-            urls = [u for u in value if u]
-        else:
-            urls = [value]
-        urls = urls[:max_count]
-        return urls or None
-
     @classmethod
     def define_schema(cls):
         return IO.Schema(
@@ -39,9 +30,9 @@ class MinimaxH3ImageEditNode(IO.ComfyNode):
                 IO.String.Input("prompt", multiline=True, default="",
                                 tooltip="Edit instruction. Cite references as <Picture 1> through <Picture 9>."),
                 IO.Image.Input("images", optional=True,
-                               tooltip="Reference images as a ComfyUI IMAGE batch (B,H,W,C). Each slice is one reference, capped at 9. Takes precedence over `image_urls`. Sent as base64 data URIs."),
+                               tooltip="Reference images as a ComfyUI IMAGE batch (B,H,W,C). Each slice is one reference, up to 9. Takes precedence over the grid and `image_urls`. Sent as base64 data URIs."),
                 IO.String.Input("image_urls", optional=True, default="",
-                                tooltip="Reference image URL(s), single URL or list, up to 9. Fallback when `images` is not connected. Each extra reference adds about $0.005."),
+                                tooltip="Reference image URLs, up to 9, separated by commas or newlines, or a list. Fallback when `images` is not connected and the grid is empty. Each extra reference adds about $0.005."),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
                 IO.Combo.Input("aspect_ratio", optional=True,
@@ -58,6 +49,8 @@ class MinimaxH3ImageEditNode(IO.ComfyNode):
                              tooltip="Generation seed, sent to the API. A fixed seed reproduces the same result and lets ComfyUI reuse the cached output; -1 generates a new one each queue."),
                 IO.Custom("MINIMAX_H3_LORAS").Input("loras", optional=True,
                     tooltip="LoRA stack from the MiniMax H3 LoRA Stack node. When connected, the call goes to the endpoint's -lora twin (+$0.015 per image)."),
+                *grid_inputs(cls.MAX_IMAGES, cls.MAX_IMAGES,
+                             "Most images the grid accepts. MiniMax H3 takes up to 9 reference images."),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -71,11 +64,15 @@ class MinimaxH3ImageEditNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
+    def validate_inputs(cls, grid_images="[]"):
+        return validate_grid(grid_images)
+
+    @classmethod
     async def execute(cls, prompt="", images=None, image_urls="", client=None,
                 aspect_ratio="auto", resolution="1k", output_format="jpeg", seed=-1,
                 loras=None, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
-        from .wavespeed_api.utils import imageurl2tensor, images_to_data_uris
+        from .wavespeed_api.utils import NO_INPUT_IMAGE, imageurl2tensor, input_image_list
         from .wavespeed_api.requests.minimax_h3_image_edit import MinimaxH3ImageEdit
 
         if client is None:
@@ -85,12 +82,11 @@ class MinimaxH3ImageEditNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        if images is not None:
-            images_value = images_to_data_uris(images, max_count=cls.MAX_IMAGES)
-        else:
-            images_value = cls._normalize_url_list(image_urls, cls.MAX_IMAGES)
+        images_value = input_image_list(images, image_urls, cls.MAX_IMAGES, "MiniMax H3 Image Edit",
+                                        grid=kwargs.get("grid_images"),
+                                        grid_max=kwargs.get("grid_max_images"))
         if not images_value:
-            raise ValueError("At least one reference image is required, as an IMAGE batch or a URL")
+            raise ValueError(NO_INPUT_IMAGE)
 
         request = MinimaxH3ImageEdit(
             prompt=prompt,

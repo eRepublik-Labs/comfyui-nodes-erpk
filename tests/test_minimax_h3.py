@@ -18,27 +18,30 @@ Reference-to-video accepts more references than any other node here: 9 images
 against the 4 the Seedance helpers cap at.
 """
 
+import asyncio
 import inspect
+from unittest.mock import patch
+
 import pytest
 
 IO = pytest.importorskip("comfy_api.latest").IO
 
-from wavespeed.minimax_h3_text_to_video import MinimaxH3TextToVideoNode
-from wavespeed.minimax_h3_image_to_video import MinimaxH3ImageToVideoNode
-from wavespeed.minimax_h3_reference_to_video import MinimaxH3ReferenceToVideoNode
+from erpk.wavespeed.minimax_h3_text_to_video import MinimaxH3TextToVideoNode
+from erpk.wavespeed.minimax_h3_image_to_video import MinimaxH3ImageToVideoNode
+from erpk.wavespeed.minimax_h3_reference_to_video import MinimaxH3ReferenceToVideoNode
 
-from wavespeed.wavespeed_api.requests.minimax_h3_text_to_video import MinimaxH3TextToVideo
-from wavespeed.wavespeed_api.requests.minimax_h3_image_to_video import MinimaxH3ImageToVideo
-from wavespeed.wavespeed_api.requests.minimax_h3_reference_to_video import MinimaxH3ReferenceToVideo
-from wavespeed.minimax_h3_lora_stack import MinimaxH3LoraStackNode
-from wavespeed.minimax_h3_text_to_image import MinimaxH3TextToImageNode
-from wavespeed.minimax_h3_image_edit import MinimaxH3ImageEditNode
-from wavespeed.minimax_h3_video_edit import MinimaxH3VideoEditNode
-from wavespeed.minimax_h3_video_extend import MinimaxH3VideoExtendNode
-from wavespeed.wavespeed_api.requests.minimax_h3_text_to_image import MinimaxH3TextToImage
-from wavespeed.wavespeed_api.requests.minimax_h3_image_edit import MinimaxH3ImageEdit
-from wavespeed.wavespeed_api.requests.minimax_h3_video_edit import MinimaxH3VideoEdit
-from wavespeed.wavespeed_api.requests.minimax_h3_video_extend import MinimaxH3VideoExtend
+from erpk.wavespeed.wavespeed_api.requests.minimax_h3_text_to_video import MinimaxH3TextToVideo
+from erpk.wavespeed.wavespeed_api.requests.minimax_h3_image_to_video import MinimaxH3ImageToVideo
+from erpk.wavespeed.wavespeed_api.requests.minimax_h3_reference_to_video import MinimaxH3ReferenceToVideo
+from erpk.wavespeed.minimax_h3_lora_stack import MinimaxH3LoraStackNode
+from erpk.wavespeed.minimax_h3_text_to_image import MinimaxH3TextToImageNode
+from erpk.wavespeed.minimax_h3_image_edit import MinimaxH3ImageEditNode
+from erpk.wavespeed.minimax_h3_video_edit import MinimaxH3VideoEditNode
+from erpk.wavespeed.minimax_h3_video_extend import MinimaxH3VideoExtendNode
+from erpk.wavespeed.wavespeed_api.requests.minimax_h3_text_to_image import MinimaxH3TextToImage
+from erpk.wavespeed.wavespeed_api.requests.minimax_h3_image_edit import MinimaxH3ImageEdit
+from erpk.wavespeed.wavespeed_api.requests.minimax_h3_video_edit import MinimaxH3VideoEdit
+from erpk.wavespeed.wavespeed_api.requests.minimax_h3_video_extend import MinimaxH3VideoExtend
 
 
 ALL_NODES = [
@@ -189,7 +192,7 @@ def test_reference_to_video_exposes_all_three_reference_kinds():
 
 @pytest.mark.parametrize("node", ALL_NODES)
 def test_node_is_registered(node):
-    from wavespeed import NODES
+    from erpk.wavespeed import NODES
     assert node in NODES
 
 
@@ -216,7 +219,7 @@ def test_lora_stack_feeds_the_image_nodes():
     # The official video edition has no -lora twin; only the open-weights image
     # endpoints do, so only those nodes expose the socket.
     assert _schema(MinimaxH3TextToImageNode).inputs[-1].io_type == "MINIMAX_H3_LORAS"
-    assert _schema(MinimaxH3ImageEditNode).inputs[-1].io_type == "MINIMAX_H3_LORAS"
+    assert _input(MinimaxH3ImageEditNode, "loras").io_type == "MINIMAX_H3_LORAS"
 
 
 def test_lora_stack_is_a_config_node():
@@ -271,11 +274,18 @@ def test_new_nodes_follow_the_seed_contract(node):
     assert inspect.iscoroutinefunction(node.execute.__func__)
 
 
+IMAGE_NODE_LAST_INPUTS = {
+    MinimaxH3TextToImageNode: ["loras"],
+    MinimaxH3ImageEditNode: ["loras", "grid_images", "grid_max_images"],
+}
+
+
 @pytest.mark.parametrize("node", IMAGE_NODES)
 def test_image_nodes_output_an_image(node):
     assert [o.io_type for o in _schema(node).outputs] == ["IMAGE"]
     assert list(_input(node, "resolution").options) == ["1k", "2k"]
-    assert _schema(node).inputs[-1].id == "loras"
+    last = IMAGE_NODE_LAST_INPUTS[node]
+    assert [spec.id for spec in _schema(node).inputs][-len(last):] == last
 
 
 def test_text_to_image_offers_all_fifteen_ratios():
@@ -288,6 +298,32 @@ def test_image_edit_follows_the_first_reference_by_default():
         spec = _input(node, "aspect_ratio")
         assert spec.options[0] == "auto" and spec.default == "auto"
     assert MinimaxH3ImageEdit(prompt="x", images=["u"], aspect_ratio=None).build_payload().get("aspect_ratio") is None
+
+
+def _image_edit_sends(**inputs):
+    sent = {}
+
+    async def fake_send(self, request, *args, **kwargs):
+        sent["images"] = request.images
+        return {"outputs": ["https://example.com/out.png"]}
+
+    with patch("erpk.wavespeed.wavespeed_api.client.WaveSpeedClient.send_request", fake_send), \
+         patch("erpk.wavespeed.wavespeed_api.utils.imageurl2tensor", return_value=None):
+        asyncio.run(MinimaxH3ImageEditNode.execute(prompt="p", client={"api_key": "test-key"}, **inputs))
+    return sent["images"]
+
+
+def test_image_edit_sends_each_url_on_its_own_line():
+    assert _image_edit_sends(image_urls="https://example.com/a.png\nhttps://example.com/b.png") == [
+        "https://example.com/a.png", "https://example.com/b.png"]
+
+
+def test_image_edit_refuses_more_than_nine_references():
+    urls = [f"https://example.com/{n}.png" for n in range(10)]
+    with patch("erpk.wavespeed.wavespeed_api.client.WaveSpeedClient.send_request") as send:
+        with pytest.raises(ValueError, match="^MiniMax H3 Image Edit accepts at most 9 input images, got 10$"):
+            asyncio.run(MinimaxH3ImageEditNode.execute(prompt="p", client={"api_key": "test-key"}, image_urls=urls))
+    assert not send.called
 
 
 @pytest.mark.parametrize("node", CHAIN_NODES)

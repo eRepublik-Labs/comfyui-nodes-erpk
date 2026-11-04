@@ -22,7 +22,7 @@ IO = pytest.importorskip("comfy_api.latest").IO
 def _import_node(module_name, class_name):
     """Import a node class from the wavespeed package."""
     import importlib
-    mod = importlib.import_module(f"wavespeed.{module_name}")
+    mod = importlib.import_module(f"erpk.wavespeed.{module_name}")
     return getattr(mod, class_name)
 
 
@@ -303,18 +303,18 @@ class TestWaveSpeedProviderExport:
 
     def test_nodes_list_exported(self):
         import importlib
-        mod = importlib.import_module("wavespeed")
+        mod = importlib.import_module("erpk.wavespeed")
         assert hasattr(mod, "NODES"), "wavespeed package must export NODES"
         assert isinstance(mod.NODES, list)
 
     def test_nodes_list_has_all_classes(self):
         import importlib
-        mod = importlib.import_module("wavespeed")
+        mod = importlib.import_module("erpk.wavespeed")
         assert len(mod.NODES) == 67, f"Expected 67 WaveSpeed nodes, got {len(mod.NODES)}"
 
     def test_nodes_list_all_comfy_nodes(self):
         import importlib
-        mod = importlib.import_module("wavespeed")
+        mod = importlib.import_module("erpk.wavespeed")
         for cls in mod.NODES:
             assert issubclass(cls, IO.ComfyNode), \
                 f"{cls.__name__} in NODES must inherit IO.ComfyNode"

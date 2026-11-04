@@ -12,8 +12,8 @@ sys.path.insert(0, _REPO)
 
 pytest.importorskip("requests")
 
-from wavespeed.wavespeed_api import client as client_module
-from wavespeed.wavespeed_api.client import WaveSpeedClient
+from erpk.wavespeed.wavespeed_api import client as client_module
+from erpk.wavespeed.wavespeed_api.client import WaveSpeedClient
 
 
 def test_wait_for_task_aborts_on_interrupt(monkeypatch):

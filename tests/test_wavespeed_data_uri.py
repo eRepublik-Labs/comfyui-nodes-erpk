@@ -14,7 +14,7 @@ sys.path.insert(0, _REPO)
 PIL = pytest.importorskip("PIL.Image")
 torch = pytest.importorskip("torch")
 
-from wavespeed.wavespeed_api.utils import image_to_data_uri, images_to_data_uris
+from erpk.wavespeed.wavespeed_api.utils import image_to_data_uri, images_to_data_uris
 
 
 def _solid_color_tensor(width=4, height=4, color=(255, 0, 0), batch=1):

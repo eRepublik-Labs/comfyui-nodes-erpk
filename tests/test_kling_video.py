@@ -25,14 +25,14 @@ IO = pytest.importorskip("comfy_api.latest").IO
 def _import_request(module_name, class_name):
     """Import a request class from the wavespeed_api.requests package."""
     import importlib
-    mod = importlib.import_module(f"wavespeed.wavespeed_api.requests.{module_name}")
+    mod = importlib.import_module(f"erpk.wavespeed.wavespeed_api.requests.{module_name}")
     return getattr(mod, class_name)
 
 
 def _import_node(module_name, class_name):
     """Import a node class from the wavespeed package."""
     import importlib
-    mod = importlib.import_module(f"wavespeed.{module_name}")
+    mod = importlib.import_module(f"erpk.wavespeed.{module_name}")
     return getattr(mod, class_name)
 
 
@@ -378,7 +378,7 @@ class _FakeClient:
 
 def _patch_client(monkeypatch, fake):
     """Make WaveSpeedClient(api_key) return our fake instance."""
-    import wavespeed.wavespeed_api.client as client_mod
+    import erpk.wavespeed.wavespeed_api.client as client_mod
     monkeypatch.setattr(client_mod, "WaveSpeedClient", lambda api_key: fake)
 
 

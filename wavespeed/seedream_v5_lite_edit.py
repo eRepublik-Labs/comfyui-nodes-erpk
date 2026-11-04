@@ -3,6 +3,8 @@
 
 from comfy_api.latest import IO
 
+from ..utils.image_grid import grid_inputs, validate_grid
+
 # WaveSpeed accepts up to 10 input images on every Seedream edit endpoint.
 MAX_INPUT_IMAGES = 10
 from .seedream_v5_lite import SEEDREAM_V5_LITE_SIZE_PRESETS
@@ -26,10 +28,10 @@ class SeedreamV5LiteEditNode(IO.ComfyNode):
                                 tooltip="Text description of the desired image modifications"),
                 IO.String.Input("image_url", default="", multiline=True,
                                 tooltip="Image URL(s) to edit, one per line or comma separated. Up to 10. "
-                                         "Ignored when `images` is connected."),
+                                         "Ignored when `images` is connected or the grid holds images."),
                 IO.Image.Input("images", optional=True,
                                tooltip="Images to edit as a ComfyUI IMAGE batch. Each slice is one image, up to 10. "
-                                       "Takes precedence over `image_url`. Sent inline as base64, no upload."),
+                                       "Takes precedence over the grid and `image_url`. Sent inline as base64, no upload."),
                 IO.Combo.Input("size_preset",
                                options=list(SEEDREAM_V5_LITE_SIZE_PRESETS.keys()),
                                default="Custom",
@@ -49,6 +51,8 @@ class SeedreamV5LiteEditNode(IO.ComfyNode):
                 IO.Int.Input("seed", default=-1, min=-1, max=2**31 - 1,
                              control_after_generate="randomize",
                              tooltip="Seed for cache control. Randomizes by default."),
+                *grid_inputs(MAX_INPUT_IMAGES, MAX_INPUT_IMAGES,
+                             "Most images the grid accepts. Seedream takes up to 10 input images."),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -63,11 +67,15 @@ class SeedreamV5LiteEditNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
+    def validate_inputs(cls, grid_images="[]"):
+        return validate_grid(grid_images)
+
+    @classmethod
     async def execute(cls, prompt, size_preset, image_url="", images=None, client=None, width=2048, height=2048,
                 show_aspect_ratio=True, enable_sync_mode=False, enable_base64_output=False,
                 **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
-        from .wavespeed_api.utils import imageurl2tensor, input_image_list
+        from .wavespeed_api.utils import NO_INPUT_IMAGE, imageurl2tensor, input_image_list
         from .wavespeed_api.requests.seedream_v5_lite_edit import SeedreamV5LiteEdit
 
         if client is None:
@@ -77,9 +85,11 @@ class SeedreamV5LiteEditNode(IO.ComfyNode):
         if prompt is None or prompt == "":
             raise ValueError("Prompt is required")
 
-        images_param = input_image_list(images, image_url, MAX_INPUT_IMAGES, "Seedream")
+        images_param = input_image_list(images, image_url, MAX_INPUT_IMAGES, "Seedream",
+                                        grid=kwargs.get("grid_images"),
+                                        grid_max=kwargs.get("grid_max_images"))
         if images_param is None:
-            raise ValueError("Connect images or enter at least one image URL")
+            raise ValueError(NO_INPUT_IMAGE)
 
         preset_dims = SEEDREAM_V5_LITE_SIZE_PRESETS.get(size_preset)
         if preset_dims:

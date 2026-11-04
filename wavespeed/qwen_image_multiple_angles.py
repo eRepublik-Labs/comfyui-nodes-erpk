@@ -3,6 +3,8 @@
 
 from comfy_api.latest import IO
 
+from ..utils.image_grid import grid_inputs, validate_grid
+
 
 class QwenImageMultipleAnglesNode(IO.ComfyNode):
     """
@@ -13,6 +15,8 @@ class QwenImageMultipleAnglesNode(IO.ComfyNode):
     and distance adjustment (0 to 2). Prompt is optional.
     """
 
+    MAX_IMAGES = 3
+
     @classmethod
     def define_schema(cls):
         return IO.Schema(
@@ -22,10 +26,10 @@ class QwenImageMultipleAnglesNode(IO.ComfyNode):
             inputs=[
                 IO.String.Input("images", default="",
                                 tooltip="Reference image URLs to transform, up to 3, separated by commas or newlines. "
-                                        "Ignored when `reference_images` is connected."),
+                                        "Ignored when `reference_images` is connected or the grid holds images."),
                 IO.Image.Input("reference_images", optional=True,
                                tooltip="Reference images as a ComfyUI IMAGE batch, up to 3. Each slice is one image. "
-                                       "Takes precedence over `images`. Sent inline as base64, no upload."),
+                                       "Takes precedence over the grid and `images`. Sent inline as base64, no upload."),
                 IO.String.Input("prompt", optional=True, multiline=True, default="",
                                 tooltip="Optional text description to guide the transformation (Chinese or English)"),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
@@ -50,6 +54,8 @@ class QwenImageMultipleAnglesNode(IO.ComfyNode):
                                  tooltip="Wait for completion before returning response"),
                 IO.Boolean.Input("enable_base64_output", optional=True, default=False,
                                  tooltip="Return BASE64-encoded output instead of URL"),
+                *grid_inputs(cls.MAX_IMAGES, cls.MAX_IMAGES,
+                             "Most images the grid accepts. Qwen Image Multiple Angles takes up to 3 reference images."),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -64,21 +70,27 @@ class QwenImageMultipleAnglesNode(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
+    def validate_inputs(cls, grid_images="[]"):
+        return validate_grid(grid_images)
+
+    @classmethod
     async def execute(cls, images="", reference_images=None, prompt="", client=None, horizontal_angle=0,
                 vertical_angle=0, distance=1.0, width=1024, height=1024,
                 seed=-1, output_format="jpeg", enable_sync_mode=False,
                 enable_base64_output=False, **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
-        from .wavespeed_api.utils import imageurl2tensor, input_image_list
+        from .wavespeed_api.utils import NO_INPUT_IMAGE, imageurl2tensor, input_image_list
         from .wavespeed_api.requests.qwen_image_multiple_angles import QwenImageMultipleAngles
 
         if client is None:
             from .nodes import WaveSpeedAIAPIClient
             client = WaveSpeedAIAPIClient.execute()[0]
 
-        images_list = input_image_list(reference_images, images, 3, "Qwen Image Multiple Angles")
+        images_list = input_image_list(reference_images, images, cls.MAX_IMAGES, "Qwen Image Multiple Angles",
+                                       grid=kwargs.get("grid_images"),
+                                       grid_max=kwargs.get("grid_max_images"))
         if not images_list:
-            raise ValueError("Connect reference_images or enter at least one image URL")
+            raise ValueError(NO_INPUT_IMAGE)
 
         size = f"{width}*{height}" if width and height else None
 

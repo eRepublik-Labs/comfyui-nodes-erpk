@@ -5,7 +5,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from wavespeed.wavespeed_api.utils import input_image_list
+from erpk.wavespeed.wavespeed_api.utils import input_image_list
 
 
 def test_single_url_becomes_one_item_list():
@@ -90,11 +90,13 @@ WIDGET_TYPES = ("STRING", "INT", "FLOAT", "BOOLEAN", "COMBO")
 
 # Widget order as saved in workflows before the IMAGE socket existed (captured
 # from the nodes on main). ComfyUI lists required widgets before optional ones,
-# so flipping a widget's optional flag moves it and misplaces saved values.
+# so flipping a widget's optional flag moves it and misplaces saved values. The
+# image grid's two inputs were then appended last.
+GRID = ["grid_images", "grid_max_images"]
 PLAIN_ORDER = ["prompt", "image_url", "size_preset", "seed", "width", "height",
-               "show_aspect_ratio", "enable_sync_mode", "enable_base64_output"]
+               "show_aspect_ratio", "enable_sync_mode", "enable_base64_output", *GRID]
 SEQUENTIAL_ORDER = ["prompt", "max_images", "size_preset", "seed", "image_url", "width",
-                    "height", "show_aspect_ratio", "enable_sync_mode", "enable_base64_output"]
+                    "height", "show_aspect_ratio", "enable_sync_mode", "enable_base64_output", *GRID]
 
 
 @pytest.mark.parametrize("module,name,seq", EDIT_NODES)
@@ -141,7 +143,7 @@ def test_node_sends_the_image_batch(module, name, seq):
 
 @pytest.mark.parametrize("module,name", [(m, n) for m, n, seq in EDIT_NODES if not seq])
 def test_plain_edit_without_any_image_is_an_error(module, name):
-    with pytest.raises(ValueError, match="^Connect images or enter at least one image URL$"):
+    with pytest.raises(ValueError, match="^Connect an image or add images to the grid, or enter at least one image URL$"):
         _run(_node(module, name), **_kwargs(False))
 
 

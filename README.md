@@ -79,11 +79,15 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 - **Seedream V4.5 Edit** - Image editing with enhanced text rendering (up to 10 reference images)
 - **Seedream V4.5 Edit Sequential** - Multi-image editing with typography (1-15 images, $0.027/image)
 
+Every Seedream edit node, Sequential included, also has an image grid. With nothing on `images`, the node sends up to 10 grid files at their own size. It reads the URL text only when the grid is empty.
+
 #### MiniMax H3 Image Models
 
 - **MiniMax H3 Text-to-Image** - 1k/2k images in 15 aspect ratios ($0.02-$0.06/image)
 - **MiniMax H3 Image Edit** - Identity-preserving re-render from 1-9 reference images cited as `<Picture N>` ($0.03-$0.09/image)
 - **MiniMax H3 LoRA Stack** - Config node holding up to 3 LoRA weights; connect to any H3 node to call its `-lora` twin
+
+MiniMax H3 Image Edit also has an image grid. With nothing on `images`, it sends up to 9 grid files at their own size. It reads the URL text only when the grid is empty.
 
 #### Qwen Image Models
 
@@ -96,7 +100,7 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 - **Qwen Image 3.0 Edit** - Qwen Image 3.0 and 3.0 Pro editing with up to 3 reference images, 1k or 2k
 - **Qwen Image Multiple Angles (96 poses)** - Re-renders a subject from one of 8 azimuths, 4 elevations and 3 framing distances ($0.025/image)
 
-Every Qwen edit node (Edit, Edit LoRA, Edit Plus, Edit Plus LoRA, Max Edit, 2.0 Edit, 3.0 Edit, Multiple Angles, Multiple Angles (96 poses), Layered) takes a ComfyUI IMAGE directly, sent inline as base64, so you don't need WaveSpeed Upload Image. The multi-image nodes take an IMAGE batch on `reference_images`; the single-image nodes take one image on `input_image`. Without a connected image, the node reads the URL text. To build an IMAGE batch from files on disk, use the **Image Grid Loader** node.
+Every Qwen edit node (Edit, Edit LoRA, Edit Plus, Edit Plus LoRA, Max Edit, 2.0 Edit, 3.0 Edit, Multiple Angles, Multiple Angles (96 poses), Layered) takes a ComfyUI IMAGE directly, sent inline as base64, so you don't need WaveSpeed Upload Image. The multi-image nodes take an IMAGE batch on `reference_images`; the single-image nodes take one image on `input_image`. Max Edit, 2.0 Edit, 3.0 Edit, Edit Plus, Edit Plus LoRA and Multiple Angles also have an image grid. With nothing on `reference_images`, they send the grid files at their own size. They read the URL text only when the grid is empty. The other nodes read the URL text when their image socket is empty. To build an IMAGE batch from files on disk for those, use the **Image Grid Loader** node.
 
 #### Video Generation
 

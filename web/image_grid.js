@@ -19,6 +19,20 @@ const GRID_NODES = [
     { nodeId: "OpenAIImageEdit", socket: "image" },
     { nodeId: "GrokImageEdit", socket: "image" },
     { nodeId: "GeminiImageEdit", socket: "image" },
+    { nodeId: "QwenImageMaxEditNode", socket: "reference_images" },
+    { nodeId: "QwenImage20EditNode", socket: "reference_images" },
+    { nodeId: "QwenImage30EditNode", socket: "reference_images" },
+    { nodeId: "QwenImageEditPlusNode", socket: "reference_images" },
+    { nodeId: "QwenImageEditPlusLoraNode", socket: "reference_images" },
+    { nodeId: "QwenImageMultipleAnglesNode", socket: "reference_images" },
+    { nodeId: "SeedreamV4EditNode", socket: "images" },
+    { nodeId: "SeedreamV4EditSequentialNode", socket: "images" },
+    { nodeId: "SeedreamV4_5EditNode", socket: "images" },
+    { nodeId: "SeedreamV4_5EditSequentialNode", socket: "images" },
+    { nodeId: "SeedreamV5LiteEditNode", socket: "images" },
+    { nodeId: "SeedreamV5LiteEditSequentialNode", socket: "images" },
+    { nodeId: "SeedreamV5ProEditNode", socket: "images" },
+    { nodeId: "MinimaxH3ImageEditNode", socket: "images" },
 ];
 
 /** @param {File} file */

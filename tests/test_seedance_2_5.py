@@ -20,19 +20,19 @@ import pytest
 
 IO = pytest.importorskip("comfy_api.latest").IO
 
-from wavespeed.seedance_2_5_text_to_video import Seedance25TextToVideoNode
-from wavespeed.seedance_2_5_image_to_video import Seedance25ImageToVideoNode
-from wavespeed.seedance_2_5_video_edit import Seedance25VideoEditNode
-from wavespeed.seedance_2_5_video_extend import Seedance25VideoExtendNode
+from erpk.wavespeed.seedance_2_5_text_to_video import Seedance25TextToVideoNode
+from erpk.wavespeed.seedance_2_5_image_to_video import Seedance25ImageToVideoNode
+from erpk.wavespeed.seedance_2_5_video_edit import Seedance25VideoEditNode
+from erpk.wavespeed.seedance_2_5_video_extend import Seedance25VideoExtendNode
 
-from wavespeed.wavespeed_api.requests.seedance_2_5_text_to_video import Seedance25TextToVideo
-from wavespeed.wavespeed_api.requests.seedance_2_5_text_to_video_turbo import Seedance25TextToVideoTurbo
-from wavespeed.wavespeed_api.requests.seedance_2_5_image_to_video import Seedance25ImageToVideo
-from wavespeed.wavespeed_api.requests.seedance_2_5_image_to_video_turbo import Seedance25ImageToVideoTurbo
-from wavespeed.wavespeed_api.requests.seedance_2_5_image_to_video_spicy import Seedance25ImageToVideoSpicy
-from wavespeed.wavespeed_api.requests.seedance_2_5_video_edit import Seedance25VideoEdit
-from wavespeed.wavespeed_api.requests.seedance_2_5_video_edit_turbo import Seedance25VideoEditTurbo
-from wavespeed.wavespeed_api.requests.seedance_2_5_video_extend import Seedance25VideoExtend
+from erpk.wavespeed.wavespeed_api.requests.seedance_2_5_text_to_video import Seedance25TextToVideo
+from erpk.wavespeed.wavespeed_api.requests.seedance_2_5_text_to_video_turbo import Seedance25TextToVideoTurbo
+from erpk.wavespeed.wavespeed_api.requests.seedance_2_5_image_to_video import Seedance25ImageToVideo
+from erpk.wavespeed.wavespeed_api.requests.seedance_2_5_image_to_video_turbo import Seedance25ImageToVideoTurbo
+from erpk.wavespeed.wavespeed_api.requests.seedance_2_5_image_to_video_spicy import Seedance25ImageToVideoSpicy
+from erpk.wavespeed.wavespeed_api.requests.seedance_2_5_video_edit import Seedance25VideoEdit
+from erpk.wavespeed.wavespeed_api.requests.seedance_2_5_video_edit_turbo import Seedance25VideoEditTurbo
+from erpk.wavespeed.wavespeed_api.requests.seedance_2_5_video_extend import Seedance25VideoExtend
 
 
 ALL_NODES = [
@@ -187,5 +187,5 @@ def test_image_to_video_accepts_tensor_or_url():
 
 @pytest.mark.parametrize("node", ALL_NODES)
 def test_node_is_registered(node):
-    from wavespeed import NODES
+    from erpk.wavespeed import NODES
     assert node in NODES

@@ -13,7 +13,7 @@ sys.path.insert(0, _REPO)
 # requests is a transitive dep of the client module; skip cleanly if absent.
 pytest.importorskip("requests")
 
-from wavespeed.wavespeed_api.client import WaveSpeedClient
+from erpk.wavespeed.wavespeed_api.client import WaveSpeedClient
 
 
 class _FakeRequest:
