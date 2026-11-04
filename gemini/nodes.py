@@ -8,6 +8,7 @@ import math
 from comfy_api.latest import IO
 
 from .gemini_api.client import GeminiClient, raise_if_cut_off, stop_reason
+from ..utils.image_grid import NO_GRID_IMAGE, grid_inputs, load_grid_images, validate_grid
 
 # Degenerate-box floor for detections, mirroring utils/regional_prompt's
 # MIN_REGION_EXTENT (the regions contract). It is duplicated rather than imported
@@ -1395,6 +1396,10 @@ class GeminiImageGeneration(IO.ComfyNode):
             raise ValueError(error_msg)
 
 
+EDIT_GRID_DEFAULT = 10
+EDIT_GRID_CAP = 14
+
+
 class GeminiImageEdit(IO.ComfyNode):
     """Uses Gemini's image generation models to edit/modify existing images based on text prompts.
     Gemini 3 Pro supports up to 14 reference images (up to 6 objects, up to 5 humans)."""
@@ -1410,7 +1415,9 @@ class GeminiImageEdit(IO.ComfyNode):
             inputs=[
                 IO.Image.Input(
                     "image",
-                    tooltip="Reference image(s) to edit. Use Batch Images node to combine multiple images (up to 14).",
+                    optional=True,
+                    tooltip=("Reference image(s) to edit. Use Batch Images node to combine multiple images (up to 14). "
+                             "When connected, the grid on the node is ignored."),
                 ),
                 IO.String.Input(
                     "prompt",
@@ -1489,6 +1496,11 @@ class GeminiImageEdit(IO.ComfyNode):
                     control_after_generate="randomize",
                     tooltip="Seed for reproducible outputs. Randomizes by default.",
                 ),
+                *grid_inputs(
+                    EDIT_GRID_DEFAULT,
+                    EDIT_GRID_CAP,
+                    "Most images the grid accepts. Gemini 3 Pro takes up to 14 reference images.",
+                ),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -1500,6 +1512,12 @@ class GeminiImageEdit(IO.ComfyNode):
     def fingerprint_inputs(cls, **kwargs):
         seed = kwargs.get("seed", -1)
         return float("NaN") if seed == -1 else seed
+
+    @classmethod
+    def validate_inputs(cls, grid_images="[]"):
+        # Only `grid_images` is named: ComfyUI skips its own type and range checks for
+        # every input named here, and grid_max_images keeps its min/max that way.
+        return validate_grid(grid_images)
 
     @classmethod
     async def execute(cls, **kwargs) -> IO.NodeOutput:
@@ -1521,6 +1539,16 @@ class GeminiImageEdit(IO.ComfyNode):
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 
+        grid_images = []
+        if image is None:
+            grid_images = await asyncio.to_thread(
+                load_grid_images,
+                kwargs.get("grid_images", "[]"),
+                kwargs.get("grid_max_images", EDIT_GRID_DEFAULT),
+            )
+            if not grid_images:
+                raise ValueError(NO_GRID_IMAGE)
+
         try:
             if client is not None:
                 image_client = GeminiClient(
@@ -1537,7 +1565,7 @@ class GeminiImageEdit(IO.ComfyNode):
                     model=model,
                 )
 
-            pil_images = ImageConverter.tensors_to_pil_list(image)
+            pil_images = grid_images if image is None else ImageConverter.tensors_to_pil_list(image)
             # Refs precede additional_images so the prompt's image numbering
             # (base image is 1, refs follow in region order) holds.
             for ref in image_refs or []:

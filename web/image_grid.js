@@ -18,6 +18,7 @@ const GRID_NODES = [
     { nodeId: "ImageGridLoader" },
     { nodeId: "OpenAIImageEdit", socket: "image" },
     { nodeId: "GrokImageEdit", socket: "image" },
+    { nodeId: "GeminiImageEdit", socket: "image" },
 ];
 
 /** @param {File} file */
