@@ -1,8 +1,12 @@
 # ABOUTME: ComfyUI V3 nodes for OpenAI image generation and editing
 # ABOUTME: Provides image generation and editing with GPT Image models
 
+import asyncio
+from io import BytesIO
+
 from comfy_api.latest import IO
 from .openai_api.client import OpenAIClient
+from ..utils.image_grid import grid_inputs, load_grid_images, validate_grid
 
 IMAGE_MODELS = list(OpenAIClient.IMAGE_MODELS.keys())
 EDIT_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"]
@@ -11,6 +15,9 @@ EDIT_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"]
 # prompts that omit the input.
 GENERATION_DEFAULT_MODEL = "gpt-image-2.5-flare"
 EDIT_DEFAULT_MODEL = "gpt-image-2.5-sunburst"
+EDIT_GRID_DEFAULT = 10
+EDIT_GRID_CAP = 16
+NO_EDIT_IMAGE = "Connect an image or add images to the grid"
 
 # Mainline (text/reasoning) models for the Responses API call. Each returned
 # 200 on responses.create with the image_generation tool attached (measured
@@ -538,6 +545,22 @@ class OpenAIImageResponses(IO.ComfyNode):
             raise ValueError(error_msg)
 
 
+def _grid_pngs(raw, max_images):
+    """The grid's files as PNG bytes at their own size, in grid order.
+
+    Re-encoded rather than sent as stored: the client labels every image image/png.
+    """
+    pictures = load_grid_images(raw, max_images)
+    if not pictures:
+        raise ValueError(NO_EDIT_IMAGE)
+    pngs = []
+    for picture in pictures:
+        buffer = BytesIO()
+        picture.save(buffer, format="PNG")
+        pngs.append(buffer.getvalue())
+    return pngs
+
+
 class OpenAIImageEdit(IO.ComfyNode):
     """Uses OpenAI's image editing API to modify existing images based on text prompts."""
 
@@ -551,12 +574,14 @@ class OpenAIImageEdit(IO.ComfyNode):
             inputs=[
                 IO.Image.Input(
                     "image",
+                    optional=True,
                     tooltip=(
                         "Input image(s) to edit. A single image is the default. "
                         "If you pass a batched IMAGE (e.g. from an Image Batch / "
                         "Rebatch node), all N images are sent as reference images "
                         "— gpt-image-2 uses this for character/scene continuity "
-                        "(up to 16 images). Mask (if provided) applies to the first."
+                        "(up to 16 images). Mask (if provided) applies to the first. "
+                        "When connected, the grid on the node is ignored."
                     ),
                 ),
                 IO.String.Input(
@@ -662,6 +687,11 @@ class OpenAIImageEdit(IO.ComfyNode):
                     optional=True,
                     tooltip="Compression level 0-100 (100 = least compression). Applied only to jpeg and webp.",
                 ),
+                *grid_inputs(
+                    EDIT_GRID_DEFAULT,
+                    EDIT_GRID_CAP,
+                    "Most images the grid accepts. gpt-image-2 takes up to 16 reference images.",
+                ),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -674,7 +704,13 @@ class OpenAIImageEdit(IO.ComfyNode):
         return float("NaN") if seed == -1 else seed
 
     @classmethod
-    async def execute(cls, image, prompt, **kwargs) -> IO.NodeOutput:
+    def validate_inputs(cls, images="[]"):
+        # Only `images` is named: ComfyUI skips its own type and range checks for
+        # every input named here, and max_images keeps its min/max that way.
+        return validate_grid(images)
+
+    @classmethod
+    async def execute(cls, prompt, image=None, **kwargs) -> IO.NodeOutput:
         from .openai_api.utils import ImageConverter
 
         client = kwargs.get("client")
@@ -696,6 +732,14 @@ class OpenAIImageEdit(IO.ComfyNode):
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
 
+        grid_pngs = None
+        if image is None:
+            grid_pngs = await asyncio.to_thread(
+                _grid_pngs,
+                kwargs.get("images", "[]"),
+                kwargs.get("max_images", EDIT_GRID_DEFAULT),
+            )
+
         try:
             # Use provided client or create new one
             if client is not None:
@@ -709,18 +753,22 @@ class OpenAIImageEdit(IO.ComfyNode):
             print(f"[OpenAI] Editing image with model: {model}")
             print(f"[OpenAI] Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
 
-            # Convert image tensor to PNG bytes. Handle batched input: if the
-            # IMAGE tensor has N > 1 in its batch dimension, send all N as a
-            # list of reference images (gpt-image-2 multi-image edit).
-            batch_size = image.shape[0] if hasattr(image, "shape") and len(image.shape) == 4 else 1
-            if batch_size > 1:
-                image_bytes = [
-                    ImageConverter.tensor_to_bytes(image[i:i + 1], format="PNG")
-                    for i in range(batch_size)
-                ]
-                print(f"[OpenAI] Multi-image edit: sending {batch_size} reference images")
+            if image is None:
+                image_bytes = grid_pngs
+                print(f"[OpenAI] Grid edit: sending {len(grid_pngs)} image(s) at their own size")
             else:
-                image_bytes = ImageConverter.tensor_to_bytes(image, format="PNG")
+                # Convert image tensor to PNG bytes. Handle batched input: if the
+                # IMAGE tensor has N > 1 in its batch dimension, send all N as a
+                # list of reference images (gpt-image-2 multi-image edit).
+                batch_size = image.shape[0] if hasattr(image, "shape") and len(image.shape) == 4 else 1
+                if batch_size > 1:
+                    image_bytes = [
+                        ImageConverter.tensor_to_bytes(image[i:i + 1], format="PNG")
+                        for i in range(batch_size)
+                    ]
+                    print(f"[OpenAI] Multi-image edit: sending {batch_size} reference images")
+                else:
+                    image_bytes = ImageConverter.tensor_to_bytes(image, format="PNG")
 
             # Convert mask if provided
             mask_bytes = None
@@ -753,7 +801,8 @@ class OpenAIImageEdit(IO.ComfyNode):
 
                 # Create RGBA image with transparency where mask is white
                 # OpenAI expects transparent areas to be edited
-                pil_image = ImageConverter.tensor_to_pil(image)
+                pil_image = (ImageConverter.tensor_to_pil(image) if image is not None
+                             else Image.open(BytesIO(image_bytes[0])))
                 if pil_image.mode != 'RGBA':
                     pil_image = pil_image.convert('RGBA')
 

@@ -11,7 +11,8 @@ import { api } from "../../../scripts/api.js";
 import { storedName, viewPath } from "./image_grid/grid_list.js";
 import { installImageGrid } from "./image_grid/mount.js";
 
-const GRID_NODES = ["ImageGridLoader"];
+// Each node here declares the grid's inputs with grid_inputs() from utils/image_grid.py.
+const GRID_NODES = ["ImageGridLoader", "OpenAIImageEdit"];
 
 /** @param {File} file */
 async function uploadToInput(file) {

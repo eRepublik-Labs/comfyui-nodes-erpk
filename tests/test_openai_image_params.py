@@ -398,6 +398,10 @@ class TestOutputFormat:
             "quality", "moderation", "n", "background", "input_fidelity", "seed",
         ],
     }
+    WIDGETS_AFTER = {
+        "OpenAIImageGeneration": [],
+        "OpenAIImageEdit": ["images", "max_images"],
+    }
 
     @pytest.mark.parametrize("class_name", sorted(WIDGETS_BEFORE))
     def test_new_widgets_are_appended_last(self, class_name):
@@ -407,7 +411,8 @@ class TestOutputFormat:
         inputs = cls.define_schema().inputs
         widget_ids = [i.id for i in inputs
                       if i.io_type in ("STRING", "INT", "FLOAT", "BOOLEAN", "COMBO")]
-        assert widget_ids == self.WIDGETS_BEFORE[class_name] + ["output_format", "output_compression"]
+        assert widget_ids == (self.WIDGETS_BEFORE[class_name] + ["output_format", "output_compression"]
+                              + self.WIDGETS_AFTER[class_name])
         fmt = next(i for i in inputs if i.id == "output_format")
         assert fmt.options == ["png", "jpeg", "webp"] and fmt.default == "png"
         comp = next(i for i in inputs if i.id == "output_compression")

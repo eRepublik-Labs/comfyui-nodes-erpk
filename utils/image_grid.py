@@ -35,6 +35,20 @@ def grid_inputs(max_default, max_cap, max_tooltip):
     ]
 
 
+def validate_grid(raw):
+    """A validate_inputs answer for the `images` list: True, or why its files cannot load.
+
+    An empty list passes, for nodes where a connected socket can stand in for the grid.
+    """
+    import folder_paths
+
+    try:
+        resolve_grid_images(raw, folder_paths.get_input_directory())
+    except ValueError as e:
+        return str(e)
+    return True
+
+
 def load_grid_images(raw, max_images):
     """The grid's files as upright RGB PIL images in grid order; an empty grid gives []."""
     import folder_paths

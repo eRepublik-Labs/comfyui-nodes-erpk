@@ -276,7 +276,7 @@ class TestImageModelDefaults:
         seen = {}
         with pytest.raises(ValueError, match="stop here"):
             asyncio.run(OpenAIImageEdit.execute(
-                torch.zeros(1, 8, 8, 3), "add a hat",
+                image=torch.zeros(1, 8, 8, 3), prompt="add a hat",
                 client=self._recording_client("edit_image", seen),
             ))
         assert seen["model"] == "gpt-image-2.5-sunburst"
