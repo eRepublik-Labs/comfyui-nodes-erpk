@@ -1,5 +1,5 @@
-# ABOUTME: ComfyUI V3 nodes for OpenAI image generation and editing
-# ABOUTME: Provides image generation and editing with GPT Image models
+# ABOUTME: ComfyUI V3 nodes for OpenAI image generation, editing and SVG generation
+# ABOUTME: Provides image generation, editing, GIF and SVG output with GPT Image models
 
 import asyncio
 import base64
