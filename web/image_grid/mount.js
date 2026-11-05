@@ -50,6 +50,7 @@ export function installImageGrid(nodeType, io, { socket, caps, nodeName }) {
         if (grid) {
             // widgets_values are assigned by now; rebuild before anything can queue.
             grid.setup();
+            grid.setCollapsed(this.properties?.erpkGridCollapsed === true);
             grid.loadFromWidget();
             if (socket) grid.setSocketLinked(isSocketLinked(this, socket));
         }

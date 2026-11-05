@@ -3,7 +3,7 @@
 // @ts-check
 
 export const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"];
-export const ACCEPTED_LABEL = "PNG, JPG, WEBP";
+export const ACCEPTED_LABEL = "PNG, JPG, WebP";
 
 /**
  * Read the `grid_images` widget value. A value that is not a JSON list of filenames

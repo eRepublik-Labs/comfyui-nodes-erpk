@@ -27,6 +27,8 @@ import {
     FOOTER_GAP,
     FOOTER_H,
     GAP,
+    HEADER_GAP,
+    HEADER_H,
     MIN_NODE_WIDTH,
     NOTICE_H,
     ROOT_PAD_V,
@@ -56,12 +58,23 @@ const SOCKET_NOTICE = { text: "Image socket connected, grid ignored", tone: "inf
  * @param {string} nodeName what an over-cap notice names when the node has no model choice
  */
 export function createImageGrid(node, io, caps, nodeName) {
-    const hintId = `erpk-grid-hint-${++gridSerial}`;
+    const serial = ++gridSerial;
+    const hintId = `erpk-grid-hint-${serial}`;
 
     const root = el("div", "erpk-grid-root");
     root.setAttribute("role", "group");
     root.setAttribute("aria-label", "Image grid");
     const zone = el("div", "erpk-grid-zone");
+    const header = el("div", "erpk-grid-header");
+    const toggle = button("erpk-grid-toggle", "");
+    const chevron = el("span", "erpk-grid-chevron");
+    chevron.setAttribute("aria-hidden", "true");
+    toggle.append(chevron, "Reference images");
+    const headerCount = el("span", "erpk-grid-header-count");
+    header.append(toggle, headerCount);
+    const body = el("div");
+    body.id = `erpk-grid-body-${serial}`;
+    toggle.setAttribute("aria-controls", body.id);
     const list = el("ol", "erpk-grid-list");
     list.setAttribute("aria-label", "Images in send order");
     const empty = buildEmptyState();
@@ -74,7 +87,8 @@ export function createImageGrid(node, io, caps, nodeName) {
     const overlayTitle = el("span");
     const overlayDetail = el("small");
     overlay.append(overlayTitle, overlayDetail);
-    zone.append(empty.root, list, footer, overlay);
+    body.append(empty.root, list, footer);
+    zone.append(header, body, overlay);
 
     const notice = el("div", "erpk-grid-notice");
     notice.setAttribute("role", "status");
@@ -107,6 +121,7 @@ export function createImageGrid(node, io, caps, nodeName) {
         refocus: null,
         ready: false,
         socketLinked: false,
+        collapsed: false,
     };
     // Uploads run in parallel, but a finished one joins `names` only once every
     // earlier one has, so the list keeps drop order. Batch summaries follow the
@@ -190,6 +205,12 @@ export function createImageGrid(node, io, caps, nodeName) {
         if (remainingSlots(count, cap) > 0) list.append(buildAddCell());
         capacity.textContent = capacityText(count, cap);
         capacity.classList.toggle("erpk-grid-over-cap", count > cap);
+        headerCount.textContent = countLabel(count, cap);
+        headerCount.classList.toggle("erpk-grid-over-cap", count > cap);
+        body.hidden = state.collapsed;
+        chevron.textContent = state.collapsed ? "▸" : "▾";
+        toggle.setAttribute("aria-expanded", String(!state.collapsed));
+        zone.classList.toggle("erpk-grid-collapsed", state.collapsed);
         clearButton.disabled = state.uploads.length > 0;
         zone.classList.toggle("erpk-grid-ignored", state.socketLinked);
         setDisabled(empty.choose, state.socketLinked);
@@ -227,6 +248,22 @@ export function createImageGrid(node, io, caps, nodeName) {
         node.setDirtyCanvas?.(true, true);
     }
 
+    /** @param {boolean} collapsed */
+    function setCollapsed(collapsed) {
+        state.collapsed = collapsed;
+        if (state.ready) render();
+    }
+
+    // Only a user's choice is written, so a grid nobody has collapsed saves no
+    // property and loads expanded.
+    /** @param {boolean} collapsed */
+    function chooseCollapsed(collapsed) {
+        node.properties = node.properties || {};
+        node.properties.erpkGridCollapsed = collapsed;
+        setCollapsed(collapsed);
+        node.setDirtyCanvas?.(true, true);
+    }
+
     function layout() {
         root.style.width = `${rootWidth()}px`;
     }
@@ -239,14 +276,16 @@ export function createImageGrid(node, io, caps, nodeName) {
     // a time as images arrive. Mirrors the CSS box model in styles.js.
     function desiredHeight() {
         const noticeH = currentNotice() ? NOTICE_H : 0;
+        if (state.collapsed) return HEADER_H + 2 * ZONE_PAD + 2 * ZONE_BORDER + noticeH + ROOT_PAD_V;
+        const headerH = HEADER_H + HEADER_GAP;
         const count = filled();
-        if (count === 0) return EMPTY_H + noticeH + ROOT_PAD_V;
+        if (count === 0) return EMPTY_H + headerH + noticeH + ROOT_PAD_V;
         const inner = rootWidth() - 2 * ZONE_PAD - 2 * ZONE_BORDER;
         const cell = (inner - GAP * (COLUMNS - 1)) / COLUMNS;
         const cells = count + (remainingSlots(count, maxImages()) > 0 ? 1 : 0);
         const rows = Math.ceil(cells / COLUMNS);
         const grid = rows * cell + (rows - 1) * GAP;
-        const zoneH = grid + 2 * ZONE_PAD + 2 * ZONE_BORDER + FOOTER_GAP + FOOTER_H;
+        const zoneH = headerH + grid + 2 * ZONE_PAD + 2 * ZONE_BORDER + FOOTER_GAP + FOOTER_H;
         return Math.ceil(zoneH + noticeH + ROOT_PAD_V);
     }
 
@@ -356,6 +395,7 @@ export function createImageGrid(node, io, caps, nodeName) {
             render();
             return;
         }
+        if (state.collapsed) chooseCollapsed(false);
         /** @type {Upload[]} */
         const batch = plan.take.map((file) => ({ name: file.name, stored: null }));
         /** @type {(string | null)[]} */
@@ -574,6 +614,7 @@ export function createImageGrid(node, io, caps, nodeName) {
         fileInput.value = "";
         addFiles(files);
     });
+    toggle.addEventListener("click", () => chooseCollapsed(!state.collapsed));
     empty.choose.addEventListener("click", openPicker);
     clearButton.addEventListener("click", clearAll);
     undoButton.addEventListener("click", undoClear);
@@ -588,7 +629,7 @@ export function createImageGrid(node, io, caps, nodeName) {
     root.addEventListener("dragleave", onFileDragLeave);
     root.addEventListener("drop", onFileDrop);
 
-    return { root, setup, loadFromWidget, layout, desiredHeight, titleCount, addFiles, setSocketLinked };
+    return { root, setup, loadFromWidget, layout, desiredHeight, titleCount, addFiles, setSocketLinked, setCollapsed };
 }
 
 /** @param {HTMLButtonElement} control @param {boolean} disabled */

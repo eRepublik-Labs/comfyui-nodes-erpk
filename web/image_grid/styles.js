@@ -19,6 +19,8 @@ export const EMPTY_H = 150;
 export const FOOTER_GAP = 10;
 export const FOOTER_H = 26;
 export const NOTICE_H = 24;
+export const HEADER_H = 24;
+export const HEADER_GAP = 8;
 export const ROOT_PAD_TOP = 0;
 export const ROOT_PAD_BOTTOM = 4;
 // The frontend wraps a DOM widget in 10px top and bottom margins and sizes the
@@ -60,6 +62,34 @@ sheet.textContent = `
 .erpk-grid-zone.erpk-grid-over.erpk-grid-refuse { border-color: ${DANGER_RED}; background: #170f10; }
 .erpk-grid-zone.erpk-grid-over .erpk-grid-list { opacity: 0.35; }
 .erpk-grid-zone.erpk-grid-ignored { opacity: 0.5; cursor: default; }
+.erpk-grid-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    height: ${HEADER_H}px;
+}
+.erpk-grid-zone:not(.erpk-grid-collapsed) .erpk-grid-header { margin-bottom: ${HEADER_GAP}px; }
+.erpk-grid-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: ${HEADER_H}px;
+    min-width: 0;
+    padding: 0 6px 0 2px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: ${TEXT};
+    font: inherit;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.erpk-grid-toggle:hover { color: #fff; }
+.erpk-grid-chevron { width: 12px; color: ${MUTED}; font-size: 18px; line-height: 1; text-align: center; }
+.erpk-grid-toggle:hover .erpk-grid-chevron { color: ${TEXT}; }
+.erpk-grid-header-count { color: ${MUTED}; font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .erpk-grid-list {
     display: grid;
     grid-template-columns: repeat(${COLUMNS}, minmax(0, 1fr));
@@ -85,7 +115,7 @@ sheet.textContent = `
     border-radius: 3px;
     pointer-events: none;
 }
-.erpk-grid-cell:focus-visible, .erpk-grid-btn:focus-visible, .erpk-grid-remove:focus-visible {
+.erpk-grid-cell:focus-visible, .erpk-grid-btn:focus-visible, .erpk-grid-remove:focus-visible, .erpk-grid-toggle:focus-visible {
     outline: 2px solid ${ACTIVE_GREEN};
     outline-offset: 2px;
 }
@@ -226,7 +256,7 @@ sheet.textContent = `
     font-size: 11px;
 }
 .erpk-grid-capacity { font-variant-numeric: tabular-nums; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.erpk-grid-capacity.erpk-grid-over-cap { color: ${DANGER_RED}; }
+.erpk-grid-root .erpk-grid-over-cap { color: ${DANGER_RED}; }
 .erpk-grid-overlay {
     position: absolute;
     inset: 0;
@@ -246,6 +276,10 @@ sheet.textContent = `
 .erpk-grid-over .erpk-grid-overlay { display: flex; }
 .erpk-grid-refuse .erpk-grid-overlay { background: rgba(23, 15, 16, 0.9); color: ${DANGER_RED}; }
 .erpk-grid-overlay small { color: ${TEXT}; font-weight: 400; font-size: 11px; }
+/* A collapsed zone is one header tall, room for the title line only, which would sit on the header's text. */
+.erpk-grid-collapsed .erpk-grid-overlay { padding: 0 12px; }
+.erpk-grid-collapsed.erpk-grid-over .erpk-grid-header { opacity: 0; }
+.erpk-grid-collapsed .erpk-grid-overlay small { display: none; }
 .erpk-grid-notice {
     display: flex;
     align-items: center;
