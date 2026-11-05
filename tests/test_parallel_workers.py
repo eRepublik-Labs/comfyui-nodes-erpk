@@ -11,7 +11,7 @@ import pytest
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _REPO)
 
-from erpk.parallel_workers import _clamp_worker_count, install, _DEFAULT_WORKERS, _MAX_WORKERS
+from erpk.parallel_workers import _clamp_worker_count, cache_config, install, _DEFAULT_WORKERS, _MAX_WORKERS
 
 
 class TestClampWorkerCount:
@@ -113,3 +113,40 @@ class TestInstall:
         )
         # Should not raise.
         install()
+
+
+class _Args:
+    def __init__(self, cache_ram=(), cache_lru=0, cache_classic=False, cache_none=False):
+        self.cache_ram = list(cache_ram)
+        self.cache_lru = cache_lru
+        self.cache_classic = cache_classic
+        self.cache_none = cache_none
+
+
+class _CacheTypes:
+    CLASSIC, LRU, RAM_PRESSURE, NONE = "classic", "lru", "ram_pressure", "none"
+
+
+RAM_64GB_MB = 64 * 1024
+
+
+def test_cache_config_defaults_to_ram_pressure_with_derived_headroom():
+    cache_type, cache_args = cache_config(_Args(), _CacheTypes, RAM_64GB_MB)
+    assert cache_type == "ram_pressure"
+    assert cache_args == {"lru": 0, "ram": 6.4, "ram_inactive": 64.0}
+
+
+def test_cache_config_reads_active_and_inactive_gb_from_cache_ram_list():
+    _, cache_args = cache_config(_Args(cache_ram=[3.0]), _CacheTypes, RAM_64GB_MB)
+    assert cache_args == {"lru": 0, "ram": 3.0, "ram_inactive": 64.0}
+    _, cache_args = cache_config(_Args(cache_ram=[3.0, 20.0]), _CacheTypes, RAM_64GB_MB)
+    assert cache_args == {"lru": 0, "ram": 3.0, "ram_inactive": 20.0}
+
+
+def test_cache_config_classic_lru_and_none_override_ram_pressure():
+    assert cache_config(_Args(cache_classic=True), _CacheTypes, RAM_64GB_MB) == (
+        "classic", {"lru": 0, "ram": 0, "ram_inactive": 0})
+    assert cache_config(_Args(cache_lru=5), _CacheTypes, RAM_64GB_MB) == (
+        "lru", {"lru": 5, "ram": 0, "ram_inactive": 0})
+    assert cache_config(_Args(cache_none=True), _CacheTypes, RAM_64GB_MB) == (
+        "none", {"lru": 0, "ram": 0, "ram_inactive": 0})

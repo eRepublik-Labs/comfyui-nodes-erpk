@@ -5,12 +5,12 @@ from .nodes import (
     OpenAIAPIConfig, OpenAITextGeneration, OpenAIChat, OpenAIVision,
     OpenAISystemInstruction,
 )
-from .image_nodes import OpenAIImageGeneration, OpenAIImageEdit, OpenAIImageResponses
+from .image_nodes import OpenAIImageGeneration, OpenAIImageEdit, OpenAIImageResponses, OpenAISVGGeneration
 
 NODES = [
     OpenAIAPIConfig, OpenAITextGeneration, OpenAIChat, OpenAIVision,
     OpenAISystemInstruction, OpenAIImageGeneration, OpenAIImageEdit,
-    OpenAIImageResponses,
+    OpenAIImageResponses, OpenAISVGGeneration,
 ]
 
 __all__ = ["NODES"]

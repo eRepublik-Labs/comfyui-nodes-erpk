@@ -122,11 +122,10 @@ class TestGptImage25:
 
     MODELS_25 = ("gpt-image-2.5-sunburst", "gpt-image-2.5-flare")
 
-    def test_offered_in_image_and_gpt_image_sets(self):
+    def test_offered_with_the_gpt_image_2_envelope(self):
         for m in self.MODELS_25:
-            assert m in OpenAIClient.IMAGE_MODELS
-            assert m in OpenAIClient.GPT_IMAGE_MODELS
-            assert m in OpenAIClient.GPT_IMAGE_2_MODELS
+            caps = OpenAIClient.IMAGE_MODELS[m]
+            assert (caps.custom_size, caps.input_fidelity, caps.transparent_background) == (True, False, True)
 
     def test_offered_inside_responses_image_tool(self):
         # The model pages list v1/responses as "Not supported" as a top-level
@@ -145,6 +144,42 @@ class TestGptImage25:
         assert OpenAIClient._quality_for("gpt-image-2", "max") == "high"
         assert OpenAIClient._quality_for("gpt-image-2", "xhigh") == "high"
         assert OpenAIClient._quality_for("gpt-image-2", "low") == "low"
+
+
+class TestGptImage26:
+    """gpt-image-2.6-sunburst / -flare, measured 2026-11-05 on images.generate,
+    images.edit and the Responses image tool: all 200; xhigh 200, transparent
+    200, 1040x1040 200, input_fidelity 400."""
+
+    MODELS_26 = ("gpt-image-2.6-sunburst", "gpt-image-2.6-flare")
+
+    def test_capabilities(self):
+        for m in self.MODELS_26:
+            caps = OpenAIClient.IMAGE_MODELS[m]
+            assert (caps.max_quality, caps.transparent_background, caps.custom_size,
+                    caps.input_fidelity, caps.complexity) == ("max", True, True, False, True)
+
+    def test_offered_on_every_image_node(self):
+        from erpk.openai.image_nodes import IMAGE_MODELS, EDIT_MODELS, RESPONSES_IMAGE_MODELS
+        for m in self.MODELS_26:
+            assert m in IMAGE_MODELS and m in EDIT_MODELS and m in RESPONSES_IMAGE_MODELS
+
+    def test_xhigh_and_max_pass_through(self):
+        for m in self.MODELS_26:
+            assert OpenAIClient._quality_for(m, "xhigh") == "xhigh"
+            assert OpenAIClient._quality_for(m, "max") == "max"
+
+    def test_complexity_reaches_only_26(self, capsys):
+        assert OpenAIClient._complexity_for("gpt-image-2.6-flare", "low") == "low"
+        assert OpenAIClient._complexity_for("gpt-image-2.6-sunburst", "high") == "high"
+        assert OpenAIClient._complexity_for("gpt-image-2.6-flare", "auto") is None
+        assert capsys.readouterr().out == ""
+        assert OpenAIClient._complexity_for("gpt-image-2.5-flare", "low") is None
+        assert OpenAIClient._complexity_for("gpt-image-2", "medium") is None
+        assert capsys.readouterr().out == (
+            "[OpenAI] gpt-image-2.5-flare does not support complexity; omitting 'low'\n"
+            "[OpenAI] gpt-image-2 does not support complexity; omitting 'medium'\n"
+        )
 
 
 class TestReasoningEffortClamp:
@@ -180,7 +215,10 @@ class TestOfferedCatalog:
         "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "chat-latest",
     }
-    KEPT_IMAGE = {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"}
+    KEPT_IMAGE = {
+        "gpt-image-2.6-sunburst", "gpt-image-2.6-flare",
+        "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2",
+    }
 
     def test_text_dropdowns_offer_exactly_the_kept_models(self):
         from erpk.openai.nodes import TEXT_MODELS, VISION_MODELS
@@ -197,7 +235,7 @@ class TestOfferedCatalog:
         from erpk.openai.image_nodes import IMAGE_MODELS, EDIT_MODELS
         assert set(IMAGE_MODELS) == self.KEPT_IMAGE
         assert set(EDIT_MODELS) == self.KEPT_IMAGE
-        assert set(OpenAIClient.GPT_IMAGE_MODELS) == self.KEPT_IMAGE
+        assert set(OpenAIClient.IMAGE_MODELS) == self.KEPT_IMAGE
 
     def test_generation_quality_drops_dalle_only_values(self):
         # The images reference marks hd and standard "only supported by
@@ -228,15 +266,16 @@ class TestMaxTokensCap:
 
 
 class TestImageModelDefaults:
-    """Alex's 2026-11-03 call: Image Generation and the Responses image tool
-    default to gpt-image-2.5-flare, Image Edit to gpt-image-2.5-sunburst (the
-    images.edit reference's own default). A saved workflow keeps the model it
-    stored; only a new node, or a prompt that omits the input, gets these."""
+    """Alex's 2026-11-05 call: Image Generation and the Responses image tool
+    default to gpt-image-2.6-flare, Image Edit to gpt-image-2.6-sunburst. The
+    Responses tool took gpt-image-2.6-flare with a 200 (measured 2026-11-05).
+    A saved workflow keeps the model it stored; only a new node, or a prompt
+    that omits the input, gets these."""
 
     @pytest.mark.parametrize("node_name,input_id,expected", [
-        ("OpenAIImageGeneration", "model", "gpt-image-2.5-flare"),
-        ("OpenAIImageResponses", "image_model", "gpt-image-2.5-flare"),
-        ("OpenAIImageEdit", "model", "gpt-image-2.5-sunburst"),
+        ("OpenAIImageGeneration", "model", "gpt-image-2.6-flare"),
+        ("OpenAIImageResponses", "image_model", "gpt-image-2.6-flare"),
+        ("OpenAIImageEdit", "model", "gpt-image-2.6-sunburst"),
     ])
     def test_new_node_starts_on_the_documented_model(self, node_name, input_id, expected):
         import erpk.openai.image_nodes as image_nodes
@@ -252,25 +291,25 @@ class TestImageModelDefaults:
             return {"blocked": True, "error": "stop here"}
         return SimpleNamespace(**{method_name: record})
 
-    def test_generation_without_a_model_sends_flare(self):
+    def test_generation_without_a_model_sends_26_flare(self):
         from erpk.openai.image_nodes import OpenAIImageGeneration
         seen = {}
         with pytest.raises(ValueError, match="stop here"):
             asyncio.run(OpenAIImageGeneration.execute(
                 "a cat", client=self._recording_client("generate_image", seen),
             ))
-        assert seen["model"] == "gpt-image-2.5-flare"
+        assert seen["model"] == "gpt-image-2.6-flare"
 
-    def test_responses_without_an_image_model_sends_flare(self):
+    def test_responses_without_an_image_model_sends_26_flare(self):
         from erpk.openai.image_nodes import OpenAIImageResponses
         seen = {}
         with pytest.raises(ValueError, match="stop here"):
             asyncio.run(OpenAIImageResponses.execute(
                 "a cat", client=self._recording_client("generate_image_via_responses", seen),
             ))
-        assert seen["image_model"] == "gpt-image-2.5-flare"
+        assert seen["image_model"] == "gpt-image-2.6-flare"
 
-    def test_edit_without_a_model_sends_sunburst(self):
+    def test_edit_without_a_model_sends_26_sunburst(self):
         torch = pytest.importorskip("torch")
         from erpk.openai.image_nodes import OpenAIImageEdit
         seen = {}
@@ -279,4 +318,4 @@ class TestImageModelDefaults:
                 image=torch.zeros(1, 8, 8, 3), prompt="add a hat",
                 client=self._recording_client("edit_image", seen),
             ))
-        assert seen["model"] == "gpt-image-2.5-sunburst"
+        assert seen["model"] == "gpt-image-2.6-sunburst"

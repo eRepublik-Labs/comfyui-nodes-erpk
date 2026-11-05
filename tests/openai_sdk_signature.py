@@ -27,6 +27,18 @@ def sdk_parameters(module_name: str, class_name: str, method_name: str) -> froze
     return frozenset(json.loads(result.stdout))
 
 
+@functools.lru_cache(maxsize=None)
+def sdk_has(module_name: str, attribute: str) -> bool:
+    """Whether the installed SDK's module exposes `attribute`, e.g. openai.types.ImagesResponse."""
+    result = subprocess.run(
+        [sys.executable, "-I", "-c",
+         "import importlib, sys; print(hasattr(importlib.import_module(sys.argv[1]), sys.argv[2]))",
+         module_name, attribute],
+        capture_output=True, text=True, check=True, cwd="/",
+    )
+    return result.stdout.strip() == "True"
+
+
 def assert_binds(params: dict, module_name: str, class_name: str, method_name: str) -> None:
     """Fail with the offending names when the SDK method has no such keyword."""
     unknown = set(params) - sdk_parameters(module_name, class_name, method_name)

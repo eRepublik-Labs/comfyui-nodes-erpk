@@ -1,7 +1,8 @@
-# ABOUTME: ComfyUI V3 nodes for OpenAI image generation and editing
-# ABOUTME: Provides image generation and editing with GPT Image models
+# ABOUTME: ComfyUI V3 nodes for OpenAI image generation, editing and SVG generation
+# ABOUTME: Provides image generation, editing, GIF and SVG output with GPT Image models
 
 import asyncio
+import base64
 from io import BytesIO
 
 from comfy_api.latest import IO
@@ -10,13 +11,15 @@ from ..utils.image_grid import (
     NO_GRID_IMAGE, grid_input, load_grid_images, model_grid_cap, register_grid_caps, validate_grid,
 )
 
-IMAGE_MODELS = list(OpenAIClient.IMAGE_MODELS.keys())
-EDIT_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"]
+# Every GPT Image model takes images.generate, images.edit and the Responses
+# image_generation tool, so the three nodes offer the same list.
+IMAGE_MODELS = list(OpenAIClient.IMAGE_MODELS)
+EDIT_MODELS = IMAGE_MODELS
 
 # A saved workflow keeps its stored model; these reach only new nodes and
 # prompts that omit the input.
-GENERATION_DEFAULT_MODEL = "gpt-image-2.5-flare"
-EDIT_DEFAULT_MODEL = "gpt-image-2.5-sunburst"
+GENERATION_DEFAULT_MODEL = "gpt-image-2.6-flare"
+EDIT_DEFAULT_MODEL = "gpt-image-2.6-sunburst"
 
 # One limit for every GPT Image model, "For GPT image models, you can provide up to 16 images":
 # https://developers.openai.com/api/reference/resources/images/methods/edit
@@ -25,7 +28,8 @@ register_grid_caps("OpenAIImageEdit", EDIT_GRID_CAPS, model_widget="model")
 
 # Mainline (text/reasoning) models for the Responses API call. Each returned
 # 200 on responses.create with the image_generation tool attached (measured
-# 2026-10-01, gpt-6.1-terra 2026-11-03). The first entry is the node default.
+# 2026-10-01, gpt-6.1-terra 2026-11-03; both gpt-image-2.6 tiers as the tool
+# model 2026-11-05). The first entry is the node default.
 RESPONSES_MAINLINE_MODELS = [
     "gpt-6.1-sol",
     "gpt-6.1-terra",
@@ -37,12 +41,10 @@ RESPONSES_MAINLINE_MODELS = [
     "gpt-5.6-luna",
 ]
 
-# Image models valid inside the Responses-API image_generation tool config.
-RESPONSES_IMAGE_MODELS = [
-    "gpt-image-2",
-    "gpt-image-2.5-sunburst",
-    "gpt-image-2.5-flare",
-]
+RESPONSES_IMAGE_MODELS = IMAGE_MODELS
+
+SVG_MODELS = [m for m, caps in OpenAIClient.IMAGE_MODELS.items() if caps.svg]
+SVG_DEFAULT_MODEL = "gpt-image-2.6-flare"
 
 # max is Responses-only: 200 on all 8 mainlines here, 400 on chat.completions
 # (measured 2026-10-14, gpt-6.1-terra 2026-11-03), so the text nodes stop at
@@ -57,6 +59,23 @@ SIZE_PRESETS = [
     "Custom",
 ]
 CUSTOM_SIZE = "Custom"
+
+COMPLEXITY_LEVELS = ["auto", "low", "medium", "high"]
+
+
+def complexity_input():
+    """The complexity Combo shared by the generation and edit nodes."""
+    return IO.Combo.Input(
+        "complexity",
+        options=COMPLEXITY_LEVELS,
+        default="auto",
+        optional=True,
+        tooltip=(
+            "How much detail GPT Image 2.6 puts into the image: low, medium or high. "
+            "'auto' sends nothing, which OpenAI documents as high. Other models reject "
+            "the parameter, so there it is left out."
+        ),
+    )
 
 
 def resolve_size(size, custom_width, custom_height):
@@ -138,12 +157,13 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Image generation model. "
-                        "gpt-image-2.5-sunburst / -flare: newest, add xhigh/max quality and transparent background. "
+                        "gpt-image-2.6-sunburst / -flare: newest, add complexity control. "
+                        "gpt-image-2.6 and 2.5 add xhigh/max quality and transparent background. "
                         "gpt-image-2: 4K output, multilingual text; no transparent background (the API rejects it)."
                     ),
                 ),
                 *size_inputs(
-                    "gpt-image-2 and 2.5 accept any size with both edges divisible by 16, "
+                    "gpt-image-2, 2.5 and 2.6 accept any size with both edges divisible by 16, "
                     "aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels and max edge 3840."
                 ),
                 IO.Combo.Input(
@@ -151,7 +171,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     options=["auto", "low", "medium", "high", "xhigh", "max"],
                     default="auto",
                     optional=True,
-                    tooltip="Image quality. auto/low/medium/high on every model; xhigh/max only on GPT Image 2.5 (clamped to high on gpt-image-2).",
+                    tooltip="Image quality. auto/low/medium/high on every model; xhigh/max only on GPT Image 2.6 and 2.5 (clamped to high on gpt-image-2).",
                 ),
                 IO.Combo.Input(
                     "background",
@@ -160,7 +180,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Background type for the generated output (GPT Image models only). "
-                        "'transparent' works on GPT Image 2.5 only (gpt-image-2 rejects it) and "
+                        "'transparent' works on GPT Image 2.6 and 2.5 only (gpt-image-2 rejects it) and "
                         "needs png or webp output."
                     ),
                 ),
@@ -197,10 +217,14 @@ class OpenAIImageGeneration(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "output_format",
-                    options=["png", "jpeg", "webp"],
+                    options=["png", "jpeg", "webp", "gif"],
                     default="png",
                     optional=True,
-                    tooltip="Output file format. 'transparent' background needs png or webp.",
+                    tooltip=(
+                        "Output file format. 'transparent' background needs png or webp. "
+                        "'gif' (GPT Image 2.6 only) returns an animation, and the image output "
+                        "holds every frame as a batch."
+                    ),
                 ),
                 IO.Int.Input(
                     "output_compression",
@@ -209,6 +233,28 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     max=100,
                     optional=True,
                     tooltip="Compression level 0-100 (100 = least compression). Applied only to jpeg and webp.",
+                ),
+                complexity_input(),
+                IO.Int.Input(
+                    "frame_count",
+                    default=9,
+                    min=2,
+                    max=64,
+                    optional=True,
+                    tooltip=(
+                        "Frames per GIF animation; used only when output_format is gif. The API tiles "
+                        "the frames onto one sheet whose longest edge must stay within 3840 px, so "
+                        "many frames need a smaller size or size auto."
+                    ),
+                ),
+                IO.Int.Input(
+                    "frame_duration_ms",
+                    default=200,
+                    min=20,
+                    max=2000,
+                    step=10,
+                    optional=True,
+                    tooltip="How long each GIF frame shows, in milliseconds; used only when output_format is gif.",
                 ),
             ],
             outputs=[
@@ -239,6 +285,9 @@ class OpenAIImageGeneration(IO.ComfyNode):
         n = kwargs.get("n", 1)
         output_format = kwargs.get("output_format", "png")
         output_compression = kwargs.get("output_compression", 100)
+        complexity = kwargs.get("complexity", "auto")
+        frame_count = kwargs.get("frame_count", 9)
+        frame_duration_ms = kwargs.get("frame_duration_ms", 200)
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -268,6 +317,9 @@ class OpenAIImageGeneration(IO.ComfyNode):
                 n=n,
                 output_format=output_format,
                 output_compression=output_compression,
+                complexity=complexity,
+                frame_count=frame_count,
+                frame_duration_ms=frame_duration_ms,
             )
 
             if response.get("blocked", False):
@@ -279,10 +331,10 @@ class OpenAIImageGeneration(IO.ComfyNode):
             if not images:
                 raise ValueError("No image was generated")
 
-            # Convert ALL returned images to a single batched tensor [N,H,W,C].
-            # Previously only images[0] was kept, silently dropping N-1 images
-            # the user was billed for.
-            tensors = [ImageConverter.base64_to_tensor(img) for img in images]
+            # Convert ALL returned images to a single batched tensor [N,H,W,C],
+            # each GIF contributing every frame. Previously only images[0] was
+            # kept, silently dropping N-1 images the user was billed for.
+            tensors = [ImageConverter.base64_frames_to_tensor(img) for img in images]
             if len(tensors) == 1:
                 image_tensor = tensors[0]
             else:
@@ -391,7 +443,7 @@ class OpenAIImageResponses(IO.ComfyNode):
                     options=["auto", "low", "medium", "high", "xhigh", "max"],
                     default="auto",
                     optional=True,
-                    tooltip="Image quality tier. xhigh/max only on GPT Image 2.5 (clamped to high on gpt-image-2).",
+                    tooltip="Image quality tier. xhigh/max only on GPT Image 2.6 and 2.5 (clamped to high on gpt-image-2).",
                 ),
                 IO.Combo.Input(
                     "background",
@@ -399,7 +451,7 @@ class OpenAIImageResponses(IO.ComfyNode):
                     default="auto",
                     optional=True,
                     tooltip=(
-                        "Background type. 'transparent' works on GPT Image 2.5 only (gpt-image-2 "
+                        "Background type. 'transparent' works on GPT Image 2.6 and 2.5 only (gpt-image-2 "
                         "rejects it) and needs png or webp output."
                     ),
                 ),
@@ -565,6 +617,37 @@ def _grid_pngs(raw, model):
     return pngs
 
 
+def _markup_png(markup, markup_mask, first_size):
+    """The markup layer as an RGBA PNG the size of image 1: marks opaque, the rest transparent.
+
+    The color comes from `markup`. The alpha comes from `markup_mask` read the way
+    Load Image writes it (1 where the PNG was transparent), or, with no mask, is
+    opaque wherever the markup pixel is not pure black.
+    """
+    import numpy as np
+    from PIL import Image
+
+    rgb = np.clip(markup[0, :, :, :3].cpu().numpy() * 255, 0, 255).astype(np.uint8)
+    height, width = rgb.shape[:2]
+    if (width, height) != first_size:
+        raise ValueError(
+            f"markup is {width}x{height} but image 1 is {first_size[0]}x{first_size[1]}; "
+            f"draw the marks on a layer the size of image 1")
+    if markup_mask is None:
+        alpha = np.where(rgb.any(axis=2), 255, 0).astype(np.uint8)
+    else:
+        mask = markup_mask[0] if markup_mask.dim() == 3 else markup_mask
+        mask_height, mask_width = mask.shape
+        if (mask_width, mask_height) != (width, height):
+            raise ValueError(
+                f"markup_mask is {mask_width}x{mask_height} but markup is {width}x{height}; "
+                f"connect the MASK of the Load Image that loads the markup")
+        alpha = 255 - np.clip(mask.cpu().numpy() * 255, 0, 255).astype(np.uint8)
+    buffer = BytesIO()
+    Image.fromarray(np.dstack([rgb, alpha]), "RGBA").save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 class OpenAIImageEdit(IO.ComfyNode):
     """Uses OpenAI's image editing API to modify existing images based on text prompts."""
 
@@ -604,18 +687,38 @@ class OpenAIImageEdit(IO.ComfyNode):
                     optional=True,
                     tooltip="Optional mask indicating areas to edit (white = edit, black = keep)",
                 ),
+                IO.Image.Input(
+                    "markup",
+                    optional=True,
+                    tooltip=(
+                        "Optional markup layer: arrows, circles or text drawn on a transparent "
+                        "layer the size of image 1, telling the model where and what to edit. "
+                        "Load the PNG with Load Image and connect its IMAGE here and its MASK to "
+                        "markup_mask. Cannot be combined with mask."
+                    ),
+                ),
+                IO.Mask.Input(
+                    "markup_mask",
+                    optional=True,
+                    tooltip=(
+                        "The MASK output of the Load Image that loads the markup (white where the "
+                        "layer is transparent). Without it, every pixel of markup that is not pure "
+                        "black counts as a mark."
+                    ),
+                ),
                 IO.Combo.Input(
                     "model",
                     options=EDIT_MODELS,
                     default=EDIT_DEFAULT_MODEL,
                     optional=True,
                     tooltip=(
-                        "Image editing model. gpt-image-2.5-sunburst / -flare add xhigh/max quality; "
+                        "Image editing model. gpt-image-2.6-sunburst / -flare add complexity control; "
+                        "gpt-image-2.6 and 2.5 add xhigh/max quality; "
                         "gpt-image-2 offers multilingual text and character continuity across edits."
                     ),
                 ),
                 *size_inputs(
-                    "gpt-image-2 and 2.5 accept any size with both edges divisible by 16, "
+                    "gpt-image-2, 2.5 and 2.6 accept any size with both edges divisible by 16, "
                     "aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels and max edge 3840."
                 ),
                 IO.Combo.Input(
@@ -623,7 +726,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                     options=["auto", "low", "medium", "high", "xhigh", "max"],
                     default="auto",
                     optional=True,
-                    tooltip="Image quality for GPT Image models; xhigh/max only on GPT Image 2.5 (clamped to high elsewhere).",
+                    tooltip="Image quality for GPT Image models; xhigh/max only on GPT Image 2.6 and 2.5 (clamped to high elsewhere).",
                 ),
                 IO.Combo.Input(
                     "moderation",
@@ -653,7 +756,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Background type for the edited output (GPT Image models only). "
-                        "'transparent' works on GPT Image 2.5 only (gpt-image-2 rejects it) and "
+                        "'transparent' works on GPT Image 2.6 and 2.5 only (gpt-image-2 rejects it) and "
                         "needs png or webp output."
                     ),
                 ),
@@ -665,7 +768,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                     tooltip=(
                         "Fidelity to the original input image(s). 'high' preserves details "
                         "more aggressively; 'low' gives the model more creative freedom. "
-                        "Ignored by gpt-image-2 and the 2.5 models (always high fidelity)."
+                        "Ignored by gpt-image-2, 2.5 and 2.6 (always high fidelity)."
                     ),
                 ),
                 IO.Int.Input(
@@ -692,6 +795,10 @@ class OpenAIImageEdit(IO.ComfyNode):
                     tooltip="Compression level 0-100 (100 = least compression). Applied only to jpeg and webp.",
                 ),
                 grid_input(),
+                # After grid_images, not before it: a save from before complexity
+                # holds the grid list then the grid's DOM widget slot, so only that
+                # slot's "" shifts here, and web/openai_dynamic_sizes.js resets it.
+                complexity_input(),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -715,6 +822,8 @@ class OpenAIImageEdit(IO.ComfyNode):
 
         client = kwargs.get("client")
         mask = kwargs.get("mask")
+        markup = kwargs.get("markup")
+        markup_mask = kwargs.get("markup_mask")
         model = kwargs.get("model", EDIT_DEFAULT_MODEL)
         size = resolve_size(
             kwargs.get("size", "1024x1024"),
@@ -728,9 +837,12 @@ class OpenAIImageEdit(IO.ComfyNode):
         input_fidelity = kwargs.get("input_fidelity", "auto")
         output_format = kwargs.get("output_format", "png")
         output_compression = kwargs.get("output_compression", 100)
+        complexity = kwargs.get("complexity", "auto")
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
+        if markup_mask is not None and markup is None:
+            raise ValueError("markup_mask is connected but markup is not; connect the markup IMAGE too")
 
         grid_pngs = None
         if image is None:
@@ -775,7 +887,6 @@ class OpenAIImageEdit(IO.ComfyNode):
             if mask is not None:
                 import numpy as np
                 from PIL import Image
-                from io import BytesIO
 
                 try:
                     import torch
@@ -816,6 +927,14 @@ class OpenAIImageEdit(IO.ComfyNode):
 
                 print(f"[OpenAI] Using mask for inpainting")
 
+            markup_bytes = None
+            if markup is not None:
+                from PIL import Image
+                first_size = ((image.shape[2], image.shape[1]) if image is not None
+                              else Image.open(BytesIO(image_bytes[0])).size)
+                markup_bytes = _markup_png(markup, markup_mask, first_size)
+                print("[OpenAI] Using markup layer")
+
             # Edit image
             response = await image_client.edit_image(
                 image_data=image_bytes,
@@ -830,6 +949,8 @@ class OpenAIImageEdit(IO.ComfyNode):
                 input_fidelity=input_fidelity,
                 output_format=output_format,
                 output_compression=output_compression,
+                complexity=complexity,
+                markup_data=markup_bytes,
             )
 
             if response.get("blocked", False):
@@ -854,5 +975,130 @@ class OpenAIImageEdit(IO.ComfyNode):
 
         except Exception as e:
             error_msg = f"Failed to edit image: {str(e)}"
+            print(f"[OpenAI] Error: {error_msg}")
+            raise ValueError(error_msg)
+
+
+class OpenAISVGGeneration(IO.ComfyNode):
+    """Generates SVG markup with GPT Image 2.6, which hands the drawing to a text model."""
+
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="OpenAISVGGeneration",
+            display_name="OpenAI SVG Generation",
+            category="ERPK/OpenAI",
+            not_idempotent=True,
+            inputs=[
+                IO.String.Input(
+                    "prompt",
+                    multiline=True,
+                    default="",
+                    tooltip="Description of the vector image to generate",
+                ),
+                IO.Custom("OPENAI_API_CLIENT").Input(
+                    "client",
+                    optional=True,
+                    tooltip="OpenAI API client from OpenAI API Config node (uses API key from config)",
+                ),
+                IO.Combo.Input(
+                    "model",
+                    options=SVG_MODELS,
+                    default=SVG_DEFAULT_MODEL,
+                    optional=True,
+                    tooltip="Image model. Only GPT Image 2.6 returns SVG.",
+                ),
+                IO.Combo.Input(
+                    "svg_model",
+                    options=RESPONSES_MAINLINE_MODELS,
+                    default=RESPONSES_MAINLINE_MODELS[0],
+                    optional=True,
+                    tooltip="Text model that writes the SVG markup for the image model.",
+                ),
+                *size_inputs(
+                    "GPT Image 2.6 accepts any size with both edges divisible by 16, "
+                    "aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels and max edge 3840."
+                ),
+                IO.Combo.Input(
+                    "quality",
+                    options=["auto", "low", "medium", "high", "xhigh", "max"],
+                    default="auto",
+                    optional=True,
+                    tooltip="Image quality.",
+                ),
+                complexity_input(),
+                IO.Combo.Input(
+                    "background",
+                    options=["auto", "transparent", "opaque"],
+                    default="auto",
+                    optional=True,
+                    tooltip="Background type for the generated image.",
+                ),
+                IO.Int.Input(
+                    "seed",
+                    default=-1,
+                    min=-1,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip=(
+                        "Cache control only; not sent to the API. Randomize re-runs (and re-bills) "
+                        "on every queue; a fixed value reuses the cached SVG."
+                    ),
+                ),
+            ],
+            outputs=[
+                IO.String.Output("svg"),
+            ],
+        )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
+
+    @classmethod
+    async def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
+        client = kwargs.get("client")
+        model = kwargs.get("model", SVG_DEFAULT_MODEL)
+        svg_model = kwargs.get("svg_model", RESPONSES_MAINLINE_MODELS[0])
+        size = resolve_size(
+            kwargs.get("size", "1024x1024"),
+            kwargs.get("custom_width", 1024),
+            kwargs.get("custom_height", 1024),
+        )
+
+        if not prompt or not prompt.strip():
+            raise ValueError("Prompt cannot be empty")
+
+        try:
+            image_client = client if client is not None else OpenAIClient(api_key=None, model=model)
+            print(f"[OpenAI] Generating SVG with model: {model}, svg_model: {svg_model}, size: {size}")
+
+            # SVG output takes one image per request.
+            response = await image_client.generate_image(
+                prompt=prompt.strip(),
+                model=model,
+                size=size,
+                quality=kwargs.get("quality", "auto"),
+                background=kwargs.get("background", "auto"),
+                n=1,
+                output_format="svg",
+                complexity=kwargs.get("complexity", "auto"),
+                svg_model=svg_model,
+            )
+
+            if response.get("blocked", False):
+                raise ValueError(f"Image blocked by content filters: {response.get('error', 'Unknown reason')}")
+
+            images = response.get("images", [])
+            if not images:
+                raise ValueError("No SVG was generated")
+
+            svg = base64.b64decode(images[0]).decode("utf-8")
+            print(f"[OpenAI] Generated SVG, {len(svg)} characters")
+            return IO.NodeOutput(svg)
+
+        except Exception as e:
+            error_msg = f"Failed to generate SVG: {str(e)}"
             print(f"[OpenAI] Error: {error_msg}")
             raise ValueError(error_msg)

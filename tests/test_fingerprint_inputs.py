@@ -31,6 +31,8 @@ API_NODES = [
     ("erpk.openai.nodes", "OpenAIVision"),
     ("erpk.openai.image_nodes", "OpenAIImageGeneration"),
     ("erpk.openai.image_nodes", "OpenAIImageEdit"),
+    ("erpk.openai.image_nodes", "OpenAIImageResponses"),
+    ("erpk.openai.image_nodes", "OpenAISVGGeneration"),
     # Claude
     ("claude.text_generation", "ClaudeTextGeneration"),
     ("claude.conversation", "ClaudeConversation"),

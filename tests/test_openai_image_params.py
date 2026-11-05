@@ -8,10 +8,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from erpk.openai.openai_api.client import OpenAIClient
-from tests.openai_sdk_signature import assert_binds
+from tests.openai_sdk_signature import assert_binds, sdk_has
 
 
-GPT_IMAGE_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"]
+GPT_IMAGE_MODELS = [
+    "gpt-image-2.6-sunburst", "gpt-image-2.6-flare",
+    "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2",
+]
 DALLE_MODELS = ["dall-e-3", "dall-e-2"]
 
 
@@ -26,6 +29,7 @@ def _make_client_with_mock():
     mock_response.data = [mock_img]
     mock_openai.images.generate.return_value = mock_response
     mock_openai.images.edit.return_value = mock_response
+    mock_openai.post.return_value = mock_response
     client.client = mock_openai
     return client, mock_openai
 
@@ -60,10 +64,15 @@ class TestGptImage2Background:
     # models returned RGBA PNGs with real alpha.
     def test_transparent_rejected_before_the_call_for_gpt_image_2(self):
         client, mock = _make_client_with_mock()
-        with pytest.raises(ValueError, match="gpt-image-2 does not support background='transparent'"):
+        with pytest.raises(ValueError) as exc:
             asyncio.run(client.generate_image(
                 prompt="a cat", model="gpt-image-2", background="transparent"
             ))
+        assert str(exc.value) == (
+            "gpt-image-2 does not support background='transparent'. Use gpt-image-2.5-flare, "
+            "gpt-image-2.5-sunburst, gpt-image-2.6-flare, gpt-image-2.6-sunburst, "
+            "or set background to auto or opaque."
+        )
         mock.images.generate.assert_not_called()
 
     def test_edit_transparent_rejected_before_the_call_for_gpt_image_2(self):
@@ -106,11 +115,9 @@ class TestGptImage2ModelPresence:
     def test_gpt_image_2_in_image_models(self):
         assert "gpt-image-2" in OpenAIClient.IMAGE_MODELS
 
-    def test_gpt_image_2_in_gpt_image_models_set(self):
-        assert "gpt-image-2" in OpenAIClient.GPT_IMAGE_MODELS
-
-    def test_gpt_image_2_flagged_in_gpt_image_2_models_set(self):
-        assert "gpt-image-2" in OpenAIClient.GPT_IMAGE_2_MODELS
+    def test_gpt_image_2_takes_custom_sizes_and_rejects_input_fidelity(self):
+        caps = OpenAIClient.IMAGE_MODELS["gpt-image-2"]
+        assert (caps.custom_size, caps.input_fidelity) == (True, False)
 
 
 class TestModeration:
@@ -232,7 +239,7 @@ class TestGptImage2SizeValidation:
         asyncio.run(client.generate_image(prompt="x", model="gpt-image-2", size="auto"))
         assert mock.images.generate.called
 
-    @pytest.mark.parametrize("model", sorted(OpenAIClient.GPT_IMAGE_2_MODELS))
+    @pytest.mark.parametrize("model", sorted(OpenAIClient.IMAGE_MODELS))
     def test_edit_rejects_sizes_below_pixel_budget_before_calling_api(self, model):
         # Measured live 2026-09-21: images.edit 400s 512x512 and 256x256 on
         # gpt-image-2 and both 2.5 models ("below the current minimum pixel budget").
@@ -262,7 +269,7 @@ class TestEditInputFidelity:
     (400 invalid_input_fidelity_model, measured live 2026-09-21). The OpenAI
     reference names only gpt-image-2 as ignoring it; the reference is wrong."""
 
-    @pytest.mark.parametrize("model", sorted(OpenAIClient.GPT_IMAGE_2_MODELS))
+    @pytest.mark.parametrize("model", sorted(OpenAIClient.IMAGE_MODELS))
     def test_dropped_for_gpt_image_2_family(self, model):
         client, mock = _make_client_with_mock()
         asyncio.run(client.edit_image(
@@ -383,6 +390,186 @@ class TestEditNodeMask:
         assert list(sent.getchannel("A").getdata()) == [255, 0, 255, 255, 255, 255]
 
 
+class TestMarkup:
+    """images.edit takes a `markup` file of drawn marks, which SDK 2.15's
+    Images.edit() has no keyword for and extra_body cannot carry (400 "Invalid
+    type for 'markup': expected a file, but got an array instead", measured
+    2026-11-05), so the client posts the multipart request itself."""
+
+    @pytest.fixture(autouse=True)
+    def images_response(self, monkeypatch):
+        import types as pytypes
+        stand_in = type("ImagesResponse", (), {})
+        monkeypatch.setitem(sys.modules, "openai.types", pytypes.SimpleNamespace(ImagesResponse=stand_in))
+        return stand_in
+
+    def test_the_installed_sdk_has_what_the_post_uses(self):
+        assert sdk_has("openai.types", "ImagesResponse")
+        assert_binds({"cast_to": 1, "body": 1, "files": 1, "options": 1},
+                     "openai._base_client", "SyncAPIClient", "post")
+
+    def test_one_image_and_the_markup_go_out_as_files(self, images_response):
+        client, mock = _make_client_with_mock()
+        result = asyncio.run(client.edit_image(
+            image_data=b"base", prompt="put an apple in the circle", model="gpt-image-2.6-flare",
+            size="1024x1024", quality="low", markup_data=b"marks",
+        ))
+        mock.images.edit.assert_not_called()
+        args, kwargs = mock.post.call_args
+        assert args == ("/images/edits",)
+        assert kwargs == {
+            "cast_to": images_response,
+            "body": {"model": "gpt-image-2.6-flare", "prompt": "put an apple in the circle",
+                     "size": "1024x1024", "n": 1, "quality": "low"},
+            "files": [("image", ("image.png", b"base", "image/png")),
+                      ("markup", ("markup.png", b"marks", "image/png"))],
+            "options": {"headers": {"Content-Type": "multipart/form-data"}},
+        }
+        assert result == {"images": ["fakebase64data"]}
+
+    def test_several_images_go_out_as_an_array_with_the_body_extras(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.edit_image(
+            image_data=[b"first", b"second"], prompt="x", model="gpt-image-2.6-sunburst",
+            moderation="low", complexity="medium", output_format="webp", output_compression=50,
+            markup_data=b"marks",
+        ))
+        kwargs = mock.post.call_args[1]
+        assert kwargs["body"] == {
+            "model": "gpt-image-2.6-sunburst", "prompt": "x", "size": "1024x1024", "n": 1,
+            "output_format": "webp", "output_compression": 50,
+            "moderation": "low", "complexity": "medium",
+        }
+        assert kwargs["files"] == [
+            ("image[]", ("image_0.png", b"first", "image/png")),
+            ("image[]", ("image_1.png", b"second", "image/png")),
+            ("markup", ("markup.png", b"marks", "image/png")),
+        ]
+
+    def test_a_mask_and_a_markup_are_refused_before_the_call(self):
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(client.edit_image(
+                image_data=b"base", prompt="x", model="gpt-image-2.6-flare",
+                mask_data=b"mask", markup_data=b"marks",
+            ))
+        assert str(exc.value) == "A markup layer cannot be combined with a mask; send one or the other."
+        mock.post.assert_not_called()
+        mock.images.edit.assert_not_called()
+
+    def test_a_model_outside_the_table_is_refused_before_the_call(self):
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(client.edit_image(
+                image_data=b"base", prompt="x", model="dall-e-2", markup_data=b"marks",
+            ))
+        assert str(exc.value) == (
+            "dall-e-2 does not take a markup layer. Use gpt-image-2, gpt-image-2.5-flare, "
+            "gpt-image-2.5-sunburst, gpt-image-2.6-flare, gpt-image-2.6-sunburst."
+        )
+        mock.post.assert_not_called()
+
+    def test_without_a_markup_the_edit_still_goes_through_images_edit(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.edit_image(image_data=b"base", prompt="x", model="gpt-image-2.6-flare"))
+        mock.post.assert_not_called()
+        assert mock.images.edit.called
+
+
+class TestEditNodeMarkup:
+    """The node builds the markup PNG: color from `markup`, alpha from
+    `markup_mask` read as Load Image writes it (1 - alpha, ComfyUI nodes.py
+    LoadImage), else opaque wherever the markup is not pure black."""
+
+    @staticmethod
+    def _refusal(**inputs):
+        """The node's error message; the recording client answers every call with "stop here"."""
+        from types import SimpleNamespace
+        from erpk.openai.image_nodes import OpenAIImageEdit
+        seen = inputs.pop("seen", {})
+
+        async def edit_image(**kwargs):
+            seen.update(kwargs)
+            return {"blocked": True, "error": "stop here"}
+
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(OpenAIImageEdit.execute(
+                prompt="x", client=SimpleNamespace(edit_image=edit_image), **inputs,
+            ))
+        return str(exc.value)
+
+    @classmethod
+    def _run(cls, **inputs):
+        seen = {}
+        assert cls._refusal(seen=seen, **inputs).endswith("stop here")
+        return seen
+
+    @staticmethod
+    def _markup(torch):
+        # 2x3 layer: one red mark at (row 0, col 1), the rest black.
+        markup = torch.zeros(1, 2, 3, 3)
+        markup[0, 0, 1] = torch.tensor([1.0, 0.0, 0.0])
+        return markup
+
+    @staticmethod
+    def _decode(payload):
+        from io import BytesIO
+        from PIL import Image
+        with Image.open(BytesIO(payload)) as img:
+            return img.mode, img.size, list(img.getdata())
+
+    def test_without_a_mask_non_black_pixels_are_the_marks(self):
+        torch = pytest.importorskip("torch")
+        seen = self._run(image=torch.zeros(1, 2, 3, 3), markup=self._markup(torch))
+        assert self._decode(seen["markup_data"]) == ("RGBA", (3, 2), [
+            (0, 0, 0, 0), (255, 0, 0, 255), (0, 0, 0, 0),
+            (0, 0, 0, 0), (0, 0, 0, 0), (0, 0, 0, 0),
+        ])
+        assert seen["mask_data"] is None
+
+    def test_a_load_image_mask_sets_the_alpha(self):
+        torch = pytest.importorskip("torch")
+        # Load Image's MASK is 1 where the PNG is transparent; here the mark at
+        # (row 1, col 2) is black but opaque, and the red pixel is transparent.
+        mask = torch.ones(1, 2, 3)
+        mask[0, 1, 2] = 0.0
+        seen = self._run(image=torch.zeros(1, 2, 3, 3), markup=self._markup(torch), markup_mask=mask)
+        assert self._decode(seen["markup_data"]) == ("RGBA", (3, 2), [
+            (0, 0, 0, 0), (255, 0, 0, 0), (0, 0, 0, 0),
+            (0, 0, 0, 0), (0, 0, 0, 0), (0, 0, 0, 255),
+        ])
+
+    def test_a_markup_unlike_image_1_in_size_is_refused(self):
+        torch = pytest.importorskip("torch")
+        assert self._refusal(image=torch.zeros(1, 4, 5, 3), markup=self._markup(torch)) == (
+            "Failed to edit image: markup is 3x2 but image 1 is 5x4; "
+            "draw the marks on a layer the size of image 1"
+        )
+
+    def test_a_mask_unlike_the_markup_in_size_is_refused(self):
+        torch = pytest.importorskip("torch")
+        # Load Image gives a 64x64 zero MASK for a PNG with no alpha channel.
+        assert self._refusal(image=torch.zeros(1, 2, 3, 3), markup=self._markup(torch),
+                             markup_mask=torch.zeros(1, 64, 64)) == (
+            "Failed to edit image: markup_mask is 64x64 but markup is 3x2; "
+            "connect the MASK of the Load Image that loads the markup"
+        )
+
+    def test_a_markup_mask_alone_is_refused(self):
+        torch = pytest.importorskip("torch")
+        seen = {}
+        assert self._refusal(seen=seen, image=torch.zeros(1, 2, 3, 3), markup_mask=torch.zeros(1, 2, 3)) == (
+            "markup_mask is connected but markup is not; connect the markup IMAGE too")
+        assert seen == {}
+
+    def test_both_sockets_are_optional_and_sit_after_mask(self):
+        from erpk.openai.image_nodes import OpenAIImageEdit
+        inputs = OpenAIImageEdit.define_schema().inputs
+        sockets = [(i.id, i.io_type, i.optional) for i in inputs if i.io_type in ("IMAGE", "MASK")]
+        assert sockets == [("image", "IMAGE", True), ("mask", "MASK", True),
+                           ("markup", "IMAGE", True), ("markup_mask", "MASK", True)]
+
+
 class TestOutputFormat:
     """images.generate and images.edit take output_format (png/jpeg/webp) and
     output_compression (0-100, jpeg/webp only) for GPT Image models, per the
@@ -399,8 +586,12 @@ class TestOutputFormat:
         ],
     }
     WIDGETS_AFTER = {
-        "OpenAIImageGeneration": [],
-        "OpenAIImageEdit": ["grid_images"],
+        "OpenAIImageGeneration": ["complexity", "frame_count", "frame_duration_ms"],
+        "OpenAIImageEdit": ["grid_images", "complexity"],
+    }
+    FORMATS = {
+        "OpenAIImageGeneration": ["png", "jpeg", "webp", "gif"],
+        "OpenAIImageEdit": ["png", "jpeg", "webp"],
     }
 
     @pytest.mark.parametrize("class_name", sorted(WIDGETS_BEFORE))
@@ -414,7 +605,7 @@ class TestOutputFormat:
         assert widget_ids == (self.WIDGETS_BEFORE[class_name] + ["output_format", "output_compression"]
                               + self.WIDGETS_AFTER[class_name])
         fmt = next(i for i in inputs if i.id == "output_format")
-        assert fmt.options == ["png", "jpeg", "webp"] and fmt.default == "png"
+        assert fmt.options == self.FORMATS[class_name] and fmt.default == "png"
         comp = next(i for i in inputs if i.id == "output_compression")
         assert (comp.min, comp.max, comp.default) == (0, 100, 100)
 
@@ -464,6 +655,282 @@ class TestOutputFormat:
                 "a cat", client=RecordingClient(), output_format="jpeg", output_compression=70,
             ))
         assert (seen["output_format"], seen["output_compression"]) == ("jpeg", 70)
+
+
+class TestComplexity:
+    """complexity low/medium/high returns 200 on GPT Image 2.6 for images.generate
+    and images.edit; 2.5 answers 400 "Complexity 'low' is not supported for this
+    image model." (measured 2026-11-05). SDK 2.15 has no complexity keyword."""
+
+    def test_generate_sends_it_in_the_body_on_26(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.generate_image(prompt="x", model="gpt-image-2.6-flare", complexity="low"))
+        params = mock.images.generate.call_args[1]
+        assert_binds(params, "openai.resources.images", "Images", "generate")
+        assert params["extra_body"] == {"complexity": "low"}
+
+    @pytest.mark.parametrize("model,complexity", [
+        ("gpt-image-2.6-flare", "auto"),
+        ("gpt-image-2.5-flare", "high"),
+        ("gpt-image-2", "low"),
+    ])
+    def test_generate_leaves_it_out_for_auto_and_older_models(self, model, complexity):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.generate_image(prompt="x", model=model, complexity=complexity))
+        assert "extra_body" not in mock.images.generate.call_args[1]
+
+    def test_edit_merges_it_with_moderation(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.edit_image(
+            image_data=b"fakepng", prompt="x", model="gpt-image-2.6-sunburst",
+            moderation="low", complexity="high",
+        ))
+        params = mock.images.edit.call_args[1]
+        assert_binds(params, "openai.resources.images", "Images", "edit")
+        assert params["extra_body"] == {"moderation": "low", "complexity": "high"}
+
+    def test_edit_on_25_keeps_moderation_alone(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.edit_image(
+            image_data=b"fakepng", prompt="x", model="gpt-image-2.5-sunburst",
+            moderation="low", complexity="high",
+        ))
+        assert mock.images.edit.call_args[1]["extra_body"] == {"moderation": "low"}
+
+    @pytest.mark.parametrize("class_name", ["OpenAIImageGeneration", "OpenAIImageEdit"])
+    def test_combo_offers_auto_and_the_three_levels(self, class_name):
+        import importlib
+        cls = getattr(importlib.import_module("erpk.openai.image_nodes"), class_name)
+        combo = next(i for i in cls.define_schema().inputs if i.id == "complexity")
+        assert (combo.options, combo.default, combo.optional) == (["auto", "low", "medium", "high"], "auto", True)
+
+    def test_generation_node_forwards_it(self):
+        from erpk.openai.image_nodes import OpenAIImageGeneration
+        seen = {}
+
+        class RecordingClient:
+            async def generate_image(self, **kwargs):
+                seen.update(kwargs)
+                return {"blocked": True, "error": "stop here"}
+
+        with pytest.raises(ValueError, match="stop here"):
+            asyncio.run(OpenAIImageGeneration.execute("a cat", client=RecordingClient(), complexity="medium"))
+        assert seen["complexity"] == "medium"
+
+    def test_edit_node_forwards_it(self):
+        torch = pytest.importorskip("torch")
+        from types import SimpleNamespace
+        from erpk.openai.image_nodes import OpenAIImageEdit
+        seen = {}
+
+        async def edit_image(**kwargs):
+            seen.update(kwargs)
+            return {"blocked": True, "error": "stop here"}
+
+        with pytest.raises(ValueError, match="stop here"):
+            asyncio.run(OpenAIImageEdit.execute(
+                image=torch.zeros(1, 8, 8, 3), prompt="x",
+                client=SimpleNamespace(edit_image=edit_image), complexity="low",
+            ))
+        assert seen["complexity"] == "low"
+
+
+def _gif_base64(colors, size=(4, 3)):
+    """An animated GIF, one solid frame per color, as the API's b64_json."""
+    import base64
+    from io import BytesIO
+    from PIL import Image
+    frames = [Image.new("RGB", size, color) for color in colors]
+    buffer = BytesIO()
+    frames[0].save(buffer, format="GIF", save_all=True, append_images=frames[1:], duration=200, loop=0)
+    return base64.b64encode(buffer.getvalue()).decode()
+
+
+class TestGif:
+    """output_format gif returns a GIF89a on GPT Image 2.6; 2.5 and gpt-image-2
+    answer 400 "GIF output is not enabled for the model '<id>'." frame_count
+    (2-64) and frame_duration_ms (20-2000) ride in the body (measured 2026-11-05)."""
+
+    def test_26_sends_the_format_and_the_frame_fields(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.generate_image(
+            prompt="a bouncing ball", model="gpt-image-2.6-flare", size="auto", output_format="gif",
+            output_compression=40, complexity="low", frame_count=2, frame_duration_ms=150,
+        ))
+        params = mock.images.generate.call_args[1]
+        assert_binds(params, "openai.resources.images", "Images", "generate")
+        assert params["output_format"] == "gif"
+        assert "output_compression" not in params
+        assert params["extra_body"] == {"complexity": "low", "frame_count": 2, "frame_duration_ms": 150}
+
+    @pytest.mark.parametrize("model", ["gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2"])
+    def test_older_models_are_refused_before_the_call(self, model):
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(client.generate_image(prompt="x", model=model, output_format="gif", frame_count=2))
+        assert str(exc.value) == (
+            f"{model} does not support output_format='gif'. "
+            "Use gpt-image-2.6-flare, gpt-image-2.6-sunburst, or pick png, jpeg or webp."
+        )
+        mock.images.generate.assert_not_called()
+
+    def test_frame_fields_stay_out_of_a_still_image(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.generate_image(
+            prompt="x", model="gpt-image-2.6-flare", output_format="png", frame_count=2, frame_duration_ms=150,
+        ))
+        assert "extra_body" not in mock.images.generate.call_args[1]
+
+    @staticmethod
+    def _node_output(images, **inputs):
+        from erpk.openai.image_nodes import OpenAIImageGeneration
+
+        class Client:
+            async def generate_image(self, **kwargs):
+                return {"images": images, "revised_prompt": None}
+
+        return asyncio.run(OpenAIImageGeneration.execute("a ball", client=Client(), output_format="gif", **inputs))
+
+    def test_the_node_returns_every_frame_of_every_animation(self):
+        pytest.importorskip("torch")
+        output = self._node_output([_gif_base64([(255, 0, 0), (0, 0, 255)]),
+                                    _gif_base64([(0, 255, 0), (255, 255, 255)])])
+        image = output.args[0]
+        assert tuple(image.shape) == (4, 3, 4, 3)
+        corners = [tuple(round(float(v) * 255) for v in image[i, 0, 0]) for i in range(4)]
+        assert corners == [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 255)]
+
+    def test_the_node_forwards_the_frame_widgets(self):
+        from erpk.openai.image_nodes import OpenAIImageGeneration
+        seen = {}
+
+        class RecordingClient:
+            async def generate_image(self, **kwargs):
+                seen.update(kwargs)
+                return {"blocked": True, "error": "stop here"}
+
+        with pytest.raises(ValueError, match="stop here"):
+            asyncio.run(OpenAIImageGeneration.execute(
+                "a ball", client=RecordingClient(), output_format="gif", frame_count=4, frame_duration_ms=90,
+            ))
+        assert (seen["output_format"], seen["frame_count"], seen["frame_duration_ms"]) == ("gif", 4, 90)
+
+    def test_the_api_sheet_message_reaches_the_user_whole(self):
+        from erpk.openai.image_nodes import OpenAIImageGeneration
+        api_message = ("No supported sheet fits 2 GIF frames at size '1024x1024'. Invalid size "
+                       "'4096x2048'. The longest edge must be less than or equal to 3840.")
+
+        class RefusingClient:
+            async def generate_image(self, **kwargs):
+                raise RuntimeError(api_message)
+
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(OpenAIImageGeneration.execute("a ball", client=RefusingClient(), output_format="gif"))
+        assert str(exc.value) == f"Failed to generate image: {api_message}"
+
+    def test_frame_widgets_cover_the_documented_ranges(self):
+        from erpk.openai.image_nodes import OpenAIImageGeneration
+        inputs = {i.id: i for i in OpenAIImageGeneration.define_schema().inputs}
+        count, duration = inputs["frame_count"], inputs["frame_duration_ms"]
+        assert (count.min, count.max, count.default, count.optional) == (2, 64, 9, True)
+        assert (duration.min, duration.max, duration.step, duration.default, duration.optional) == (20, 2000, 10, 200, True)
+
+
+class TestSvg:
+    """output_format svg on GPT Image 2.6 returns base64 SVG markup written by
+    svg.model; without svg.model the API answers 400 "SVG generation requires
+    'svg.model'", and 2.5 and gpt-image-2 answer 400 "SVG output is not
+    supported for this model." (measured 2026-11-05)."""
+
+    def test_26_sends_the_format_and_the_text_model(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.generate_image(
+            prompt="a red circle", model="gpt-image-2.6-sunburst", output_format="svg", n=1,
+            complexity="medium", svg_model="gpt-6.1-sol",
+        ))
+        params = mock.images.generate.call_args[1]
+        assert_binds(params, "openai.resources.images", "Images", "generate")
+        assert (params["output_format"], params["n"]) == ("svg", 1)
+        assert params["extra_body"] == {"complexity": "medium", "svg": {"model": "gpt-6.1-sol"}}
+
+    @pytest.mark.parametrize("model", ["gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2"])
+    def test_older_models_are_refused_before_the_call(self, model):
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(client.generate_image(prompt="x", model=model, output_format="svg", svg_model="gpt-6.1-sol"))
+        assert str(exc.value) == (
+            f"{model} does not support output_format='svg'. Use gpt-image-2.6-flare, gpt-image-2.6-sunburst."
+        )
+        mock.images.generate.assert_not_called()
+
+    def test_a_missing_text_model_is_refused_before_the_call(self):
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(client.generate_image(prompt="x", model="gpt-image-2.6-flare", output_format="svg"))
+        assert str(exc.value) == "output_format='svg' needs svg_model, the text model that writes the SVG markup."
+        mock.images.generate.assert_not_called()
+
+
+class TestSvgNode:
+    """OpenAI SVG Generation returns the markup as one STRING."""
+
+    SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="red"/></svg>'
+
+    def _recording_client(self, seen, answer=None):
+        import base64
+
+        class Client:
+            async def generate_image(self, **kwargs):
+                seen.update(kwargs)
+                return answer or {"images": [base64.b64encode(TestSvgNode.SVG.encode()).decode()]}
+
+        return Client()
+
+    def test_returns_the_decoded_markup(self):
+        from erpk.openai.image_nodes import OpenAISVGGeneration
+        seen = {}
+        output = asyncio.run(OpenAISVGGeneration.execute("a red circle", client=self._recording_client(seen)))
+        assert output.args == (self.SVG,)
+
+    def test_sends_one_svg_from_the_defaults(self):
+        from erpk.openai.image_nodes import OpenAISVGGeneration
+        seen = {}
+        asyncio.run(OpenAISVGGeneration.execute("a red circle", client=self._recording_client(seen)))
+        assert seen == {
+            "prompt": "a red circle", "model": "gpt-image-2.6-flare", "size": "1024x1024",
+            "quality": "auto", "background": "auto", "n": 1, "output_format": "svg",
+            "complexity": "auto", "svg_model": "gpt-6.1-sol",
+        }
+
+    def test_forwards_the_widgets(self):
+        from erpk.openai.image_nodes import OpenAISVGGeneration
+        seen = {}
+        asyncio.run(OpenAISVGGeneration.execute(
+            "a logo", client=self._recording_client(seen), model="gpt-image-2.6-sunburst",
+            svg_model="gpt-6-luna", size="Custom", custom_width=1040, custom_height=1040,
+            quality="low", complexity="low", background="transparent",
+        ))
+        assert {k: seen[k] for k in ("model", "svg_model", "size", "quality", "complexity", "background")} == {
+            "model": "gpt-image-2.6-sunburst", "svg_model": "gpt-6-luna", "size": "1040x1040",
+            "quality": "low", "complexity": "low", "background": "transparent",
+        }
+
+    def test_a_refusal_names_the_reason(self):
+        from erpk.openai.image_nodes import OpenAISVGGeneration
+        client = self._recording_client({}, answer={"images": [], "blocked": True, "error": "The prompt was refused."})
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(OpenAISVGGeneration.execute("x", client=client))
+        assert str(exc.value) == "Failed to generate SVG: Image blocked by content filters: The prompt was refused."
+
+    def test_schema(self):
+        from erpk.openai.image_nodes import OpenAISVGGeneration
+        schema = OpenAISVGGeneration.define_schema()
+        inputs = {i.id: i for i in schema.inputs}
+        assert [(o.io_type, o.id) for o in schema.outputs] == [("STRING", "svg")]
+        assert (inputs["model"].options, inputs["model"].default) == (
+            ["gpt-image-2.6-sunburst", "gpt-image-2.6-flare"], "gpt-image-2.6-flare")
+        assert inputs["svg_model"].default == "gpt-6.1-sol"
+        assert "output_format" not in inputs and "n" not in inputs
 
 
 class TestTransparentNeedsAlphaFormat:

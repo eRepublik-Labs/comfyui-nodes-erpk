@@ -1,5 +1,5 @@
-// ABOUTME: Filters the `size` Combo on the OpenAI image nodes to what the selected
-// ABOUTME: model accepts, and migrates workflows saved before custom_width/height existed.
+// ABOUTME: Filters the `size` Combo on the OpenAI image nodes to what the selected model accepts,
+// ABOUTME: and migrates workflows saved before custom_width/height or complexity existed.
 
 import { app } from "../../../scripts/app.js";
 
@@ -14,6 +14,8 @@ const ALL_PRESETS = [
 // _validate_size_for_gpt_image_2 in openai_api/client.py is the
 // authoritative safety net for gpt-image-2 and 2.5.
 const GEN_SIZE_MAP = {
+    "gpt-image-2.6-sunburst": ALL_PRESETS,
+    "gpt-image-2.6-flare": ALL_PRESETS,
     "gpt-image-2.5-sunburst": ALL_PRESETS,
     "gpt-image-2.5-flare": ALL_PRESETS,
     "gpt-image-2": ALL_PRESETS,
@@ -22,6 +24,8 @@ const GEN_SIZE_MAP = {
 // Valid sizes per model for OpenAIImageEdit (measured live 2026-09-21:
 // gpt-image-2 and 2.5 take any size in the gpt-image-2 envelope).
 const EDIT_SIZE_MAP = {
+    "gpt-image-2.6-sunburst": ALL_PRESETS,
+    "gpt-image-2.6-flare": ALL_PRESETS,
     "gpt-image-2.5-sunburst": ALL_PRESETS,
     "gpt-image-2.5-flare": ALL_PRESETS,
     "gpt-image-2": ALL_PRESETS,
@@ -64,11 +68,23 @@ export function migrateSizeValues(node, info) {
     });
 }
 
+// On OpenAIImageEdit, complexity follows grid_images, so a workflow saved
+// before complexity existed restores the grid's DOM widget slot ("") into it,
+// and ComfyUI refuses to queue a combo value outside its options. Reset only
+// a value the options do not hold.
+export function repairComplexity(node) {
+    const widget = node.widgets?.find((w) => w.name === "complexity");
+    if (widget && !widget.options?.values?.includes(widget.value)) {
+        widget.value = "auto";
+    }
+}
+
 function installDynamicSizeFilter(nodeType, sizeMap) {
     const origOnConfigure = nodeType.prototype.onConfigure;
     nodeType.prototype.onConfigure = function (info) {
         const r = origOnConfigure?.apply(this, arguments);
         migrateSizeValues(this, info);
+        repairComplexity(this);
         return r;
     };
 

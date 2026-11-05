@@ -63,7 +63,7 @@ Complete OpenAI API integration providing text generation, vision analysis, mult
 
 6. **Verify installation:**
    - Look for `ERPK/OpenAI` category in ComfyUI node menu
-   - Should see 8 nodes available
+   - Should see 9 nodes available
 
 ## Available Nodes
 
@@ -193,29 +193,33 @@ Generate images from text descriptions using OpenAI's image generation models.
 **Inputs:**
 - `prompt`: Text description of the image to generate
 - `client`: Optional OpenAI API client (from OpenAI API Config node)
-- `model`: gpt-image-2.5-flare (default), gpt-image-2.5-sunburst, gpt-image-2
+- `model`: gpt-image-2.6-flare (default), gpt-image-2.6-sunburst, gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-2
 - `size`: Preset (auto, 1024x1024, 1024x1536, 1536x1024, 2048x2048, 2048x1152, 1152x2048, 3840x2160, 2160x3840) or Custom
 - `custom_width` / `custom_height`: Used when size is Custom (256 to 3840, step 16). Sizes outside the gpt-image-2 envelope below are rejected before the request is sent.
-- `quality`: Image quality - auto (default), low, medium, high, xhigh, max (xhigh/max on GPT Image 2.5 only, clamped to high on gpt-image-2)
-- `background`: Background type - auto, transparent, opaque (transparent: GPT Image 2.5 only, with png or webp output; gpt-image-2 or jpeg is refused before the request)
+- `quality`: Image quality - auto (default), low, medium, high, xhigh, max (xhigh/max on GPT Image 2.6 and 2.5 only, clamped to high on gpt-image-2)
+- `background`: Background type - auto, transparent, opaque (transparent: GPT Image 2.6 and 2.5 only, with png or webp output; gpt-image-2 or jpeg is refused before the request)
 - `moderation`: auto (default) / low
 - `n`: Number of images (1-10)
 - `seed`: Cache control only, not sent to the API (-1 randomizes)
-- `output_format`: png (default), jpeg, webp
+- `output_format`: png (default), jpeg, webp, gif (gif on GPT Image 2.6 only; the node refuses other models before the request)
 - `output_compression`: 0-100 (default 100), sent only with jpeg or webp
+- `complexity`: auto (default), low, medium, high. How much detail GPT Image 2.6 puts in; `auto` sends nothing (OpenAI documents high). Other models reject the parameter, so the node leaves it out there and logs a note
+- `frame_count`: 2-64 (default 9), frames per GIF animation; sent only with gif
+- `frame_duration_ms`: 20-2000 in steps of 10 (default 200), how long each GIF frame shows; sent only with gif
 
 **Outputs:**
-- `image`: Generated image batch (ComfyUI IMAGE tensor; when n>1, all images are stacked into a batch)
+- `image`: Generated image batch (ComfyUI IMAGE tensor; when n>1, all images are stacked into a batch; with gif, every frame of every animation is one batch entry)
 - `revised_prompt`: Model's revised prompt (GPT Image models may modify your prompt)
 
 **Features:**
 - Credentials resolved from ComfyUI Settings, the node input, or config.ini
 - Direct image output compatible with all ComfyUI image nodes
-- Transparent background support on gpt-image-2.5-sunburst / gpt-image-2.5-flare (gpt-image-2 rejects it)
+- Transparent background support on the GPT Image 2.6 and 2.5 models (gpt-image-2 rejects it)
+- GIF output on GPT Image 2.6. The API tiles the frames onto one sheet whose longest edge must stay within 3840 px, so the API refuses 2 frames at 1024x1024 ("No supported sheet fits 2 GIF frames at size '1024x1024'") while size auto or 1024x640 works
 - n>1 returns a batched IMAGE tensor — no images are dropped
 - Size presets plus a Custom width/height pair (validated against the model's supported sizes by the API)
 
-**gpt-image-2 and 2.5 constraints** (enforced client-side as defense-in-depth):
+**gpt-image-2, 2.5 and 2.6 constraints** (enforced client-side as defense-in-depth):
 - Max edge ≤ 3840px, both edges multiples of 16
 - Total pixels between 655,360 and 8,294,400
 - Aspect ratio (long:short) ≤ 3:1
@@ -235,12 +239,12 @@ Generate images via the OpenAI Responses API with a mainline reasoning model dri
 - `prompt`: Image description (the mainline model may auto-revise before dispatch)
 - `client`: Optional OpenAI API client
 - `mainline_model`: Text/reasoning model that orchestrates the call — gpt-6.1-sol (default), gpt-6.1-terra, gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna
-- `image_model`: Underlying GPT Image model — gpt-image-2.5-flare (default), gpt-image-2.5-sunburst, gpt-image-2
+- `image_model`: Underlying GPT Image model — gpt-image-2.6-flare (default), gpt-image-2.6-sunburst, gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-2
 - `reasoning_effort`: default (the starting value), none, minimal, low, medium, high, xhigh, max. `default` sends no effort, so the mainline reasons at its own default; `none` turns reasoning off where the mainline accepts it, as on the text nodes; `minimal` is rejected alongside the image tool and is sent as `low`. `max` works here but not on the text nodes (chat.completions rejects it)
 - `verbosity`: default, low, medium, high; sent as `text.verbosity`
 - `size`: auto (the model chooses), 1024x1024 (default) and common variants
-- `quality`: auto / low / medium / high / xhigh / max (xhigh/max on GPT Image 2.5 only)
-- `background`: auto / transparent / opaque (transparent: GPT Image 2.5 only, with png or webp output)
+- `quality`: auto / low / medium / high / xhigh / max (xhigh/max on GPT Image 2.6 and 2.5 only)
+- `background`: auto / transparent / opaque (transparent: GPT Image 2.6 and 2.5 only, with png or webp output)
 - `output_format`: png (default), jpeg, webp
 - `moderation`: auto (default) or low
 - `enable_web_search`: Attach the `web_search` tool so the mainline model can ground the prompt in fresh reference material (adds ~$10/1000 calls when invoked)
@@ -267,24 +271,28 @@ Edit and modify existing images using text prompts with optional masking.
 - `prompt`: Text description of how to modify the image
 - `client`: Optional OpenAI API client (from OpenAI API Config node)
 - `mask`: Optional mask (ComfyUI MASK tensor) - white areas will be edited
-- `model`: gpt-image-2.5-sunburst (default), gpt-image-2.5-flare, gpt-image-2
+- `markup`: Optional markup layer (ComfyUI IMAGE): arrows, circles or text drawn on a transparent layer the size of image 1, telling the model where and what to edit. Load the PNG with Load Image and connect its IMAGE here. Not with `mask`
+- `markup_mask`: Optional MASK of the same Load Image (white where the layer is transparent). Without it, every markup pixel that is not pure black counts as a mark
+- `model`: gpt-image-2.6-sunburst (default), gpt-image-2.6-flare, gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-2
 - `size`: Preset (auto, 1024x1024, 1024x1536, 1536x1024, 2048x2048, 2048x1152, 1152x2048, 3840x2160, 2160x3840) or Custom. Every model accepts any Custom size within the gpt-image-2 constraints listed under OpenAI Image Generation
 - `custom_width` / `custom_height`: Used when size is Custom (256 to 3840, step 16)
-- `quality`: Image quality - auto (default), low, medium, high, xhigh, max (xhigh/max on GPT Image 2.5 only)
+- `quality`: Image quality - auto (default), low, medium, high, xhigh, max (xhigh/max on GPT Image 2.6 and 2.5 only)
 - `moderation`: auto (default) / low
-- `background`: auto / transparent / opaque (transparent: GPT Image 2.5 only, with png or webp output; gpt-image-2 or jpeg is refused before the request)
-- `input_fidelity`: auto / high / low (ignored by every current model: gpt-image-2 and the 2.5 models reject the param, so it is never sent)
+- `background`: auto / transparent / opaque (transparent: GPT Image 2.6 and 2.5 only, with png or webp output; gpt-image-2 or jpeg is refused before the request)
+- `input_fidelity`: auto / high / low (ignored by every current model: gpt-image-2, 2.5 and 2.6 reject the param, so it is never sent)
 - `n`: Number of variations (1-10)
 - `seed`: Cache control only, not sent to the API (-1 randomizes)
 - `output_format`: png (default), jpeg, webp
 - `output_compression`: 0-100 (default 100), sent only with jpeg or webp
 - `grid_images`: Hidden; the grid's ordered list of file names in ComfyUI's `input` folder. The grid holds up to 16 files, the limit of every GPT Image model
+- `complexity`: auto (default), low, medium, high, as on OpenAI Image Generation
 
 **Outputs:**
 - `image`: Edited image (ComfyUI IMAGE tensor)
 
 **Features:**
 - Inpainting with optional mask support
+- Markup-guided edits. The docs name GPT Image 2.5 and 2.6, and gpt-image-2 also followed a drawn circle (measured 2026-11-05). On 2.5 and gpt-image-2 the API refuses an empty markup layer ("No actionable edit annotations were found")
 - Credentials resolved from ComfyUI Settings, the node input, or config.ini
 - Compatible with all ComfyUI image nodes
 
@@ -294,7 +302,26 @@ Edit and modify existing images using text prompts with optional masking.
 - "Remove the person and fill with background"
 - "Add raindrops to the window"
 
-**Note:** gpt-image-2.5-sunburst is the highest-quality editing tier; gpt-image-2.5-flare is the fastest.
+**Note:** gpt-image-2.6-sunburst is the highest-quality editing tier; gpt-image-2.6-flare is the fastest.
+
+---
+
+#### OpenAI SVG Generation
+Generate a vector image as SVG markup with GPT Image 2.6. The image model hands the drawing to a text model, which writes the markup.
+
+**Inputs:**
+- `prompt`: Description of the vector image
+- `client`: Optional OpenAI API client
+- `model`: gpt-image-2.6-flare (default), gpt-image-2.6-sunburst. gpt-image-2 and 2.5 answer 400 "SVG output is not supported for this model."
+- `svg_model`: Text model that writes the markup: gpt-6.1-sol (default) or another mainline of the Responses image node
+- `size`, `custom_width`, `custom_height`: As on OpenAI Image Generation
+- `quality`, `complexity`, `background`: As on OpenAI Image Generation
+- `seed`: Cache control only, not sent to the API (-1 randomizes)
+
+**Outputs:**
+- `svg`: The SVG markup as one STRING, starting with `<svg`
+
+Each run asks for one SVG (`n=1`, the only value SVG output takes). Nothing here turns the markup into pixels; save it as a `.svg` file or pass it to a node that renders SVG.
 
 ---
 
@@ -320,8 +347,10 @@ Removed on 2026-10-01: gpt-5.5, gpt-5.5-pro, gpt-5.4 / -pro / -mini / -nano, gpt
 
 | Model | Best For | Notes |
 |-------|----------|-------|
-| **gpt-image-2.5-sunburst** | Highest quality | **Image Edit default**, 4K output, `xhigh`/`max` quality tiers, transparent background |
-| **gpt-image-2.5-flare** | Fastest 2.5 tier | **Default** for Image Generation and the Responses image tool, 4K output, `xhigh`/`max` quality tiers, transparent background |
+| **gpt-image-2.6-sunburst** | Highest quality | **Image Edit default**, `complexity`, gif and SVG output, `xhigh`/`max` quality tiers, transparent background |
+| **gpt-image-2.6-flare** | Fastest 2.6 tier | **Default** for Image Generation, SVG Generation and the Responses image tool, `complexity`, gif and SVG output, `xhigh`/`max` quality tiers, transparent background |
+| **gpt-image-2.5-sunburst** | Highest 2.5 quality | 4K output, `xhigh`/`max` quality tiers, transparent background |
+| **gpt-image-2.5-flare** | Fastest 2.5 tier | 4K output, `xhigh`/`max` quality tiers, transparent background |
 | **gpt-image-2** | 4K, multilingual text | 4K output, multilingual text, no transparent background |
 
 gpt-image-1.5, gpt-image-1 and gpt-image-1-mini were removed on 2026-10-01, along with the DALL-E-only quality values hd / standard.

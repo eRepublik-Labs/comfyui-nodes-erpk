@@ -5,7 +5,29 @@ import asyncio
 import os
 import configparser
 import time
+from dataclasses import dataclass
 from typing import Dict, Any, List, Optional
+
+
+@dataclass(frozen=True)
+class ImageModel:
+    """What one GPT Image model accepts, as measured against the live API."""
+
+    # Highest quality tier; xhigh and max clamp down to it.
+    max_quality: str
+    transparent_background: bool
+    # Any size in the gpt-image-2 envelope, checked before the call.
+    custom_size: bool
+    # False where the API answers 400 to the parameter.
+    input_fidelity: bool
+    # Takes complexity low/medium/high.
+    complexity: bool
+    # images.edit takes a `markup` layer of drawn marks.
+    markup: bool
+    # images.generate returns an animated GIF for output_format gif.
+    gif: bool
+    # images.generate returns SVG markup for output_format svg.
+    svg: bool
 
 
 class OpenAIClient:
@@ -32,35 +54,51 @@ class OpenAIClient:
         "chat-latest": "ChatGPT Instant (Non-reasoning, 400K context, $5/$30 per MTok)",
     }
 
-    # Available image generation models
+    # The GPT Image models, the one source for what each accepts. Any other
+    # model ID takes the legacy response_format path.
+    # gpt-image-2 returns 400 "Transparent background is not supported for
+    # this model." (measured 2026-10-01); both 2.5 models returned RGBA PNGs
+    # with real alpha. gpt-image-2 and 2.5 reject input_fidelity (400
+    # invalid_input_fidelity_model, measured 2026-09-21 despite the reference
+    # naming only gpt-image-2); every model here shares gpt-image-2's size
+    # envelope. Only 2.5 and 2.6 accept the xhigh and max quality tiers;
+    # earlier models stop at high. On both 2.6 tiers (measured 2026-11-05): transparent background,
+    # 1040x1040 and xhigh return 200 (max is documented, not probed);
+    # input_fidelity 400s "does not support the 'input_fidelity' parameter";
+    # complexity low/medium/high returns 200 on generate and edit, where 2.5
+    # answers 400 "Complexity 'low' is not supported for this image model."
+    # The docs name 2.5 and 2.6 for markup, but gpt-image-2 also returned 200
+    # and placed the edit inside a circle drawn off-center on the markup layer
+    # (measured 2026-11-05); an empty layer 400s "No actionable edit
+    # annotations were found" on 2.5 and gpt-image-2. GIF output returns a
+    # GIF89a on both 2.6 tiers; 2.5 and gpt-image-2 answer 400 "GIF output is
+    # not enabled for the model '<id>'." (measured 2026-11-05). SVG output needs
+    # svg.model, a text model that writes the markup (400 "SVG generation
+    # requires 'svg.model'" without it); with gpt-6.1-sol both 2.6 tiers
+    # returned "<svg" markup, and 2.5 and gpt-image-2 answer 400 "SVG output
+    # is not supported for this model." (measured 2026-11-05).
     IMAGE_MODELS = {
-        "gpt-image-2.5-sunburst": "GPT Image 2.5 Sunburst (Highest quality, xhigh/max quality tiers)",
-        "gpt-image-2.5-flare": "GPT Image 2.5 Flare (Fastest 2.5 tier, xhigh/max quality tiers)",
-        "gpt-image-2": "GPT Image 2 (Latest flagship, 4K, multilingual text)",
+        "gpt-image-2.6-sunburst": ImageModel(
+            max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
+            complexity=True, markup=True, gif=True, svg=True,
+        ),
+        "gpt-image-2.6-flare": ImageModel(
+            max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
+            complexity=True, markup=True, gif=True, svg=True,
+        ),
+        "gpt-image-2.5-sunburst": ImageModel(
+            max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
+            complexity=False, markup=True, gif=False, svg=False,
+        ),
+        "gpt-image-2.5-flare": ImageModel(
+            max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
+            complexity=False, markup=True, gif=False, svg=False,
+        ),
+        "gpt-image-2": ImageModel(
+            max_quality="high", transparent_background=False, custom_size=True, input_fidelity=False,
+            complexity=False, markup=True, gif=False, svg=False,
+        ),
     }
-
-    # Image models on the GPT Image family — share parameter conventions
-    # (quality + background). Any other model ID takes the legacy
-    # response_format path.
-    GPT_IMAGE_MODELS = {
-        "gpt-image-2.5-sunburst", "gpt-image-2.5-flare",
-        "gpt-image-2",
-    }
-
-    # Models that accept background="transparent". gpt-image-2 returns 400
-    # "Transparent background is not supported for this model." (measured
-    # 2026-10-01); both 2.5 models returned RGBA PNGs with real alpha.
-    TRANSPARENT_BACKGROUND_MODELS = {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare"}
-
-    # gpt-image-2 and the 2.5 models always process at high fidelity, reject
-    # the input_fidelity param (400 invalid_input_fidelity_model, measured
-    # 2026-09-21 despite the reference naming only gpt-image-2), and share
-    # the same size envelope.
-    GPT_IMAGE_2_MODELS = {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"}
-
-    # Only GPT Image 2.5 accepts the xhigh and max quality tiers; earlier GPT
-    # Image models stop at high.
-    EXTENDED_QUALITY_MODELS = {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare"}
 
     # gpt-image-2 size constraints (from OpenAI docs):
     # - max edge <= 3840px, both edges multiples of 16
@@ -169,12 +207,32 @@ class OpenAIClient:
         return effort
 
     @classmethod
+    def _models_where(cls, accepts) -> str:
+        """The table's models for which accepts(caps) holds, sorted, for a refusal message."""
+        return ", ".join(sorted(m for m, caps in cls.IMAGE_MODELS.items() if accepts(caps)))
+
+    QUALITY_TIERS = ("low", "medium", "high", "xhigh", "max")
+
+    @classmethod
     def _quality_for(cls, model: str, quality: str) -> str:
-        """Clamp xhigh/max down to high on models that stop at high."""
-        if quality in ("xhigh", "max") and model not in cls.EXTENDED_QUALITY_MODELS:
-            print(f"[OpenAI] {model} supports quality up to 'high'; using 'high' instead of '{quality}'")
-            return "high"
+        """Clamp a tier above the model's ceiling down to it; models outside the table stop at high."""
+        caps = cls.IMAGE_MODELS.get(model)
+        ceiling = caps.max_quality if caps else "high"
+        if quality in cls.QUALITY_TIERS and cls.QUALITY_TIERS.index(quality) > cls.QUALITY_TIERS.index(ceiling):
+            print(f"[OpenAI] {model} supports quality up to '{ceiling}'; using '{ceiling}' instead of '{quality}'")
+            return ceiling
         return quality
+
+    @classmethod
+    def _complexity_for(cls, model: str, complexity: str) -> Optional[str]:
+        """The complexity to send, or None to omit it: auto, and any value on a model without complexity."""
+        if complexity == "auto":
+            return None
+        caps = cls.IMAGE_MODELS.get(model)
+        if not (caps and caps.complexity):
+            print(f"[OpenAI] {model} does not support complexity; omitting '{complexity}'")
+            return None
+        return complexity
 
     @staticmethod
     def _output_format_params(output_format: str, output_compression: int) -> Dict[str, Any]:
@@ -185,7 +243,36 @@ class OpenAIClient:
         """
         if output_format in ("jpeg", "webp"):
             return {"output_format": output_format, "output_compression": output_compression}
+        if output_format in ("gif", "svg"):
+            return {"output_format": output_format}
         return {}
+
+    @classmethod
+    def _svg_body(cls, model: str, svg_model: Optional[str]) -> Dict[str, Any]:
+        """The body field of an SVG request, raising before the call when the API would refuse it."""
+        caps = cls.IMAGE_MODELS.get(model)
+        if not (caps and caps.svg):
+            raise ValueError(
+                f"{model} does not support output_format='svg'. Use {cls._models_where(lambda c: c.svg)}.")
+        if not svg_model:
+            raise ValueError("output_format='svg' needs svg_model, the text model that writes the SVG markup.")
+        return {"svg": {"model": svg_model}}
+
+    @classmethod
+    def _gif_body(cls, model: str, frame_count: Optional[int], frame_duration_ms: Optional[int]) -> Dict[str, Any]:
+        """The body fields of a GIF request, raising before the call on a model without GIF output."""
+        caps = cls.IMAGE_MODELS.get(model)
+        if not (caps and caps.gif):
+            raise ValueError(
+                f"{model} does not support output_format='gif'. "
+                f"Use {cls._models_where(lambda c: c.gif)}, or pick png, jpeg or webp."
+            )
+        body = {}
+        if frame_count is not None:
+            body["frame_count"] = frame_count
+        if frame_duration_ms is not None:
+            body["frame_duration_ms"] = frame_duration_ms
+        return body
 
     # Models that use max_completion_tokens instead of max_tokens
     NEW_TOKEN_PARAM_MODELS = {
@@ -662,11 +749,11 @@ class OpenAIClient:
         """Raise before the call when the API would reject the background (400)."""
         if background != "transparent":
             return
-        if model not in cls.TRANSPARENT_BACKGROUND_MODELS:
-            supported = ", ".join(sorted(cls.TRANSPARENT_BACKGROUND_MODELS))
+        caps = cls.IMAGE_MODELS.get(model)
+        if not (caps and caps.transparent_background):
             raise ValueError(
                 f"{model} does not support background='transparent'. "
-                f"Use {supported}, or set background to auto or opaque."
+                f"Use {cls._models_where(lambda c: c.transparent_background)}, or set background to auto or opaque."
             )
         if output_format == "jpeg":
             raise ValueError(
@@ -685,6 +772,10 @@ class OpenAIClient:
         n: int = 1,
         output_format: str = "png",
         output_compression: int = 100,
+        complexity: str = "auto",
+        frame_count: Optional[int] = None,
+        frame_duration_ms: Optional[int] = None,
+        svg_model: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -692,20 +783,27 @@ class OpenAIClient:
 
         Args:
             prompt: Text description of image to generate
-            model: Image model (gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-2)
+            model: Image model (a key of IMAGE_MODELS)
             size: Image size (1024x1024, 1024x1536, 1536x1024, etc.)
-            quality: Image quality (auto, low, medium, high; xhigh/max on GPT Image 2.5)
+            quality: Image quality (auto, low, medium, high; xhigh/max on GPT Image 2.5 and 2.6)
             background: Background type (auto, transparent, opaque - GPT Image models only)
             n: Number of images to generate
+            complexity: auto (omitted), low, medium or high; dropped on models without it
+            frame_count, frame_duration_ms: GIF frames per animation and frame
+                length, sent only when output_format is gif; None leaves the
+                API default (9 frames, 200 ms)
+            svg_model: the text model that writes the markup; required when
+                output_format is svg, which also needs n=1
             **kwargs: Additional parameters
 
         Returns:
-            Dict with 'images' (list of base64 data) and metadata
+            Dict with 'images' (list of base64 data, one animated GIF each for
+            gif, base64 SVG markup for svg) and metadata
         """
         from openai import APIError
 
-        # Preflight size validation for gpt-image-2 (stricter than other models)
-        if model in self.GPT_IMAGE_2_MODELS:
+        caps = self.IMAGE_MODELS.get(model)
+        if caps and caps.custom_size:
             self._validate_size_for_gpt_image_2(size, model)
 
         params = {
@@ -715,8 +813,7 @@ class OpenAIClient:
             "n": n,
         }
 
-        # Model-specific parameters
-        if model in self.GPT_IMAGE_MODELS:
+        if caps:
             if quality != "auto":
                 params["quality"] = self._quality_for(model, quality)
             if background != "auto":
@@ -725,6 +822,18 @@ class OpenAIClient:
             if moderation != "auto":
                 params["moderation"] = moderation
             params.update(self._output_format_params(output_format, output_compression))
+            # Images.generate() has no `complexity`, `frame_count`,
+            # `frame_duration_ms` or `svg` keyword in SDK 2.15.
+            extra_body = {}
+            level = self._complexity_for(model, complexity)
+            if level:
+                extra_body["complexity"] = level
+            if output_format == "gif":
+                extra_body.update(self._gif_body(model, frame_count, frame_duration_ms))
+            if output_format == "svg":
+                extra_body.update(self._svg_body(model, svg_model))
+            if extra_body:
+                params["extra_body"] = extra_body
             # GPT Image models always return base64, do not accept response_format
         else:
             params["response_format"] = "b64_json"
@@ -765,6 +874,10 @@ class OpenAIClient:
         n: int = 1,
         output_format: str = "png",
         output_compression: int = 100,
+        complexity: str = "auto",
+        frame_count: Optional[int] = None,
+        frame_duration_ms: Optional[int] = None,
+        svg_model: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -772,21 +885,30 @@ class OpenAIClient:
 
         Args:
             prompt: Text description of image to generate
-            model: Image model (gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-2)
+            model: Image model (a key of IMAGE_MODELS)
             size: Image size (1024x1024, 1024x1536, 1536x1024, etc.)
-            quality: Image quality (auto, low, medium, high; xhigh/max on GPT Image 2.5)
+            quality: Image quality (auto, low, medium, high; xhigh/max on GPT Image 2.5 and 2.6)
             background: Background type (auto, transparent, opaque - GPT Image models only)
             n: Number of images to generate
+            complexity: auto (omitted), low, medium or high; dropped on models without it
+            frame_count, frame_duration_ms: GIF frames per animation and frame
+                length, sent only when output_format is gif; None leaves the
+                API default (9 frames, 200 ms)
+            svg_model: the text model that writes the markup; required when
+                output_format is svg, which also needs n=1
             **kwargs: Additional parameters
 
         Returns:
-            Dict with 'images' (list of base64 data) and metadata
+            Dict with 'images' (list of base64 data, one animated GIF each for
+            gif, base64 SVG markup for svg) and metadata
         """
         return await asyncio.to_thread(
             self._generate_image_sync, prompt,
             model=model, size=size, quality=quality,
             background=background, moderation=moderation, n=n,
-            output_format=output_format, output_compression=output_compression, **kwargs
+            output_format=output_format, output_compression=output_compression,
+            complexity=complexity, frame_count=frame_count,
+            frame_duration_ms=frame_duration_ms, svg_model=svg_model, **kwargs
         )
 
     def _validate_size_for_gpt_image_2(self, size: str, model: str = "gpt-image-2"):
@@ -867,7 +989,8 @@ class OpenAIClient:
         from openai import APIError
 
         # Preflight: gpt-image-2 size constraints apply regardless of endpoint
-        if image_model in self.GPT_IMAGE_2_MODELS:
+        caps = self.IMAGE_MODELS.get(image_model)
+        if caps and caps.custom_size:
             self._validate_size_for_gpt_image_2(size)
 
         # Build the image_generation tool config
@@ -1003,6 +1126,37 @@ class OpenAIClient:
             output_compression=output_compression, **kwargs
         )
 
+    @classmethod
+    def _check_markup(cls, model: str, mask_data: Optional[bytes]) -> None:
+        """Raise before the call when images.edit would refuse the markup layer."""
+        caps = cls.IMAGE_MODELS.get(model)
+        if not (caps and caps.markup):
+            raise ValueError(
+                f"{model} does not take a markup layer. Use {cls._models_where(lambda c: c.markup)}.")
+        if mask_data:
+            raise ValueError("A markup layer cannot be combined with a mask; send one or the other.")
+
+    def _post_markup_edit(self, params: Dict[str, Any], markup_data: bytes):
+        """images.edit with a markup layer, a file field SDK 2.15's Images.edit() has no keyword for.
+
+        Sends the same multipart request through the client's own post(), so the
+        key, base URL, timeout and retries are those images.edit uses.
+        """
+        from openai.types import ImagesResponse
+
+        body = {k: v for k, v in params.items() if k not in ("image", "extra_body")}
+        body.update(params.get("extra_body", {}))
+        image = params["image"]
+        files = [("image[]", f) for f in image] if isinstance(image, list) else [("image", image)]
+        files.append(("markup", ("markup.png", markup_data, "image/png")))
+        return self.client.post(
+            "/images/edits",
+            cast_to=ImagesResponse,
+            body=body,
+            files=files,
+            options={"headers": {"Content-Type": "multipart/form-data"}},
+        )
+
     def _edit_image_sync(
         self,
         image_data,
@@ -1017,6 +1171,8 @@ class OpenAIClient:
         input_fidelity: str = "auto",
         output_format: str = "png",
         output_compression: int = 100,
+        complexity: str = "auto",
+        markup_data: Optional[bytes] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -1030,10 +1186,14 @@ class OpenAIClient:
             prompt: Text description of desired edits
             mask_data: Optional mask as bytes (PNG with transparency). When
                 multiple images are provided, mask applies to the first image.
+            markup_data: Optional markup layer as an RGBA PNG the size of the
+                first image: drawn marks opaque, the rest transparent. Cannot
+                be combined with mask_data.
             model: Image model (gpt-image-2 recommended)
             size: Output image size
             quality: Image quality (GPT Image models only)
             n: Number of images to generate
+            complexity: auto (omitted), low, medium or high; dropped on models without it
             **kwargs: Additional parameters
 
         Returns:
@@ -1050,10 +1210,14 @@ class OpenAIClient:
         if not image_list:
             raise ValueError("edit_image requires at least one image")
 
+        if markup_data is not None:
+            self._check_markup(model, mask_data)
+
         # images.edit shares the generation size envelope on these models
         # (measured 2026-09-21: 512x512 and 256x256 400 as "below the current
         # minimum pixel budget", 1536x864 is accepted).
-        if model in self.GPT_IMAGE_2_MODELS:
+        caps = self.IMAGE_MODELS.get(model)
+        if caps and caps.custom_size:
             self._validate_size_for_gpt_image_2(size, model)
 
         # Single image uses singular multipart field; multi-image uses array.
@@ -1079,28 +1243,35 @@ class OpenAIClient:
             mask_file = ("mask.png", mask_data, "image/png")
             params["mask"] = mask_file
 
-        # Model-specific parameters
-        if model in self.GPT_IMAGE_MODELS:
+        if caps:
             # GPT Image models always return base64, do not accept response_format
             if quality != "auto":
                 params["quality"] = self._quality_for(model, quality)
-            # Images.edit() has no `moderation` keyword in any SDK release, though
-            # the endpoint takes the field (it validates auto/low), so it goes in
-            # the request body directly.
+            # Images.edit() has no `moderation` or `complexity` keyword in SDK
+            # 2.15, though the endpoint takes both (it validates moderation
+            # auto/low), so they go in the request body directly.
+            extra_body = {}
             if moderation != "auto":
-                params["extra_body"] = {"moderation": moderation}
+                extra_body["moderation"] = moderation
+            level = self._complexity_for(model, complexity)
+            if level:
+                extra_body["complexity"] = level
+            if extra_body:
+                params["extra_body"] = extra_body
             if background and background != "auto":
                 self._check_background(model, background, output_format)
                 params["background"] = background
-            # gpt-image-2 always processes at high fidelity and rejects input_fidelity.
-            if input_fidelity and input_fidelity != "auto" and model not in self.GPT_IMAGE_2_MODELS:
+            if input_fidelity and input_fidelity != "auto" and caps.input_fidelity:
                 params["input_fidelity"] = input_fidelity
             params.update(self._output_format_params(output_format, output_compression))
         else:
             params["response_format"] = "b64_json"
 
         try:
-            response = self.client.images.edit(**params)
+            if markup_data is None:
+                response = self.client.images.edit(**params)
+            else:
+                response = self._post_markup_edit(params, markup_data)
 
             images = []
             for img in response.data:
@@ -1135,6 +1306,8 @@ class OpenAIClient:
         input_fidelity: str = "auto",
         output_format: str = "png",
         output_compression: int = 100,
+        complexity: str = "auto",
+        markup_data: Optional[bytes] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -1148,10 +1321,14 @@ class OpenAIClient:
             prompt: Text description of desired edits
             mask_data: Optional mask as bytes (PNG with transparency). When
                 multiple images are provided, mask applies to the first image.
+            markup_data: Optional markup layer as an RGBA PNG the size of the
+                first image: drawn marks opaque, the rest transparent. Cannot
+                be combined with mask_data.
             model: Image model (gpt-image-2 recommended)
             size: Output image size
             quality: Image quality (GPT Image models only)
             n: Number of images to generate
+            complexity: auto (omitted), low, medium or high; dropped on models without it
             **kwargs: Additional parameters
 
         Returns:
@@ -1162,5 +1339,6 @@ class OpenAIClient:
             mask_data=mask_data, model=model, size=size, quality=quality,
             moderation=moderation, n=n, background=background,
             input_fidelity=input_fidelity, output_format=output_format,
-            output_compression=output_compression, **kwargs
+            output_compression=output_compression, complexity=complexity,
+            markup_data=markup_data, **kwargs
         )

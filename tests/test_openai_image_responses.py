@@ -442,9 +442,13 @@ class TestNodeSchema:
         inp = next((i for i in schema.inputs if i.id == "image_model"), None)
         assert inp is not None
         # The 2.5 model pages: "Select it directly in the Image API or as the
-        # model of the Responses API image generation tool."
-        assert set(inp.options) == {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"}
-        assert inp.default == "gpt-image-2.5-flare"
+        # model of the Responses API image generation tool." Both 2.6 tiers
+        # returned 200 as the tool model (measured 2026-11-05).
+        assert list(inp.options) == [
+            "gpt-image-2.6-sunburst", "gpt-image-2.6-flare",
+            "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2",
+        ]
+        assert inp.default == "gpt-image-2.6-flare"
 
     def test_quality_offers_extended_tiers(self, schema):
         inp = next(i for i in schema.inputs if i.id == "quality")

@@ -52,12 +52,13 @@ def model_grid_cap(node_id, model):
 
 
 def grid_input():
-    """The `grid_images` list the grid writes, declared after every other input.
+    """The `grid_images` list the grid writes, declared after the node's existing widgets.
 
     It is optional because the frontend lays out required widgets before optional
     ones and widgets_values is positional: a required grid input on a node that
     already has optional widgets would land mid-list and shift every saved value
-    after it.
+    after it. A widget added to the node later goes after this one, where it takes
+    the grid's DOM widget slot in older saves; see web/openai_dynamic_sizes.js.
     """
     return IO.String.Input(
         "grid_images",

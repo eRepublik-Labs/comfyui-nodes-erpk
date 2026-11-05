@@ -28,7 +28,7 @@ def test_grid_widgets_follow_every_saved_widget():
     assert frontend_widget_order(OpenAIImageEdit.define_schema()) == [
         "prompt", "seed", "model", "size", "custom_width", "custom_height",
         "quality", "moderation", "n", "background", "input_fidelity",
-        "output_format", "output_compression", "grid_images",
+        "output_format", "output_compression", "grid_images", "complexity",
     ]
 
 
@@ -93,7 +93,10 @@ def test_grid_files_reach_the_api_one_png_each_at_their_own_size_in_grid_order(i
     ]
 
 
-@pytest.mark.parametrize("model", ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"])
+@pytest.mark.parametrize("model", [
+    "gpt-image-2.6-sunburst", "gpt-image-2.6-flare",
+    "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2",
+])
 def test_more_files_than_the_model_takes_names_the_model(input_dir, model):
     names = [f"{i}.png" for i in range(17)]
     for name in names:
@@ -144,6 +147,22 @@ def test_a_mask_shapes_the_first_grid_image(input_dir):
             (0, 255, 0, 255), (0, 255, 0, 0), (0, 255, 0, 255),
             (0, 255, 0, 255), (0, 255, 0, 255), (0, 255, 0, 255),
         ]
+
+
+def test_a_markup_is_checked_against_the_first_grid_image(input_dir):
+    torch = pytest.importorskip("torch")
+    _write(input_dir / "first.png", (3, 2), (0, 255, 0))
+    _write(input_dir / "second.png", (5, 5), (0, 0, 255))
+    seen = {}
+    _edit(seen, markup=torch.ones(1, 2, 3, 3), grid_images='["first.png", "second.png"]')
+    assert _decoded(seen["markup_data"]) == ("PNG", (3, 2), (255, 255, 255, 255))
+    with pytest.raises(ValueError) as exc:
+        asyncio.run(OpenAIImageEdit.execute(
+            prompt="add a hat", client=_recording_client({}), markup=torch.ones(1, 5, 5, 3),
+            grid_images='["first.png", "second.png"]',
+        ))
+    assert str(exc.value) == (
+        "Failed to edit image: markup is 5x5 but image 1 is 3x2; draw the marks on a layer the size of image 1")
 
 
 def test_validation_passes_an_empty_grid_and_names_a_missing_file(input_dir):

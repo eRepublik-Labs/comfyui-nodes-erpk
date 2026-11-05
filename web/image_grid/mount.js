@@ -7,7 +7,7 @@ import { createImageGrid } from "./widget.js";
 
 /**
  * The node type must declare the `grid_images` widget (utils/image_grid.py
- * grid_input) as its last Python input.
+ * grid_input); the grid finds it by name.
  * @param {any} nodeType
  * @param {import("./widget.js").GridIO} io
  * @param {{ socket?: string, caps: import("./grid_list.js").GridCaps, nodeName: string }} options
