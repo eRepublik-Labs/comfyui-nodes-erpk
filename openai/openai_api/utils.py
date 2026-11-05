@@ -222,6 +222,20 @@ class ImageConverter:
         return ImageConverter.pil_to_tensor(pil_image)
 
     @staticmethod
+    def base64_frames_to_tensor(b64_string: str):
+        """Every frame of a base64-encoded image as one ComfyUI batch [F, H, W, C].
+
+        An animated GIF gives one entry per frame; a still image gives one.
+        """
+        import torch
+        from PIL import ImageSequence
+
+        with Image.open(BytesIO(base64.b64decode(b64_string))) as img:
+            frames = [ImageConverter.pil_to_tensor(frame.convert("RGB"))
+                      for frame in ImageSequence.Iterator(img)]
+        return torch.cat(frames, dim=0)
+
+    @staticmethod
     def bytes_to_tensor(image_bytes: bytes):
         """
         Convert image bytes to ComfyUI tensor format.

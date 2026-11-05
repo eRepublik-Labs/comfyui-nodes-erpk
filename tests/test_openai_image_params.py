@@ -586,8 +586,12 @@ class TestOutputFormat:
         ],
     }
     WIDGETS_AFTER = {
-        "OpenAIImageGeneration": ["complexity"],
+        "OpenAIImageGeneration": ["complexity", "frame_count", "frame_duration_ms"],
         "OpenAIImageEdit": ["grid_images", "complexity"],
+    }
+    FORMATS = {
+        "OpenAIImageGeneration": ["png", "jpeg", "webp", "gif"],
+        "OpenAIImageEdit": ["png", "jpeg", "webp"],
     }
 
     @pytest.mark.parametrize("class_name", sorted(WIDGETS_BEFORE))
@@ -601,7 +605,7 @@ class TestOutputFormat:
         assert widget_ids == (self.WIDGETS_BEFORE[class_name] + ["output_format", "output_compression"]
                               + self.WIDGETS_AFTER[class_name])
         fmt = next(i for i in inputs if i.id == "output_format")
-        assert fmt.options == ["png", "jpeg", "webp"] and fmt.default == "png"
+        assert fmt.options == self.FORMATS[class_name] and fmt.default == "png"
         comp = next(i for i in inputs if i.id == "output_compression")
         assert (comp.min, comp.max, comp.default) == (0, 100, 100)
 
@@ -729,6 +733,107 @@ class TestComplexity:
                 client=SimpleNamespace(edit_image=edit_image), complexity="low",
             ))
         assert seen["complexity"] == "low"
+
+
+def _gif_base64(colours, size=(4, 3)):
+    """An animated GIF, one solid frame per colour, as the API's b64_json."""
+    import base64
+    from io import BytesIO
+    from PIL import Image
+    frames = [Image.new("RGB", size, colour) for colour in colours]
+    buffer = BytesIO()
+    frames[0].save(buffer, format="GIF", save_all=True, append_images=frames[1:], duration=200, loop=0)
+    return base64.b64encode(buffer.getvalue()).decode()
+
+
+class TestGif:
+    """output_format gif returns a GIF89a on GPT Image 2.6; 2.5 and gpt-image-2
+    answer 400 "GIF output is not enabled for the model '<id>'." frame_count
+    (2-64) and frame_duration_ms (20-2000) ride in the body (measured 2026-11-05)."""
+
+    def test_26_sends_the_format_and_the_frame_fields(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.generate_image(
+            prompt="a bouncing ball", model="gpt-image-2.6-flare", size="auto", output_format="gif",
+            output_compression=40, complexity="low", frame_count=2, frame_duration_ms=150,
+        ))
+        params = mock.images.generate.call_args[1]
+        assert_binds(params, "openai.resources.images", "Images", "generate")
+        assert params["output_format"] == "gif"
+        assert "output_compression" not in params
+        assert params["extra_body"] == {"complexity": "low", "frame_count": 2, "frame_duration_ms": 150}
+
+    @pytest.mark.parametrize("model", ["gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2"])
+    def test_older_models_are_refused_before_the_call(self, model):
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(client.generate_image(prompt="x", model=model, output_format="gif", frame_count=2))
+        assert str(exc.value) == (
+            f"{model} does not support output_format='gif'. "
+            "Use gpt-image-2.6-flare, gpt-image-2.6-sunburst, or pick png, jpeg or webp."
+        )
+        mock.images.generate.assert_not_called()
+
+    def test_frame_fields_stay_out_of_a_still_image(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.generate_image(
+            prompt="x", model="gpt-image-2.6-flare", output_format="png", frame_count=2, frame_duration_ms=150,
+        ))
+        assert "extra_body" not in mock.images.generate.call_args[1]
+
+    @staticmethod
+    def _node_output(images, **inputs):
+        from erpk.openai.image_nodes import OpenAIImageGeneration
+
+        class Client:
+            async def generate_image(self, **kwargs):
+                return {"images": images, "revised_prompt": None}
+
+        return asyncio.run(OpenAIImageGeneration.execute("a ball", client=Client(), output_format="gif", **inputs))
+
+    def test_the_node_returns_every_frame_of_every_animation(self):
+        pytest.importorskip("torch")
+        output = self._node_output([_gif_base64([(255, 0, 0), (0, 0, 255)]),
+                                    _gif_base64([(0, 255, 0), (255, 255, 255)])])
+        image = output.args[0]
+        assert tuple(image.shape) == (4, 3, 4, 3)
+        corners = [tuple(round(float(v) * 255) for v in image[i, 0, 0]) for i in range(4)]
+        assert corners == [(255, 0, 0), (0, 0, 255), (0, 255, 0), (255, 255, 255)]
+
+    def test_the_node_forwards_the_frame_widgets(self):
+        from erpk.openai.image_nodes import OpenAIImageGeneration
+        seen = {}
+
+        class RecordingClient:
+            async def generate_image(self, **kwargs):
+                seen.update(kwargs)
+                return {"blocked": True, "error": "stop here"}
+
+        with pytest.raises(ValueError, match="stop here"):
+            asyncio.run(OpenAIImageGeneration.execute(
+                "a ball", client=RecordingClient(), output_format="gif", frame_count=4, frame_duration_ms=90,
+            ))
+        assert (seen["output_format"], seen["frame_count"], seen["frame_duration_ms"]) == ("gif", 4, 90)
+
+    def test_the_api_sheet_message_reaches_the_user_whole(self):
+        from erpk.openai.image_nodes import OpenAIImageGeneration
+        api_message = ("No supported sheet fits 2 GIF frames at size '1024x1024'. Invalid size "
+                       "'4096x2048'. The longest edge must be less than or equal to 3840.")
+
+        class RefusingClient:
+            async def generate_image(self, **kwargs):
+                raise RuntimeError(api_message)
+
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(OpenAIImageGeneration.execute("a ball", client=RefusingClient(), output_format="gif"))
+        assert str(exc.value) == f"Failed to generate image: {api_message}"
+
+    def test_frame_widgets_cover_the_documented_ranges(self):
+        from erpk.openai.image_nodes import OpenAIImageGeneration
+        inputs = {i.id: i for i in OpenAIImageGeneration.define_schema().inputs}
+        count, duration = inputs["frame_count"], inputs["frame_duration_ms"]
+        assert (count.min, count.max, count.default, count.optional) == (2, 64, 9, True)
+        assert (duration.min, duration.max, duration.step, duration.default, duration.optional) == (20, 2000, 10, 200, True)
 
 
 class TestTransparentNeedsAlphaFormat:

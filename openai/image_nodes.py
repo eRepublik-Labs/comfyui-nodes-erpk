@@ -213,10 +213,14 @@ class OpenAIImageGeneration(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "output_format",
-                    options=["png", "jpeg", "webp"],
+                    options=["png", "jpeg", "webp", "gif"],
                     default="png",
                     optional=True,
-                    tooltip="Output file format. 'transparent' background needs png or webp.",
+                    tooltip=(
+                        "Output file format. 'transparent' background needs png or webp. "
+                        "'gif' (GPT Image 2.6 only) returns an animation, and the image output "
+                        "holds every frame as a batch."
+                    ),
                 ),
                 IO.Int.Input(
                     "output_compression",
@@ -227,6 +231,27 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     tooltip="Compression level 0-100 (100 = least compression). Applied only to jpeg and webp.",
                 ),
                 complexity_input(),
+                IO.Int.Input(
+                    "frame_count",
+                    default=9,
+                    min=2,
+                    max=64,
+                    optional=True,
+                    tooltip=(
+                        "Frames per GIF animation; used only when output_format is gif. The API tiles "
+                        "the frames onto one sheet whose longest edge must stay within 3840 px, so "
+                        "many frames need a smaller size or size auto."
+                    ),
+                ),
+                IO.Int.Input(
+                    "frame_duration_ms",
+                    default=200,
+                    min=20,
+                    max=2000,
+                    step=10,
+                    optional=True,
+                    tooltip="How long each GIF frame shows, in milliseconds; used only when output_format is gif.",
+                ),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -257,6 +282,8 @@ class OpenAIImageGeneration(IO.ComfyNode):
         output_format = kwargs.get("output_format", "png")
         output_compression = kwargs.get("output_compression", 100)
         complexity = kwargs.get("complexity", "auto")
+        frame_count = kwargs.get("frame_count", 9)
+        frame_duration_ms = kwargs.get("frame_duration_ms", 200)
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -287,6 +314,8 @@ class OpenAIImageGeneration(IO.ComfyNode):
                 output_format=output_format,
                 output_compression=output_compression,
                 complexity=complexity,
+                frame_count=frame_count,
+                frame_duration_ms=frame_duration_ms,
             )
 
             if response.get("blocked", False):
@@ -298,10 +327,10 @@ class OpenAIImageGeneration(IO.ComfyNode):
             if not images:
                 raise ValueError("No image was generated")
 
-            # Convert ALL returned images to a single batched tensor [N,H,W,C].
-            # Previously only images[0] was kept, silently dropping N-1 images
-            # the user was billed for.
-            tensors = [ImageConverter.base64_to_tensor(img) for img in images]
+            # Convert ALL returned images to a single batched tensor [N,H,W,C],
+            # each GIF contributing every frame. Previously only images[0] was
+            # kept, silently dropping N-1 images the user was billed for.
+            tensors = [ImageConverter.base64_frames_to_tensor(img) for img in images]
             if len(tensors) == 1:
                 image_tensor = tensors[0]
             else:

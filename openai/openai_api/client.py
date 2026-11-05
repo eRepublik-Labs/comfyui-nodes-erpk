@@ -24,6 +24,8 @@ class ImageModel:
     complexity: bool
     # images.edit takes a `markup` layer of drawn marks.
     markup: bool
+    # images.generate returns an animated GIF for output_format gif.
+    gif: bool
 
 
 class OpenAIClient:
@@ -67,27 +69,29 @@ class OpenAIClient:
     # The docs name 2.5 and 2.6 for markup, but gpt-image-2 also returned 200
     # and placed the edit inside a circle drawn off-centre on the markup layer
     # (measured 2026-11-05); an empty layer 400s "No actionable edit
-    # annotations were found" on 2.5 and gpt-image-2.
+    # annotations were found" on 2.5 and gpt-image-2. GIF output returns a
+    # GIF89a on both 2.6 tiers; 2.5 and gpt-image-2 answer 400 "GIF output is
+    # not enabled for the model '<id>'." (measured 2026-11-05).
     IMAGE_MODELS = {
         "gpt-image-2.6-sunburst": ImageModel(
             max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
-            complexity=True, markup=True,
+            complexity=True, markup=True, gif=True,
         ),
         "gpt-image-2.6-flare": ImageModel(
             max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
-            complexity=True, markup=True,
+            complexity=True, markup=True, gif=True,
         ),
         "gpt-image-2.5-sunburst": ImageModel(
             max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
-            complexity=False, markup=True,
+            complexity=False, markup=True, gif=False,
         ),
         "gpt-image-2.5-flare": ImageModel(
             max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
-            complexity=False, markup=True,
+            complexity=False, markup=True, gif=False,
         ),
         "gpt-image-2": ImageModel(
             max_quality="high", transparent_background=False, custom_size=True, input_fidelity=False,
-            complexity=False, markup=True,
+            complexity=False, markup=True, gif=False,
         ),
     }
 
@@ -229,7 +233,26 @@ class OpenAIClient:
         """
         if output_format in ("jpeg", "webp"):
             return {"output_format": output_format, "output_compression": output_compression}
+        if output_format == "gif":
+            return {"output_format": output_format}
         return {}
+
+    @classmethod
+    def _gif_body(cls, model: str, frame_count: Optional[int], frame_duration_ms: Optional[int]) -> Dict[str, Any]:
+        """The body fields of a GIF request, raising before the call on a model without GIF output."""
+        caps = cls.IMAGE_MODELS.get(model)
+        if not (caps and caps.gif):
+            supported = ", ".join(sorted(m for m, c in cls.IMAGE_MODELS.items() if c.gif))
+            raise ValueError(
+                f"{model} does not support output_format='gif'. "
+                f"Use {supported}, or pick png, jpeg or webp."
+            )
+        body = {}
+        if frame_count is not None:
+            body["frame_count"] = frame_count
+        if frame_duration_ms is not None:
+            body["frame_duration_ms"] = frame_duration_ms
+        return body
 
     # Models that use max_completion_tokens instead of max_tokens
     NEW_TOKEN_PARAM_MODELS = {
@@ -731,6 +754,8 @@ class OpenAIClient:
         output_format: str = "png",
         output_compression: int = 100,
         complexity: str = "auto",
+        frame_count: Optional[int] = None,
+        frame_duration_ms: Optional[int] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -744,10 +769,14 @@ class OpenAIClient:
             background: Background type (auto, transparent, opaque - GPT Image models only)
             n: Number of images to generate
             complexity: auto (omitted), low, medium or high; dropped on models without it
+            frame_count, frame_duration_ms: GIF frames per animation and frame
+                length, sent only when output_format is gif; None leaves the
+                API default (9 frames, 200 ms)
             **kwargs: Additional parameters
 
         Returns:
-            Dict with 'images' (list of base64 data) and metadata
+            Dict with 'images' (list of base64 data, one animated GIF each for
+            gif) and metadata
         """
         from openai import APIError
 
@@ -771,10 +800,16 @@ class OpenAIClient:
             if moderation != "auto":
                 params["moderation"] = moderation
             params.update(self._output_format_params(output_format, output_compression))
-            # Images.generate() has no `complexity` keyword in SDK 2.15.
+            # Images.generate() has no `complexity`, `frame_count` or
+            # `frame_duration_ms` keyword in SDK 2.15.
+            extra_body = {}
             level = self._complexity_for(model, complexity)
             if level:
-                params["extra_body"] = {"complexity": level}
+                extra_body["complexity"] = level
+            if output_format == "gif":
+                extra_body.update(self._gif_body(model, frame_count, frame_duration_ms))
+            if extra_body:
+                params["extra_body"] = extra_body
             # GPT Image models always return base64, do not accept response_format
         else:
             params["response_format"] = "b64_json"
@@ -816,6 +851,8 @@ class OpenAIClient:
         output_format: str = "png",
         output_compression: int = 100,
         complexity: str = "auto",
+        frame_count: Optional[int] = None,
+        frame_duration_ms: Optional[int] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -829,17 +866,22 @@ class OpenAIClient:
             background: Background type (auto, transparent, opaque - GPT Image models only)
             n: Number of images to generate
             complexity: auto (omitted), low, medium or high; dropped on models without it
+            frame_count, frame_duration_ms: GIF frames per animation and frame
+                length, sent only when output_format is gif; None leaves the
+                API default (9 frames, 200 ms)
             **kwargs: Additional parameters
 
         Returns:
-            Dict with 'images' (list of base64 data) and metadata
+            Dict with 'images' (list of base64 data, one animated GIF each for
+            gif) and metadata
         """
         return await asyncio.to_thread(
             self._generate_image_sync, prompt,
             model=model, size=size, quality=quality,
             background=background, moderation=moderation, n=n,
             output_format=output_format, output_compression=output_compression,
-            complexity=complexity, **kwargs
+            complexity=complexity, frame_count=frame_count,
+            frame_duration_ms=frame_duration_ms, **kwargs
         )
 
     def _validate_size_for_gpt_image_2(self, size: str, model: str = "gpt-image-2"):
