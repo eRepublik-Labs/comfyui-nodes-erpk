@@ -477,7 +477,7 @@ class TestMarkup:
 
 
 class TestEditNodeMarkup:
-    """The node builds the markup PNG: colour from `markup`, alpha from
+    """The node builds the markup PNG: color from `markup`, alpha from
     `markup_mask` read as Load Image writes it (1 - alpha, ComfyUI nodes.py
     LoadImage), else opaque wherever the markup is not pure black."""
 
@@ -735,12 +735,12 @@ class TestComplexity:
         assert seen["complexity"] == "low"
 
 
-def _gif_base64(colours, size=(4, 3)):
-    """An animated GIF, one solid frame per colour, as the API's b64_json."""
+def _gif_base64(colors, size=(4, 3)):
+    """An animated GIF, one solid frame per color, as the API's b64_json."""
     import base64
     from io import BytesIO
     from PIL import Image
-    frames = [Image.new("RGB", size, colour) for colour in colours]
+    frames = [Image.new("RGB", size, color) for color in colors]
     buffer = BytesIO()
     frames[0].save(buffer, format="GIF", save_all=True, append_images=frames[1:], duration=200, loop=0)
     return base64.b64encode(buffer.getvalue()).decode()

@@ -620,7 +620,7 @@ def _grid_pngs(raw, model):
 def _markup_png(markup, markup_mask, first_size):
     """The markup layer as an RGBA PNG the size of image 1: marks opaque, the rest transparent.
 
-    The colour comes from `markup`. The alpha comes from `markup_mask` read the way
+    The color comes from `markup`. The alpha comes from `markup_mask` read the way
     Load Image writes it (1 where the PNG was transparent), or, with no mask, is
     opaque wherever the markup pixel is not pure black.
     """

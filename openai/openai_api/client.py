@@ -61,15 +61,14 @@ class OpenAIClient:
     # with real alpha. gpt-image-2 and 2.5 reject input_fidelity (400
     # invalid_input_fidelity_model, measured 2026-09-21 despite the reference
     # naming only gpt-image-2); every model here shares gpt-image-2's size
-    # envelope. Only 2.5
-    # and 2.6 accept the xhigh and max quality tiers; earlier models stop at
-    # high. On both 2.6 tiers (measured 2026-11-05): transparent background,
+    # envelope. Only 2.5 and 2.6 accept the xhigh and max quality tiers;
+    # earlier models stop at high. On both 2.6 tiers (measured 2026-11-05): transparent background,
     # 1040x1040 and xhigh return 200 (max is documented, not probed);
     # input_fidelity 400s "does not support the 'input_fidelity' parameter";
     # complexity low/medium/high returns 200 on generate and edit, where 2.5
     # answers 400 "Complexity 'low' is not supported for this image model."
     # The docs name 2.5 and 2.6 for markup, but gpt-image-2 also returned 200
-    # and placed the edit inside a circle drawn off-centre on the markup layer
+    # and placed the edit inside a circle drawn off-center on the markup layer
     # (measured 2026-11-05); an empty layer 400s "No actionable edit
     # annotations were found" on 2.5 and gpt-image-2. GIF output returns a
     # GIF89a on both 2.6 tiers; 2.5 and gpt-image-2 answer 400 "GIF output is
@@ -207,6 +206,11 @@ class OpenAIClient:
             return "low"
         return effort
 
+    @classmethod
+    def _models_where(cls, accepts) -> str:
+        """The table's models for which accepts(caps) holds, sorted, for a refusal message."""
+        return ", ".join(sorted(m for m, caps in cls.IMAGE_MODELS.items() if accepts(caps)))
+
     QUALITY_TIERS = ("low", "medium", "high", "xhigh", "max")
 
     @classmethod
@@ -248,8 +252,8 @@ class OpenAIClient:
         """The body field of an SVG request, raising before the call when the API would refuse it."""
         caps = cls.IMAGE_MODELS.get(model)
         if not (caps and caps.svg):
-            supported = ", ".join(sorted(m for m, c in cls.IMAGE_MODELS.items() if c.svg))
-            raise ValueError(f"{model} does not support output_format='svg'. Use {supported}.")
+            raise ValueError(
+                f"{model} does not support output_format='svg'. Use {cls._models_where(lambda c: c.svg)}.")
         if not svg_model:
             raise ValueError("output_format='svg' needs svg_model, the text model that writes the SVG markup.")
         return {"svg": {"model": svg_model}}
@@ -259,10 +263,9 @@ class OpenAIClient:
         """The body fields of a GIF request, raising before the call on a model without GIF output."""
         caps = cls.IMAGE_MODELS.get(model)
         if not (caps and caps.gif):
-            supported = ", ".join(sorted(m for m, c in cls.IMAGE_MODELS.items() if c.gif))
             raise ValueError(
                 f"{model} does not support output_format='gif'. "
-                f"Use {supported}, or pick png, jpeg or webp."
+                f"Use {cls._models_where(lambda c: c.gif)}, or pick png, jpeg or webp."
             )
         body = {}
         if frame_count is not None:
@@ -748,10 +751,9 @@ class OpenAIClient:
             return
         caps = cls.IMAGE_MODELS.get(model)
         if not (caps and caps.transparent_background):
-            supported = ", ".join(sorted(m for m, c in cls.IMAGE_MODELS.items() if c.transparent_background))
             raise ValueError(
                 f"{model} does not support background='transparent'. "
-                f"Use {supported}, or set background to auto or opaque."
+                f"Use {cls._models_where(lambda c: c.transparent_background)}, or set background to auto or opaque."
             )
         if output_format == "jpeg":
             raise ValueError(
@@ -1129,8 +1131,8 @@ class OpenAIClient:
         """Raise before the call when images.edit would refuse the markup layer."""
         caps = cls.IMAGE_MODELS.get(model)
         if not (caps and caps.markup):
-            supported = ", ".join(sorted(m for m, c in cls.IMAGE_MODELS.items() if c.markup))
-            raise ValueError(f"{model} does not take a markup layer. Use {supported}.")
+            raise ValueError(
+                f"{model} does not take a markup layer. Use {cls._models_where(lambda c: c.markup)}.")
         if mask_data:
             raise ValueError("A markup layer cannot be combined with a mask; send one or the other.")
 
