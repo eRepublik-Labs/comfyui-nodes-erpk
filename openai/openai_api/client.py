@@ -26,6 +26,8 @@ class ImageModel:
     markup: bool
     # images.generate returns an animated GIF for output_format gif.
     gif: bool
+    # images.generate returns SVG markup for output_format svg.
+    svg: bool
 
 
 class OpenAIClient:
@@ -71,27 +73,31 @@ class OpenAIClient:
     # (measured 2026-11-05); an empty layer 400s "No actionable edit
     # annotations were found" on 2.5 and gpt-image-2. GIF output returns a
     # GIF89a on both 2.6 tiers; 2.5 and gpt-image-2 answer 400 "GIF output is
-    # not enabled for the model '<id>'." (measured 2026-11-05).
+    # not enabled for the model '<id>'." (measured 2026-11-05). SVG output needs
+    # svg.model, a text model that writes the markup (400 "SVG generation
+    # requires 'svg.model'" without it); with gpt-6.1-sol both 2.6 tiers
+    # returned "<svg" markup, and 2.5 and gpt-image-2 answer 400 "SVG output
+    # is not supported for this model." (measured 2026-11-05).
     IMAGE_MODELS = {
         "gpt-image-2.6-sunburst": ImageModel(
             max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
-            complexity=True, markup=True, gif=True,
+            complexity=True, markup=True, gif=True, svg=True,
         ),
         "gpt-image-2.6-flare": ImageModel(
             max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
-            complexity=True, markup=True, gif=True,
+            complexity=True, markup=True, gif=True, svg=True,
         ),
         "gpt-image-2.5-sunburst": ImageModel(
             max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
-            complexity=False, markup=True, gif=False,
+            complexity=False, markup=True, gif=False, svg=False,
         ),
         "gpt-image-2.5-flare": ImageModel(
             max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
-            complexity=False, markup=True, gif=False,
+            complexity=False, markup=True, gif=False, svg=False,
         ),
         "gpt-image-2": ImageModel(
             max_quality="high", transparent_background=False, custom_size=True, input_fidelity=False,
-            complexity=False, markup=True, gif=False,
+            complexity=False, markup=True, gif=False, svg=False,
         ),
     }
 
@@ -233,9 +239,20 @@ class OpenAIClient:
         """
         if output_format in ("jpeg", "webp"):
             return {"output_format": output_format, "output_compression": output_compression}
-        if output_format == "gif":
+        if output_format in ("gif", "svg"):
             return {"output_format": output_format}
         return {}
+
+    @classmethod
+    def _svg_body(cls, model: str, svg_model: Optional[str]) -> Dict[str, Any]:
+        """The body field of an SVG request, raising before the call when the API would refuse it."""
+        caps = cls.IMAGE_MODELS.get(model)
+        if not (caps and caps.svg):
+            supported = ", ".join(sorted(m for m, c in cls.IMAGE_MODELS.items() if c.svg))
+            raise ValueError(f"{model} does not support output_format='svg'. Use {supported}.")
+        if not svg_model:
+            raise ValueError("output_format='svg' needs svg_model, the text model that writes the SVG markup.")
+        return {"svg": {"model": svg_model}}
 
     @classmethod
     def _gif_body(cls, model: str, frame_count: Optional[int], frame_duration_ms: Optional[int]) -> Dict[str, Any]:
@@ -756,6 +773,7 @@ class OpenAIClient:
         complexity: str = "auto",
         frame_count: Optional[int] = None,
         frame_duration_ms: Optional[int] = None,
+        svg_model: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -772,11 +790,13 @@ class OpenAIClient:
             frame_count, frame_duration_ms: GIF frames per animation and frame
                 length, sent only when output_format is gif; None leaves the
                 API default (9 frames, 200 ms)
+            svg_model: the text model that writes the markup; required when
+                output_format is svg, which also needs n=1
             **kwargs: Additional parameters
 
         Returns:
             Dict with 'images' (list of base64 data, one animated GIF each for
-            gif) and metadata
+            gif, base64 SVG markup for svg) and metadata
         """
         from openai import APIError
 
@@ -800,14 +820,16 @@ class OpenAIClient:
             if moderation != "auto":
                 params["moderation"] = moderation
             params.update(self._output_format_params(output_format, output_compression))
-            # Images.generate() has no `complexity`, `frame_count` or
-            # `frame_duration_ms` keyword in SDK 2.15.
+            # Images.generate() has no `complexity`, `frame_count`,
+            # `frame_duration_ms` or `svg` keyword in SDK 2.15.
             extra_body = {}
             level = self._complexity_for(model, complexity)
             if level:
                 extra_body["complexity"] = level
             if output_format == "gif":
                 extra_body.update(self._gif_body(model, frame_count, frame_duration_ms))
+            if output_format == "svg":
+                extra_body.update(self._svg_body(model, svg_model))
             if extra_body:
                 params["extra_body"] = extra_body
             # GPT Image models always return base64, do not accept response_format
@@ -853,6 +875,7 @@ class OpenAIClient:
         complexity: str = "auto",
         frame_count: Optional[int] = None,
         frame_duration_ms: Optional[int] = None,
+        svg_model: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -869,11 +892,13 @@ class OpenAIClient:
             frame_count, frame_duration_ms: GIF frames per animation and frame
                 length, sent only when output_format is gif; None leaves the
                 API default (9 frames, 200 ms)
+            svg_model: the text model that writes the markup; required when
+                output_format is svg, which also needs n=1
             **kwargs: Additional parameters
 
         Returns:
             Dict with 'images' (list of base64 data, one animated GIF each for
-            gif) and metadata
+            gif, base64 SVG markup for svg) and metadata
         """
         return await asyncio.to_thread(
             self._generate_image_sync, prompt,
@@ -881,7 +906,7 @@ class OpenAIClient:
             background=background, moderation=moderation, n=n,
             output_format=output_format, output_compression=output_compression,
             complexity=complexity, frame_count=frame_count,
-            frame_duration_ms=frame_duration_ms, **kwargs
+            frame_duration_ms=frame_duration_ms, svg_model=svg_model, **kwargs
         )
 
     def _validate_size_for_gpt_image_2(self, size: str, model: str = "gpt-image-2"):

@@ -2,6 +2,7 @@
 # ABOUTME: Provides image generation and editing with GPT Image models
 
 import asyncio
+import base64
 from io import BytesIO
 
 from comfy_api.latest import IO
@@ -41,6 +42,9 @@ RESPONSES_MAINLINE_MODELS = [
 ]
 
 RESPONSES_IMAGE_MODELS = IMAGE_MODELS
+
+SVG_MODELS = [m for m, caps in OpenAIClient.IMAGE_MODELS.items() if caps.svg]
+SVG_DEFAULT_MODEL = "gpt-image-2.6-flare"
 
 # max is Responses-only: 200 on all 8 mainlines here, 400 on chat.completions
 # (measured 2026-10-14, gpt-6.1-terra 2026-11-03), so the text nodes stop at
@@ -971,5 +975,130 @@ class OpenAIImageEdit(IO.ComfyNode):
 
         except Exception as e:
             error_msg = f"Failed to edit image: {str(e)}"
+            print(f"[OpenAI] Error: {error_msg}")
+            raise ValueError(error_msg)
+
+
+class OpenAISVGGeneration(IO.ComfyNode):
+    """Generates SVG markup with GPT Image 2.6, which hands the drawing to a text model."""
+
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="OpenAISVGGeneration",
+            display_name="OpenAI SVG Generation",
+            category="ERPK/OpenAI",
+            not_idempotent=True,
+            inputs=[
+                IO.String.Input(
+                    "prompt",
+                    multiline=True,
+                    default="",
+                    tooltip="Description of the vector image to generate",
+                ),
+                IO.Custom("OPENAI_API_CLIENT").Input(
+                    "client",
+                    optional=True,
+                    tooltip="OpenAI API client from OpenAI API Config node (uses API key from config)",
+                ),
+                IO.Combo.Input(
+                    "model",
+                    options=SVG_MODELS,
+                    default=SVG_DEFAULT_MODEL,
+                    optional=True,
+                    tooltip="Image model. Only GPT Image 2.6 returns SVG.",
+                ),
+                IO.Combo.Input(
+                    "svg_model",
+                    options=RESPONSES_MAINLINE_MODELS,
+                    default=RESPONSES_MAINLINE_MODELS[0],
+                    optional=True,
+                    tooltip="Text model that writes the SVG markup for the image model.",
+                ),
+                *size_inputs(
+                    "GPT Image 2.6 accepts any size with both edges divisible by 16, "
+                    "aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels and max edge 3840."
+                ),
+                IO.Combo.Input(
+                    "quality",
+                    options=["auto", "low", "medium", "high", "xhigh", "max"],
+                    default="auto",
+                    optional=True,
+                    tooltip="Image quality.",
+                ),
+                complexity_input(),
+                IO.Combo.Input(
+                    "background",
+                    options=["auto", "transparent", "opaque"],
+                    default="auto",
+                    optional=True,
+                    tooltip="Background type for the generated image.",
+                ),
+                IO.Int.Input(
+                    "seed",
+                    default=-1,
+                    min=-1,
+                    max=2**31 - 1,
+                    control_after_generate="randomize",
+                    tooltip=(
+                        "Cache control only; not sent to the API. Randomize re-runs (and re-bills) "
+                        "on every queue; a fixed value reuses the cached SVG."
+                    ),
+                ),
+            ],
+            outputs=[
+                IO.String.Output("svg"),
+            ],
+        )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
+
+    @classmethod
+    async def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
+        client = kwargs.get("client")
+        model = kwargs.get("model", SVG_DEFAULT_MODEL)
+        svg_model = kwargs.get("svg_model", RESPONSES_MAINLINE_MODELS[0])
+        size = resolve_size(
+            kwargs.get("size", "1024x1024"),
+            kwargs.get("custom_width", 1024),
+            kwargs.get("custom_height", 1024),
+        )
+
+        if not prompt or not prompt.strip():
+            raise ValueError("Prompt cannot be empty")
+
+        try:
+            image_client = client if client is not None else OpenAIClient(api_key=None, model=model)
+            print(f"[OpenAI] Generating SVG with model: {model}, svg_model: {svg_model}, size: {size}")
+
+            # SVG output takes one image per request.
+            response = await image_client.generate_image(
+                prompt=prompt.strip(),
+                model=model,
+                size=size,
+                quality=kwargs.get("quality", "auto"),
+                background=kwargs.get("background", "auto"),
+                n=1,
+                output_format="svg",
+                complexity=kwargs.get("complexity", "auto"),
+                svg_model=svg_model,
+            )
+
+            if response.get("blocked", False):
+                raise ValueError(f"Image blocked by content filters: {response.get('error', 'Unknown reason')}")
+
+            images = response.get("images", [])
+            if not images:
+                raise ValueError("No SVG was generated")
+
+            svg = base64.b64decode(images[0]).decode("utf-8")
+            print(f"[OpenAI] Generated SVG, {len(svg)} characters")
+            return IO.NodeOutput(svg)
+
+        except Exception as e:
+            error_msg = f"Failed to generate SVG: {str(e)}"
             print(f"[OpenAI] Error: {error_msg}")
             raise ValueError(error_msg)

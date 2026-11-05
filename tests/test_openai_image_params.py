@@ -836,6 +836,103 @@ class TestGif:
         assert (duration.min, duration.max, duration.step, duration.default, duration.optional) == (20, 2000, 10, 200, True)
 
 
+class TestSvg:
+    """output_format svg on GPT Image 2.6 returns base64 SVG markup written by
+    svg.model; without svg.model the API answers 400 "SVG generation requires
+    'svg.model'", and 2.5 and gpt-image-2 answer 400 "SVG output is not
+    supported for this model." (measured 2026-11-05)."""
+
+    def test_26_sends_the_format_and_the_text_model(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.generate_image(
+            prompt="a red circle", model="gpt-image-2.6-sunburst", output_format="svg", n=1,
+            complexity="medium", svg_model="gpt-6.1-sol",
+        ))
+        params = mock.images.generate.call_args[1]
+        assert_binds(params, "openai.resources.images", "Images", "generate")
+        assert (params["output_format"], params["n"]) == ("svg", 1)
+        assert params["extra_body"] == {"complexity": "medium", "svg": {"model": "gpt-6.1-sol"}}
+
+    @pytest.mark.parametrize("model", ["gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2"])
+    def test_older_models_are_refused_before_the_call(self, model):
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(client.generate_image(prompt="x", model=model, output_format="svg", svg_model="gpt-6.1-sol"))
+        assert str(exc.value) == (
+            f"{model} does not support output_format='svg'. Use gpt-image-2.6-flare, gpt-image-2.6-sunburst."
+        )
+        mock.images.generate.assert_not_called()
+
+    def test_a_missing_text_model_is_refused_before_the_call(self):
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(client.generate_image(prompt="x", model="gpt-image-2.6-flare", output_format="svg"))
+        assert str(exc.value) == "output_format='svg' needs svg_model, the text model that writes the SVG markup."
+        mock.images.generate.assert_not_called()
+
+
+class TestSvgNode:
+    """OpenAI SVG Generation returns the markup as one STRING."""
+
+    SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="red"/></svg>'
+
+    def _recording_client(self, seen, answer=None):
+        import base64
+
+        class Client:
+            async def generate_image(self, **kwargs):
+                seen.update(kwargs)
+                return answer or {"images": [base64.b64encode(TestSvgNode.SVG.encode()).decode()]}
+
+        return Client()
+
+    def test_returns_the_decoded_markup(self):
+        from erpk.openai.image_nodes import OpenAISVGGeneration
+        seen = {}
+        output = asyncio.run(OpenAISVGGeneration.execute("a red circle", client=self._recording_client(seen)))
+        assert output.args == (self.SVG,)
+
+    def test_sends_one_svg_from_the_defaults(self):
+        from erpk.openai.image_nodes import OpenAISVGGeneration
+        seen = {}
+        asyncio.run(OpenAISVGGeneration.execute("a red circle", client=self._recording_client(seen)))
+        assert seen == {
+            "prompt": "a red circle", "model": "gpt-image-2.6-flare", "size": "1024x1024",
+            "quality": "auto", "background": "auto", "n": 1, "output_format": "svg",
+            "complexity": "auto", "svg_model": "gpt-6.1-sol",
+        }
+
+    def test_forwards_the_widgets(self):
+        from erpk.openai.image_nodes import OpenAISVGGeneration
+        seen = {}
+        asyncio.run(OpenAISVGGeneration.execute(
+            "a logo", client=self._recording_client(seen), model="gpt-image-2.6-sunburst",
+            svg_model="gpt-6-luna", size="Custom", custom_width=1040, custom_height=1040,
+            quality="low", complexity="low", background="transparent",
+        ))
+        assert {k: seen[k] for k in ("model", "svg_model", "size", "quality", "complexity", "background")} == {
+            "model": "gpt-image-2.6-sunburst", "svg_model": "gpt-6-luna", "size": "1040x1040",
+            "quality": "low", "complexity": "low", "background": "transparent",
+        }
+
+    def test_a_refusal_names_the_reason(self):
+        from erpk.openai.image_nodes import OpenAISVGGeneration
+        client = self._recording_client({}, answer={"images": [], "blocked": True, "error": "The prompt was refused."})
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(OpenAISVGGeneration.execute("x", client=client))
+        assert str(exc.value) == "Failed to generate SVG: Image blocked by content filters: The prompt was refused."
+
+    def test_schema(self):
+        from erpk.openai.image_nodes import OpenAISVGGeneration
+        schema = OpenAISVGGeneration.define_schema()
+        inputs = {i.id: i for i in schema.inputs}
+        assert [(o.io_type, o.id) for o in schema.outputs] == [("STRING", "svg")]
+        assert (inputs["model"].options, inputs["model"].default) == (
+            ["gpt-image-2.6-sunburst", "gpt-image-2.6-flare"], "gpt-image-2.6-flare")
+        assert inputs["svg_model"].default == "gpt-6.1-sol"
+        assert "output_format" not in inputs and "n" not in inputs
+
+
 class TestTransparentNeedsAlphaFormat:
     """background=transparent with output_format=jpeg returns 400 "Transparent
     background is not supported for JPEG output format" (measured on
