@@ -30,7 +30,7 @@ Edits images from a text prompt with ByteDance's Seedream V5.0 Pro, using up to 
 
 ## Image grid
 
-With nothing connected to `images`, the node sends the files on its grid. Pick or drop PNG, JPG, or WEBP files, drag a cell to reorder it, and hover a cell and click **×** to remove it. While `images` is connected, the grid dims and the node ignores it.
+With nothing connected to `images`, the node sends the files on its grid. Pick or drop PNG, JPG, or WebP files, drag a cell to reorder it, and hover a cell and click **×** to remove it. Click **Reference images** at the top of the grid to collapse it to its header, which still shows the count, and click it again to expand it. While `images` is connected, the grid dims and the node ignores it.
 
 - Each file goes to the API as its own image, at its own size, in cell order.
 - The node applies EXIF orientation, drops any alpha channel, and sends each file as JPEG.
