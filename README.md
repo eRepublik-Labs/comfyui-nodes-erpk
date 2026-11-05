@@ -311,11 +311,12 @@ String manipulation and general utility nodes.
 - Visual separators between configuration and input sections
 
 **Image Grid Loader features:**
-- Pick files with **Choose files…** or the **+ Add** cell, or drop them onto the grid; it takes PNG, JPG, and WEBP
+- Pick files with **Choose files…** or the **+ Add** cell, or drop them onto the grid; it takes PNG, JPG, and WebP
 - The grid uploads each file to ComfyUI's `input` folder through the standard image upload, so the workflow saves file names, not pixels
-- Numbered cells in send order; drag to reorder, hover **×** to remove, **Clear all** with Undo
+- Numbered cells in send order; drag to reorder, click to see full size, hover **×** to remove, **Clear all** with Undo
+- A **Reference images** header with the count collapses the grid to one row; the workflow saves the collapsed state
 - Each file shows as a numbered placeholder with a spinner while it uploads, and lands in drop order; PNG thumbnails load through ComfyUI's WebP preview
-- Press Tab to focus a cell; the arrow keys move it and Delete or Backspace removes it
+- Press Tab to focus a cell; the arrow keys move it, Enter shows it full size, and Delete or Backspace removes it
 - The grid holds up to 14 files; it ignores dropped files past that and the overlay says how many free slots remain
 - The node centers mixed sizes on a canvas of the largest height and width with mid-grey padding, since a batch must share one size
 - Calls no API; a missing or out-of-folder file fails when you queue, naming the entry

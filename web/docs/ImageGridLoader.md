@@ -30,14 +30,17 @@ The number on each cell is the image's position in the batch. Cell 1 is the firs
 - **Choose files…** in the empty grid, or the **+ Add** cell, opens a file picker that accepts more than one file at a time.
 - You can drop files from your file manager onto the grid.
 - Each accepted file appears at once as a grey numbered cell with a spinner, in drop order. The cell shows the thumbnail when its upload finishes, and the file joins the list after every file dropped before it. A file that fails to upload leaves the grid, and the notice under the grid names it. **Clear all** waits until every upload has finished.
-- The grid accepts PNG, JPG, and WEBP files. It skips other file types and says how many it skipped.
+- The grid accepts PNG, JPG, and WebP files. It skips other file types and says how many it skipped.
 - The grid holds up to 14 files, the most any edit node here takes. Gemini Image Edit takes up to 14 images and the Seedream edit nodes up to 10. When you drop more files than the grid has free slots, it adds files up to that limit and ignores the rest. The drop overlay shows how many free slots remain. It turns red when the grid is full.
 - Drag a cell to reorder it. A green bar shows where it lands.
 - Hover a cell and click **×** to remove it.
+- Click a cell to see the image full size. The left and right arrow keys step to the previous or next image. Press Escape, click outside the image, or click **×** to close it.
 - **Clear all** empties the grid. Click **Undo** in the notice under the grid to bring the images back.
-- The title bar and the footer show the count, for example `7 of 14`.
+- The title bar, the grid's header, and the footer show the count, for example `7 of 14`. The header count turns red when the grid holds more files than its limit.
+- Click **Reference images** in the header to collapse the grid to that row, and click it again to expand it. A collapsed grid keeps the notice under it. The workflow saves the collapsed state, and a grid you never collapsed loads expanded.
+- Dropping files on a collapsed grid, or on the node's title bar, adds them and expands the grid.
 
-Keyboard: press Tab to focus a cell. The arrow keys move the focused image one place left or right, or one row up or down. Delete or Backspace removes it.
+Keyboard: press Tab to focus a cell. The arrow keys move the focused image one place left or right, or one row up or down. Enter shows it full size. Delete or Backspace removes it.
 
 ## Files
 

@@ -19,6 +19,8 @@ export const EMPTY_H = 150;
 export const FOOTER_GAP = 10;
 export const FOOTER_H = 26;
 export const NOTICE_H = 24;
+export const HEADER_H = 24;
+export const HEADER_GAP = 8;
 export const ROOT_PAD_TOP = 0;
 export const ROOT_PAD_BOTTOM = 4;
 // The frontend wraps a DOM widget in 10px top and bottom margins and sizes the
@@ -28,6 +30,11 @@ export const DOM_WIDGET_MARGIN_V = 20;
 export const ROOT_PAD_V = ROOT_PAD_TOP + ROOT_PAD_BOTTOM + DOM_WIDGET_MARGIN_V;
 export const MIN_NODE_WIDTH = 300;
 
+const TAG_H = 18;
+// Room above the picture for the viewer's close button.
+const VIEWER_PAD = 56;
+const VIEWER_GAP = 10;
+const VIEWER_CAPTION_H = 18;
 const LINE = "#2a2a33";
 const LINE_SOFT = "#1f1f27";
 const TEXT = "#d6d6de";
@@ -60,6 +67,34 @@ sheet.textContent = `
 .erpk-grid-zone.erpk-grid-over.erpk-grid-refuse { border-color: ${DANGER_RED}; background: #170f10; }
 .erpk-grid-zone.erpk-grid-over .erpk-grid-list { opacity: 0.35; }
 .erpk-grid-zone.erpk-grid-ignored { opacity: 0.5; cursor: default; }
+.erpk-grid-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    height: ${HEADER_H}px;
+}
+.erpk-grid-zone:not(.erpk-grid-collapsed) .erpk-grid-header { margin-bottom: ${HEADER_GAP}px; }
+.erpk-grid-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: ${HEADER_H}px;
+    min-width: 0;
+    padding: 0 6px 0 2px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: ${TEXT};
+    font: inherit;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.erpk-grid-toggle:hover { color: #fff; }
+.erpk-grid-chevron { width: 12px; color: ${MUTED}; font-size: 18px; line-height: 1; text-align: center; }
+.erpk-grid-toggle:hover .erpk-grid-chevron { color: ${TEXT}; }
+.erpk-grid-header-count { color: ${MUTED}; font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .erpk-grid-list {
     display: grid;
     grid-template-columns: repeat(${COLUMNS}, minmax(0, 1fr));
@@ -85,7 +120,7 @@ sheet.textContent = `
     border-radius: 3px;
     pointer-events: none;
 }
-.erpk-grid-cell:focus-visible, .erpk-grid-btn:focus-visible, .erpk-grid-remove:focus-visible {
+.erpk-grid-cell:focus-visible, .erpk-grid-btn:focus-visible, .erpk-grid-remove:focus-visible, .erpk-grid-toggle:focus-visible {
     outline: 2px solid ${ACTIVE_GREEN};
     outline-offset: 2px;
 }
@@ -128,43 +163,49 @@ sheet.textContent = `
 }
 @keyframes erpk-grid-spin { to { transform: rotate(360deg); } }
 .erpk-grid-is-missing > .erpk-grid-missing { display: flex; }
+/* Corner tags: the outer corner matches the image's 3px radius inside the cell's 1px border. */
 .erpk-grid-badge, .erpk-grid-remove {
     position: absolute;
-    top: 4px;
-    height: 22px;
-    border-radius: 11px;
+    top: 0;
+    height: ${TAG_H}px;
+    border: none;
     background: rgba(13, 13, 18, 0.85);
-    border: 1px solid ${LINE};
+    color: ${TEXT};
     font-size: 11px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .erpk-grid-badge {
-    left: 4px;
-    min-width: 22px;
-    padding: 0 6px;
-    color: ${TEXT};
-    font-weight: 600;
+    left: 0;
+    min-width: ${TAG_H}px;
+    padding: 0 5px;
+    border-radius: 3px 0 4px 0;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
     pointer-events: none;
 }
 .erpk-grid-remove {
-    right: 4px;
-    width: 22px;
+    right: 0;
+    width: ${TAG_H}px;
     padding: 0;
-    color: ${TEXT};
+    border-radius: 0 3px 0 4px;
     cursor: pointer;
-    font-size: 15px;
+    font-size: 14px;
     line-height: 1;
-    transition: color 130ms, background-color 130ms, border-color 130ms;
+    opacity: 0;
+    transition: opacity 130ms, color 130ms, background-color 130ms;
 }
-/* The glyph is 22px; the hit area extends to 24px. */
-.erpk-grid-remove::before { content: ""; position: absolute; inset: -1px; }
+/* Not :focus-within: a cell refocused after a mouse action would keep its × up with no pointer on it. */
+.erpk-grid-cell:hover .erpk-grid-remove,
+.erpk-grid-cell:focus-visible .erpk-grid-remove { opacity: 1; }
+/* Touch has no hover to reveal it. */
+@media (hover: none) { .erpk-grid-remove { opacity: 1; } }
+/* The tag is ${TAG_H}px; the hit area grows into the cell to 24px, as there is no room past the corner. */
+.erpk-grid-remove::before { content: ""; position: absolute; inset: 0 0 -${24 - TAG_H}px -${24 - TAG_H}px; }
 .erpk-grid-remove:hover, .erpk-grid-remove:focus-visible {
     color: #fff;
     background: ${DANGER_RED};
-    border-color: ${DANGER_RED};
 }
 .erpk-grid-add {
     aspect-ratio: 1;
@@ -226,7 +267,7 @@ sheet.textContent = `
     font-size: 11px;
 }
 .erpk-grid-capacity { font-variant-numeric: tabular-nums; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.erpk-grid-capacity.erpk-grid-over-cap { color: ${DANGER_RED}; }
+.erpk-grid-root .erpk-grid-over-cap { color: ${DANGER_RED}; }
 .erpk-grid-overlay {
     position: absolute;
     inset: 0;
@@ -246,6 +287,10 @@ sheet.textContent = `
 .erpk-grid-over .erpk-grid-overlay { display: flex; }
 .erpk-grid-refuse .erpk-grid-overlay { background: rgba(23, 15, 16, 0.9); color: ${DANGER_RED}; }
 .erpk-grid-overlay small { color: ${TEXT}; font-weight: 400; font-size: 11px; }
+/* A collapsed zone is one header tall, room for the title line only, which would sit on the header's text. */
+.erpk-grid-collapsed .erpk-grid-overlay { padding: 0 12px; }
+.erpk-grid-collapsed.erpk-grid-over .erpk-grid-header { opacity: 0; }
+.erpk-grid-collapsed .erpk-grid-overlay small { display: none; }
 .erpk-grid-notice {
     display: flex;
     align-items: center;
@@ -277,6 +322,62 @@ sheet.textContent = `
     clip: rect(0 0 0 0);
     white-space: nowrap;
 }
+.erpk-grid-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: ${VIEWER_GAP}px;
+    padding: ${VIEWER_PAD}px;
+    background: rgba(13, 13, 18, 0.94);
+    color: ${MUTED};
+    font: 12px/1.4 'Segoe UI', system-ui, sans-serif;
+    overscroll-behavior: contain;
+    outline: none;
+    cursor: zoom-out;
+}
+/* Sized to the picture rather than filling the viewer, so a click beside it lands on the backdrop. */
+.erpk-grid-viewer > img {
+    display: block;
+    max-width: calc(100vw - ${2 * VIEWER_PAD}px);
+    max-height: calc(100vh - ${2 * VIEWER_PAD + VIEWER_GAP + VIEWER_CAPTION_H}px);
+    object-fit: contain;
+    cursor: default;
+}
+.erpk-grid-viewer-caption {
+    display: flex;
+    gap: 12px;
+    max-width: 100%;
+    height: ${VIEWER_CAPTION_H}px;
+    white-space: nowrap;
+}
+.erpk-grid-viewer-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: ${TEXT}; }
+.erpk-grid-viewer-position { flex: none; font-variant-numeric: tabular-nums; }
+.erpk-grid-viewer-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    box-sizing: border-box;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid ${LINE};
+    border-radius: 16px;
+    background: ${PANEL_BG};
+    color: ${TEXT};
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+.erpk-grid-viewer-close:hover { color: #fff; border-color: ${ACTIVE_GREEN_BORDER}; }
+.erpk-grid-viewer-close:focus-visible { outline: 2px solid ${ACTIVE_GREEN}; outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
     .erpk-grid-remove { transition: none; }
     .erpk-grid-spinner { animation: none; }
