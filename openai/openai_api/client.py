@@ -13,7 +13,6 @@ from typing import Dict, Any, List, Optional
 class ImageModel:
     """What one GPT Image model accepts, as measured against the live API."""
 
-    description: str
     # Highest quality tier; xhigh and max clamp down to it.
     max_quality: str
     transparent_background: bool
@@ -21,6 +20,8 @@ class ImageModel:
     custom_size: bool
     # False where the API answers 400 to the parameter.
     input_fidelity: bool
+    # Takes complexity low/medium/high.
+    complexity: bool
 
 
 class OpenAIClient:
@@ -51,22 +52,36 @@ class OpenAIClient:
     # model ID takes the legacy response_format path.
     # gpt-image-2 returns 400 "Transparent background is not supported for
     # this model." (measured 2026-10-01); both 2.5 models returned RGBA PNGs
-    # with real alpha. All three reject input_fidelity (400
+    # with real alpha. gpt-image-2 and 2.5 reject input_fidelity (400
     # invalid_input_fidelity_model, measured 2026-09-21 despite the reference
-    # naming only gpt-image-2) and share gpt-image-2's size envelope. Only 2.5
-    # accepts the xhigh and max quality tiers; earlier models stop at high.
+    # naming only gpt-image-2); every model here shares gpt-image-2's size
+    # envelope. Only 2.5
+    # and 2.6 accept the xhigh and max quality tiers; earlier models stop at
+    # high. On both 2.6 tiers (measured 2026-11-05): transparent background,
+    # 1040x1040 and xhigh return 200 (max is documented, not probed);
+    # input_fidelity 400s "does not support the 'input_fidelity' parameter";
+    # complexity low/medium/high returns 200 on generate and edit, where 2.5
+    # answers 400 "Complexity 'low' is not supported for this image model."
     IMAGE_MODELS = {
-        "gpt-image-2.5-sunburst": ImageModel(
-            description="GPT Image 2.5 Sunburst (Highest quality, xhigh/max quality tiers)",
+        "gpt-image-2.6-sunburst": ImageModel(
             max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
+            complexity=True,
+        ),
+        "gpt-image-2.6-flare": ImageModel(
+            max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
+            complexity=True,
+        ),
+        "gpt-image-2.5-sunburst": ImageModel(
+            max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
+            complexity=False,
         ),
         "gpt-image-2.5-flare": ImageModel(
-            description="GPT Image 2.5 Flare (Fastest 2.5 tier, xhigh/max quality tiers)",
             max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
+            complexity=False,
         ),
         "gpt-image-2": ImageModel(
-            description="GPT Image 2 (Latest flagship, 4K, multilingual text)",
             max_quality="high", transparent_background=False, custom_size=True, input_fidelity=False,
+            complexity=False,
         ),
     }
 
@@ -187,6 +202,17 @@ class OpenAIClient:
             print(f"[OpenAI] {model} supports quality up to '{ceiling}'; using '{ceiling}' instead of '{quality}'")
             return ceiling
         return quality
+
+    @classmethod
+    def _complexity_for(cls, model: str, complexity: str) -> Optional[str]:
+        """The complexity to send, or None to omit it: auto, and any value on a model without complexity."""
+        if complexity == "auto":
+            return None
+        caps = cls.IMAGE_MODELS.get(model)
+        if not (caps and caps.complexity):
+            print(f"[OpenAI] {model} does not support complexity; omitting '{complexity}'")
+            return None
+        return complexity
 
     @staticmethod
     def _output_format_params(output_format: str, output_compression: int) -> Dict[str, Any]:
@@ -698,6 +724,7 @@ class OpenAIClient:
         n: int = 1,
         output_format: str = "png",
         output_compression: int = 100,
+        complexity: str = "auto",
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -705,11 +732,12 @@ class OpenAIClient:
 
         Args:
             prompt: Text description of image to generate
-            model: Image model (gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-2)
+            model: Image model (a key of IMAGE_MODELS)
             size: Image size (1024x1024, 1024x1536, 1536x1024, etc.)
-            quality: Image quality (auto, low, medium, high; xhigh/max on GPT Image 2.5)
+            quality: Image quality (auto, low, medium, high; xhigh/max on GPT Image 2.5 and 2.6)
             background: Background type (auto, transparent, opaque - GPT Image models only)
             n: Number of images to generate
+            complexity: auto (omitted), low, medium or high; dropped on models without it
             **kwargs: Additional parameters
 
         Returns:
@@ -737,6 +765,10 @@ class OpenAIClient:
             if moderation != "auto":
                 params["moderation"] = moderation
             params.update(self._output_format_params(output_format, output_compression))
+            # Images.generate() has no `complexity` keyword in SDK 2.15.
+            level = self._complexity_for(model, complexity)
+            if level:
+                params["extra_body"] = {"complexity": level}
             # GPT Image models always return base64, do not accept response_format
         else:
             params["response_format"] = "b64_json"
@@ -777,6 +809,7 @@ class OpenAIClient:
         n: int = 1,
         output_format: str = "png",
         output_compression: int = 100,
+        complexity: str = "auto",
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -784,11 +817,12 @@ class OpenAIClient:
 
         Args:
             prompt: Text description of image to generate
-            model: Image model (gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-2)
+            model: Image model (a key of IMAGE_MODELS)
             size: Image size (1024x1024, 1024x1536, 1536x1024, etc.)
-            quality: Image quality (auto, low, medium, high; xhigh/max on GPT Image 2.5)
+            quality: Image quality (auto, low, medium, high; xhigh/max on GPT Image 2.5 and 2.6)
             background: Background type (auto, transparent, opaque - GPT Image models only)
             n: Number of images to generate
+            complexity: auto (omitted), low, medium or high; dropped on models without it
             **kwargs: Additional parameters
 
         Returns:
@@ -798,7 +832,8 @@ class OpenAIClient:
             self._generate_image_sync, prompt,
             model=model, size=size, quality=quality,
             background=background, moderation=moderation, n=n,
-            output_format=output_format, output_compression=output_compression, **kwargs
+            output_format=output_format, output_compression=output_compression,
+            complexity=complexity, **kwargs
         )
 
     def _validate_size_for_gpt_image_2(self, size: str, model: str = "gpt-image-2"):
@@ -1030,6 +1065,7 @@ class OpenAIClient:
         input_fidelity: str = "auto",
         output_format: str = "png",
         output_compression: int = 100,
+        complexity: str = "auto",
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -1047,6 +1083,7 @@ class OpenAIClient:
             size: Output image size
             quality: Image quality (GPT Image models only)
             n: Number of images to generate
+            complexity: auto (omitted), low, medium or high; dropped on models without it
             **kwargs: Additional parameters
 
         Returns:
@@ -1097,11 +1134,17 @@ class OpenAIClient:
             # GPT Image models always return base64, do not accept response_format
             if quality != "auto":
                 params["quality"] = self._quality_for(model, quality)
-            # Images.edit() has no `moderation` keyword in any SDK release, though
-            # the endpoint takes the field (it validates auto/low), so it goes in
-            # the request body directly.
+            # Images.edit() has no `moderation` or `complexity` keyword in SDK
+            # 2.15, though the endpoint takes both (it validates moderation
+            # auto/low), so they go in the request body directly.
+            extra_body = {}
             if moderation != "auto":
-                params["extra_body"] = {"moderation": moderation}
+                extra_body["moderation"] = moderation
+            level = self._complexity_for(model, complexity)
+            if level:
+                extra_body["complexity"] = level
+            if extra_body:
+                params["extra_body"] = extra_body
             if background and background != "auto":
                 self._check_background(model, background, output_format)
                 params["background"] = background
@@ -1147,6 +1190,7 @@ class OpenAIClient:
         input_fidelity: str = "auto",
         output_format: str = "png",
         output_compression: int = 100,
+        complexity: str = "auto",
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -1164,6 +1208,7 @@ class OpenAIClient:
             size: Output image size
             quality: Image quality (GPT Image models only)
             n: Number of images to generate
+            complexity: auto (omitted), low, medium or high; dropped on models without it
             **kwargs: Additional parameters
 
         Returns:
@@ -1174,5 +1219,5 @@ class OpenAIClient:
             mask_data=mask_data, model=model, size=size, quality=quality,
             moderation=moderation, n=n, background=background,
             input_fidelity=input_fidelity, output_format=output_format,
-            output_compression=output_compression, **kwargs
+            output_compression=output_compression, complexity=complexity, **kwargs
         )

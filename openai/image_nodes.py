@@ -17,8 +17,8 @@ EDIT_MODELS = IMAGE_MODELS
 
 # A saved workflow keeps its stored model; these reach only new nodes and
 # prompts that omit the input.
-GENERATION_DEFAULT_MODEL = "gpt-image-2.5-flare"
-EDIT_DEFAULT_MODEL = "gpt-image-2.5-sunburst"
+GENERATION_DEFAULT_MODEL = "gpt-image-2.6-flare"
+EDIT_DEFAULT_MODEL = "gpt-image-2.6-sunburst"
 
 # One limit for every GPT Image model, "For GPT image models, you can provide up to 16 images":
 # https://developers.openai.com/api/reference/resources/images/methods/edit
@@ -27,7 +27,8 @@ register_grid_caps("OpenAIImageEdit", EDIT_GRID_CAPS, model_widget="model")
 
 # Mainline (text/reasoning) models for the Responses API call. Each returned
 # 200 on responses.create with the image_generation tool attached (measured
-# 2026-10-01, gpt-6.1-terra 2026-11-03). The first entry is the node default.
+# 2026-10-01, gpt-6.1-terra 2026-11-03; both gpt-image-2.6 tiers as the tool
+# model 2026-11-05). The first entry is the node default.
 RESPONSES_MAINLINE_MODELS = [
     "gpt-6.1-sol",
     "gpt-6.1-terra",
@@ -54,6 +55,23 @@ SIZE_PRESETS = [
     "Custom",
 ]
 CUSTOM_SIZE = "Custom"
+
+COMPLEXITY_LEVELS = ["auto", "low", "medium", "high"]
+
+
+def complexity_input():
+    """The complexity Combo shared by the generation and edit nodes."""
+    return IO.Combo.Input(
+        "complexity",
+        options=COMPLEXITY_LEVELS,
+        default="auto",
+        optional=True,
+        tooltip=(
+            "How much detail GPT Image 2.6 puts into the image: low, medium or high. "
+            "'auto' sends nothing, which OpenAI documents as high. Other models reject "
+            "the parameter, so there it is left out."
+        ),
+    )
 
 
 def resolve_size(size, custom_width, custom_height):
@@ -135,12 +153,13 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Image generation model. "
-                        "gpt-image-2.5-sunburst / -flare: newest, add xhigh/max quality and transparent background. "
+                        "gpt-image-2.6-sunburst / -flare: newest, add complexity control. "
+                        "gpt-image-2.6 and 2.5 add xhigh/max quality and transparent background. "
                         "gpt-image-2: 4K output, multilingual text; no transparent background (the API rejects it)."
                     ),
                 ),
                 *size_inputs(
-                    "gpt-image-2 and 2.5 accept any size with both edges divisible by 16, "
+                    "gpt-image-2, 2.5 and 2.6 accept any size with both edges divisible by 16, "
                     "aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels and max edge 3840."
                 ),
                 IO.Combo.Input(
@@ -148,7 +167,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     options=["auto", "low", "medium", "high", "xhigh", "max"],
                     default="auto",
                     optional=True,
-                    tooltip="Image quality. auto/low/medium/high on every model; xhigh/max only on GPT Image 2.5 (clamped to high on gpt-image-2).",
+                    tooltip="Image quality. auto/low/medium/high on every model; xhigh/max only on GPT Image 2.6 and 2.5 (clamped to high on gpt-image-2).",
                 ),
                 IO.Combo.Input(
                     "background",
@@ -157,7 +176,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Background type for the generated output (GPT Image models only). "
-                        "'transparent' works on GPT Image 2.5 only (gpt-image-2 rejects it) and "
+                        "'transparent' works on GPT Image 2.6 and 2.5 only (gpt-image-2 rejects it) and "
                         "needs png or webp output."
                     ),
                 ),
@@ -207,6 +226,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip="Compression level 0-100 (100 = least compression). Applied only to jpeg and webp.",
                 ),
+                complexity_input(),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -236,6 +256,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
         n = kwargs.get("n", 1)
         output_format = kwargs.get("output_format", "png")
         output_compression = kwargs.get("output_compression", 100)
+        complexity = kwargs.get("complexity", "auto")
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -265,6 +286,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
                 n=n,
                 output_format=output_format,
                 output_compression=output_compression,
+                complexity=complexity,
             )
 
             if response.get("blocked", False):
@@ -388,7 +410,7 @@ class OpenAIImageResponses(IO.ComfyNode):
                     options=["auto", "low", "medium", "high", "xhigh", "max"],
                     default="auto",
                     optional=True,
-                    tooltip="Image quality tier. xhigh/max only on GPT Image 2.5 (clamped to high on gpt-image-2).",
+                    tooltip="Image quality tier. xhigh/max only on GPT Image 2.6 and 2.5 (clamped to high on gpt-image-2).",
                 ),
                 IO.Combo.Input(
                     "background",
@@ -396,7 +418,7 @@ class OpenAIImageResponses(IO.ComfyNode):
                     default="auto",
                     optional=True,
                     tooltip=(
-                        "Background type. 'transparent' works on GPT Image 2.5 only (gpt-image-2 "
+                        "Background type. 'transparent' works on GPT Image 2.6 and 2.5 only (gpt-image-2 "
                         "rejects it) and needs png or webp output."
                     ),
                 ),
@@ -607,12 +629,13 @@ class OpenAIImageEdit(IO.ComfyNode):
                     default=EDIT_DEFAULT_MODEL,
                     optional=True,
                     tooltip=(
-                        "Image editing model. gpt-image-2.5-sunburst / -flare add xhigh/max quality; "
+                        "Image editing model. gpt-image-2.6-sunburst / -flare add complexity control; "
+                        "gpt-image-2.6 and 2.5 add xhigh/max quality; "
                         "gpt-image-2 offers multilingual text and character continuity across edits."
                     ),
                 ),
                 *size_inputs(
-                    "gpt-image-2 and 2.5 accept any size with both edges divisible by 16, "
+                    "gpt-image-2, 2.5 and 2.6 accept any size with both edges divisible by 16, "
                     "aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels and max edge 3840."
                 ),
                 IO.Combo.Input(
@@ -620,7 +643,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                     options=["auto", "low", "medium", "high", "xhigh", "max"],
                     default="auto",
                     optional=True,
-                    tooltip="Image quality for GPT Image models; xhigh/max only on GPT Image 2.5 (clamped to high elsewhere).",
+                    tooltip="Image quality for GPT Image models; xhigh/max only on GPT Image 2.6 and 2.5 (clamped to high elsewhere).",
                 ),
                 IO.Combo.Input(
                     "moderation",
@@ -650,7 +673,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                     optional=True,
                     tooltip=(
                         "Background type for the edited output (GPT Image models only). "
-                        "'transparent' works on GPT Image 2.5 only (gpt-image-2 rejects it) and "
+                        "'transparent' works on GPT Image 2.6 and 2.5 only (gpt-image-2 rejects it) and "
                         "needs png or webp output."
                     ),
                 ),
@@ -662,7 +685,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                     tooltip=(
                         "Fidelity to the original input image(s). 'high' preserves details "
                         "more aggressively; 'low' gives the model more creative freedom. "
-                        "Ignored by gpt-image-2 and the 2.5 models (always high fidelity)."
+                        "Ignored by gpt-image-2, 2.5 and 2.6 (always high fidelity)."
                     ),
                 ),
                 IO.Int.Input(
@@ -689,6 +712,10 @@ class OpenAIImageEdit(IO.ComfyNode):
                     tooltip="Compression level 0-100 (100 = least compression). Applied only to jpeg and webp.",
                 ),
                 grid_input(),
+                # After grid_images, not before it: a save from before complexity
+                # holds the grid list then the grid's DOM widget slot, so only that
+                # slot's "" shifts here, and web/openai_dynamic_sizes.js resets it.
+                complexity_input(),
             ],
             outputs=[
                 IO.Image.Output("image"),
@@ -725,6 +752,7 @@ class OpenAIImageEdit(IO.ComfyNode):
         input_fidelity = kwargs.get("input_fidelity", "auto")
         output_format = kwargs.get("output_format", "png")
         output_compression = kwargs.get("output_compression", 100)
+        complexity = kwargs.get("complexity", "auto")
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
@@ -827,6 +855,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                 input_fidelity=input_fidelity,
                 output_format=output_format,
                 output_compression=output_compression,
+                complexity=complexity,
             )
 
             if response.get("blocked", False):

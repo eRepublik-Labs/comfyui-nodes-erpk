@@ -11,7 +11,10 @@ from erpk.openai.openai_api.client import OpenAIClient
 from tests.openai_sdk_signature import assert_binds
 
 
-GPT_IMAGE_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"]
+GPT_IMAGE_MODELS = [
+    "gpt-image-2.6-sunburst", "gpt-image-2.6-flare",
+    "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2",
+]
 DALLE_MODELS = ["dall-e-3", "dall-e-2"]
 
 
@@ -60,10 +63,15 @@ class TestGptImage2Background:
     # models returned RGBA PNGs with real alpha.
     def test_transparent_rejected_before_the_call_for_gpt_image_2(self):
         client, mock = _make_client_with_mock()
-        with pytest.raises(ValueError, match="gpt-image-2 does not support background='transparent'"):
+        with pytest.raises(ValueError) as exc:
             asyncio.run(client.generate_image(
                 prompt="a cat", model="gpt-image-2", background="transparent"
             ))
+        assert str(exc.value) == (
+            "gpt-image-2 does not support background='transparent'. Use gpt-image-2.5-flare, "
+            "gpt-image-2.5-sunburst, gpt-image-2.6-flare, gpt-image-2.6-sunburst, "
+            "or set background to auto or opaque."
+        )
         mock.images.generate.assert_not_called()
 
     def test_edit_transparent_rejected_before_the_call_for_gpt_image_2(self):
@@ -397,8 +405,8 @@ class TestOutputFormat:
         ],
     }
     WIDGETS_AFTER = {
-        "OpenAIImageGeneration": [],
-        "OpenAIImageEdit": ["grid_images"],
+        "OpenAIImageGeneration": ["complexity"],
+        "OpenAIImageEdit": ["grid_images", "complexity"],
     }
 
     @pytest.mark.parametrize("class_name", sorted(WIDGETS_BEFORE))
@@ -462,6 +470,84 @@ class TestOutputFormat:
                 "a cat", client=RecordingClient(), output_format="jpeg", output_compression=70,
             ))
         assert (seen["output_format"], seen["output_compression"]) == ("jpeg", 70)
+
+
+class TestComplexity:
+    """complexity low/medium/high returns 200 on GPT Image 2.6 for images.generate
+    and images.edit; 2.5 answers 400 "Complexity 'low' is not supported for this
+    image model." (measured 2026-11-05). SDK 2.15 has no complexity keyword."""
+
+    def test_generate_sends_it_in_the_body_on_26(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.generate_image(prompt="x", model="gpt-image-2.6-flare", complexity="low"))
+        params = mock.images.generate.call_args[1]
+        assert_binds(params, "openai.resources.images", "Images", "generate")
+        assert params["extra_body"] == {"complexity": "low"}
+
+    @pytest.mark.parametrize("model,complexity", [
+        ("gpt-image-2.6-flare", "auto"),
+        ("gpt-image-2.5-flare", "high"),
+        ("gpt-image-2", "low"),
+    ])
+    def test_generate_leaves_it_out_for_auto_and_older_models(self, model, complexity):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.generate_image(prompt="x", model=model, complexity=complexity))
+        assert "extra_body" not in mock.images.generate.call_args[1]
+
+    def test_edit_merges_it_with_moderation(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.edit_image(
+            image_data=b"fakepng", prompt="x", model="gpt-image-2.6-sunburst",
+            moderation="low", complexity="high",
+        ))
+        params = mock.images.edit.call_args[1]
+        assert_binds(params, "openai.resources.images", "Images", "edit")
+        assert params["extra_body"] == {"moderation": "low", "complexity": "high"}
+
+    def test_edit_on_25_keeps_moderation_alone(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.edit_image(
+            image_data=b"fakepng", prompt="x", model="gpt-image-2.5-sunburst",
+            moderation="low", complexity="high",
+        ))
+        assert mock.images.edit.call_args[1]["extra_body"] == {"moderation": "low"}
+
+    @pytest.mark.parametrize("class_name", ["OpenAIImageGeneration", "OpenAIImageEdit"])
+    def test_combo_offers_auto_and_the_three_levels(self, class_name):
+        import importlib
+        cls = getattr(importlib.import_module("erpk.openai.image_nodes"), class_name)
+        combo = next(i for i in cls.define_schema().inputs if i.id == "complexity")
+        assert (combo.options, combo.default, combo.optional) == (["auto", "low", "medium", "high"], "auto", True)
+
+    def test_generation_node_forwards_it(self):
+        from erpk.openai.image_nodes import OpenAIImageGeneration
+        seen = {}
+
+        class RecordingClient:
+            async def generate_image(self, **kwargs):
+                seen.update(kwargs)
+                return {"blocked": True, "error": "stop here"}
+
+        with pytest.raises(ValueError, match="stop here"):
+            asyncio.run(OpenAIImageGeneration.execute("a cat", client=RecordingClient(), complexity="medium"))
+        assert seen["complexity"] == "medium"
+
+    def test_edit_node_forwards_it(self):
+        torch = pytest.importorskip("torch")
+        from types import SimpleNamespace
+        from erpk.openai.image_nodes import OpenAIImageEdit
+        seen = {}
+
+        async def edit_image(**kwargs):
+            seen.update(kwargs)
+            return {"blocked": True, "error": "stop here"}
+
+        with pytest.raises(ValueError, match="stop here"):
+            asyncio.run(OpenAIImageEdit.execute(
+                image=torch.zeros(1, 8, 8, 3), prompt="x",
+                client=SimpleNamespace(edit_image=edit_image), complexity="low",
+            ))
+        assert seen["complexity"] == "low"
 
 
 class TestTransparentNeedsAlphaFormat:

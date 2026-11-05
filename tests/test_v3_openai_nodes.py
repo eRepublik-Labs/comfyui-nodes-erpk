@@ -300,8 +300,11 @@ class TestOpenAIModelOptions:
         schema = cls.define_schema()
         model_inputs = [i for i in schema.inputs if i.id == "model"]
         assert len(model_inputs) == 1
-        expected = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"]
-        assert set(model_inputs[0].options) == set(expected)
+        expected = [
+            "gpt-image-2.6-sunburst", "gpt-image-2.6-flare",
+            "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2",
+        ]
+        assert list(model_inputs[0].options) == expected
 
 
 class TestOpenAINoDuplicateIds:

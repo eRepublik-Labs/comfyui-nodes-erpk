@@ -28,7 +28,7 @@ def test_grid_widgets_follow_every_saved_widget():
     assert frontend_widget_order(OpenAIImageEdit.define_schema()) == [
         "prompt", "seed", "model", "size", "custom_width", "custom_height",
         "quality", "moderation", "n", "background", "input_fidelity",
-        "output_format", "output_compression", "grid_images",
+        "output_format", "output_compression", "grid_images", "complexity",
     ]
 
 
@@ -93,7 +93,10 @@ def test_grid_files_reach_the_api_one_png_each_at_their_own_size_in_grid_order(i
     ]
 
 
-@pytest.mark.parametrize("model", ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"])
+@pytest.mark.parametrize("model", [
+    "gpt-image-2.6-sunburst", "gpt-image-2.6-flare",
+    "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2",
+])
 def test_more_files_than_the_model_takes_names_the_model(input_dir, model):
     names = [f"{i}.png" for i in range(17)]
     for name in names:
