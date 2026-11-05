@@ -685,7 +685,9 @@ export function createImageGrid(node, io, caps, nodeName) {
     root.addEventListener("drop", onFileDrop);
     viewer.root.addEventListener("keydown", onViewerKeydown);
     viewer.root.addEventListener("click", (e) => {
-        if (e.target !== viewer.img) closeViewer();
+        // The second click of a double-click on a cell lands here, and must
+        // not close what the first click opened.
+        if (e.target !== viewer.img && e.detail < 2) closeViewer();
     });
 
     return { root, setup, loadFromWidget, layout, desiredHeight, titleCount, addFiles, setSocketLinked, setCollapsed };
