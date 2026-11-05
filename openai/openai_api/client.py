@@ -22,6 +22,8 @@ class ImageModel:
     input_fidelity: bool
     # Takes complexity low/medium/high.
     complexity: bool
+    # images.edit takes a `markup` layer of drawn marks.
+    markup: bool
 
 
 class OpenAIClient:
@@ -62,26 +64,30 @@ class OpenAIClient:
     # input_fidelity 400s "does not support the 'input_fidelity' parameter";
     # complexity low/medium/high returns 200 on generate and edit, where 2.5
     # answers 400 "Complexity 'low' is not supported for this image model."
+    # The docs name 2.5 and 2.6 for markup, but gpt-image-2 also returned 200
+    # and placed the edit inside a circle drawn off-centre on the markup layer
+    # (measured 2026-11-05); an empty layer 400s "No actionable edit
+    # annotations were found" on 2.5 and gpt-image-2.
     IMAGE_MODELS = {
         "gpt-image-2.6-sunburst": ImageModel(
             max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
-            complexity=True,
+            complexity=True, markup=True,
         ),
         "gpt-image-2.6-flare": ImageModel(
             max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
-            complexity=True,
+            complexity=True, markup=True,
         ),
         "gpt-image-2.5-sunburst": ImageModel(
             max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
-            complexity=False,
+            complexity=False, markup=True,
         ),
         "gpt-image-2.5-flare": ImageModel(
             max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
-            complexity=False,
+            complexity=False, markup=True,
         ),
         "gpt-image-2": ImageModel(
             max_quality="high", transparent_background=False, custom_size=True, input_fidelity=False,
-            complexity=False,
+            complexity=False, markup=True,
         ),
     }
 
@@ -1051,6 +1057,37 @@ class OpenAIClient:
             output_compression=output_compression, **kwargs
         )
 
+    @classmethod
+    def _check_markup(cls, model: str, mask_data: Optional[bytes]) -> None:
+        """Raise before the call when images.edit would refuse the markup layer."""
+        caps = cls.IMAGE_MODELS.get(model)
+        if not (caps and caps.markup):
+            supported = ", ".join(sorted(m for m, c in cls.IMAGE_MODELS.items() if c.markup))
+            raise ValueError(f"{model} does not take a markup layer. Use {supported}.")
+        if mask_data:
+            raise ValueError("A markup layer cannot be combined with a mask; send one or the other.")
+
+    def _post_markup_edit(self, params: Dict[str, Any], markup_data: bytes):
+        """images.edit with a markup layer, a file field SDK 2.15's Images.edit() has no keyword for.
+
+        Sends the same multipart request through the client's own post(), so the
+        key, base URL, timeout and retries are those images.edit uses.
+        """
+        from openai.types import ImagesResponse
+
+        body = {k: v for k, v in params.items() if k not in ("image", "extra_body")}
+        body.update(params.get("extra_body", {}))
+        image = params["image"]
+        files = [("image[]", f) for f in image] if isinstance(image, list) else [("image", image)]
+        files.append(("markup", ("markup.png", markup_data, "image/png")))
+        return self.client.post(
+            "/images/edits",
+            cast_to=ImagesResponse,
+            body=body,
+            files=files,
+            options={"headers": {"Content-Type": "multipart/form-data"}},
+        )
+
     def _edit_image_sync(
         self,
         image_data,
@@ -1066,6 +1103,7 @@ class OpenAIClient:
         output_format: str = "png",
         output_compression: int = 100,
         complexity: str = "auto",
+        markup_data: Optional[bytes] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -1079,6 +1117,9 @@ class OpenAIClient:
             prompt: Text description of desired edits
             mask_data: Optional mask as bytes (PNG with transparency). When
                 multiple images are provided, mask applies to the first image.
+            markup_data: Optional markup layer as an RGBA PNG the size of the
+                first image: drawn marks opaque, the rest transparent. Cannot
+                be combined with mask_data.
             model: Image model (gpt-image-2 recommended)
             size: Output image size
             quality: Image quality (GPT Image models only)
@@ -1099,6 +1140,9 @@ class OpenAIClient:
 
         if not image_list:
             raise ValueError("edit_image requires at least one image")
+
+        if markup_data is not None:
+            self._check_markup(model, mask_data)
 
         # images.edit shares the generation size envelope on these models
         # (measured 2026-09-21: 512x512 and 256x256 400 as "below the current
@@ -1155,7 +1199,10 @@ class OpenAIClient:
             params["response_format"] = "b64_json"
 
         try:
-            response = self.client.images.edit(**params)
+            if markup_data is None:
+                response = self.client.images.edit(**params)
+            else:
+                response = self._post_markup_edit(params, markup_data)
 
             images = []
             for img in response.data:
@@ -1191,6 +1238,7 @@ class OpenAIClient:
         output_format: str = "png",
         output_compression: int = 100,
         complexity: str = "auto",
+        markup_data: Optional[bytes] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -1204,6 +1252,9 @@ class OpenAIClient:
             prompt: Text description of desired edits
             mask_data: Optional mask as bytes (PNG with transparency). When
                 multiple images are provided, mask applies to the first image.
+            markup_data: Optional markup layer as an RGBA PNG the size of the
+                first image: drawn marks opaque, the rest transparent. Cannot
+                be combined with mask_data.
             model: Image model (gpt-image-2 recommended)
             size: Output image size
             quality: Image quality (GPT Image models only)
@@ -1219,5 +1270,6 @@ class OpenAIClient:
             mask_data=mask_data, model=model, size=size, quality=quality,
             moderation=moderation, n=n, background=background,
             input_fidelity=input_fidelity, output_format=output_format,
-            output_compression=output_compression, complexity=complexity, **kwargs
+            output_compression=output_compression, complexity=complexity,
+            markup_data=markup_data, **kwargs
         )

@@ -584,6 +584,37 @@ def _grid_pngs(raw, model):
     return pngs
 
 
+def _markup_png(markup, markup_mask, first_size):
+    """The markup layer as an RGBA PNG the size of image 1: marks opaque, the rest transparent.
+
+    The colour comes from `markup`. The alpha comes from `markup_mask` read the way
+    Load Image writes it (1 where the PNG was transparent), or, with no mask, is
+    opaque wherever the markup pixel is not pure black.
+    """
+    import numpy as np
+    from PIL import Image
+
+    rgb = np.clip(markup[0, :, :, :3].cpu().numpy() * 255, 0, 255).astype(np.uint8)
+    height, width = rgb.shape[:2]
+    if (width, height) != first_size:
+        raise ValueError(
+            f"markup is {width}x{height} but image 1 is {first_size[0]}x{first_size[1]}; "
+            f"draw the marks on a layer the size of image 1")
+    if markup_mask is None:
+        alpha = np.where(rgb.any(axis=2), 255, 0).astype(np.uint8)
+    else:
+        mask = markup_mask[0] if markup_mask.dim() == 3 else markup_mask
+        mask_height, mask_width = mask.shape
+        if (mask_width, mask_height) != (width, height):
+            raise ValueError(
+                f"markup_mask is {mask_width}x{mask_height} but markup is {width}x{height}; "
+                f"connect the MASK of the Load Image that loads the markup")
+        alpha = 255 - np.clip(mask.cpu().numpy() * 255, 0, 255).astype(np.uint8)
+    buffer = BytesIO()
+    Image.fromarray(np.dstack([rgb, alpha]), "RGBA").save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 class OpenAIImageEdit(IO.ComfyNode):
     """Uses OpenAI's image editing API to modify existing images based on text prompts."""
 
@@ -622,6 +653,25 @@ class OpenAIImageEdit(IO.ComfyNode):
                     "mask",
                     optional=True,
                     tooltip="Optional mask indicating areas to edit (white = edit, black = keep)",
+                ),
+                IO.Image.Input(
+                    "markup",
+                    optional=True,
+                    tooltip=(
+                        "Optional markup layer: arrows, circles or text drawn on a transparent "
+                        "layer the size of image 1, telling the model where and what to edit. "
+                        "Load the PNG with Load Image and connect its IMAGE here and its MASK to "
+                        "markup_mask. Cannot be combined with mask."
+                    ),
+                ),
+                IO.Mask.Input(
+                    "markup_mask",
+                    optional=True,
+                    tooltip=(
+                        "The MASK output of the Load Image that loads the markup (white where the "
+                        "layer is transparent). Without it, every pixel of markup that is not pure "
+                        "black counts as a mark."
+                    ),
                 ),
                 IO.Combo.Input(
                     "model",
@@ -739,6 +789,8 @@ class OpenAIImageEdit(IO.ComfyNode):
 
         client = kwargs.get("client")
         mask = kwargs.get("mask")
+        markup = kwargs.get("markup")
+        markup_mask = kwargs.get("markup_mask")
         model = kwargs.get("model", EDIT_DEFAULT_MODEL)
         size = resolve_size(
             kwargs.get("size", "1024x1024"),
@@ -756,6 +808,8 @@ class OpenAIImageEdit(IO.ComfyNode):
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
+        if markup_mask is not None and markup is None:
+            raise ValueError("markup_mask is connected but markup is not; connect the markup IMAGE too")
 
         grid_pngs = None
         if image is None:
@@ -800,7 +854,6 @@ class OpenAIImageEdit(IO.ComfyNode):
             if mask is not None:
                 import numpy as np
                 from PIL import Image
-                from io import BytesIO
 
                 try:
                     import torch
@@ -841,6 +894,14 @@ class OpenAIImageEdit(IO.ComfyNode):
 
                 print(f"[OpenAI] Using mask for inpainting")
 
+            markup_bytes = None
+            if markup is not None:
+                from PIL import Image
+                first_size = ((image.shape[2], image.shape[1]) if image is not None
+                              else Image.open(BytesIO(image_bytes[0])).size)
+                markup_bytes = _markup_png(markup, markup_mask, first_size)
+                print("[OpenAI] Using markup layer")
+
             # Edit image
             response = await image_client.edit_image(
                 image_data=image_bytes,
@@ -856,6 +917,7 @@ class OpenAIImageEdit(IO.ComfyNode):
                 output_format=output_format,
                 output_compression=output_compression,
                 complexity=complexity,
+                markup_data=markup_bytes,
             )
 
             if response.get("blocked", False):

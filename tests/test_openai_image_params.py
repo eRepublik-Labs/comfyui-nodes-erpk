@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from erpk.openai.openai_api.client import OpenAIClient
-from tests.openai_sdk_signature import assert_binds
+from tests.openai_sdk_signature import assert_binds, sdk_has
 
 
 GPT_IMAGE_MODELS = [
@@ -29,6 +29,7 @@ def _make_client_with_mock():
     mock_response.data = [mock_img]
     mock_openai.images.generate.return_value = mock_response
     mock_openai.images.edit.return_value = mock_response
+    mock_openai.post.return_value = mock_response
     client.client = mock_openai
     return client, mock_openai
 
@@ -387,6 +388,186 @@ class TestEditNodeMask:
         sent = Image.open(BytesIO(seen["mask_data"]))
         assert (sent.mode, sent.size) == ("RGBA", (3, 2))
         assert list(sent.getchannel("A").getdata()) == [255, 0, 255, 255, 255, 255]
+
+
+class TestMarkup:
+    """images.edit takes a `markup` file of drawn marks, which SDK 2.15's
+    Images.edit() has no keyword for and extra_body cannot carry (400 "Invalid
+    type for 'markup': expected a file, but got an array instead", measured
+    2026-11-05), so the client posts the multipart request itself."""
+
+    @pytest.fixture(autouse=True)
+    def images_response(self, monkeypatch):
+        import types as pytypes
+        stand_in = type("ImagesResponse", (), {})
+        monkeypatch.setitem(sys.modules, "openai.types", pytypes.SimpleNamespace(ImagesResponse=stand_in))
+        return stand_in
+
+    def test_the_installed_sdk_has_what_the_post_uses(self):
+        assert sdk_has("openai.types", "ImagesResponse")
+        assert_binds({"cast_to": 1, "body": 1, "files": 1, "options": 1},
+                     "openai._base_client", "SyncAPIClient", "post")
+
+    def test_one_image_and_the_markup_go_out_as_files(self, images_response):
+        client, mock = _make_client_with_mock()
+        result = asyncio.run(client.edit_image(
+            image_data=b"base", prompt="put an apple in the circle", model="gpt-image-2.6-flare",
+            size="1024x1024", quality="low", markup_data=b"marks",
+        ))
+        mock.images.edit.assert_not_called()
+        args, kwargs = mock.post.call_args
+        assert args == ("/images/edits",)
+        assert kwargs == {
+            "cast_to": images_response,
+            "body": {"model": "gpt-image-2.6-flare", "prompt": "put an apple in the circle",
+                     "size": "1024x1024", "n": 1, "quality": "low"},
+            "files": [("image", ("image.png", b"base", "image/png")),
+                      ("markup", ("markup.png", b"marks", "image/png"))],
+            "options": {"headers": {"Content-Type": "multipart/form-data"}},
+        }
+        assert result == {"images": ["fakebase64data"]}
+
+    def test_several_images_go_out_as_an_array_with_the_body_extras(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.edit_image(
+            image_data=[b"first", b"second"], prompt="x", model="gpt-image-2.6-sunburst",
+            moderation="low", complexity="medium", output_format="webp", output_compression=50,
+            markup_data=b"marks",
+        ))
+        kwargs = mock.post.call_args[1]
+        assert kwargs["body"] == {
+            "model": "gpt-image-2.6-sunburst", "prompt": "x", "size": "1024x1024", "n": 1,
+            "output_format": "webp", "output_compression": 50,
+            "moderation": "low", "complexity": "medium",
+        }
+        assert kwargs["files"] == [
+            ("image[]", ("image_0.png", b"first", "image/png")),
+            ("image[]", ("image_1.png", b"second", "image/png")),
+            ("markup", ("markup.png", b"marks", "image/png")),
+        ]
+
+    def test_a_mask_and_a_markup_are_refused_before_the_call(self):
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(client.edit_image(
+                image_data=b"base", prompt="x", model="gpt-image-2.6-flare",
+                mask_data=b"mask", markup_data=b"marks",
+            ))
+        assert str(exc.value) == "A markup layer cannot be combined with a mask; send one or the other."
+        mock.post.assert_not_called()
+        mock.images.edit.assert_not_called()
+
+    def test_a_model_outside_the_table_is_refused_before_the_call(self):
+        client, mock = _make_client_with_mock()
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(client.edit_image(
+                image_data=b"base", prompt="x", model="dall-e-2", markup_data=b"marks",
+            ))
+        assert str(exc.value) == (
+            "dall-e-2 does not take a markup layer. Use gpt-image-2, gpt-image-2.5-flare, "
+            "gpt-image-2.5-sunburst, gpt-image-2.6-flare, gpt-image-2.6-sunburst."
+        )
+        mock.post.assert_not_called()
+
+    def test_without_a_markup_the_edit_still_goes_through_images_edit(self):
+        client, mock = _make_client_with_mock()
+        asyncio.run(client.edit_image(image_data=b"base", prompt="x", model="gpt-image-2.6-flare"))
+        mock.post.assert_not_called()
+        assert mock.images.edit.called
+
+
+class TestEditNodeMarkup:
+    """The node builds the markup PNG: colour from `markup`, alpha from
+    `markup_mask` read as Load Image writes it (1 - alpha, ComfyUI nodes.py
+    LoadImage), else opaque wherever the markup is not pure black."""
+
+    @staticmethod
+    def _refusal(**inputs):
+        """The node's error message; the recording client answers every call with "stop here"."""
+        from types import SimpleNamespace
+        from erpk.openai.image_nodes import OpenAIImageEdit
+        seen = inputs.pop("seen", {})
+
+        async def edit_image(**kwargs):
+            seen.update(kwargs)
+            return {"blocked": True, "error": "stop here"}
+
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(OpenAIImageEdit.execute(
+                prompt="x", client=SimpleNamespace(edit_image=edit_image), **inputs,
+            ))
+        return str(exc.value)
+
+    @classmethod
+    def _run(cls, **inputs):
+        seen = {}
+        assert cls._refusal(seen=seen, **inputs).endswith("stop here")
+        return seen
+
+    @staticmethod
+    def _markup(torch):
+        # 2x3 layer: one red mark at (row 0, col 1), the rest black.
+        markup = torch.zeros(1, 2, 3, 3)
+        markup[0, 0, 1] = torch.tensor([1.0, 0.0, 0.0])
+        return markup
+
+    @staticmethod
+    def _decode(payload):
+        from io import BytesIO
+        from PIL import Image
+        with Image.open(BytesIO(payload)) as img:
+            return img.mode, img.size, list(img.getdata())
+
+    def test_without_a_mask_non_black_pixels_are_the_marks(self):
+        torch = pytest.importorskip("torch")
+        seen = self._run(image=torch.zeros(1, 2, 3, 3), markup=self._markup(torch))
+        assert self._decode(seen["markup_data"]) == ("RGBA", (3, 2), [
+            (0, 0, 0, 0), (255, 0, 0, 255), (0, 0, 0, 0),
+            (0, 0, 0, 0), (0, 0, 0, 0), (0, 0, 0, 0),
+        ])
+        assert seen["mask_data"] is None
+
+    def test_a_load_image_mask_sets_the_alpha(self):
+        torch = pytest.importorskip("torch")
+        # Load Image's MASK is 1 where the PNG is transparent; here the mark at
+        # (row 1, col 2) is black but opaque, and the red pixel is transparent.
+        mask = torch.ones(1, 2, 3)
+        mask[0, 1, 2] = 0.0
+        seen = self._run(image=torch.zeros(1, 2, 3, 3), markup=self._markup(torch), markup_mask=mask)
+        assert self._decode(seen["markup_data"]) == ("RGBA", (3, 2), [
+            (0, 0, 0, 0), (255, 0, 0, 0), (0, 0, 0, 0),
+            (0, 0, 0, 0), (0, 0, 0, 0), (0, 0, 0, 255),
+        ])
+
+    def test_a_markup_unlike_image_1_in_size_is_refused(self):
+        torch = pytest.importorskip("torch")
+        assert self._refusal(image=torch.zeros(1, 4, 5, 3), markup=self._markup(torch)) == (
+            "Failed to edit image: markup is 3x2 but image 1 is 5x4; "
+            "draw the marks on a layer the size of image 1"
+        )
+
+    def test_a_mask_unlike_the_markup_in_size_is_refused(self):
+        torch = pytest.importorskip("torch")
+        # Load Image gives a 64x64 zero MASK for a PNG with no alpha channel.
+        assert self._refusal(image=torch.zeros(1, 2, 3, 3), markup=self._markup(torch),
+                             markup_mask=torch.zeros(1, 64, 64)) == (
+            "Failed to edit image: markup_mask is 64x64 but markup is 3x2; "
+            "connect the MASK of the Load Image that loads the markup"
+        )
+
+    def test_a_markup_mask_alone_is_refused(self):
+        torch = pytest.importorskip("torch")
+        seen = {}
+        assert self._refusal(seen=seen, image=torch.zeros(1, 2, 3, 3), markup_mask=torch.zeros(1, 2, 3)) == (
+            "markup_mask is connected but markup is not; connect the markup IMAGE too")
+        assert seen == {}
+
+    def test_both_sockets_are_optional_and_sit_after_mask(self):
+        from erpk.openai.image_nodes import OpenAIImageEdit
+        inputs = OpenAIImageEdit.define_schema().inputs
+        sockets = [(i.id, i.io_type, i.optional) for i in inputs if i.io_type in ("IMAGE", "MASK")]
+        assert sockets == [("image", "IMAGE", True), ("mask", "MASK", True),
+                           ("markup", "IMAGE", True), ("markup_mask", "MASK", True)]
 
 
 class TestOutputFormat:
