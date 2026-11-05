@@ -27,7 +27,7 @@ Edits one or more input images using a text prompt. Pass a batched IMAGE tensor 
 
 ## Image grid
 
-With nothing connected to `image`, the node sends the files on its grid instead. While `image` is connected, the grid dims, shows `Image socket connected, grid ignored`, and takes no new files, but keeps the files it has. The grid works as on the Image Grid Loader node: pick or drop PNG, JPG, or WebP files, drag a cell to reorder it, and hover a cell and click **×** to remove it. Click **Reference images** at the top of the grid to collapse it to its header, which still shows the count, and click it again to expand it. The number on each cell is the image's position in the request: cell 1 is `<IMAGE_0>` in the prompt, cell 2 is `<IMAGE_1>`, and so on.
+With nothing connected to `image`, the node sends the files on its grid instead. While `image` is connected, the grid dims, shows `Image socket connected, grid ignored`, and takes no new files, but keeps the files it has. The grid works as on the Image Grid Loader node: pick or drop PNG, JPG, or WebP files, drag a cell to reorder it, click a cell to see the image full size, and hover a cell and click **×** to remove it. Click **Reference images** at the top of the grid to collapse it to its header, which still shows the count, and click it again to expand it. The number on each cell is the image's position in the request: cell 1 is `<IMAGE_0>` in the prompt, cell 2 is `<IMAGE_1>`, and so on.
 
 - Each file goes to xAI as its own source image, in cell order. The node does not batch or letterbox them.
 - The grid holds up to 5 files, grok-imagine-image-2.0's limit.

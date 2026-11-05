@@ -34,12 +34,13 @@ The number on each cell is the image's position in the batch. Cell 1 is the firs
 - The grid holds up to 14 files, the most any edit node here takes. Gemini Image Edit takes up to 14 images and the Seedream edit nodes up to 10. When you drop more files than the grid has free slots, it adds files up to that limit and ignores the rest. The drop overlay shows how many free slots remain. It turns red when the grid is full.
 - Drag a cell to reorder it. A green bar shows where it lands.
 - Hover a cell and click **×** to remove it.
+- Click a cell to see the image full size. The left and right arrow keys step to the previous or next image. Press Escape, click outside the image, or click **×** to close it.
 - **Clear all** empties the grid. Click **Undo** in the notice under the grid to bring the images back.
 - The title bar, the grid's header, and the footer show the count, for example `7 of 14`. The header count turns red when the grid holds more files than its limit.
 - Click **Reference images** in the header to collapse the grid to that row, and click it again to expand it. A collapsed grid keeps the notice under it. The workflow saves the collapsed state, and a grid you never collapsed loads expanded.
 - Dropping files on a collapsed grid, or on the node's title bar, adds them and expands the grid.
 
-Keyboard: press Tab to focus a cell. The arrow keys move the focused image one place left or right, or one row up or down. Delete or Backspace removes it.
+Keyboard: press Tab to focus a cell. The arrow keys move the focused image one place left or right, or one row up or down. Enter shows it full size. Delete or Backspace removes it.
 
 ## Files
 

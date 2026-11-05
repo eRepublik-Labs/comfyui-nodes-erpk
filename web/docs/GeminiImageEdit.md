@@ -31,7 +31,7 @@ Edits and modifies existing images using text prompts. Supports up to 14 referen
 
 ## Image grid
 
-With nothing connected to `image`, the node sends the files on its grid instead. While `image` is connected, the grid dims, shows `Image socket connected, grid ignored`, and takes no new files, but keeps the files it has. The grid works as on the Image Grid Loader node: pick or drop PNG, JPG, or WebP files, drag a cell to reorder it, and hover a cell and click **×** to remove it. Click **Reference images** at the top of the grid to collapse it to its header, which still shows the count, and click it again to expand it. The number on each cell is the image's position in the request.
+With nothing connected to `image`, the node sends the files on its grid instead. While `image` is connected, the grid dims, shows `Image socket connected, grid ignored`, and takes no new files, but keeps the files it has. The grid works as on the Image Grid Loader node: pick or drop PNG, JPG, or WebP files, drag a cell to reorder it, click a cell to see the image full size, and hover a cell and click **×** to remove it. Click **Reference images** at the top of the grid to collapse it to its header, which still shows the count, and click it again to expand it. The number on each cell is the image's position in the request.
 
 - Each file goes to the model as its own image, at its own size, in cell order. The node does not batch or letterbox them.
 - The grid holds up to 14 files on every model (Google documents 14 for Nano Banana 2.1, 3.1 Flash and 3 Pro). 3.1 Flash Lite has no documented limit and Google says it is not optimized for multiple reference inputs, so expect weaker results with many files there.
