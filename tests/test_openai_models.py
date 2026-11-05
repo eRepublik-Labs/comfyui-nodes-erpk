@@ -122,11 +122,10 @@ class TestGptImage25:
 
     MODELS_25 = ("gpt-image-2.5-sunburst", "gpt-image-2.5-flare")
 
-    def test_offered_in_image_and_gpt_image_sets(self):
+    def test_offered_with_the_gpt_image_2_envelope(self):
         for m in self.MODELS_25:
-            assert m in OpenAIClient.IMAGE_MODELS
-            assert m in OpenAIClient.GPT_IMAGE_MODELS
-            assert m in OpenAIClient.GPT_IMAGE_2_MODELS
+            caps = OpenAIClient.IMAGE_MODELS[m]
+            assert (caps.custom_size, caps.input_fidelity, caps.transparent_background) == (True, False, True)
 
     def test_offered_inside_responses_image_tool(self):
         # The model pages list v1/responses as "Not supported" as a top-level
@@ -197,7 +196,7 @@ class TestOfferedCatalog:
         from erpk.openai.image_nodes import IMAGE_MODELS, EDIT_MODELS
         assert set(IMAGE_MODELS) == self.KEPT_IMAGE
         assert set(EDIT_MODELS) == self.KEPT_IMAGE
-        assert set(OpenAIClient.GPT_IMAGE_MODELS) == self.KEPT_IMAGE
+        assert set(OpenAIClient.IMAGE_MODELS) == self.KEPT_IMAGE
 
     def test_generation_quality_drops_dalle_only_values(self):
         # The images reference marks hd and standard "only supported by

@@ -10,8 +10,10 @@ from ..utils.image_grid import (
     NO_GRID_IMAGE, grid_input, load_grid_images, model_grid_cap, register_grid_caps, validate_grid,
 )
 
-IMAGE_MODELS = list(OpenAIClient.IMAGE_MODELS.keys())
-EDIT_MODELS = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"]
+# Every GPT Image model takes images.generate, images.edit and the Responses
+# image_generation tool, so the three nodes offer the same list.
+IMAGE_MODELS = list(OpenAIClient.IMAGE_MODELS)
+EDIT_MODELS = IMAGE_MODELS
 
 # A saved workflow keeps its stored model; these reach only new nodes and
 # prompts that omit the input.
@@ -37,12 +39,7 @@ RESPONSES_MAINLINE_MODELS = [
     "gpt-5.6-luna",
 ]
 
-# Image models valid inside the Responses-API image_generation tool config.
-RESPONSES_IMAGE_MODELS = [
-    "gpt-image-2",
-    "gpt-image-2.5-sunburst",
-    "gpt-image-2.5-flare",
-]
+RESPONSES_IMAGE_MODELS = IMAGE_MODELS
 
 # max is Responses-only: 200 on all 8 mainlines here, 400 on chat.completions
 # (measured 2026-10-14, gpt-6.1-terra 2026-11-03), so the text nodes stop at

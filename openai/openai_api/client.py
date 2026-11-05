@@ -5,7 +5,22 @@ import asyncio
 import os
 import configparser
 import time
+from dataclasses import dataclass
 from typing import Dict, Any, List, Optional
+
+
+@dataclass(frozen=True)
+class ImageModel:
+    """What one GPT Image model accepts, as measured against the live API."""
+
+    description: str
+    # Highest quality tier; xhigh and max clamp down to it.
+    max_quality: str
+    transparent_background: bool
+    # Any size in the gpt-image-2 envelope, checked before the call.
+    custom_size: bool
+    # False where the API answers 400 to the parameter.
+    input_fidelity: bool
 
 
 class OpenAIClient:
@@ -32,35 +47,28 @@ class OpenAIClient:
         "chat-latest": "ChatGPT Instant (Non-reasoning, 400K context, $5/$30 per MTok)",
     }
 
-    # Available image generation models
+    # The GPT Image models, the one source for what each accepts. Any other
+    # model ID takes the legacy response_format path.
+    # gpt-image-2 returns 400 "Transparent background is not supported for
+    # this model." (measured 2026-10-01); both 2.5 models returned RGBA PNGs
+    # with real alpha. All three reject input_fidelity (400
+    # invalid_input_fidelity_model, measured 2026-09-21 despite the reference
+    # naming only gpt-image-2) and share gpt-image-2's size envelope. Only 2.5
+    # accepts the xhigh and max quality tiers; earlier models stop at high.
     IMAGE_MODELS = {
-        "gpt-image-2.5-sunburst": "GPT Image 2.5 Sunburst (Highest quality, xhigh/max quality tiers)",
-        "gpt-image-2.5-flare": "GPT Image 2.5 Flare (Fastest 2.5 tier, xhigh/max quality tiers)",
-        "gpt-image-2": "GPT Image 2 (Latest flagship, 4K, multilingual text)",
+        "gpt-image-2.5-sunburst": ImageModel(
+            description="GPT Image 2.5 Sunburst (Highest quality, xhigh/max quality tiers)",
+            max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
+        ),
+        "gpt-image-2.5-flare": ImageModel(
+            description="GPT Image 2.5 Flare (Fastest 2.5 tier, xhigh/max quality tiers)",
+            max_quality="max", transparent_background=True, custom_size=True, input_fidelity=False,
+        ),
+        "gpt-image-2": ImageModel(
+            description="GPT Image 2 (Latest flagship, 4K, multilingual text)",
+            max_quality="high", transparent_background=False, custom_size=True, input_fidelity=False,
+        ),
     }
-
-    # Image models on the GPT Image family — share parameter conventions
-    # (quality + background). Any other model ID takes the legacy
-    # response_format path.
-    GPT_IMAGE_MODELS = {
-        "gpt-image-2.5-sunburst", "gpt-image-2.5-flare",
-        "gpt-image-2",
-    }
-
-    # Models that accept background="transparent". gpt-image-2 returns 400
-    # "Transparent background is not supported for this model." (measured
-    # 2026-10-01); both 2.5 models returned RGBA PNGs with real alpha.
-    TRANSPARENT_BACKGROUND_MODELS = {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare"}
-
-    # gpt-image-2 and the 2.5 models always process at high fidelity, reject
-    # the input_fidelity param (400 invalid_input_fidelity_model, measured
-    # 2026-09-21 despite the reference naming only gpt-image-2), and share
-    # the same size envelope.
-    GPT_IMAGE_2_MODELS = {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"}
-
-    # Only GPT Image 2.5 accepts the xhigh and max quality tiers; earlier GPT
-    # Image models stop at high.
-    EXTENDED_QUALITY_MODELS = {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare"}
 
     # gpt-image-2 size constraints (from OpenAI docs):
     # - max edge <= 3840px, both edges multiples of 16
@@ -168,12 +176,16 @@ class OpenAIClient:
             return "low"
         return effort
 
+    QUALITY_TIERS = ("low", "medium", "high", "xhigh", "max")
+
     @classmethod
     def _quality_for(cls, model: str, quality: str) -> str:
-        """Clamp xhigh/max down to high on models that stop at high."""
-        if quality in ("xhigh", "max") and model not in cls.EXTENDED_QUALITY_MODELS:
-            print(f"[OpenAI] {model} supports quality up to 'high'; using 'high' instead of '{quality}'")
-            return "high"
+        """Clamp a tier above the model's ceiling down to it; models outside the table stop at high."""
+        caps = cls.IMAGE_MODELS.get(model)
+        ceiling = caps.max_quality if caps else "high"
+        if quality in cls.QUALITY_TIERS and cls.QUALITY_TIERS.index(quality) > cls.QUALITY_TIERS.index(ceiling):
+            print(f"[OpenAI] {model} supports quality up to '{ceiling}'; using '{ceiling}' instead of '{quality}'")
+            return ceiling
         return quality
 
     @staticmethod
@@ -662,8 +674,9 @@ class OpenAIClient:
         """Raise before the call when the API would reject the background (400)."""
         if background != "transparent":
             return
-        if model not in cls.TRANSPARENT_BACKGROUND_MODELS:
-            supported = ", ".join(sorted(cls.TRANSPARENT_BACKGROUND_MODELS))
+        caps = cls.IMAGE_MODELS.get(model)
+        if not (caps and caps.transparent_background):
+            supported = ", ".join(sorted(m for m, c in cls.IMAGE_MODELS.items() if c.transparent_background))
             raise ValueError(
                 f"{model} does not support background='transparent'. "
                 f"Use {supported}, or set background to auto or opaque."
@@ -704,8 +717,8 @@ class OpenAIClient:
         """
         from openai import APIError
 
-        # Preflight size validation for gpt-image-2 (stricter than other models)
-        if model in self.GPT_IMAGE_2_MODELS:
+        caps = self.IMAGE_MODELS.get(model)
+        if caps and caps.custom_size:
             self._validate_size_for_gpt_image_2(size, model)
 
         params = {
@@ -715,8 +728,7 @@ class OpenAIClient:
             "n": n,
         }
 
-        # Model-specific parameters
-        if model in self.GPT_IMAGE_MODELS:
+        if caps:
             if quality != "auto":
                 params["quality"] = self._quality_for(model, quality)
             if background != "auto":
@@ -867,7 +879,8 @@ class OpenAIClient:
         from openai import APIError
 
         # Preflight: gpt-image-2 size constraints apply regardless of endpoint
-        if image_model in self.GPT_IMAGE_2_MODELS:
+        caps = self.IMAGE_MODELS.get(image_model)
+        if caps and caps.custom_size:
             self._validate_size_for_gpt_image_2(size)
 
         # Build the image_generation tool config
@@ -1053,7 +1066,8 @@ class OpenAIClient:
         # images.edit shares the generation size envelope on these models
         # (measured 2026-09-21: 512x512 and 256x256 400 as "below the current
         # minimum pixel budget", 1536x864 is accepted).
-        if model in self.GPT_IMAGE_2_MODELS:
+        caps = self.IMAGE_MODELS.get(model)
+        if caps and caps.custom_size:
             self._validate_size_for_gpt_image_2(size, model)
 
         # Single image uses singular multipart field; multi-image uses array.
@@ -1079,8 +1093,7 @@ class OpenAIClient:
             mask_file = ("mask.png", mask_data, "image/png")
             params["mask"] = mask_file
 
-        # Model-specific parameters
-        if model in self.GPT_IMAGE_MODELS:
+        if caps:
             # GPT Image models always return base64, do not accept response_format
             if quality != "auto":
                 params["quality"] = self._quality_for(model, quality)
@@ -1092,8 +1105,7 @@ class OpenAIClient:
             if background and background != "auto":
                 self._check_background(model, background, output_format)
                 params["background"] = background
-            # gpt-image-2 always processes at high fidelity and rejects input_fidelity.
-            if input_fidelity and input_fidelity != "auto" and model not in self.GPT_IMAGE_2_MODELS:
+            if input_fidelity and input_fidelity != "auto" and caps.input_fidelity:
                 params["input_fidelity"] = input_fidelity
             params.update(self._output_format_params(output_format, output_compression))
         else:

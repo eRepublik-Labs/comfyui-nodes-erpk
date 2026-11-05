@@ -106,11 +106,9 @@ class TestGptImage2ModelPresence:
     def test_gpt_image_2_in_image_models(self):
         assert "gpt-image-2" in OpenAIClient.IMAGE_MODELS
 
-    def test_gpt_image_2_in_gpt_image_models_set(self):
-        assert "gpt-image-2" in OpenAIClient.GPT_IMAGE_MODELS
-
-    def test_gpt_image_2_flagged_in_gpt_image_2_models_set(self):
-        assert "gpt-image-2" in OpenAIClient.GPT_IMAGE_2_MODELS
+    def test_gpt_image_2_takes_custom_sizes_and_rejects_input_fidelity(self):
+        caps = OpenAIClient.IMAGE_MODELS["gpt-image-2"]
+        assert (caps.custom_size, caps.input_fidelity) == (True, False)
 
 
 class TestModeration:
@@ -232,7 +230,7 @@ class TestGptImage2SizeValidation:
         asyncio.run(client.generate_image(prompt="x", model="gpt-image-2", size="auto"))
         assert mock.images.generate.called
 
-    @pytest.mark.parametrize("model", sorted(OpenAIClient.GPT_IMAGE_2_MODELS))
+    @pytest.mark.parametrize("model", sorted(OpenAIClient.IMAGE_MODELS))
     def test_edit_rejects_sizes_below_pixel_budget_before_calling_api(self, model):
         # Measured live 2026-09-21: images.edit 400s 512x512 and 256x256 on
         # gpt-image-2 and both 2.5 models ("below the current minimum pixel budget").
@@ -262,7 +260,7 @@ class TestEditInputFidelity:
     (400 invalid_input_fidelity_model, measured live 2026-09-21). The OpenAI
     reference names only gpt-image-2 as ignoring it; the reference is wrong."""
 
-    @pytest.mark.parametrize("model", sorted(OpenAIClient.GPT_IMAGE_2_MODELS))
+    @pytest.mark.parametrize("model", sorted(OpenAIClient.IMAGE_MODELS))
     def test_dropped_for_gpt_image_2_family(self, model):
         client, mock = _make_client_with_mock()
         asyncio.run(client.edit_image(
