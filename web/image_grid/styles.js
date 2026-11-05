@@ -31,6 +31,10 @@ export const ROOT_PAD_V = ROOT_PAD_TOP + ROOT_PAD_BOTTOM + DOM_WIDGET_MARGIN_V;
 export const MIN_NODE_WIDTH = 300;
 
 const TAG_H = 18;
+// Room above the picture for the viewer's close button.
+const VIEWER_PAD = 56;
+const VIEWER_GAP = 10;
+const VIEWER_CAPTION_H = 18;
 const LINE = "#2a2a33";
 const LINE_SOFT = "#1f1f27";
 const TEXT = "#d6d6de";
@@ -192,8 +196,8 @@ sheet.textContent = `
     opacity: 0;
     transition: opacity 130ms, color 130ms, background-color 130ms;
 }
+/* Not :focus-within: a cell refocused after a mouse action would keep its × up with no pointer on it. */
 .erpk-grid-cell:hover .erpk-grid-remove,
-.erpk-grid-cell:focus-within .erpk-grid-remove,
 .erpk-grid-cell:focus-visible .erpk-grid-remove { opacity: 1; }
 /* Touch has no hover to reveal it. */
 @media (hover: none) { .erpk-grid-remove { opacity: 1; } }
@@ -318,6 +322,62 @@ sheet.textContent = `
     clip: rect(0 0 0 0);
     white-space: nowrap;
 }
+.erpk-grid-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: ${VIEWER_GAP}px;
+    padding: ${VIEWER_PAD}px;
+    background: rgba(13, 13, 18, 0.94);
+    color: ${MUTED};
+    font: 12px/1.4 'Segoe UI', system-ui, sans-serif;
+    overscroll-behavior: contain;
+    outline: none;
+    cursor: zoom-out;
+}
+/* Sized to the picture rather than filling the viewer, so a click beside it lands on the backdrop. */
+.erpk-grid-viewer > img {
+    display: block;
+    max-width: calc(100vw - ${2 * VIEWER_PAD}px);
+    max-height: calc(100vh - ${2 * VIEWER_PAD + VIEWER_GAP + VIEWER_CAPTION_H}px);
+    object-fit: contain;
+    cursor: default;
+}
+.erpk-grid-viewer-caption {
+    display: flex;
+    gap: 12px;
+    max-width: 100%;
+    height: ${VIEWER_CAPTION_H}px;
+    white-space: nowrap;
+}
+.erpk-grid-viewer-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: ${TEXT}; }
+.erpk-grid-viewer-position { flex: none; font-variant-numeric: tabular-nums; }
+.erpk-grid-viewer-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    box-sizing: border-box;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid ${LINE};
+    border-radius: 16px;
+    background: ${PANEL_BG};
+    color: ${TEXT};
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+.erpk-grid-viewer-close:hover { color: #fff; border-color: ${ACTIVE_GREEN_BORDER}; }
+.erpk-grid-viewer-close:focus-visible { outline: 2px solid ${ACTIVE_GREEN}; outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
     .erpk-grid-remove { transition: none; }
     .erpk-grid-spinner { animation: none; }

@@ -98,8 +98,11 @@ export function storedName({ name, subfolder }) {
     return subfolder ? `${subfolder}/${name}` : name;
 }
 
-/** The ComfyUI /view path that serves a stored name from the input directory, for a thumbnail. */
-export function viewPath(stored) {
+/**
+ * The ComfyUI /view path that serves a stored name from the input directory: a thumbnail,
+ * or with `preview: false` the file as stored.
+ */
+export function viewPath(stored, { preview = true } = {}) {
     const slash = stored.lastIndexOf("/");
     const query = new URLSearchParams({
         filename: stored.slice(slash + 1),
@@ -108,7 +111,7 @@ export function viewPath(stored) {
     });
     // /view's preview re-encodes at full size. Measured on real inputs it was
     // 5-10% of a PNG's bytes but 91-151% of a JPEG's or WebP's, so only PNG asks.
-    if (/\.png$/i.test(stored)) query.set("preview", "webp;90");
+    if (preview && /\.png$/i.test(stored)) query.set("preview", "webp;90");
     return `/view?${query}`;
 }
 

@@ -53,6 +53,7 @@ async function uploadToInput(file) {
 const gridIO = {
     upload: uploadToInput,
     imageUrl: (/** @type {string} */ stored) => api.apiURL(viewPath(stored)),
+    fullImageUrl: (/** @type {string} */ stored) => api.apiURL(viewPath(stored, { preview: false })),
 };
 
 /** @type {Promise<Record<string, import("./image_grid/grid_list.js").GridCaps>> | null} */

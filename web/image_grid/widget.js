@@ -1,5 +1,5 @@
-// ABOUTME: The image grid DOM widget: a numbered thumbnail grid that picks, drops, reorders,
-// ABOUTME: and removes images, and writes the ordered filename list back to the node's `grid_images` widget.
+// ABOUTME: The image grid DOM widget: a numbered thumbnail grid that picks, drops, reorders, removes,
+// ABOUTME: and shows images full size, and writes the ordered filename list back to the node's `grid_images` widget.
 // @ts-check
 
 import { CHROME_HORIZONTAL_INSET } from "../regions/constants.js";
@@ -42,7 +42,11 @@ let gridSerial = 0;
 
 /**
  * @typedef {{ text: string, tone: "info" | "error", undo?: string[] }} Notice
- * @typedef {{ upload: (file: File) => Promise<string>, imageUrl: (stored: string) => string }} GridIO
+ * @typedef {{
+ *   upload: (file: File) => Promise<string>,
+ *   imageUrl: (stored: string) => string,
+ *   fullImageUrl: (stored: string) => string,
+ * }} GridIO `imageUrl` serves a thumbnail, `fullImageUrl` the file as stored.
  * @typedef {{ name: string, stored: string | null }} Upload
  *   A picked file on its way to ComfyUI's input folder. `stored` is the name the
  *   upload route answered with, null until it answers.
@@ -99,7 +103,7 @@ export function createImageGrid(node, io, caps, nodeName) {
     announcer.setAttribute("aria-live", "polite");
     const hint = el("div", "erpk-grid-sr");
     hint.id = hintId;
-    hint.textContent = "Arrow keys move this image, Delete removes it.";
+    hint.textContent = "Enter shows this image full size, arrow keys move it, Delete removes it.";
     const fileInput = document.createElement("input");
     fileInput.type = "file";
     fileInput.multiple = true;
@@ -107,6 +111,7 @@ export function createImageGrid(node, io, caps, nodeName) {
     fileInput.hidden = true;
     root.append(zone, notice, announcer, hint, fileInput);
     list.hidden = footer.hidden = notice.hidden = true;
+    const viewer = buildViewer();
 
     const state = {
         /** @type {string[]} */
@@ -119,6 +124,8 @@ export function createImageGrid(node, io, caps, nodeName) {
         dragFrom: null,
         /** @type {(() => void) | null} */
         refocus: null,
+        /** @type {number | null} The index in `names` the full-size viewer shows, null while it is closed. */
+        viewing: null,
         ready: false,
         socketLinked: false,
         collapsed: false,
@@ -543,6 +550,8 @@ export function createImageGrid(node, io, caps, nodeName) {
         const index = Number(cell.dataset.index);
         if (e.key === "Delete" || e.key === "Backspace") {
             removeImage(index, { keepFocus: true });
+        } else if (e.key === "Enter") {
+            openViewer(index);
         } else if (e.key in KEY_MOVES) {
             const moved = moveBy(state.names, index, KEY_MOVES[e.key]);
             if (moved.index !== index) {
@@ -557,9 +566,55 @@ export function createImageGrid(node, io, caps, nodeName) {
     }
 
     function onListClick(e) {
-        const remove = e.target instanceof Element ? e.target.closest("[data-remove]") : null;
-        if (!(remove instanceof HTMLElement)) return;
-        removeImage(Number(remove.dataset.remove), { keepFocus: false });
+        const target = e.target instanceof Element ? e.target : null;
+        const remove = target?.closest("[data-remove]");
+        const cell = target?.closest(".erpk-grid-cell[data-index]");
+        if (remove instanceof HTMLElement) removeImage(Number(remove.dataset.remove), { keepFocus: false });
+        else if (cell instanceof HTMLElement) openViewer(Number(cell.dataset.index));
+    }
+
+    /** @param {number} index */
+    function openViewer(index) {
+        showViewing(index);
+        document.body.append(viewer.root);
+        viewer.close.focus();
+    }
+
+    /** @param {number} index */
+    function showViewing(index) {
+        state.viewing = index;
+        const name = state.names[index];
+        const position = `${index + 1} of ${state.names.length}`;
+        viewer.img.src = io.fullImageUrl(name);
+        viewer.img.alt = name;
+        viewer.name.textContent = name;
+        viewer.position.textContent = position;
+        viewer.root.setAttribute("aria-label", `Image ${position}, ${name}`);
+    }
+
+    /** @param {number} delta */
+    function stepViewer(delta) {
+        const next = Math.min(Math.max(state.viewing + delta, 0), state.names.length - 1);
+        if (next !== state.viewing) showViewing(next);
+    }
+
+    function closeViewer() {
+        const index = state.viewing;
+        state.viewing = null;
+        viewer.root.remove();
+        focusCellOrAdd(index);
+    }
+
+    // The viewer covers the graph. No key leaves it, so no ComfyUI shortcut,
+    // such as Delete on the selected node, acts on the graph behind it.
+    function onViewerKeydown(e) {
+        e.stopPropagation();
+        if (e.key === "Escape") closeViewer();
+        else if (e.key === "ArrowLeft") stepViewer(-1);
+        else if (e.key === "ArrowRight") stepViewer(1);
+        else if (e.key === "Tab") viewer.close.focus();
+        else return;
+        e.preventDefault();
     }
 
     // ComfyUI loads a workflow from any image dropped on the page, so a file
@@ -628,6 +683,10 @@ export function createImageGrid(node, io, caps, nodeName) {
     root.addEventListener("dragover", onFileDragOver);
     root.addEventListener("dragleave", onFileDragLeave);
     root.addEventListener("drop", onFileDrop);
+    viewer.root.addEventListener("keydown", onViewerKeydown);
+    viewer.root.addEventListener("click", (e) => {
+        if (e.target !== viewer.img) closeViewer();
+    });
 
     return { root, setup, loadFromWidget, layout, desiredHeight, titleCount, addFiles, setSocketLinked, setCollapsed };
 }
@@ -650,6 +709,26 @@ function buildEmptyState() {
     const choose = button("erpk-grid-btn", "Choose files…");
     root.append(icon, primary, limit, choose);
     return { root, limit, choose };
+}
+
+// Attached to document.body only while open. A click anywhere but the image
+// closes it, the × included.
+function buildViewer() {
+    const root = el("div", "erpk-grid-viewer");
+    root.tabIndex = -1;
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
+    const img = document.createElement("img");
+    img.draggable = false;
+    const caption = el("div", "erpk-grid-viewer-caption");
+    caption.setAttribute("aria-live", "polite");
+    const name = el("span", "erpk-grid-viewer-name");
+    const position = el("span", "erpk-grid-viewer-position");
+    caption.append(name, position);
+    const close = button("erpk-grid-viewer-close", "×");
+    close.setAttribute("aria-label", "Close");
+    root.append(img, caption, close);
+    return { root, img, name, position, close };
 }
 
 /** @param {string} tag @param {string} [className] */
