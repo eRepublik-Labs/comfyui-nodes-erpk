@@ -30,6 +30,7 @@ export const DOM_WIDGET_MARGIN_V = 20;
 export const ROOT_PAD_V = ROOT_PAD_TOP + ROOT_PAD_BOTTOM + DOM_WIDGET_MARGIN_V;
 export const MIN_NODE_WIDTH = 300;
 
+const TAG_H = 18;
 const LINE = "#2a2a33";
 const LINE_SOFT = "#1f1f27";
 const TEXT = "#d6d6de";
@@ -158,43 +159,49 @@ sheet.textContent = `
 }
 @keyframes erpk-grid-spin { to { transform: rotate(360deg); } }
 .erpk-grid-is-missing > .erpk-grid-missing { display: flex; }
+/* Corner tags: the outer corner matches the image's 3px radius inside the cell's 1px border. */
 .erpk-grid-badge, .erpk-grid-remove {
     position: absolute;
-    top: 4px;
-    height: 22px;
-    border-radius: 11px;
+    top: 0;
+    height: ${TAG_H}px;
+    border: none;
     background: rgba(13, 13, 18, 0.85);
-    border: 1px solid ${LINE};
+    color: ${TEXT};
     font-size: 11px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .erpk-grid-badge {
-    left: 4px;
-    min-width: 22px;
-    padding: 0 6px;
-    color: ${TEXT};
-    font-weight: 600;
+    left: 0;
+    min-width: ${TAG_H}px;
+    padding: 0 5px;
+    border-radius: 3px 0 4px 0;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
     pointer-events: none;
 }
 .erpk-grid-remove {
-    right: 4px;
-    width: 22px;
+    right: 0;
+    width: ${TAG_H}px;
     padding: 0;
-    color: ${TEXT};
+    border-radius: 0 3px 0 4px;
     cursor: pointer;
-    font-size: 15px;
+    font-size: 14px;
     line-height: 1;
-    transition: color 130ms, background-color 130ms, border-color 130ms;
+    opacity: 0;
+    transition: opacity 130ms, color 130ms, background-color 130ms;
 }
-/* The glyph is 22px; the hit area extends to 24px. */
-.erpk-grid-remove::before { content: ""; position: absolute; inset: -1px; }
+.erpk-grid-cell:hover .erpk-grid-remove,
+.erpk-grid-cell:focus-within .erpk-grid-remove,
+.erpk-grid-cell:focus-visible .erpk-grid-remove { opacity: 1; }
+/* Touch has no hover to reveal it. */
+@media (hover: none) { .erpk-grid-remove { opacity: 1; } }
+/* The tag is ${TAG_H}px; the hit area grows into the cell to 24px, as there is no room past the corner. */
+.erpk-grid-remove::before { content: ""; position: absolute; inset: 0 0 -${24 - TAG_H}px -${24 - TAG_H}px; }
 .erpk-grid-remove:hover, .erpk-grid-remove:focus-visible {
     color: #fff;
     background: ${DANGER_RED};
-    border-color: ${DANGER_RED};
 }
 .erpk-grid-add {
     aspect-ratio: 1;
