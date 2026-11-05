@@ -28,6 +28,31 @@ def _clamp_worker_count(value):
     return n
 
 
+def cache_config(args, cache_types, total_ram_mb):
+    """The PromptExecutor cache_type and cache_args ComfyUI's main.prompt_worker
+    derives from the CLI args: RAM pressure by default, with --cache-ram's
+    optional active and inactive headroom in GB; classic, LRU or none override it.
+    """
+    cache_ram = 0
+    cache_ram_inactive = 0
+    if not args.cache_classic and not args.cache_none and args.cache_lru <= 0:
+        cache_ram = min(10.0, max(2.0, total_ram_mb * 0.10 / 1024.0))
+        cache_ram_inactive = min(128.0, total_ram_mb / 1024.0)
+        if len(args.cache_ram) > 0:
+            cache_ram = args.cache_ram[0]
+        if len(args.cache_ram) > 1:
+            cache_ram_inactive = args.cache_ram[1]
+
+    cache_type = cache_types.RAM_PRESSURE
+    if args.cache_classic:
+        cache_type = cache_types.CLASSIC
+    elif args.cache_lru > 0:
+        cache_type = cache_types.LRU
+    elif args.cache_none:
+        cache_type = cache_types.NONE
+    return cache_type, {"lru": args.cache_lru, "ram": cache_ram, "ram_inactive": cache_ram_inactive}
+
+
 def _erpk_worker_loop(q, server_instance):
     """Mirror of ComfyUI's main.prompt_worker, simplified for the extra workers.
 
@@ -41,23 +66,8 @@ def _erpk_worker_loop(q, server_instance):
     except ImportError:
         return
 
-    cache_ram = args.cache_ram
-    if cache_ram < 0:
-        cache_ram = min(32.0, max(4.0, comfy.model_management.total_ram * 0.25 / 1024.0))
-
-    cache_type = execution.CacheType.CLASSIC
-    if args.cache_lru > 0:
-        cache_type = execution.CacheType.LRU
-    elif cache_ram > 0:
-        cache_type = execution.CacheType.RAM_PRESSURE
-    elif args.cache_none:
-        cache_type = execution.CacheType.NONE
-
-    e = execution.PromptExecutor(
-        server_instance,
-        cache_type=cache_type,
-        cache_args={"lru": args.cache_lru, "ram": cache_ram},
-    )
+    cache_type, cache_args = cache_config(args, execution.CacheType, comfy.model_management.total_ram)
+    e = execution.PromptExecutor(server_instance, cache_type=cache_type, cache_args=cache_args)
 
     while True:
         try:
