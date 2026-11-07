@@ -12,7 +12,7 @@ Complete Google Gemini API integration providing text generation, vision analysi
 - **Vision Analysis** - Analyze images with Gemini's multimodal capabilities
 - **Image Generation** - Generate images from text descriptions
 - **Image Editing** - Edit and modify images with natural language prompts (up to 14 reference images)
-- **Video Generation (Omni Flash)** - Generate 3-10 second videos from text, a start image or reference images
+- **Video Generation (Omni Flash)** - Generate 3-15 second videos with sound from text, a start image or reference images
 - **Multi-turn Conversations** - Maintain chat history across requests
 - **System Instructions** - Set persistent instructions to guide model behavior
 - **Safety Settings** - Configure content safety filters with presets or custom thresholds
@@ -300,7 +300,7 @@ Configure content safety filters.
 
 ### Gemini Omni Video Generation
 
-Generate 3-10 second video at 24 FPS, 360p to 4k, with Gemini Omni Flash 1.1 (`gemini-omni-1.1-flash`).
+Generate 3-15 second video with sound at 24 FPS, 360p to 4k, with Gemini Omni Flash 1.2 (`gemini-omni-1.2-flash`).
 
 This model runs on Google's Interactions API and returns the
 video directly, so a generation completes in a single call with no polling.
@@ -315,7 +315,7 @@ the 5-minute default.
 - `output_directory`: Where to save the video (default: ComfyUI output folder)
 - `seed`: Cache control only — Omni Flash takes no API seed, so this is never sent. A fixed seed reuses the video you already paid for; -1 regenerates every queue
 - `resolution`: 360p, 720p (default), 1080p or 4k. Google upscales 1080p and 4k; those come back as a Files API download because they exceed the 4MB inline limit. That delivery requires Google to store the interaction (`store=true`); the node deletes the downloaded file right after
-- `duration_seconds`: Clip length, 3-10 seconds (default: 10)
+- `duration_seconds`: Clip length, 3-15 seconds (default: 10)
 
 **Outputs:**
 - `video_path`: Path to the generated video file (.mp4)
@@ -328,7 +328,7 @@ interpolation between first and last frames. All output carries a SynthID waterm
 
 ### Gemini Omni Reference to Video
 
-Generate 3-10 second video that features the people, objects or style shown in reference
+Generate 3-15 second video with sound that features the people, objects or style shown in reference
 images (`reference_to_video` task).
 
 **Inputs:**
@@ -343,7 +343,7 @@ images (`reference_to_video` task).
 
 **Omni tasks without a node:** Google does not offer `edit` or `extend` on uploaded videos in
 the EEA, Switzerland or the UK, so no node wraps them. The API's task list also names `upscale`,
-but `gemini-omni-1.1-flash` rejects it.
+but `gemini-omni-1.2-flash` rejects it.
 
 ---
 

@@ -28,10 +28,10 @@ def _config(aspect_ratio="16:9", has_image=False, resolution="720p", duration_se
                                      aspect_ratio=aspect_ratio)
 
 
-def test_model_id_is_the_stable_omni_11_string():
-    # gemini-omni-flash-preview shuts down 2026-09-30; the Gemini deprecations
-    # page names gemini-omni-1.1-flash as its replacement.
-    assert OMNI_MODEL == "gemini-omni-1.1-flash"
+def test_model_id_is_the_stable_omni_12_string():
+    # The Gemini changelog (2026-11-05) lists gemini-omni-1.2-flash as GA, and
+    # requests to gemini-omni-1.1-flash route to it from 2026-12-03.
+    assert OMNI_MODEL == "gemini-omni-1.2-flash"
 
 
 def test_text_only_request_uses_text_to_video_task():
@@ -178,19 +178,19 @@ def test_inputs_keep_their_saved_order():
 
 
 # --- Clip length (Interactions API response_format.duration, a string. Measured
-# 2026-11-03: "1s" -> 400 "less than the minimum allowed 3s 0ns", "11s" -> 400
-# "exceeds the maximum allowed 10s 0ns", "3s" at 360p -> a 3.03 s clip) --------
+# on gemini-omni-1.2-flash 2026-11-07: "2s" -> 400 "less than the minimum
+# allowed 3s 0ns", "16s" -> 400 "exceeds the maximum allowed 15s 0ns") --------
 
 def test_duration_is_sent_as_seconds_string():
     assert _config(duration_seconds=3)["response_format"]["duration"] == "3s"
-    assert _config(duration_seconds=10)["response_format"]["duration"] == "10s"
+    assert _config(duration_seconds=15)["response_format"]["duration"] == "15s"
 
 
 def test_duration_widget_spans_the_api_range_and_defaults_to_ten_seconds():
-    # Ten seconds is the length the model picks when no duration is sent, so a
-    # saved workflow that loads without a value keeps its clip length.
+    # Ten seconds is the documented default length, so a saved workflow that
+    # loads without a value keeps its clip length.
     spec = _input("duration_seconds")
-    assert (spec.min, spec.max, spec.default) == (3, 10, 10)
+    assert (spec.min, spec.max, spec.default) == (3, 15, 10)
 
 
 def test_execute_sends_the_chosen_duration(tmp_path):

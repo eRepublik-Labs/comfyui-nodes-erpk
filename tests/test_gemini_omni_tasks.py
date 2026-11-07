@@ -74,8 +74,10 @@ def test_reference_inputs_keep_their_saved_order():
 
 
 def test_reference_duration_widget_spans_the_api_range_and_defaults_to_ten_seconds():
+    # gemini-omni-1.2-flash, 2026-11-07: an 11 s reference_to_video clip from two
+    # reference images completed, and "16s" -> 400 "exceeds the maximum allowed 15s".
     spec = _input(GeminiOmniReferenceToVideo, "duration_seconds")
-    assert (spec.min, spec.max, spec.default) == (3, 10, 10)
+    assert (spec.min, spec.max, spec.default) == (3, 15, 10)
 
 
 def test_reference_images_input_is_required():

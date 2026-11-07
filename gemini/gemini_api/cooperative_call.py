@@ -14,7 +14,7 @@ _DEFAULT_TIMEOUT_MS = 300000
 # least 15 minutes" (ai.google.dev/gemini-api/docs/latest-model). Omni Flash
 # renders a whole video inside one call, so a 1080p/4k job can outlast 5
 # minutes and still be billed.
-_MODEL_MIN_TIMEOUT_MS = {"gemini-4-argon": 900000, "gemini-omni-1.1-flash": 900000}
+_MODEL_MIN_TIMEOUT_MS = {"gemini-4-argon": 900000, "gemini-omni-1.2-flash": 900000}
 
 
 def _configured_timeout_ms() -> int:
