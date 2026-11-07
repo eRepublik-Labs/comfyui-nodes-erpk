@@ -177,7 +177,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 
 #### Video Generation Nodes
 
-- **Gemini Omni Video Generation** - Generate video of a chosen length, 3-10s (360p to 4k), from a prompt or start image via Gemini Omni Flash (returns in one call; 1080p/4k arrive through the Files API)
+- **Gemini Omni Video Generation** - Generate video with sound of a chosen length, 3-15s (360p to 4k), from a prompt or start image via Gemini Omni Flash (returns in one call; 1080p/4k arrive through the Files API)
 - **Gemini Omni Reference to Video** - Generate video featuring the subjects in reference images via Gemini Omni Flash
 
 **Key Benefits:**

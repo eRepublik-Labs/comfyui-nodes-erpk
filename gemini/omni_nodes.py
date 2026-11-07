@@ -13,9 +13,9 @@ from comfy_api.latest import IO
 from .gemini_api.cooperative_call import GeminiCallInterrupted, _resolve_interrupt_checker, resolve_timeout_ms
 
 
-# Stable Omni Flash 1.1 ID from the Interactions API guide. The earlier
-# gemini-omni-flash-preview ID shuts down on 2026-09-30.
-OMNI_MODEL = "gemini-omni-1.1-flash"
+# Stable Omni Flash 1.2 ID from the Interactions API guide. Requests to
+# gemini-omni-1.1-flash route to it from 2026-12-03.
+OMNI_MODEL = "gemini-omni-1.2-flash"
 
 ASPECT_RATIOS = ["16:9", "9:16"]
 
@@ -24,12 +24,12 @@ ASPECT_RATIOS = ["16:9", "9:16"]
 RESOLUTIONS = ["360p", "720p", "1080p", "4k"]
 DEFAULT_RESOLUTION = "720p"
 
-# Clip length bounds from the API's own 400s (measured 2026-11-03): "less than
-# the minimum allowed 3s 0ns" and "exceeds the maximum allowed 10s 0ns". The
-# default matches the length the model picks when no duration is sent (every
-# such clip measured 10.005 s, 2026-10-14).
+# Clip length bounds from the API's own 400s (measured on 1.2, 2026-11-07):
+# "less than the minimum allowed 3s 0ns" and "exceeds the maximum allowed
+# 15s 0ns". The default is the guide's default length, and the length 1.1
+# picked when no duration was sent (every such clip measured 10.005 s).
 MIN_DURATION_SECONDS = 3
-MAX_DURATION_SECONDS = 10
+MAX_DURATION_SECONDS = 15
 DEFAULT_DURATION_SECONDS = 10
 
 # Omni docs: "For videos larger than 4MB (>720p when available), use
@@ -49,7 +49,7 @@ def _build_omni_video_request(task, resolution, duration_seconds, aspect_ratio=N
 
     Omni Flash rejects system instructions, temperature, top_p, stop sequences
     and negative prompts, so none of them appear here — put negatives in the
-    prompt itself ("Do not do X"). Output is 24 FPS; duration_seconds (3-10)
+    prompt itself ("Do not do X"). Output is 24 FPS; duration_seconds (3-15)
     goes on the wire as a string such as "3s". aspect_ratio is omitted when
     None so tasks that start from a source video keep its shape.
 
@@ -226,7 +226,7 @@ def _duration_input():
         max=MAX_DURATION_SECONDS,
         step=1,
         optional=True,
-        tooltip="Clip length in seconds, 3-10. Output is always 24 FPS.",
+        tooltip="Clip length in seconds, 3-15. Output is always 24 FPS.",
     )
 
 
@@ -270,7 +270,7 @@ class GeminiOmniVideoGeneration(IO.ComfyNode):
             display_name="Gemini Omni Video Generation",
             category="ERPK/Gemini",
             description=(
-                "Generate 3-10s video at 24fps with Gemini Omni Flash. "
+                "Generate 3-15s video at 24fps with Gemini Omni Flash. "
                 "Connect an image to animate it instead of generating from text alone."
             ),
             not_idempotent=True,
@@ -342,7 +342,7 @@ class GeminiOmniReferenceToVideo(IO.ComfyNode):
             display_name="Gemini Omni Reference to Video",
             category="ERPK/Gemini",
             description=(
-                "Generate 3-10s video at 24fps with Gemini Omni Flash that features the "
+                "Generate 3-15s video at 24fps with Gemini Omni Flash that features the "
                 "people, objects or style shown in reference images."
             ),
             not_idempotent=True,

@@ -3,7 +3,7 @@
 
 # Gemini Omni Reference to Video
 
-Generates 3-10 second video at 24 FPS, 360p to 4k, that features the people, objects or style shown in one or more reference images. Uses Gemini Omni Flash 1.1 (`gemini-omni-1.1-flash`) with the `reference_to_video` task.
+Generates 3-15 second video with sound at 24 FPS, 360p to 4k, that features the people, objects or style shown in one or more reference images. Uses Gemini Omni Flash 1.2 (`gemini-omni-1.2-flash`) with the `reference_to_video` task.
 
 ## Parameters
 
@@ -16,7 +16,7 @@ Generates 3-10 second video at 24 FPS, 360p to 4k, that features the people, obj
 | resolution | Combo | 720p | Output resolution: 360p, 720p, 1080p or 4k. 1080p and 4k are upscaled by Google and need a stored interaction, so the node downloads, then deletes, the file (optional) |
 | output_directory | String | "" | Directory to save video. Empty uses ComfyUI output folder (optional) |
 | seed | Int | -1 | Cache control only — never sent to the API. Range: -1 to 4294967295 (optional) |
-| duration_seconds | Int | 10 | Clip length in seconds, 3-10 (optional) |
+| duration_seconds | Int | 10 | Clip length in seconds, 3-15 (optional) |
 
 ## Output
 
