@@ -2,7 +2,7 @@
 
 Complete xAI Grok integration providing text generation, multi-turn chat, image generation and editing, and **video generation (text-to-video, reference-to-video, edit, extend)** for ComfyUI workflows.
 
-**Version:** 2026.11.6
+**Version:** 2026.11.7
 **Category in ComfyUI:** `ERPK/Grok` and `ERPK/Grok/Video`
 **SDK requirement:** `xai-sdk>=1.20.0` (declared in `pyproject.toml`; 1.18 added `xhigh` reasoning effort, 1.19 image `quality`)
 
