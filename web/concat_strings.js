@@ -34,6 +34,10 @@ app.registerExtension({
 
             // Delay to ensure widgets exist, then set up UI once
             setTimeout(() => {
+                // API-format JSON carries no properties, so its saved count is lost.
+                // Never hide an input that still holds a value or a link.
+                this.activeInputCount = Math.max(this.activeInputCount, this._highestUsedInputIndex());
+                this.properties.activeInputCount = this.activeInputCount;
                 this._styleInputsHeader();
                 this._updateInputVisibility();
                 this._createControlWidgets();  // Create once, never remove
@@ -86,6 +90,20 @@ app.registerExtension({
             }, 100);
 
             return result;
+        };
+
+        // Highest input index whose label or text holds a value or a link (0 if none)
+        nodeType.prototype._highestUsedInputIndex = function () {
+            let highest = 0;
+            for (let i = 1; i <= MAX_INPUTS; i++) {
+                for (const name of [`Label ${i}`, `Text ${i}`]) {
+                    const widget = this.widgets?.find(w => w.name === name);
+                    if (widget?.value || this.isInputConnected(this.findInputSlot(name))) {
+                        highest = i;
+                    }
+                }
+            }
+            return highest;
         };
 
         // Update visibility of text/label widgets and inputs
