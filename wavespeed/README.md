@@ -1,6 +1,6 @@
 # WaveSpeed AI - ComfyUI Custom Nodes
 
-**Version:** 2026.11.7 (CalVer)
+**Version:** 2026.11.8 (CalVer)
 **Category:** ERPK/WaveSpeedAI
 **Namespace:** ERPK Organization Custom Nodes
 
