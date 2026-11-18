@@ -165,7 +165,12 @@ class BytePlusClient:
         except requests.RequestException as e:
             raise BytePlusAPIError(f"ModelArk POST {path} got no reply ({e}). {may_bill}") from e
         except BytePlusUnreadableReply as e:
-            raise BytePlusAPIError(f"{e}. {may_bill}") from e
+            raise BytePlusAPIError(f"{e}. {may_bill}", e.status) from e
+        except BytePlusAPIError as e:
+            # A 5xx can arrive after the generation started; a 4xx is a rejection.
+            if e.status is not None and e.status >= 500:
+                raise BytePlusAPIError(f"{e}. {may_bill}", e.status) from e
+            raise
 
     async def create_video_task(self, body: dict) -> str:
         response = await self._post_once(VIDEO_TASKS_PATH, body, 300, _TASK_MAY_BILL)

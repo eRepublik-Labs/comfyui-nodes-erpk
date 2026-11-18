@@ -113,12 +113,6 @@ def test_create_is_sent_once_and_surfaces_the_sync_error_envelope(monkeypatch):
         "The request failed because the input text may contain sensitive information.")
     assert len(transport.calls) == 1
 
-    client, transport = _client([(502, "<html>bad gateway</html>")], monkeypatch=monkeypatch)
-    with pytest.raises(BytePlusAPIError) as excinfo:
-        asyncio.run(client.generate_images({"model": "m"}))
-    assert str(excinfo.value) == "ModelArk POST /images/generations returned HTTP 502: <html>bad gateway</html>"
-    assert len(transport.calls) == 1
-
     client, transport = _client([requests.ReadTimeout("read timed out")], monkeypatch=monkeypatch)
     with pytest.raises(BytePlusAPIError) as excinfo:
         asyncio.run(client.create_video_task({"model": "m"}))
@@ -195,6 +189,11 @@ IMAGES_MAY_BILL = ("The images may have been generated and billed: check your Mo
      f"ModelArk POST /contents/generations/tasks returned an unreadable reply (HTTP 200: ). {TASK_MAY_BILL}"),
     ("generate_images", "/images/generations", requests.ReadTimeout("read timed out"),
      f"ModelArk POST /images/generations got no reply (read timed out). {IMAGES_MAY_BILL}"),
+    ("generate_images", "/images/generations", (502, "<html>bad gateway</html>"),
+     f"ModelArk POST /images/generations returned HTTP 502: <html>bad gateway</html>. {IMAGES_MAY_BILL}"),
+    ("create_video_task", "/contents/generations/tasks",
+     (500, {"error": {"code": "InternalServiceError", "message": "boom"}}),
+     f"ModelArk POST /contents/generations/tasks returned HTTP 500 InternalServiceError: boom. {TASK_MAY_BILL}"),
 ])
 def test_a_post_that_may_have_billed_is_sent_once_and_says_so(monkeypatch, call, path, reply, message):
     client, transport = _client([reply], monkeypatch=monkeypatch)
