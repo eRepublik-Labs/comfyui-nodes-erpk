@@ -869,6 +869,13 @@ class OpenAIClient:
                     "moderation_stage": block["stage"],
                     "moderation_categories": block["categories"],
                 }
+            # The API tiles GIF frames onto one sheet and refuses a size no
+            # sheet fits; size auto picks a frame size that fits (512x512 for
+            # 9 and 16 frames, measured 2026-11-18).
+            if output_format == "gif" and "No supported sheet fits" in str(e):
+                raise ValueError(
+                    f"{e} GIF frames share one sheet, and no sheet fits this size. Set size to auto."
+                ) from e
             raise
 
     async def generate_image(

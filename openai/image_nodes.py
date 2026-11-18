@@ -21,6 +21,11 @@ EDIT_MODELS = IMAGE_MODELS
 GENERATION_DEFAULT_MODEL = "gpt-image-2.6-flare"
 EDIT_DEFAULT_MODEL = "gpt-image-2.6-sunburst"
 
+# The API tiles GIF frames onto one sheet, and no sheet fits 1024x1024 frames
+# (2, 4 and 9 frames answered 400), while size auto returned 512x512 frames
+# for 9 and 16 (measured 2026-11-18). Auto lets a new node make a GIF.
+GENERATION_DEFAULT_SIZE = "auto"
+
 # One limit for every GPT Image model, "For GPT image models, you can provide up to 16 images":
 # https://developers.openai.com/api/reference/resources/images/methods/edit
 EDIT_GRID_CAPS = {"*": 16}
@@ -90,13 +95,13 @@ def resolve_size(size, custom_width, custom_height):
     return size
 
 
-def size_inputs(model_hint):
+def size_inputs(model_hint, default="1024x1024"):
     """The size Combo and its custom dimension Ints, in widget order."""
     return [
         IO.Combo.Input(
             "size",
             options=SIZE_PRESETS,
-            default="1024x1024",
+            default=default,
             optional=True,
             tooltip=(
                 "Output image size. Select Custom to use custom_width and custom_height. "
@@ -169,7 +174,9 @@ class OpenAIImageGeneration(IO.ComfyNode):
                 ),
                 *size_inputs(
                     "gpt-image-2, 2.5 and 2.6 accept any size with both edges divisible by 16, "
-                    "aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels and max edge 3840."
+                    "aspect ratio 1:3 to 3:1, 655,360 to 8,294,400 pixels and max edge 3840. "
+                    "GIF output needs auto.",
+                    default=GENERATION_DEFAULT_SIZE,
                 ),
                 IO.Combo.Input(
                     "quality",
@@ -244,12 +251,12 @@ class OpenAIImageGeneration(IO.ComfyNode):
                     "frame_count",
                     default=9,
                     min=2,
-                    max=64,
+                    max=16,
                     optional=True,
                     tooltip=(
-                        "Frames per GIF animation; used only when output_format is gif. The API tiles "
-                        "the frames onto one sheet whose longest edge must stay within 3840 px, so "
-                        "many frames need a smaller size or size auto."
+                        "Frames per GIF animation (2-16); used only when output_format is gif. The API "
+                        "tiles the frames onto one sheet, and no sheet fits 1024x1024 frames, so set "
+                        "size to auto for GIF output."
                     ),
                 ),
                 IO.Int.Input(
@@ -280,7 +287,7 @@ class OpenAIImageGeneration(IO.ComfyNode):
         client = kwargs.get("client")
         model = kwargs.get("model", GENERATION_DEFAULT_MODEL)
         size = resolve_size(
-            kwargs.get("size", "1024x1024"),
+            kwargs.get("size", GENERATION_DEFAULT_SIZE),
             kwargs.get("custom_width", 1024),
             kwargs.get("custom_height", 1024),
         )

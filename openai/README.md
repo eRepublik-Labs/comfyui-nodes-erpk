@@ -196,7 +196,7 @@ Generate images from text descriptions using OpenAI's image generation models.
 - `prompt`: Text description of the image to generate
 - `client`: Optional OpenAI API client (from OpenAI API Config node)
 - `model`: gpt-image-2.6-flare (default), gpt-image-2.6-sunburst, gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-2
-- `size`: Preset (auto, 1024x1024, 1024x1536, 1536x1024, 2048x2048, 2048x1152, 1152x2048, 3840x2160, 2160x3840) or Custom
+- `size`: Preset (auto (default), 1024x1024, 1024x1536, 1536x1024, 2048x2048, 2048x1152, 1152x2048, 3840x2160, 2160x3840) or Custom. GIF output needs auto
 - `custom_width` / `custom_height`: Used when size is Custom (256 to 3840, step 16). Sizes outside the gpt-image-2 envelope below are rejected before the request is sent.
 - `quality`: Image quality - auto (default), low, medium, high, xhigh, max (xhigh/max on GPT Image 2.6 and 2.5 only, clamped to high on gpt-image-2)
 - `background`: Background type - auto, transparent, opaque (transparent: GPT Image 2.6 and 2.5 only, with png or webp output; gpt-image-2 or jpeg is refused before the request)
@@ -206,7 +206,7 @@ Generate images from text descriptions using OpenAI's image generation models.
 - `output_format`: png (default), jpeg, webp, gif (gif on GPT Image 2.6 only; the node refuses other models before the request)
 - `output_compression`: 0-100 (default 100), sent only with jpeg or webp
 - `complexity`: auto (default), low, medium, high. How much detail GPT Image 2.6 puts in; `auto` sends nothing (OpenAI documents high). Other models reject the parameter, so the node leaves it out there and logs a note
-- `frame_count`: 2-64 (default 9), frames per GIF animation; sent only with gif
+- `frame_count`: 2-16 (default 9), frames per GIF animation; sent only with gif
 - `frame_duration_ms`: 20-2000 in steps of 10 (default 200), how long each GIF frame shows; sent only with gif
 
 **Outputs:**
@@ -217,7 +217,7 @@ Generate images from text descriptions using OpenAI's image generation models.
 - Credentials resolved from ComfyUI Settings, the node input, or config.ini
 - Direct image output compatible with all ComfyUI image nodes
 - Transparent background support on the GPT Image 2.6 and 2.5 models (gpt-image-2 rejects it)
-- GIF output on GPT Image 2.6. The API tiles the frames onto one sheet whose longest edge must stay within 3840 px, so the API refuses 2 frames at 1024x1024 ("No supported sheet fits 2 GIF frames at size '1024x1024'") while size auto or 1024x640 works
+- GIF output on GPT Image 2.6. The API tiles the frames onto one sheet, and no sheet fits 1024x1024 frames ("No supported sheet fits 9 GIF frames at size '1024x1024'"). Size auto, the default, returned 512x512 frames for 9 and 16 frames; on a sheet refusal the node adds a hint to set size to auto
 - n>1 returns a batched IMAGE tensor — no images are dropped
 - Size presets plus a Custom width/height pair (validated against the model's supported sizes by the API)
 

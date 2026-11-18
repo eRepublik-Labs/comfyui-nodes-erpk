@@ -749,7 +749,40 @@ def _gif_base64(colors, size=(4, 3)):
 class TestGif:
     """output_format gif returns a GIF89a on GPT Image 2.6; 2.5 and gpt-image-2
     answer 400 "GIF output is not enabled for the model '<id>'." frame_count
-    (2-64) and frame_duration_ms (20-2000) ride in the body (measured 2026-11-05)."""
+    and frame_duration_ms (20-2000) ride in the body (measured 2026-11-05).
+    frame_count 17 answers 400 "Use an integer from 2 to 16, or omit
+    'frame_count' to use 9."; 9 and 16 frames at size auto return 512x512
+    frames, while 2, 4 and 9 frames at 1024x1024 answer 400 "No supported
+    sheet fits ..." (measured 2026-11-18)."""
+
+    SHEET_REFUSAL = (
+        "Error code: 400 - {'error': {'message': \"No supported sheet fits 9 GIF frames at size "
+        "'1024x1024'. Invalid size '3072x3072'. Requested resolution exceeds the current pixel "
+        "budget.\", 'type': 'image_generation_user_error', 'param': 'size', 'code': 'invalid_value'}}"
+    )
+
+    def test_a_sheet_refusal_names_size_auto(self):
+        import openai as sdk
+        client, mock = _make_client_with_mock()
+        mock.images.generate.side_effect = sdk.APIError(self.SHEET_REFUSAL)
+        with pytest.raises(ValueError) as exc:
+            asyncio.run(client.generate_image(
+                prompt="x", model="gpt-image-2.6-flare", size="1024x1024", output_format="gif", frame_count=9,
+            ))
+        assert str(exc.value) == (
+            f"{self.SHEET_REFUSAL} GIF frames share one sheet, and no sheet fits this size. Set size to auto."
+        )
+
+    def test_other_refusals_pass_through_unchanged(self):
+        import openai as sdk
+        client, mock = _make_client_with_mock()
+        refusal = sdk.APIError("Error code: 400 - Invalid 'frame_count' for GIF output.")
+        mock.images.generate.side_effect = refusal
+        with pytest.raises(sdk.APIError) as exc:
+            asyncio.run(client.generate_image(
+                prompt="x", model="gpt-image-2.6-flare", size="auto", output_format="gif", frame_count=9,
+            ))
+        assert exc.value is refusal
 
     def test_26_sends_the_format_and_the_frame_fields(self):
         client, mock = _make_client_with_mock()
@@ -828,11 +861,39 @@ class TestGif:
             asyncio.run(OpenAIImageGeneration.execute("a ball", client=RefusingClient(), output_format="gif"))
         assert str(exc.value) == f"Failed to generate image: {api_message}"
 
+    def test_generation_defaults_to_size_auto_so_a_gif_fits(self):
+        """Alex's call (2026-11-18): Image Generation starts on size auto, the
+        only size measured to fit a GIF sheet. The widget keeps its slot and
+        options, so a saved workflow restores the size it stored. Edit and SVG
+        keep 1024x1024."""
+        import erpk.openai.image_nodes as image_nodes
+        presets = ["auto", "1024x1024", "1024x1536", "1536x1024", "2048x2048", "2048x1152",
+                   "1152x2048", "3840x2160", "2160x3840", "Custom"]
+        expected = {"OpenAIImageGeneration": ("auto", 3), "OpenAIImageEdit": ("1024x1024", 7),
+                    "OpenAISVGGeneration": ("1024x1024", 4)}
+        for name, (default, slot) in expected.items():
+            inputs = getattr(image_nodes, name).define_schema().inputs
+            size = inputs[slot]
+            assert (size.id, size.default, size.options) == ("size", default, presets), name
+
+    def test_a_gif_at_the_node_defaults_asks_for_size_auto(self):
+        from erpk.openai.image_nodes import OpenAIImageGeneration
+        seen = {}
+
+        class RecordingClient:
+            async def generate_image(self, **kwargs):
+                seen.update(kwargs)
+                return {"blocked": True, "error": "stop here"}
+
+        with pytest.raises(ValueError, match="stop here"):
+            asyncio.run(OpenAIImageGeneration.execute("a ball", client=RecordingClient(), output_format="gif"))
+        assert (seen["size"], seen["frame_count"]) == ("auto", 9)
+
     def test_frame_widgets_cover_the_documented_ranges(self):
         from erpk.openai.image_nodes import OpenAIImageGeneration
         inputs = {i.id: i for i in OpenAIImageGeneration.define_schema().inputs}
         count, duration = inputs["frame_count"], inputs["frame_duration_ms"]
-        assert (count.min, count.max, count.default, count.optional) == (2, 64, 9, True)
+        assert (count.min, count.max, count.default, count.optional) == (2, 16, 9, True)
         assert (duration.min, duration.max, duration.step, duration.default, duration.optional) == (20, 2000, 10, 200, True)
 
 
