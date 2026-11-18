@@ -402,3 +402,24 @@ def test_a_billed_result_reaches_exactly_one_side_whichever_finishes_first():
     cancelled_before.abandon()
     cancelled_before.finish(lambda: ran.append("cancelled before the worker finished"))
     assert ran == ["cancelled after the worker finished", "cancelled before the worker finished"]
+
+
+def test_a_string_error_item_is_logged_and_the_other_images_are_returned(transport, capsys):
+    _, replies = transport
+    replies.append((200, {"data": [{"b64_json": _png_b64(Image.new("RGB", (64, 48)))},
+                                   {"error": "OutputImageSensitiveContentDetected"}]}))
+    images, _ = asyncio.run(BytePlusSeedreamTextToImage.execute(**SEEDREAM_KWARGS)).args
+    assert tuple(images.shape) == (1, 48, 64, 3)
+    assert ("[BytePlus] Seedream refused 1 of 2 images: OutputImageSensitiveContentDetected"
+            in capsys.readouterr().out.splitlines())
+
+
+def test_a_url_that_is_not_text_is_named_and_the_other_images_are_saved(transport, capsys, output_dir):
+    _, replies = transport
+    replies.append((200, {"data": [{"b64_json": _png_b64(Image.new("RGB", (64, 48)))}, {"url": {"href": "x"}}]}))
+    with pytest.raises(ValueError) as excinfo:
+        asyncio.run(BytePlusSeedreamTextToImage.execute(**SEEDREAM_KWARGS))
+    saved = output_dir / "20261118-120000-000000-01.png"
+    assert str(excinfo.value) == ("Seedream images could not be decoded: image 2 of 2: Seedream returned a url that "
+                                  f"is not text: {{'href': 'x'}}. The billed images are saved as {saved}")
+    assert _size_on_disk(saved) == (64, 48)

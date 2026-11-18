@@ -88,6 +88,8 @@ def _item_image(item: dict):
     if item.get("b64_json"):
         data = base64.b64decode(item["b64_json"])
     elif item.get("url"):
+        if not isinstance(item["url"], str):
+            raise ValueError(f"Seedream returned a url that is not text: {str(item['url'])[:100]}")
         data = fetch_remote_bytes(item["url"], max_bytes=100 * 1024 * 1024, timeout=60,
                                   user_agent="ERPK-BytePlus/1.0")
     else:

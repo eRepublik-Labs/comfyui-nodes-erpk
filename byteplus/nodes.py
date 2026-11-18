@@ -246,12 +246,12 @@ def _images_from_response(response: dict, model_id: str, options: seedream.Image
     items = [item for item in response.get("data") or [] if isinstance(item, dict)]
     failed = [item["error"] for item in items if item.get("error")]
     succeeded = [item for item in items if not item.get("error")]
-    urls = [item["url"] for item in succeeded if item.get("url")]
+    urls = [item["url"] for item in succeeded if isinstance(item.get("url"), str)]
     if urls:
         print(f"[BytePlus] Seedream result URLs (valid 24 h): {' '.join(urls)}")
     if not succeeded:
         raise ValueError(f"Seedream returned no images: {str(response)[:300]}")
-    reasons = "; ".join(f"{e.get('code')}: {e.get('message', '')}" for e in failed)
+    reasons = "; ".join(_error_reason(e) for e in failed)
     if failed:
         print(f"[BytePlus] Seedream refused {len(failed)} of {len(items)} images: {reasons}")
 
@@ -278,6 +278,12 @@ def _images_from_response(response: dict, model_id: str, options: seedream.Image
         # The images are already billed; a gap in the price list must not discard them.
         print(f"[BytePlus] Seedream returned {len(decoded)} image(s); cost unknown: {e}")
     return output, decoded
+
+
+def _error_reason(error) -> str:
+    if isinstance(error, dict):
+        return f"{error.get('code')}: {error.get('message', '')}"
+    return str(error)
 
 
 def _recover(decoded) -> str:
