@@ -6,7 +6,7 @@ import importlib
 import pytest
 
 
-# (module_path, class_name, env_var) for the four client-class providers that
+# (module_path, class_name, env_var) for the client-class providers that
 # expose _resolve_api_key. Gemini reads two env names, so both are covered.
 # Imported under the synthetic `erpk` package (conftest) so the providers'
 # relative imports resolve the same way ComfyUI's package loader resolves them.
@@ -16,6 +16,8 @@ CLIENT_PROVIDERS = [
     ("erpk.gemini.gemini_api.client", "GeminiClient", "GOOGLE_API_KEY"),
     ("erpk.gemini.gemini_api.client", "GeminiClient", "GEMINI_API_KEY"),
     ("erpk.grok.grok_api.client", "GrokClient", "XAI_API_KEY"),
+    ("erpk.byteplus.byteplus_api.client", "BytePlusClient", "BYTEPLUS_API_KEY"),
+    ("erpk.byteplus.byteplus_api.client", "BytePlusClient", "ARK_API_KEY"),
 ]
 
 

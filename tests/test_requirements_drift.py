@@ -33,7 +33,8 @@ def _pyproject_floors():
 
 def _module_requirement_files():
     names = ("requirements.txt", "claude/requirements.txt", "gemini/requirements.txt",
-             "grok/requirements.txt", "wavespeed/requirements.txt", "openai/requirements.txt")
+             "grok/requirements.txt", "wavespeed/requirements.txt", "openai/requirements.txt",
+             "byteplus/requirements.txt")
     return [(n, os.path.join(_REPO, n)) for n in names if os.path.exists(os.path.join(_REPO, n))]
 
 
