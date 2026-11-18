@@ -99,7 +99,11 @@ def _item_image(item: dict):
     else:
         raise ValueError(f"Seedream returned an image with neither url nor b64_json: {sorted(item)}")
     with safe_image_decode():
-        image = Image.open(io.BytesIO(data))
+        try:
+            image = Image.open(io.BytesIO(data))
+        except Image.UnidentifiedImageError as e:
+            # PIL's own message names a buffer's memory address, which tells the user nothing.
+            raise ValueError("the data is not an image PIL can read") from e
         image.load()
     return image.convert("RGBA")
 

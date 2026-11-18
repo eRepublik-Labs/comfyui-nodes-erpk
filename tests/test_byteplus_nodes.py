@@ -45,6 +45,12 @@ def _png_b64(image):
     return base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
+def _data_uri_image(uri):
+    """(the part before the comma, the decoded image) of a base64 data URI."""
+    header, payload = uri.split(",", 1)
+    return header, Image.open(io.BytesIO(base64.b64decode(payload)))
+
+
 def test_image_to_video_on_1_0_pro_fast_sends_the_frame_and_seed_and_returns_three_urls(transport):
     sent, replies = transport
     replies += [
@@ -63,7 +69,9 @@ def test_image_to_video_on_1_0_pro_fast_sends_the_frame_and_seed_and_returns_thr
     method, url, body = sent[0]
     assert (method, url) == ("POST", "https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks")
     frame = body["content"][1]
-    assert frame["role"] == "first_frame" and frame["image_url"]["url"].startswith("data:image/jpeg;base64,")
+    header, image = _data_uri_image(frame["image_url"]["url"])
+    assert (frame["role"], header, image.format, image.size) == ("first_frame", "data:image/jpeg;base64", "JPEG",
+                                                                 (480, 320))
     del body["content"]
     assert body == {"model": "seedance-1-0-pro-fast-251015", "resolution": "480p", "ratio": "16:9",
                     "duration": 5, "watermark": False, "return_last_frame": True,
@@ -97,7 +105,8 @@ def test_layer_decomposition_returns_the_base_then_each_layer_with_alpha(transpo
     assert alpha[1].sum().item() == 100 * 50
     assert alpha[1, 20, 10].item() == 1.0 and alpha[1, 19, 10].item() == 0.0
     body = sent[0][2]
-    assert body["image"].startswith("data:image/jpeg;base64,")
+    header, image = _data_uri_image(body["image"])
+    assert (header, image.format, image.size) == ("data:image/jpeg;base64", "JPEG", (520, 520))
     assert body["layer_decomposition"] is True
     assert body["layer_decomposition_options"] == {"max_images": 5, "text_recognition": False}
 
@@ -181,9 +190,8 @@ def test_an_image_that_does_not_decode_saves_the_others_and_names_it(transport, 
         asyncio.run(BytePlusSeedreamTextToImage.execute(client=CLIENT, prompt="a kite", model="seedream-4-0-250828",
                                                         sequential="auto", max_images=2, response_format="b64_json"))
     saved = output_dir / "20261118-120000-000000-01.png"
-    message = str(excinfo.value)
-    assert message.startswith("Seedream images could not be decoded: image 2 of 2: ")
-    assert message.endswith(f". The billed images are saved as {saved}")
+    assert str(excinfo.value) == ("Seedream images could not be decoded: image 2 of 2: the data is not an image "
+                                  f"PIL can read. The billed images are saved as {saved}")
     assert _size_on_disk(saved) == (64, 48)
 
 MINI = "dreamina-seedance-2-0-mini-260615"

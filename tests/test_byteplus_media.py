@@ -26,6 +26,12 @@ def _png_b64(image):
     return base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
+def _data_uri_image(uri):
+    """(the part before the comma, the decoded image) of a base64 data URI."""
+    header, payload = uri.split(",", 1)
+    return header, Image.open(io.BytesIO(base64.b64decode(payload)))
+
+
 def test_seedance_rejects_images_outside_its_documented_size_and_ratio():
     with pytest.raises(ValueError) as excinfo:
         images_to_data_uris(torch.zeros((1, 200, 400, 3)), SEEDANCE_IMAGE_LIMITS, "first_frame")
@@ -34,7 +40,9 @@ def test_seedance_rejects_images_outside_its_documented_size_and_ratio():
         images_to_data_uris(torch.zeros((1, 300, 900, 3)), SEEDANCE_IMAGE_LIMITS, "first_frame")
     assert str(excinfo.value) == "first_frame image 1 is 900x300; the aspect ratio must be 0.4-2.5."
     uris = images_to_data_uris(torch.zeros((2, 300, 400, 3)), SEEDREAM_IMAGE_LIMITS, "images")
-    assert len(uris) == 2 and all(u.startswith("data:image/jpeg;base64,") for u in uris)
+    decoded = [_data_uri_image(uri) for uri in uris]
+    assert [(header, image.format, image.size) for header, image in decoded] == [
+        ("data:image/jpeg;base64", "JPEG", (400, 300))] * 2
 
 
 def test_a_mask_becomes_the_png_alpha_channel_in_loadimage_convention():
@@ -42,9 +50,8 @@ def test_a_mask_becomes_the_png_alpha_channel_in_loadimage_convention():
     mask = torch.zeros((1, 300, 300))
     mask[:, :, :150] = 1.0
     [uri] = images_to_data_uris(image, SEEDREAM_IMAGE_LIMITS, "images", mask=mask)
-    assert uri.startswith("data:image/png;base64,")
-    decoded = Image.open(io.BytesIO(base64.b64decode(uri.split(",", 1)[1])))
-    assert decoded.mode == "RGBA"
+    header, decoded = _data_uri_image(uri)
+    assert (header, decoded.format, decoded.mode) == ("data:image/png;base64", "PNG", "RGBA")
     assert decoded.getpixel((10, 10))[3] == 0 and decoded.getpixel((290, 10))[3] == 255
 
 
@@ -102,5 +109,5 @@ def test_decoding_keeps_every_image_that_decodes_and_names_the_rest():
     data = [{"b64_json": _png_b64(Image.new("RGB", (4, 4)))}, {"b64_json": "bm90IGFuIGltYWdl"}, {"size": "4x4"}]
     images, errors = decode_items(data)
     assert images[0].size == (4, 4) and images[1:] == [None, None]
-    assert errors[0].startswith("image 2 of 3: ")
+    assert errors[0] == "image 2 of 3: the data is not an image PIL can read"
     assert errors[1] == "image 3 of 3: Seedream returned an image with neither url nor b64_json: ['size']"
