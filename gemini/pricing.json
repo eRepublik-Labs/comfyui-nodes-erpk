@@ -4,6 +4,11 @@
   "_version": "1.0",
   "_note": "Flash output prices include thinking tokens. Pro models are tiered by prompt size at 200k tokens; the <=200k rate is listed here because scans are small. Image inputs are billed as input tokens (Gemini 3.x: media_resolution-based, default ~1120 tokens/image). A model's price_changes list (strictly increasing effective_from dates, YYYY-MM-DD) replaces its base rate from each date onward, judged by the UTC date of the request.",
   "models": {
+    "gemini-4-neon": {
+      "name": "Gemini 4 Neon",
+      "input_price_per_mtok": 3.0,
+      "output_price_per_mtok": 15.0
+    },
     "gemini-4-carbon": {
       "name": "Gemini 4 Carbon",
       "input_price_per_mtok": 2.0,

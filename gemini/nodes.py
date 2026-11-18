@@ -39,13 +39,13 @@ def _parse_stop_sequences(text):
 
 # Models that reject thinking_level=minimal with a 400 (3.7/3.8 Flash per their
 # reference pages; 3.1 Pro Preview probed 2026-10-01; 4 Argon probed 2026-10-14;
-# 4 Carbon and 4 Hydrogen probed 2026-11-18). The node clamps minimal up to low for them.
+# 4 Carbon, 4 Hydrogen and 4 Neon probed 2026-11-18). The node clamps minimal up to low for them.
 _NO_MINIMAL_THINKING = {"gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.1-pro-preview",
-                        "gemini-4-argon", "gemini-4-carbon", "gemini-4-hydrogen"}
+                        "gemini-4-argon", "gemini-4-carbon", "gemini-4-hydrogen", "gemini-4-neon"}
 
-# Models that accept thinking_level=xhigh (probed 2026-11-18: 200 on 4 Hydrogen,
+# Models that accept thinking_level=xhigh (probed 2026-11-18: 200 on 4 Hydrogen and 4 Neon,
 # 400 on every other text model). The node lowers xhigh to high for the rest.
-_XHIGH_THINKING = {"gemini-4-hydrogen"}
+_XHIGH_THINKING = {"gemini-4-hydrogen", "gemini-4-neon"}
 
 
 # Output resolutions each image model accepts, smallest first, per
@@ -365,7 +365,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level (0.0=focused, 2.0=very creative) Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
+                    tooltip="Creativity level (0.0=focused, 2.0=very creative) Ignored by Gemini 4 Argon, 4 Carbon, 4 Hydrogen and 4 Neon.",
                 ),
                 IO.Int.Input(
                     "max_tokens",
@@ -383,7 +383,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
+                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon, 4 Carbon, 4 Hydrogen and 4 Neon.",
                 ),
                 IO.Int.Input(
                     "top_k",
@@ -392,7 +392,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     max=100,
                     step=1,
                     optional=True,
-                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
+                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon, 4 Carbon, 4 Hydrogen and 4 Neon.",
                 ),
                 IO.String.Input(
                     "stop_sequences",
@@ -422,8 +422,8 @@ class GeminiTextGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
                              "default level (it does not turn thinking off). minimal is raised to low on "
-                             "models that reject it: 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash, "
-                             "3.8 Flash. xhigh is sent only to 4 Hydrogen; other models get high."),
+                             "models that reject it: 4 Neon, 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash, "
+                             "3.8 Flash. xhigh is sent only to 4 Hydrogen and 4 Neon; other models get high."),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -560,7 +560,7 @@ class GeminiChat(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
+                    tooltip="Creativity level Ignored by Gemini 4 Argon, 4 Carbon, 4 Hydrogen and 4 Neon.",
                 ),
                 IO.Int.Input(
                     "max_tokens",
@@ -578,7 +578,7 @@ class GeminiChat(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
+                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon, 4 Carbon, 4 Hydrogen and 4 Neon.",
                 ),
                 IO.Int.Input(
                     "top_k",
@@ -587,7 +587,7 @@ class GeminiChat(IO.ComfyNode):
                     max=100,
                     step=1,
                     optional=True,
-                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
+                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon, 4 Carbon, 4 Hydrogen and 4 Neon.",
                 ),
                 IO.String.Input(
                     "stop_sequences",
@@ -617,8 +617,8 @@ class GeminiChat(IO.ComfyNode):
                     optional=True,
                     tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
                              "default level (it does not turn thinking off). minimal is raised to low on "
-                             "models that reject it: 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash, "
-                             "3.8 Flash. xhigh is sent only to 4 Hydrogen; other models get high."),
+                             "models that reject it: 4 Neon, 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash, "
+                             "3.8 Flash. xhigh is sent only to 4 Hydrogen and 4 Neon; other models get high."),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -786,7 +786,7 @@ class GeminiVision(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level (lower=more factual) Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
+                    tooltip="Creativity level (lower=more factual) Ignored by Gemini 4 Argon, 4 Carbon, 4 Hydrogen and 4 Neon.",
                 ),
                 IO.Float.Input(
                     "top_p",
@@ -795,7 +795,7 @@ class GeminiVision(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
+                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon, 4 Carbon, 4 Hydrogen and 4 Neon.",
                 ),
                 IO.Int.Input(
                     "top_k",
@@ -804,7 +804,7 @@ class GeminiVision(IO.ComfyNode):
                     max=100,
                     step=1,
                     optional=True,
-                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
+                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon, 4 Carbon, 4 Hydrogen and 4 Neon.",
                 ),
                 IO.String.Input(
                     "stop_sequences",
@@ -834,8 +834,8 @@ class GeminiVision(IO.ComfyNode):
                     optional=True,
                     tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
                              "default level (it does not turn thinking off). minimal is raised to low on "
-                             "models that reject it: 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash, "
-                             "3.8 Flash. xhigh is sent only to 4 Hydrogen; other models get high."),
+                             "models that reject it: 4 Neon, 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash, "
+                             "3.8 Flash. xhigh is sent only to 4 Hydrogen and 4 Neon; other models get high."),
                 ),
                 IO.Int.Input(
                     "seed",
