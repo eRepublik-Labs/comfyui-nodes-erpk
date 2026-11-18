@@ -10,8 +10,7 @@ class SeedreamV5FlashEdit(SeedreamV5Flash):
     """
     ByteDance Seedream V5.0 Flash edit model.
 
-    Takes the text-to-image settings plus 1 to 10 reference images. Leaving
-    `aspect_ratio` unset keeps the ratio of the first image.
+    Takes the text-to-image settings plus 1 to 10 reference images.
     """
 
     images: List[str] = Field(..., description="Image URLs or data URIs to edit (1-10).",

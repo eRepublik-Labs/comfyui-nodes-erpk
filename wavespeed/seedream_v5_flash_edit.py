@@ -10,7 +10,6 @@ from .wavespeed_api.requests.seedream_v5_pro import ASPECT_RATIOS, OUTPUT_FORMAT
 MAX_INPUT_IMAGES = 10
 register_grid_caps("SeedreamV5FlashEditNode", {"*": MAX_INPUT_IMAGES}, model_widget=None)
 
-# Sent as no aspect ratio, so the API keeps the ratio of the first image.
 AUTO_ASPECT = "auto"
 
 

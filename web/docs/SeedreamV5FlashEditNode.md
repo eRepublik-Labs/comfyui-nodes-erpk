@@ -12,7 +12,7 @@ Edits images from a text prompt with ByteDance's Seedream V5.0 Flash, using up t
 | prompt | String | "" | Text description of the desired modifications |
 | images | Image | -- | Images to edit as an IMAGE batch, one image per slice, up to 10 (optional). Sent inline as base64, no upload. Takes precedence over the grid and image_url. Batched images must share one size, so combine different sizes on the grid or through URLs |
 | image_url | String | (empty) | Image URL(s) to edit, one per line or comma separated, up to 10. Needed unless images is connected or the grid holds images |
-| aspect_ratio | Combo | "auto" | auto keeps the ratio of the first image; otherwise one of 1:1, 1:2, 2:1, 1:3, 3:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 9:21, 21:9 |
+| aspect_ratio | Combo | "auto" | auto uses the supported ratio closest to the first image; otherwise one of 1:1, 1:2, 2:1, 1:3, 3:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 9:21, 21:9 |
 | resolution | Combo | "1k" | Output resolution tier: 1k, 1.5k or 2k |
 | client | WAVESPEED_AI_API_CLIENT | -- | WaveSpeed API client (optional if API key is configured in Settings) |
 | output_format | Combo | "jpeg" | jpeg or png (optional) |
