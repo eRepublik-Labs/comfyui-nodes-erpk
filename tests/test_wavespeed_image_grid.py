@@ -159,6 +159,8 @@ NODES = [
           "prompt_optimization_mode", "enable_sync_mode", "enable_base64_output"]),
     Node("seedream_v5_5_edit", "SeedreamV5_5EditNode", "images", "image_url", 10, "Seedream",
          ["prompt", "image_url", "aspect_ratio", "resolution", "seed", "output_format", "background"]),
+    Node("seedream_v5_flash_edit", "SeedreamV5FlashEditNode", "images", "image_url", 10, "Seedream",
+         ["prompt", "image_url", "aspect_ratio", "resolution", "seed", "output_format"]),
     Node("minimax_h3_image_edit", "MinimaxH3ImageEditNode", "images", "image_urls", 9, "MiniMax H3 Image Edit",
          ["prompt", "image_urls", "aspect_ratio", "resolution", "output_format", "seed"]),
 ]
