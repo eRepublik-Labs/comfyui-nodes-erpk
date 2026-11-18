@@ -2,13 +2,18 @@
 # ABOUTME: documented input limits, Seedream response items back to IMAGE plus alpha, and billed-image recovery.
 
 import base64
+import http.client
 import io
 import os
+import time
+import urllib.error
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional, Sequence, Tuple
 
 MAX_IMAGE_BYTES = 30 * 1024 * 1024
+# Seconds to wait before the second and third attempt at a free result download.
+DOWNLOAD_RETRY_DELAYS = (1.0, 3.0)
 
 
 @dataclass(frozen=True)
@@ -90,14 +95,34 @@ def _item_image(item: dict):
     elif item.get("url"):
         if not isinstance(item["url"], str):
             raise ValueError(f"Seedream returned a url that is not text: {str(item['url'])[:100]}")
-        data = fetch_remote_bytes(item["url"], max_bytes=100 * 1024 * 1024, timeout=60,
-                                  user_agent="ERPK-BytePlus/1.0")
+        data = _download(item["url"], fetch_remote_bytes)
     else:
         raise ValueError(f"Seedream returned an image with neither url nor b64_json: {sorted(item)}")
     with safe_image_decode():
         image = Image.open(io.BytesIO(data))
         image.load()
     return image.convert("RGBA")
+
+
+def _transient(error: Exception) -> bool:
+    if isinstance(error, urllib.error.HTTPError):
+        return error.code == 429 or error.code >= 500
+    return isinstance(error, (urllib.error.URLError, ConnectionError, TimeoutError, http.client.IncompleteRead))
+
+
+def _download(url: str, fetch) -> bytes:
+    """GET a result URL, retrying connection errors, timeouts, 429 and 5xx: a download is free."""
+    attempts = len(DOWNLOAD_RETRY_DELAYS) + 1
+    for attempt in range(1, attempts + 1):
+        try:
+            return fetch(url, max_bytes=100 * 1024 * 1024, timeout=60, user_agent="ERPK-BytePlus/1.0")
+        except Exception as e:
+            if not _transient(e):
+                raise ValueError(f"Downloading {url} failed: {e}") from e
+            if attempt == attempts:
+                raise ValueError(f"Downloading {url} failed after {attempts} attempts: {e}") from e
+            print(f"[BytePlus] Downloading {url} failed ({e}); retrying.")
+            time.sleep(DOWNLOAD_RETRY_DELAYS[attempt - 1])
 
 
 def decode_items(data: Sequence[dict]) -> Tuple[List, List[str]]:

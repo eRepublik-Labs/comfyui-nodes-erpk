@@ -5,6 +5,7 @@ import asyncio
 import base64
 import io
 import json
+import urllib.error
 
 import pytest
 
@@ -438,3 +439,61 @@ def test_a_recovery_write_that_fails_midway_names_the_saved_files_and_leaves_no_
     assert message == (f"The billed images are saved as {first}, {third}. Saving image 2 of 3 failed: "
                        "No space left on device")
     assert sorted(output_dir.iterdir()) == [first, third]
+
+
+A_URL = "https://cdn.example.com/a.png"
+
+
+@pytest.fixture
+def downloads(monkeypatch):
+    """Answers each download from a script of exceptions or images and records the URLs."""
+    import erpk.utils.safe_fetch as safe_fetch
+    from erpk.byteplus.byteplus_api import media
+
+    script, fetched = [], []
+
+    def fake_fetch(url, **_):
+        fetched.append(url)
+        outcome = script.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        buffer = io.BytesIO()
+        outcome.save(buffer, format="PNG")
+        return buffer.getvalue()
+
+    monkeypatch.setattr(safe_fetch, "fetch_remote_bytes", fake_fetch)
+    monkeypatch.setattr(media, "DOWNLOAD_RETRY_DELAYS", (0, 0))
+    return script, fetched
+
+
+def _http_error(code, reason):
+    return urllib.error.HTTPError(A_URL, code, reason, {}, None)
+
+
+def test_a_result_download_that_fails_once_is_retried(transport, downloads):
+    _, replies = transport
+    script, fetched = downloads
+    script += [_http_error(503, "Service Unavailable"), Image.new("RGB", (64, 48))]
+    replies.append((200, {"data": [{"url": A_URL}]}))
+    images, _ = asyncio.run(BytePlusSeedreamTextToImage.execute(**{**SEEDREAM_KWARGS, "response_format": "url"})).args
+    assert tuple(images.shape) == (1, 48, 64, 3)
+    assert fetched == [A_URL, A_URL]
+
+
+@pytest.mark.parametrize("failures, reason", [
+    (lambda: [urllib.error.URLError("Connection refused")] * 3,
+     f"Downloading {A_URL} failed after 3 attempts: <urlopen error Connection refused>"),
+    (lambda: [_http_error(429, "Too Many Requests")] * 3,
+     f"Downloading {A_URL} failed after 3 attempts: HTTP Error 429: Too Many Requests"),
+    (lambda: [_http_error(404, "Not Found")], f"Downloading {A_URL} failed: HTTP Error 404: Not Found"),
+])
+def test_a_result_download_that_keeps_failing_names_its_url(transport, downloads, failures, reason):
+    _, replies = transport
+    script, fetched = downloads
+    script += failures()
+    replies.append((200, {"data": [{"url": A_URL}]}))
+    with pytest.raises(ValueError) as excinfo:
+        asyncio.run(BytePlusSeedreamTextToImage.execute(**{**SEEDREAM_KWARGS, "response_format": "url"}))
+    assert str(excinfo.value) == (f"Seedream images could not be decoded: image 1 of 1: {reason}. No image decoded, "
+                                  "so none could be saved.")
+    assert fetched == [A_URL] * len(failures())
