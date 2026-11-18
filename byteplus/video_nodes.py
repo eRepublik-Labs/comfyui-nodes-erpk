@@ -6,7 +6,7 @@ import re
 
 from comfy_api.latest import IO
 
-from .byteplus_api import seedance
+from .byteplus_api import emit, seedance
 from .byteplus_api.client import BytePlusClient, task_failure_message
 from .byteplus_api.media import SEEDANCE_IMAGE_LIMITS, images_to_data_uris
 from .nodes import CLIENT_TOOLTIP, make_client, url_lines
@@ -164,8 +164,8 @@ async def _run(kwargs, media: seedance.VideoMedia) -> IO.NodeOutput:
     body = seedance.build_video_body(model_id, kwargs.get("prompt", ""), media, options,
                                      kwargs.get("endpoint_id", ""))
     client: BytePlusClient = make_client(kwargs.get("client"))
-    print(f"[BytePlus] Seedance {media.mode().value} request: model={body['model']}, "
-          f"resolution={options.resolution}")
+    emit(f"Seedance {media.mode().value} request: model={body['model']}, "
+         f"resolution={options.resolution}")
     task_id = await client.create_video_task(body)
     task = await client.wait_for_video_task(task_id, options.execution_expires_after + _POLL_MARGIN_SECONDS)
 
@@ -173,19 +173,19 @@ async def _run(kwargs, media: seedance.VideoMedia) -> IO.NodeOutput:
     if not video_url:
         raise ValueError(f"Seedance task {task_id} succeeded without a video_url: {str(task)[:300]}")
     if options.return_last_frame and not last_frame_url:
-        print(f"[BytePlus] Task {task_id} returned no last_frame_url although return_last_frame was on; "
-              "returning the video without it.")
+        emit(f"Task {task_id} returned no last_frame_url although return_last_frame was on; "
+             "returning the video without it.")
     tokens = (task.get("usage") or {}).get("completion_tokens")
     if isinstance(tokens, int) and tokens > 0:
         try:
             cost = seedance.video_cost_usd(model_id, options.resolution, tokens,
                                            has_video_input=bool(media.reference_videos),
                                            flex=options.service_tier == "flex")
-            print(f"[BytePlus] Task {task_id}: {tokens} tokens, about ${cost:.4f}")
+            emit(f"Task {task_id}: {tokens} tokens, about ${cost:.4f}")
         except ValueError as e:
             # The video is already billed; a gap in the price list must not discard it.
-            print(f"[BytePlus] Task {task_id}: {tokens} tokens; cost unknown: {e}")
-    print(f"[BytePlus] Video URL: {video_url}")
+            emit(f"Task {task_id}: {tokens} tokens; cost unknown: {e}")
+    emit(f"Video URL: {video_url}")
     return IO.NodeOutput(video_url, last_frame_url, task_id)
 
 
@@ -379,8 +379,8 @@ class BytePlusSeedanceTaskResult(IO.ComfyNode):
             task = await client.get_video_task(task_id)
         status = task.get("status") or ""
         if status not in ("queued", "running", "succeeded"):
-            print(f"[BytePlus] {task_failure_message(task_id, task)}")
+            emit(task_failure_message(task_id, task))
         video_url, last_frame_url = _task_urls(task)
         if video_url:
-            print(f"[BytePlus] Video URL: {video_url}")
+            emit(f"Video URL: {video_url}")
         return IO.NodeOutput(video_url, last_frame_url, status)

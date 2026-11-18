@@ -5,6 +5,8 @@ import sys
 import os
 import types
 
+import pytest
+
 # Add project root for package imports
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if project_root not in sys.path:
@@ -49,3 +51,40 @@ if "openai" not in sys.modules:
     for _name in ("APIError", "RateLimitError", "APIConnectionError"):
         setattr(openai_sdk, _name, type(_name, (Exception,), {}))
     sys.modules["openai"] = openai_sdk
+
+
+
+class Console:
+    """sys.stdout as ComfyUI's LogInterceptor leaves it when stdout is redirected to a file:
+    not line buffered. Calling it returns, and clears, only the text that reached the stream,
+    so a line printed without a flush is missing."""
+
+    def __init__(self, monkeypatch):
+        import io
+
+        self._monkeypatch = monkeypatch
+        self._raw = io.BytesIO()
+        self._stream = io.TextIOWrapper(self._raw, encoding="utf-8", line_buffering=False)
+
+    def install(self):
+        self._monkeypatch.setattr(sys, "stdout", self._stream)
+
+    def __call__(self):
+        text = self._raw.getvalue().decode("utf-8")
+        self._raw.seek(0)
+        self._raw.truncate()
+        return text
+
+
+@pytest.fixture
+def console(monkeypatch):
+    """Use in place of capsys to also prove each line was flushed."""
+    return Console(monkeypatch)
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_call(item):
+    # pytest's capture re-installs sys.stdout between setup and call, so a swap made in the fixture is lost.
+    console = getattr(item, "funcargs", {}).get("console")
+    if isinstance(console, Console):
+        console.install()

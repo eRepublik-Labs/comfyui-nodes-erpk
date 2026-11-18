@@ -88,7 +88,7 @@ def test_image_to_video_rejects_a_bad_combination_before_any_request(transport):
     assert sent == []
 
 
-def test_image_edit_with_a_reference_and_the_default_max_images_sends_what_fits_in_15(transport, capsys):
+def test_image_edit_with_a_reference_and_the_default_max_images_sends_what_fits_in_15(transport, console):
     sent, replies = transport
     replies.append((200, {"data": [{"b64_json": _png_b64(Image.new("RGB", (64, 48)))}]}))
     images, _ = asyncio.run(BytePlusSeedreamImageEdit.execute(
@@ -98,7 +98,7 @@ def test_image_edit_with_a_reference_and_the_default_max_images_sends_what_fits_
     assert tuple(images.shape) == (1, 48, 64, 3)
     assert sent[0][2]["sequential_image_generation_options"] == {"max_images": 14}
     assert ("[BytePlus] ModelArk allows 15 reference plus generated images, so max_images 15 is sent as 14 "
-            "next to 1 reference image.") in capsys.readouterr().out.splitlines()
+            "next to 1 reference image.") in console().splitlines()
 
 
 def test_layer_decomposition_returns_the_base_then_each_layer_with_alpha(transport):
@@ -139,7 +139,7 @@ def output_dir(monkeypatch, tmp_path):
 
 
 def test_url_results_download_off_the_event_loop_and_a_partial_batch_keeps_its_billed_images(
-        transport, monkeypatch, capsys, output_dir):
+        transport, monkeypatch, console, output_dir):
     import threading
 
     import erpk.utils.safe_fetch as safe_fetch
@@ -162,7 +162,7 @@ def test_url_results_download_off_the_event_loop_and_a_partial_batch_keeps_its_b
     replies.append((200, reply))
     images, alpha = asyncio.run(BytePlusSeedreamTextToImage.execute(**kwargs)).args
     assert tuple(images.shape) == (1, 48, 64, 3) and alpha.min().item() == 1.0
-    assert capsys.readouterr().out.splitlines() == [
+    assert console().splitlines() == [
         "[BytePlus] Using API key from node input",
         "[BytePlus] Seedream request: model=seedream-4-0-250828, size=2K, reference images=0",
         "[BytePlus] Seedream result URLs (valid 24 h): https://cdn.example.com/a.png",
@@ -225,7 +225,7 @@ def _succeeded(**content):
     (True, {"last_frame_url": None}, True),
     (True, {}, True),
 ])
-def test_a_billed_video_is_returned_even_without_its_last_frame(transport, capsys, return_last_frame, content,
+def test_a_billed_video_is_returned_even_without_its_last_frame(transport, console, return_last_frame, content,
                                                                  warned):
     _, replies = transport
     replies += [(200, {"id": "cgt-9"}), _succeeded(**content)]
@@ -235,10 +235,10 @@ def test_a_billed_video_is_returned_even_without_its_last_frame(transport, capsy
     assert tuple(output.args) == (VIDEO, "", "cgt-9")
     warning = ("[BytePlus] Task cgt-9 returned no last_frame_url although return_last_frame was on; "
                "returning the video without it.")
-    assert (warning in capsys.readouterr().out.splitlines()) is warned
+    assert (warning in console().splitlines()) is warned
 
 
-def test_a_gap_in_the_seedance_price_list_does_not_discard_the_video(transport, monkeypatch, capsys):
+def test_a_gap_in_the_seedance_price_list_does_not_discard_the_video(transport, monkeypatch, console):
     from dataclasses import replace
 
     from erpk.byteplus.byteplus_api import seedance
@@ -251,7 +251,7 @@ def test_a_gap_in_the_seedance_price_list_does_not_discard_the_video(transport, 
         client=CLIENT, first_frame=torch.zeros((1, 320, 480, 3)), model=MINI, resolution="480p"))
     assert tuple(output.args) == (VIDEO, "", "cgt-9")
     assert ("[BytePlus] Task cgt-9: 40594 tokens; cost unknown: dreamina-seedance-2-0-mini-260615 has no "
-            "price for 480p.") in capsys.readouterr().out.splitlines()
+            "price for 480p.") in console().splitlines()
 
 
 def test_task_result_waits_for_a_task_and_returns_its_urls_and_status(transport, monkeypatch):
@@ -295,7 +295,7 @@ def test_size_auto_is_offered_only_where_layer_decomposition_is():
     assert "auto" in size_options(BytePlusSeedreamImageEdit)
 
 
-def test_cancel_while_task_result_waits_stops_waiting_and_never_deletes_the_task(transport, monkeypatch, capsys):
+def test_cancel_while_task_result_waits_stops_waiting_and_never_deletes_the_task(transport, monkeypatch, console):
     from erpk.byteplus.byteplus_api.client import BytePlusInterrupted
     from erpk.byteplus.video_nodes import BytePlusSeedanceTaskResult
 
@@ -307,7 +307,7 @@ def test_cancel_while_task_result_waits_stops_waiting_and_never_deletes_the_task
     message = ("Stopped waiting for Seedance task cgt-9. The Task Result node only reads a task, so the task "
                "is untouched.")
     assert str(excinfo.value) == message
-    assert capsys.readouterr().out.splitlines()[-1] == f"[BytePlus] {message}"
+    assert console().splitlines()[-1] == f"[BytePlus] {message}"
     assert sent == []
 
 
@@ -364,14 +364,14 @@ CREATED_LINE = ("[BytePlus] Created Seedance task cgt-9. If this run stops befor
                 "with the BytePlus Seedance Task Result node.")
 
 
-def test_a_seedance_task_created_after_its_node_was_cancelled_still_prints_its_id(monkeypatch, capsys):
+def test_a_seedance_task_created_after_its_node_was_cancelled_still_prints_its_id(monkeypatch, console):
     fake = BlockingTransport((200, {"id": "cgt-9"}))
     _cancel_while_in_flight(monkeypatch, fake, BytePlusSeedanceImageToVideo.execute(**SEEDANCE_KWARGS))
-    assert capsys.readouterr().out.splitlines()[-1] == CREATED_LINE
+    assert console().splitlines()[-1] == CREATED_LINE
     assert fake.sent == [("POST", "https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks")]
 
 
-def test_a_seedance_node_cancelled_while_waiting_prints_that_the_task_may_still_bill(transport, capsys):
+def test_a_seedance_node_cancelled_while_waiting_prints_that_the_task_may_still_bill(transport, console):
     sent, replies = transport
     replies += [(200, {"id": "cgt-9"}), (200, {"id": "cgt-9", "status": "running"})]
 
@@ -384,7 +384,7 @@ def test_a_seedance_node_cancelled_while_waiting_prints_that_the_task_may_still_
             await task
 
     asyncio.run(scenario())
-    lines = capsys.readouterr().out.splitlines()
+    lines = console().splitlines()
     assert CREATED_LINE in lines
     assert lines[-1] == ("[BytePlus] Stopped waiting for Seedance task cgt-9 when the ComfyUI run ended. It may "
                          "still finish and bill; fetch it with the BytePlus Seedance Task Result node.")
@@ -403,21 +403,21 @@ SEEDREAM_KWARGS = dict(client=CLIENT, prompt="a kite", model="seedream-4-0-25082
      "The billed images are saved as {}"),
 ])
 def test_seedream_images_billed_after_the_node_was_cancelled_are_saved_and_named(
-        monkeypatch, capsys, output_dir, data, fail_on_partial, saved_count, printed):
+        monkeypatch, console, output_dir, data, fail_on_partial, saved_count, printed):
     pngs = {"A": _png_b64(Image.new("RGB", (64, 48))), "B": _png_b64(Image.new("RGB", (32, 16)))}
     data = [{"b64_json": pngs[item["b64_json"]]} if "b64_json" in item else item for item in data]
     fake = BlockingTransport((200, {"data": data}))
     _cancel_while_in_flight(monkeypatch, fake, BytePlusSeedreamTextToImage.execute(
         **SEEDREAM_KWARGS, fail_on_partial=fail_on_partial))
     saved = [output_dir / f"20261118-120000-000000-{index:02d}.png" for index in range(1, saved_count + 1)]
-    assert capsys.readouterr().out.splitlines()[-1] == printed.format(", ".join(str(path) for path in saved))
+    assert console().splitlines()[-1] == printed.format(", ".join(str(path) for path in saved))
     assert [_size_on_disk(path) for path in saved] == [(64, 48), (32, 16)][:saved_count]
     assert sorted(output_dir.iterdir()) == saved
 
 
 @pytest.mark.parametrize("cancel_pressed", [True, False])
 def test_seedream_images_returned_after_cancel_was_pressed_are_also_saved_and_named(
-        transport, monkeypatch, capsys, output_dir, cancel_pressed):
+        transport, monkeypatch, console, output_dir, cancel_pressed):
     sent, replies = transport
     replies.append((200, {"data": [{"b64_json": _png_b64(Image.new("RGB", (64, 48)))},
                                    {"b64_json": _png_b64(Image.new("RGB", (64, 48), (9, 9, 9)))}]}))
@@ -425,7 +425,7 @@ def test_seedream_images_returned_after_cancel_was_pressed_are_also_saved_and_na
                         lambda: (lambda: cancel_pressed and len(sent) == 1))
     images, _ = asyncio.run(BytePlusSeedreamTextToImage.execute(**SEEDREAM_KWARGS)).args
     assert tuple(images.shape) == (2, 48, 64, 3)
-    last_line = capsys.readouterr().out.splitlines()[-1]
+    last_line = console().splitlines()[-1]
     if not cancel_pressed:
         assert not output_dir.exists()
         assert last_line == "[BytePlus] Seedream returned 2 image(s), about $0.0600"
@@ -438,12 +438,12 @@ def test_seedream_images_returned_after_cancel_was_pressed_are_also_saved_and_na
 
 
 def test_seedream_images_saved_on_cancel_are_saved_once_when_the_node_is_then_cancelled(
-        monkeypatch, capsys, output_dir):
+        monkeypatch, console, output_dir):
     monkeypatch.setattr(client_module, "_resolve_interrupt_checker", lambda: (lambda: True))
     fake = BlockingTransport((200, {"data": [{"b64_json": _png_b64(Image.new("RGB", (64, 48)))}]}))
     _cancel_while_in_flight(monkeypatch, fake, BytePlusSeedreamTextToImage.execute(**SEEDREAM_KWARGS))
     saved = output_dir / "20261118-120000-000000-01.png"
-    assert capsys.readouterr().out.splitlines()[-1] == ("[BytePlus] The ComfyUI run ended before Seedream's images "
+    assert console().splitlines()[-1] == ("[BytePlus] The ComfyUI run ended before Seedream's images "
                                                         f"were returned. The billed images are saved as {saved}")
     assert sorted(output_dir.iterdir()) == [saved]
 
@@ -463,17 +463,17 @@ def test_a_billed_result_reaches_exactly_one_side_whichever_finishes_first():
     assert ran == ["cancelled after the worker finished", "cancelled before the worker finished"]
 
 
-def test_a_string_error_item_is_logged_and_the_other_images_are_returned(transport, capsys):
+def test_a_string_error_item_is_logged_and_the_other_images_are_returned(transport, console):
     _, replies = transport
     replies.append((200, {"data": [{"b64_json": _png_b64(Image.new("RGB", (64, 48)))},
                                    {"error": "OutputImageSensitiveContentDetected"}]}))
     images, _ = asyncio.run(BytePlusSeedreamTextToImage.execute(**SEEDREAM_KWARGS)).args
     assert tuple(images.shape) == (1, 48, 64, 3)
     assert ("[BytePlus] Seedream refused 1 of 2 images: OutputImageSensitiveContentDetected"
-            in capsys.readouterr().out.splitlines())
+            in console().splitlines())
 
 
-def test_a_url_that_is_not_text_is_named_and_the_other_images_are_saved(transport, capsys, output_dir):
+def test_a_url_that_is_not_text_is_named_and_the_other_images_are_saved(transport, console, output_dir):
     _, replies = transport
     replies.append((200, {"data": [{"b64_json": _png_b64(Image.new("RGB", (64, 48)))}, {"url": {"href": "x"}}]}))
     with pytest.raises(ValueError) as excinfo:

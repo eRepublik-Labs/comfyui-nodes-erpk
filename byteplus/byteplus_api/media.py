@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional, Sequence, Tuple
 
+from . import emit
+
 MAX_IMAGE_BYTES = 30 * 1024 * 1024
 # Seconds to wait before the second and third attempt at a free result download.
 DOWNLOAD_RETRY_DELAYS = (1.0, 3.0)
@@ -125,7 +127,7 @@ def _download(url: str, fetch) -> bytes:
                 raise ValueError(f"Downloading {url} failed: {e}") from e
             if attempt == attempts:
                 raise ValueError(f"Downloading {url} failed after {attempts} attempts: {e}") from e
-            print(f"[BytePlus] Downloading {url} failed ({e}); retrying.")
+            emit(f"Downloading {url} failed ({e}); retrying.")
             time.sleep(DOWNLOAD_RETRY_DELAYS[attempt - 1])
 
 
@@ -179,7 +181,7 @@ def _letterbox(images: List) -> List:
     width = max(image.size[0] for image in images)
     height = max(image.size[1] for image in images)
     listed = ", ".join(f"{w}x{h}" for w, h in sorted({image.size for image in images}))
-    print(f"[BytePlus] Seedream returned images of different sizes ({listed}); letterboxed onto {width}x{height}.")
+    emit(f"Seedream returned images of different sizes ({listed}); letterboxed onto {width}x{height}.")
     boxed = []
     for image in images:
         canvas = Image.new("RGBA", (width, height), (128, 128, 128, 0))

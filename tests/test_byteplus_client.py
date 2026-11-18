@@ -195,15 +195,15 @@ IMAGES_MAY_BILL = ("The images may have been generated and billed: check your Mo
      (500, {"error": {"code": "InternalServiceError", "message": "boom"}}),
      f"ModelArk POST /contents/generations/tasks returned HTTP 500 InternalServiceError: boom. {TASK_MAY_BILL}"),
 ])
-def test_a_post_that_may_have_billed_is_sent_once_and_says_so(monkeypatch, capsys, call, path, reply, message):
+def test_a_post_that_may_have_billed_is_sent_once_and_says_so(monkeypatch, console, call, path, reply, message):
     client, transport = _client([reply], monkeypatch=monkeypatch)
-    capsys.readouterr()
+    console()
     with pytest.raises(BytePlusAPIError) as excinfo:
         result = getattr(client, call)({"model": "m"})
         if asyncio.iscoroutine(result):
             asyncio.run(result)
     assert str(excinfo.value) == message
-    assert capsys.readouterr().out == f"[BytePlus] {message}\n"
+    assert console() == f"[BytePlus] {message}\n"
     assert transport.calls == [("POST", f"{BASE}{path}", {"model": "m"})]
 
 
@@ -224,13 +224,13 @@ CHECK_TASK = "It may still run and bill; check it with the BytePlus Seedance Tas
      "Stopped waiting for Seedance task cgt-1, but cancelling it failed (ModelArk DELETE "
      f"/contents/generations/tasks/cgt-1 returned HTTP 500: boom). {CHECK_TASK}"),
 ])
-def test_every_cancel_outcome_is_printed_and_raised_as_comfyuis_interrupt(monkeypatch, capsys, replies, methods,
+def test_every_cancel_outcome_is_printed_and_raised_as_comfyuis_interrupt(monkeypatch, console, replies, methods,
                                                                           message):
     client, transport = _client(replies, interrupted=lambda: True, monkeypatch=monkeypatch)
-    capsys.readouterr()
+    console()
     with pytest.raises(BytePlusInterrupted) as excinfo:
         asyncio.run(client.wait_for_video_task("cgt-1", timeout=60))
     assert str(excinfo.value) == message
-    assert capsys.readouterr().out == f"[BytePlus] {message}\n"
+    assert console() == f"[BytePlus] {message}\n"
     assert [m for m, _, _ in transport.calls] == methods
     assert not isinstance(excinfo.value, Exception)

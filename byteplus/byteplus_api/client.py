@@ -10,6 +10,8 @@ from typing import Awaitable, Callable, Optional, Tuple
 
 import requests
 
+from . import emit
+
 try:
     from comfy.model_management import InterruptProcessingException as _InterruptBase
 except Exception:
@@ -103,13 +105,13 @@ class BytePlusClient:
             from ...settings import get_comfy_setting
             settings_key = get_comfy_setting("ERPK.BYTEPLUS_API_KEY")
             if settings_key:
-                print("[BytePlus] Using API key from ComfyUI Settings")
+                emit("Using API key from ComfyUI Settings")
                 return settings_key
         except (ImportError, ValueError):
             pass
 
         if api_key and api_key.strip():
-            print("[BytePlus] Using API key from node input")
+            emit("Using API key from node input")
             return api_key.strip()
 
         if config_path is None:
@@ -119,7 +121,7 @@ class BytePlusClient:
             cfg.read(config_path)
             file_key = cfg["API"]["BYTEPLUS_API_KEY"].strip()
             if file_key:
-                print("[BytePlus] Using API key from config.ini")
+                emit("Using API key from config.ini")
                 return file_key
         except (KeyError, configparser.Error):
             pass
@@ -185,8 +187,8 @@ class BytePlusClient:
         if not task_id:
             raise BytePlusAPIError(f"ModelArk created a video task without an id: {str(response)[:_ERROR_TEXT_LIMIT]}")
         # Printed here, in the worker thread, so the ID survives a node cancelled during the POST.
-        print(f"[BytePlus] Created Seedance task {task_id}. If this run stops before the video is returned, "
-              "fetch it with the BytePlus Seedance Task Result node.")
+        emit(f"Created Seedance task {task_id}. If this run stops before the video is returned, "
+             "fetch it with the BytePlus Seedance Task Result node.")
         return task_id
 
     async def get_video_task(self, task_id: str) -> dict:
@@ -214,8 +216,8 @@ class BytePlusClient:
             return await self._poll(task_id, timeout, cancel_on_interrupt)
         except asyncio.CancelledError:
             # ComfyUI cancels every pending node when another node fails or is interrupted.
-            print(f"[BytePlus] Stopped waiting for Seedance task {task_id} when the ComfyUI run ended. It may "
-                  "still finish and bill; fetch it with the BytePlus Seedance Task Result node.")
+            emit(f"Stopped waiting for Seedance task {task_id} when the ComfyUI run ended. It may "
+                 "still finish and bill; fetch it with the BytePlus Seedance Task Result node.")
             raise
 
     async def _poll(self, task_id: str, timeout: float, cancel_on_interrupt: bool) -> dict:
@@ -231,12 +233,12 @@ class BytePlusClient:
             except (requests.RequestException, BytePlusAPIError) as e:
                 if isinstance(e, BytePlusAPIError) and not e.transient:
                     raise
-                print(f"[BytePlus] Polling task {task_id} hit a transient error, retrying: {e}")
+                emit(f"Polling task {task_id} hit a transient error, retrying: {e}")
                 await self._sleep(task_id, is_interrupted, on_interrupt)
                 continue
             status = task.get("status")
             if status != last_status:
-                print(f"[BytePlus] Task {task_id} status: {status}")
+                emit(f"Task {task_id} status: {status}")
                 last_status = status
             if status == "succeeded":
                 return task
@@ -287,13 +289,13 @@ async def _leave_on_interrupt(task_id: str) -> None:
 
 
 def _may_have_billed(message: str, status: Optional[int] = None) -> BytePlusAPIError:
-    print(f"[BytePlus] {message}")
+    emit(message)
     return BytePlusAPIError(message, status)
 
 
 def _interrupted(message: str) -> BytePlusInterrupted:
     # ComfyUI shows no text for an interrupt, so the console line is the user's only record.
-    print(f"[BytePlus] {message}")
+    emit(message)
     return BytePlusInterrupted(message)
 
 

@@ -8,7 +8,7 @@ from typing import Callable, List, Optional
 from comfy_api.latest import IO
 
 from .byteplus_api import client as client_module
-from .byteplus_api import seedream
+from .byteplus_api import emit, seedream
 from .byteplus_api.client import BytePlusClient
 from .byteplus_api.media import (
     SEEDREAM_IMAGE_LIMITS, SEEDREAM_LAYER_IMAGE_LIMITS, compose, decode_items, images_to_data_uris,
@@ -187,12 +187,12 @@ async def _generate(kwargs, images: List[str]) -> IO.NodeOutput:
                                      kwargs.get("endpoint_id", ""))
     sent_max = body.get("sequential_image_generation_options", {}).get("max_images", options.max_images)
     if sent_max != options.max_images:
-        print(f"[BytePlus] ModelArk allows {seedream.MAX_SEQUENTIAL_TOTAL} reference plus generated images, so "
-              f"max_images {options.max_images} is sent as {sent_max} next to {len(images)} reference "
-              f"image{'' if len(images) == 1 else 's'}.")
+        emit(f"ModelArk allows {seedream.MAX_SEQUENTIAL_TOTAL} reference plus generated images, so "
+             f"max_images {options.max_images} is sent as {sent_max} next to {len(images)} reference "
+             f"image{'' if len(images) == 1 else 's'}.")
     client = make_client(kwargs.get("client"))
-    print(f"[BytePlus] Seedream request: model={body['model']}, size={body['size']}, "
-          f"reference images={len(images)}")
+    emit(f"Seedream request: model={body['model']}, size={body['size']}, "
+         f"reference images={len(images)}")
     handoff = _Handoff()
     try:
         image_tensor, alpha = await asyncio.to_thread(
@@ -241,15 +241,15 @@ def _generate_sync(client: BytePlusClient, body: dict, model_id: str, options: s
         output, decoded = _images_from_response(response, model_id, options, input_images, fail_on_partial)
     except Exception as e:
         message = str(e)
-        handoff.finish(lambda: print(f"[BytePlus] {message}"))
+        handoff.finish(lambda: emit(message))
         raise
     saved = None
     if client_module._resolve_interrupt_checker()():
         saved = _recover(decoded)
-        print("[BytePlus] Cancel was pressed while Seedream was generating, so the run stops before the next "
-              f"node. {saved}")
-    handoff.finish(lambda: print("[BytePlus] The ComfyUI run ended before Seedream's images were returned. "
-                                 f"{saved or _recover(decoded)}"))
+        emit("Cancel was pressed while Seedream was generating, so the run stops before the next "
+             f"node. {saved}")
+    handoff.finish(lambda: emit("The ComfyUI run ended before Seedream's images were returned. "
+                                f"{saved or _recover(decoded)}"))
     return output
 
 
@@ -262,12 +262,12 @@ def _images_from_response(response: dict, model_id: str, options: seedream.Image
     succeeded = [item for item in items if not item.get("error")]
     urls = [item["url"] for item in succeeded if isinstance(item.get("url"), str)]
     if urls:
-        print(f"[BytePlus] Seedream result URLs (valid 24 h): {' '.join(urls)}")
+        emit(f"Seedream result URLs (valid 24 h): {' '.join(urls)}")
     if not succeeded:
         raise ValueError(f"Seedream returned no images: {str(response)[:300]}")
     reasons = "; ".join(_error_reason(e) for e in failed)
     if failed:
-        print(f"[BytePlus] Seedream refused {len(failed)} of {len(items)} images: {reasons}")
+        emit(f"Seedream refused {len(failed)} of {len(items)} images: {reasons}")
 
     # Every image from here on is billed: no failure below may discard one.
     decoded, decode_errors = decode_items(succeeded)
@@ -287,10 +287,10 @@ def _images_from_response(response: dict, model_id: str, options: seedream.Image
     try:
         cost = seedream.image_cost_usd(model_id, [image.size for image in decoded], input_images=input_images,
                                        layers=options.layer_decomposition)
-        print(f"[BytePlus] Seedream returned {len(decoded)} image(s), about ${cost:.4f}")
+        emit(f"Seedream returned {len(decoded)} image(s), about ${cost:.4f}")
     except ValueError as e:
         # The images are already billed; a gap in the price list must not discard them.
-        print(f"[BytePlus] Seedream returned {len(decoded)} image(s); cost unknown: {e}")
+        emit(f"Seedream returned {len(decoded)} image(s); cost unknown: {e}")
     return output, decoded
 
 
