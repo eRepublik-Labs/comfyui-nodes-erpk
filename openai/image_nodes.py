@@ -29,8 +29,12 @@ register_grid_caps("OpenAIImageEdit", EDIT_GRID_CAPS, model_widget="model")
 # Mainline (text/reasoning) models for the Responses API call. Each returned
 # 200 on responses.create with the image_generation tool attached (measured
 # 2026-10-01, gpt-6.1-terra 2026-11-03; both gpt-image-2.6 tiers as the tool
-# model 2026-11-05). The first entry is the node default.
+# model 2026-11-05; gpt-6.2-sol and gpt-6.2-astra with gpt-image-2.6-flare
+# 2026-11-18). The first entry is the node default, and the SVG node's
+# svg_model offers the same list.
 RESPONSES_MAINLINE_MODELS = [
+    "gpt-6.2-sol",
+    "gpt-6.2-astra",
     "gpt-6.1-sol",
     "gpt-6.1-terra",
     "gpt-6-astra",
@@ -46,8 +50,9 @@ RESPONSES_IMAGE_MODELS = IMAGE_MODELS
 SVG_MODELS = [m for m, caps in OpenAIClient.IMAGE_MODELS.items() if caps.svg]
 SVG_DEFAULT_MODEL = "gpt-image-2.6-flare"
 
-# max is Responses-only: 200 on all 8 mainlines here, 400 on chat.completions
-# (measured 2026-10-14, gpt-6.1-terra 2026-11-03), so the text nodes stop at
+# max is Responses-only: 200 on the mainlines here, 400 on chat.completions
+# (measured 2026-10-14, gpt-6.1-terra 2026-11-03, the gpt-6.2 tiers
+# 2026-11-18 without the image tool attached), so the text nodes stop at
 # xhigh.
 REASONING_EFFORT_LEVELS = ["default", "none", "minimal", "low", "medium", "high", "xhigh", "max"]
 
@@ -389,9 +394,10 @@ class OpenAIImageResponses(IO.ComfyNode):
                     tooltip=(
                         "Text/reasoning model that drives the Responses API call. "
                         "Not the image model — this picks prompt interpretation, "
-                        "reasoning, and (optionally) web search. gpt-6.1-sol is the "
-                        "default; gpt-6.1-terra is the fast, efficient 6.1 tier at "
-                        "half Sol's price; gpt-6-astra is the top tier; gpt-6-luna and "
+                        "reasoning, and (optionally) web search. gpt-6.2-sol is the "
+                        "default; gpt-6.2-astra is the top 6.2 tier at four times Sol's "
+                        "price; gpt-6.1-terra is the fast, efficient 6.1 tier at "
+                        "half Sol's price; gpt-6-astra is the top GPT-6 tier; gpt-6-luna and "
                         "gpt-5.6-luna are the cheapest."
                     ),
                 ),
@@ -410,7 +416,8 @@ class OpenAIImageResponses(IO.ComfyNode):
                     tooltip=(
                         "Mainline-model reasoning depth. 'default' sends nothing, so the model uses "
                         "its own default (medium). 'none' turns reasoning off on gpt-6.1-terra, "
-                        "gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; gpt-6.1-sol and gpt-6-astra reject it, so "
+                        "gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; the gpt-6.2 tiers, gpt-6.1-sol and "
+                        "gpt-6-astra reject it, so "
                         "there 'none' acts like 'default'. "
                         "'low' to 'max' increase prompt-interpretation quality "
                         "at token cost. 'minimal' is rejected alongside the image tool and is sent "

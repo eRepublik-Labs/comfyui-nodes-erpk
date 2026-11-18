@@ -431,12 +431,14 @@ class TestNodeSchema:
         assert inp is not None
         # Each returned 200 on responses.create with the image_generation tool
         # attached (tool_choice="none", measured 2026-10-01).
-        # gpt-6.1-terra measured the same way 2026-11-03.
+        # gpt-6.1-terra measured the same way 2026-11-03; gpt-6.2-sol and
+        # gpt-6.2-astra completed an image call with the tool on 2026-11-18.
         assert set(inp.options) == {
+            "gpt-6.2-sol", "gpt-6.2-astra",
             "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
             "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
         }
-        assert inp.default == "gpt-6.1-sol"
+        assert inp.default == "gpt-6.2-sol"
 
     def test_has_image_model_input(self, schema):
         inp = next((i for i in schema.inputs if i.id == "image_model"), None)

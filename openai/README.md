@@ -86,13 +86,13 @@ General-purpose text generation and completion.
 **Inputs:**
 - `client`: OpenAI API client
 - `prompt`: Text prompt
-- `model`: gpt-6.1-sol (default), gpt-6.1-terra, gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, chat-latest
+- `model`: gpt-6.2-sol (default), gpt-6.2-astra, gpt-6.1-sol, gpt-6.1-terra, gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, chat-latest
 - `temperature`: 0.0-2.0 (creativity level, default: 0.7; sent only when `reasoning_effort` is `none` on gpt-6.1-terra, gpt-6-sol, gpt-6-luna or a gpt-5.6 tier; dropped otherwise, since every model rejects it while reasoning)
 - `max_tokens`: 256-128000 (output length, default: 4096)
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 1.0; sent only when `reasoning_effort` is `none` on gpt-6.1-terra, gpt-6-sol, gpt-6-luna or a gpt-5.6 tier; dropped otherwise, since every model rejects it while reasoning)
 - `stop_sequences`: Newline-separated sequences where generation stops (ignored by every current model, which rejects `stop` even with reasoning off)
 - `response_format`: Output format - "default", "json_object" (JSON mode) or "json_schema" (strict Structured Outputs, using the `json_schema` input)
-- `reasoning_effort`: Reasoning depth for the gpt-6.x and gpt-5.6 models — default, none, minimal, low, medium, high, xhigh. `default` (the starting value) sends nothing, so the model reasons at its own default (medium). `none` turns reasoning off on gpt-6.1-terra, gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; gpt-6.1-sol and gpt-6-astra cannot turn it off, so there `none` acts like `default`. `minimal` is rejected by every current model and is sent as `low`. Dropped for chat-latest
+- `reasoning_effort`: Reasoning depth for the gpt-6.x and gpt-5.6 models — default, none, minimal, low, medium, high, xhigh. `default` (the starting value) sends nothing, so the model reasons at its own default (medium). `none` turns reasoning off on gpt-6.1-terra, gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; the gpt-6.2 tiers, gpt-6.1-sol and gpt-6-astra cannot turn it off, so there `none` acts like `default`. `minimal` is rejected by every current model and is sent as `low`. Dropped for chat-latest
 - `verbosity`: Output verbosity for the gpt-6.x and gpt-5.6 models — default, low, medium, high. Shapes how chatty the response is independently of `max_tokens`. 'default' lets the model pick. Not sent to chat-latest, which accepts it but ignores it.
 - `json_schema`: JSON Schema the reply must match when `response_format` is `json_schema`, sent with `strict: true`. Strict mode needs every property in `required` and `additionalProperties: false` on each object. Empty, invalid or non-object JSON is refused before the request
 
@@ -115,7 +115,7 @@ Multi-turn conversation with message history preservation.
 **Inputs:**
 - `client`: OpenAI API client
 - `prompt`: Your message
-- `model`: gpt-6.1-sol (default), gpt-6.1-terra, gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, chat-latest
+- `model`: gpt-6.2-sol (default), gpt-6.2-astra, gpt-6.1-sol, gpt-6.1-terra, gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, chat-latest
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
 - `temperature`: 0.0-2.0 (default: 0.7; sent only when `reasoning_effort` is `none` on gpt-6.1-terra, gpt-6-sol, gpt-6-luna or a gpt-5.6 tier; dropped otherwise, since every model rejects it while reasoning)
@@ -123,7 +123,7 @@ Multi-turn conversation with message history preservation.
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 1.0; sent only when `reasoning_effort` is `none` on gpt-6.1-terra, gpt-6-sol, gpt-6-luna or a gpt-5.6 tier; dropped otherwise, since every model rejects it while reasoning)
 - `stop_sequences`: Newline-separated sequences where generation stops (ignored by every current model, which rejects `stop` even with reasoning off)
 - `response_format`: Output format - "default", "json_object" (JSON mode) or "json_schema" (strict Structured Outputs, using the `json_schema` input)
-- `reasoning_effort`: Reasoning depth for the gpt-6.x and gpt-5.6 models — default, none, minimal, low, medium, high, xhigh. `default` (the starting value) sends nothing, so the model reasons at its own default (medium). `none` turns reasoning off on gpt-6.1-terra, gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; gpt-6.1-sol and gpt-6-astra cannot turn it off, so there `none` acts like `default`. `minimal` is rejected by every current model and is sent as `low`. Dropped for chat-latest
+- `reasoning_effort`: Reasoning depth for the gpt-6.x and gpt-5.6 models — default, none, minimal, low, medium, high, xhigh. `default` (the starting value) sends nothing, so the model reasons at its own default (medium). `none` turns reasoning off on gpt-6.1-terra, gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; the gpt-6.2 tiers, gpt-6.1-sol and gpt-6-astra cannot turn it off, so there `none` acts like `default`. `minimal` is rejected by every current model and is sent as `low`. Dropped for chat-latest
 - `verbosity`: default, low, medium, high (not sent to chat-latest)
 - `json_schema`: JSON Schema for `response_format` json_schema (see OpenAI Text Generation)
 
@@ -146,7 +146,7 @@ Analyze images with questions or instructions.
 - `client`: OpenAI API client
 - `image`: ComfyUI image tensor (supports batches)
 - `prompt`: Question or instruction about the image(s)
-- `model`: gpt-6.1-sol (default), gpt-6.1-terra, gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, chat-latest
+- `model`: gpt-6.2-sol (default), gpt-6.2-astra, gpt-6.1-sol, gpt-6.1-terra, gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna, chat-latest
 - `detail`: Image analysis detail level - "auto" (default), "low" (faster/cheaper), "high" (more detailed), "original" (full resolution; on gpt-6-astra and the gpt-5.6 tiers `auto` already behaves this way)
 - `max_tokens`: 256-128000 (default: 4096)
 - `temperature`: 0.0-2.0 (default: 0.4; sent only when `reasoning_effort` is `none` on gpt-6.1-terra, gpt-6-sol, gpt-6-luna or a gpt-5.6 tier; dropped otherwise, since every model rejects it while reasoning)
@@ -238,7 +238,7 @@ Generate images via the OpenAI Responses API with a mainline reasoning model dri
 **Inputs:**
 - `prompt`: Image description (the mainline model may auto-revise before dispatch)
 - `client`: Optional OpenAI API client
-- `mainline_model`: Text/reasoning model that orchestrates the call — gpt-6.1-sol (default), gpt-6.1-terra, gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna
+- `mainline_model`: Text/reasoning model that orchestrates the call — gpt-6.2-sol (default), gpt-6.2-astra, gpt-6.1-sol, gpt-6.1-terra, gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna
 - `image_model`: Underlying GPT Image model — gpt-image-2.6-flare (default), gpt-image-2.6-sunburst, gpt-image-2.5-sunburst, gpt-image-2.5-flare, gpt-image-2
 - `reasoning_effort`: default (the starting value), none, minimal, low, medium, high, xhigh, max. `default` sends no effort, so the mainline reasons at its own default; `none` turns reasoning off where the mainline accepts it, as on the text nodes; `minimal` is rejected alongside the image tool and is sent as `low`. `max` works here but not on the text nodes (chat.completions rejects it)
 - `verbosity`: default, low, medium, high; sent as `text.verbosity`
@@ -313,7 +313,7 @@ Generate a vector image as SVG markup with GPT Image 2.6. The image model hands 
 - `prompt`: Description of the vector image
 - `client`: Optional OpenAI API client
 - `model`: gpt-image-2.6-flare (default), gpt-image-2.6-sunburst. gpt-image-2 and 2.5 answer 400 "SVG output is not supported for this model."
-- `svg_model`: Text model that writes the markup: gpt-6.1-sol (default) or another mainline of the Responses image node
+- `svg_model`: Text model that writes the markup: gpt-6.2-sol (default) or another mainline of the Responses image node
 - `size`, `custom_width`, `custom_height`: As on OpenAI Image Generation
 - `quality`, `complexity`, `background`: As on OpenAI Image Generation
 - `seed`: Cache control only, not sent to the API (-1 randomizes)
@@ -331,7 +331,9 @@ Each run asks for one SVG (`n=1`, the only value SVG output takes). Nothing here
 
 | Model | Best For | Context Window | Notes |
 |-------|----------|----------------|-------|
-| **gpt-6.1-sol** | Current flagship | 1.05M tokens | **Node default**; 128K output; $2/$10 per MTok ($0.10 cached input) |
+| **gpt-6.2-sol** | Current flagship | 1.05M tokens | **Node default**; 128K output; $2/$10 per MTok ($0.10 cached input) |
+| **gpt-6.2-astra** | Top 6.2 tier | 1.05M tokens | 128K output; $8/$40 per MTok ($0.40 cached input) |
+| **gpt-6.1-sol** | Previous Sol | 1.05M tokens | 128K output; $2/$10 per MTok ($0.10 cached input) |
 | **gpt-6.1-terra** | Fast, efficient 6.1 tier | 1.05M tokens | 128K output; $1/$5 per MTok ($0.05 cached input) |
 | **gpt-6-astra** | Top tier | 1.05M tokens | $10/$50 per MTok |
 | **gpt-6-sol** | GPT-6 flagship tier | 1.05M tokens | $2/$10 per MTok |

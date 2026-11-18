@@ -43,9 +43,11 @@ class OpenAIClient:
 
     # Available text/vision models
     MODELS = {
-        "gpt-6.1-sol": "GPT-6.1 Sol (Default, 1.05M context, 128K output, $2/$10 per MTok)",
+        "gpt-6.2-sol": "GPT-6.2 Sol (Default, 1.05M context, 128K output, $2/$10 per MTok)",
+        "gpt-6.2-astra": "GPT-6.2 Astra (Top 6.2 tier, 1.05M context, 128K output, $8/$40 per MTok)",
+        "gpt-6.1-sol": "GPT-6.1 Sol (1.05M context, 128K output, $2/$10 per MTok)",
         "gpt-6.1-terra": "GPT-6.1 Terra (Fast, efficient 6.1 tier, 1.05M context, 128K output, $1/$5 per MTok)",
-        "gpt-5.6-sol": "GPT-5.6 Sol (Current flagship, highest capability tier)",
+        "gpt-5.6-sol": "GPT-5.6 Sol (Highest GPT-5.6 tier)",
         "gpt-5.6-terra": "GPT-5.6 Terra (Balanced GPT-5.6 tier)",
         "gpt-5.6-luna": "GPT-5.6 Luna (Fast, cost-efficient GPT-5.6 tier)",
         "gpt-6-astra": "GPT-6 Astra (Top tier above Sol, 1.05M context, $10/$50 per MTok)",
@@ -109,7 +111,7 @@ class OpenAIClient:
     GPT_IMAGE_2_MAX_EDGE = 3840
 
     # Default configuration
-    DEFAULT_MODEL = "gpt-6.1-sol"
+    DEFAULT_MODEL = "gpt-6.2-sol"
     DEFAULT_MAX_TOKENS = 4096
     DEFAULT_TEMPERATURE = 0.7
     MAX_RETRIES = 3
@@ -117,8 +119,10 @@ class OpenAIClient:
 
     # reasoning_effort values the API rejects for a model, clamped to low.
     # 'minimal' 400s on every reasoning model (measured 2026-09-23,
-    # 2026-10-01, 2026-10-14, 2026-11-03).
+    # 2026-10-01, 2026-10-14, 2026-11-03, 2026-11-18).
     UNSUPPORTED_EFFORT = {
+        "gpt-6.2-sol": {"minimal"},
+        "gpt-6.2-astra": {"minimal"},
         "gpt-6.1-sol": {"minimal"},
         "gpt-6.1-terra": {"minimal"},
         "gpt-5.6-sol": {"minimal"},
@@ -130,11 +134,11 @@ class OpenAIClient:
     }
 
     # Models that accept reasoning_effort "none", which switches reasoning
-    # off. gpt-6.1-sol and gpt-6-astra return 400 for it, so there "none" is
-    # omitted and the model reasons at its default (medium). With effort
-    # "none" these models also accept temperature and top_p, which 400 at any
-    # other effort; stop still 400s (measured 2026-10-14, gpt-6.1-terra
-    # 2026-11-03).
+    # off. gpt-6.2-sol, gpt-6.2-astra, gpt-6.1-sol and gpt-6-astra return 400
+    # for it, so there "none" is omitted and the model reasons at its default
+    # (medium). With effort "none" these models also accept temperature and
+    # top_p, which 400 at any other effort; stop still 400s (measured
+    # 2026-10-14, gpt-6.1-terra 2026-11-03, gpt-6.2 tiers 2026-11-18).
     EFFORT_NONE_MODELS = {
         "gpt-6.1-terra",
         "gpt-6-sol", "gpt-6-luna",
@@ -276,6 +280,7 @@ class OpenAIClient:
 
     # Models that use max_completion_tokens instead of max_tokens
     NEW_TOKEN_PARAM_MODELS = {
+        "gpt-6.2-sol", "gpt-6.2-astra",
         "gpt-6.1-sol", "gpt-6.1-terra",
         "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
@@ -284,6 +289,7 @@ class OpenAIClient:
 
     # Reasoning models that support reasoning_effort parameter
     REASONING_MODELS = {
+        "gpt-6.2-sol", "gpt-6.2-astra",
         "gpt-6.1-sol", "gpt-6.1-terra",
         "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
@@ -294,10 +300,11 @@ class OpenAIClient:
     # supported") and top_p/stop 400 as unsupported_parameter (measured on
     # gpt-6.1-sol and chat-latest 2026-10-01, gpt-6 tiers 2026-09-23, and on
     # all nine text models, gpt-6.1-terra and the gpt-5.6 tiers included,
-    # 2026-11-03).
+    # 2026-11-03; gpt-6.2-sol and gpt-6.2-astra 2026-11-18).
     # chat-latest is here but not in REASONING_MODELS: it rejects sampling
     # params yet takes no reasoning_effort either.
     NO_SAMPLING_MODELS = {
+        "gpt-6.2-sol", "gpt-6.2-astra",
         "gpt-6.1-sol", "gpt-6.1-terra",
         "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
@@ -309,6 +316,7 @@ class OpenAIClient:
     # own default. Sending verbosity to a model that doesn't support it returns
     # 400, so we silently drop it for older families.
     VERBOSITY_MODELS = {
+        "gpt-6.2-sol", "gpt-6.2-astra",
         "gpt-6.1-sol", "gpt-6.1-terra",
         "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",

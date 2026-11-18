@@ -13,8 +13,8 @@ REASONING_EFFORT_OPTIONS = ["default", "none", "minimal", "low", "medium", "high
 REASONING_EFFORT_TOOLTIP = (
     "Reasoning depth for the gpt-5.6 and gpt-6.x models. 'default' sends nothing, so "
     "the model reasons at its own default (medium). 'none' turns reasoning off on "
-    "gpt-6.1-terra, gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; gpt-6.1-sol and gpt-6-astra cannot "
-    "turn it off, so there 'none' acts like 'default'. 'minimal' is rejected by every "
+    "gpt-6.1-terra, gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; the gpt-6.2 tiers, gpt-6.1-sol "
+    "and gpt-6-astra cannot turn it off, so there 'none' acts like 'default'. 'minimal' is rejected by every "
     "current model and is sent as 'low'. Ignored by chat-latest."
 )
 

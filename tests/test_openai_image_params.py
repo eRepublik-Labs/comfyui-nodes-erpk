@@ -899,7 +899,7 @@ class TestSvgNode:
         assert seen == {
             "prompt": "a red circle", "model": "gpt-image-2.6-flare", "size": "1024x1024",
             "quality": "auto", "background": "auto", "n": 1, "output_format": "svg",
-            "complexity": "auto", "svg_model": "gpt-6.1-sol",
+            "complexity": "auto", "svg_model": "gpt-6.2-sol",
         }
 
     def test_forwards_the_widgets(self):
@@ -929,7 +929,7 @@ class TestSvgNode:
         assert [(o.io_type, o.id) for o in schema.outputs] == [("STRING", "svg")]
         assert (inputs["model"].options, inputs["model"].default) == (
             ["gpt-image-2.6-sunburst", "gpt-image-2.6-flare"], "gpt-image-2.6-flare")
-        assert inputs["svg_model"].default == "gpt-6.1-sol"
+        assert inputs["svg_model"].default == "gpt-6.2-sol"
         assert "output_format" not in inputs and "n" not in inputs
 
 

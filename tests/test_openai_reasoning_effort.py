@@ -123,7 +123,8 @@ class TestVerbosityModelsSet:
     @pytest.mark.parametrize("model_id", [
         # verbosity=low returned 200 on chat.completions: gpt-6 tiers
         # 2026-09-23, gpt-6.1-sol 2026-10-01, gpt-6.1-terra low/medium/high
-        # 2026-11-03.
+        # 2026-11-03, gpt-6.2 tiers low/medium/high 2026-11-18.
+        "gpt-6.2-sol", "gpt-6.2-astra",
         "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     ])
@@ -383,14 +384,14 @@ class TestMinimalEffortClamp:
         assert mock_sdk.chat.completions.create.call_args.kwargs["reasoning_effort"] == "low"
 
 
-# Measured on chat.completions 2026-10-14 (gpt-6.1-terra 2026-11-03):
-# reasoning_effort "none" returns 200 on these six and 400 on gpt-6.1-sol and
-# gpt-6-astra; with effort none, temperature and top_p return 200 on the six,
-# while stop still 400s.
+# Measured on chat.completions 2026-10-14 (gpt-6.1-terra 2026-11-03, the
+# gpt-6.2 tiers 2026-11-18): reasoning_effort "none" returns 200 on these six
+# and 400 on the gpt-6.2 tiers, gpt-6.1-sol and gpt-6-astra; with effort none,
+# temperature and top_p return 200 on the six, while stop still 400s.
 ACCEPTS_EFFORT_NONE = [
     "gpt-6.1-terra", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
 ]
-REJECTS_EFFORT_NONE = ["gpt-6.1-sol", "gpt-6-astra"]
+REJECTS_EFFORT_NONE = ["gpt-6.2-sol", "gpt-6.2-astra", "gpt-6.1-sol", "gpt-6-astra"]
 
 
 def _run_node(class_name, model, **inputs):

@@ -28,17 +28,62 @@ class TestOpenAIModels:
                 f"{model} is in REASONING_MODELS but not MODELS"
             )
 
-    def test_default_model_is_gpt_6_1_sol(self):
-        """Alex's call (2026-10-01): gpt-6.1-sol is the default text model."""
+    def test_default_model_is_gpt_6_2_sol(self):
+        """Alex's call (2026-11-18): gpt-6.2-sol is the default text model."""
         from erpk.openai.openai_api.client import OpenAIClient
-        assert OpenAIClient.DEFAULT_MODEL == "gpt-6.1-sol"
+        assert OpenAIClient.DEFAULT_MODEL == "gpt-6.2-sol"
 
-    def test_every_text_node_defaults_to_gpt_6_1_sol(self):
+    def test_every_text_node_defaults_to_gpt_6_2_sol(self):
         from erpk.openai.nodes import OpenAITextGeneration, OpenAIChat, OpenAIVision
         for node in (OpenAITextGeneration, OpenAIChat, OpenAIVision):
             model = next(i for i in node.define_schema().inputs if i.id == "model")
-            assert model.default == "gpt-6.1-sol", node.__name__
+            assert model.default == "gpt-6.2-sol", node.__name__
             assert model.default in model.options, node.__name__
+
+    @pytest.mark.parametrize("m", ["gpt-6.2-sol", "gpt-6.2-astra"])
+    def test_gpt_6_2_tiers_offered_as_reasoning_models(self, m):
+        """gpt-6.2-sol and gpt-6.2-astra, measured on chat.completions
+        2026-11-18: effort low/medium/high/xhigh 200, none/minimal/max 400;
+        temperature 0.7, top_p 0.5 and stop 400; verbosity low/medium/high
+        200; legacy max_tokens 400. On Responses, effort low to max 200 and
+        none/minimal 400."""
+        from erpk.openai.image_nodes import RESPONSES_MAINLINE_MODELS
+        from erpk.openai.nodes import TEXT_MODELS, VISION_MODELS
+        assert m in TEXT_MODELS and m in VISION_MODELS and m in RESPONSES_MAINLINE_MODELS
+        assert m in OpenAIClient.REASONING_MODELS
+        assert m in OpenAIClient.NEW_TOKEN_PARAM_MODELS
+        assert m in OpenAIClient.NO_SAMPLING_MODELS
+        assert m in OpenAIClient.VERBOSITY_MODELS
+        assert m not in OpenAIClient.EFFORT_NONE_MODELS
+        for effort in ("low", "medium", "high", "xhigh", "max"):
+            assert OpenAIClient._effort_for(m, effort) == effort
+        assert OpenAIClient._effort_for(m, "minimal") == "low"
+        assert OpenAIClient._effort_for(m, "none") is None
+
+    @pytest.mark.parametrize("m", ["gpt-6.2-sol", "gpt-6.2-astra"])
+    def test_gpt_6_2_request_drops_what_the_model_rejects(self, m):
+        """effort none, temperature 0.7, top_p and stop all 400 on 6.2
+        (measured 2026-11-18), so none of them may reach the request."""
+        client = OpenAIClient.__new__(OpenAIClient)
+        client.system_instruction = None
+        client.model_name = m
+        sent = {}
+
+        def record(**params):
+            sent.update(params)
+            message = SimpleNamespace(content="ok")
+            usage = SimpleNamespace(prompt_tokens=1, completion_tokens=1)
+            return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")], usage=usage)
+
+        client.client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=record)))
+        asyncio.run(client.generate_content(
+            "hi", model=m, max_tokens=256, temperature=0.7, top_p=0.5, stop_sequences=["zzz"],
+            reasoning_effort="none", verbosity="low",
+        ))
+        assert sent == {
+            "model": m, "messages": [{"role": "user", "content": "hi"}],
+            "max_completion_tokens": 256, "verbosity": "low",
+        }
 
     def test_gpt_6_1_sol_offered_as_reasoning_model(self):
         """gpt-6.1-sol, measured on chat.completions 2026-10-01: effort
@@ -72,7 +117,7 @@ class TestOpenAIModels:
         assert m in OpenAIClient.EFFORT_NONE_MODELS
         assert OpenAIClient.UNSUPPORTED_EFFORT[m] == {"minimal"}
         assert m in RESPONSES_MAINLINE_MODELS
-        assert RESPONSES_MAINLINE_MODELS[0] == "gpt-6.1-sol"
+        assert RESPONSES_MAINLINE_MODELS[0] == "gpt-6.2-sol"
         for effort in ("none", "low", "medium", "high", "xhigh"):
             assert OpenAIClient._effort_for(m, effort) == effort
         assert OpenAIClient._effort_for(m, "minimal") == "low"
@@ -212,7 +257,7 @@ class TestOfferedCatalog:
     Image 1.x models leave the image nodes."""
 
     KEPT_TEXT = {
-        "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
+        "gpt-6.2-sol", "gpt-6.2-astra", "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "chat-latest",
     }
     KEPT_IMAGE = {
