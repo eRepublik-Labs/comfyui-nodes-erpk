@@ -57,39 +57,11 @@ class SeedreamV5ProLayersNode(IO.ComfyNode):
         seed = kwargs.get("seed", -1)
         return float("NaN") if seed == -1 else seed
 
-    @staticmethod
-    def _load_layers(urls):
-        """Return (base, [layer RGB], [layer alpha]) tensors, each image at its own size."""
-        import io
-        import numpy
-        import torch
-        import PIL.Image
-        from ..utils.safe_fetch import fetch_remote_bytes, safe_image_decode
-
-        def fetch(url):
-            data = fetch_remote_bytes(url, max_bytes=100 * 1024 * 1024, timeout=30,
-                                      user_agent="ERPK-WaveSpeed-Layers/1.0")
-            with safe_image_decode(), io.BytesIO(data) as buffer:
-                image = PIL.Image.open(buffer)
-                image.load()
-                return image
-
-        def to_tensor(pixels):
-            return torch.from_numpy(numpy.asarray(pixels, dtype=numpy.float32) / 255.0).unsqueeze(0)
-
-        base = to_tensor(fetch(urls[0]).convert("RGB"))
-        layers, masks = [], []
-        for url in urls[1:]:
-            rgba = fetch(url).convert("RGBA")
-            layers.append(to_tensor(rgba.convert("RGB")))
-            masks.append(to_tensor(rgba.getchannel("A")))
-        return base, layers, masks
-
     @classmethod
     async def execute(cls, image_url="", images=None, prompt="", resolution="1k", client=None,
                       prompt_optimization_mode="standard", **kwargs):
         from .wavespeed_api.client import WaveSpeedClient
-        from .wavespeed_api.utils import input_image_list
+        from .wavespeed_api.utils import input_image_list, load_decomposed_layers
         from .wavespeed_api.requests.seedream_v5_pro_layers import SeedreamV5ProLayers
 
         if client is None:
@@ -112,11 +84,5 @@ class SeedreamV5ProLayersNode(IO.ComfyNode):
         waveSpeedClient = WaveSpeedClient(client["api_key"])
         response = await waveSpeedClient.send_request(request, True, 1)
 
-        urls = response.get("outputs", [])
-        if len(urls) < 2:
-            images_word = "image" if len(urls) == 1 else "images"
-            raise ValueError(
-                f"Layer decomposition returned {len(urls)} {images_word}, so there are no layers to output")
-
-        base, layers, masks = cls._load_layers(urls)
+        base, layers, masks = load_decomposed_layers(response.get("outputs", []))
         return IO.NodeOutput(base, layers, masks)
