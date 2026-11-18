@@ -335,7 +335,7 @@ Each run asks for one SVG (`n=1`, the only value SVG output takes). Nothing here
 |-------|----------|----------------|-------|
 | **gpt-6.2-sol** | Current flagship | 1.05M tokens | **Node default**; 128K output; $2/$10 per MTok ($0.10 cached input) |
 | **gpt-6.2-astra** | Top 6.2 tier | 1.05M tokens | 128K output; $8/$40 per MTok ($0.40 cached input) |
-| **gpt-6.1-sol** | Previous Sol | 1.05M tokens | 128K output; $2/$10 per MTok ($0.10 cached input) |
+| **gpt-6.1-sol** | GPT-6.1 Sol tier | 1.05M tokens | 128K output; $2/$10 per MTok ($0.10 cached input) |
 | **gpt-6.1-terra** | Fast, efficient 6.1 tier | 1.05M tokens | 128K output; $1/$5 per MTok ($0.05 cached input) |
 | **gpt-6-astra** | Top tier | 1.05M tokens | $10/$50 per MTok |
 | **gpt-6-sol** | GPT-6 flagship tier | 1.05M tokens | $2/$10 per MTok |
