@@ -242,7 +242,7 @@ OpenAI API integration for text generation, vision analysis, multi-turn conversa
 - Image editing with an optional mask for inpainting, or a markup layer of drawn marks
 - Multi-turn conversation with session management
 - Automatic retry with exponential backoff
-- JSON mode and strict json_schema Structured Outputs on Text Generation and Chat
+- JSON mode and strict json_schema Structured Outputs on Text Generation, Chat and Vision
 
 **Installation & Documentation:** See [openai/README.md](openai/README.md)
 

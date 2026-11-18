@@ -152,6 +152,8 @@ Analyze images with questions or instructions.
 - `temperature`: 0.0-2.0 (default: 0.4; sent only when `reasoning_effort` is `none` on gpt-6.1-terra, gpt-6-sol, gpt-6-luna or a gpt-5.6 tier; dropped otherwise, since every model rejects it while reasoning)
 - `reasoning_effort`: same values and behaviour as OpenAI Text Generation
 - `verbosity`: default, low, medium, high (not sent to chat-latest)
+- `response_format`: default, json_object or json_schema, as on OpenAI Text Generation
+- `json_schema`: JSON Schema for `response_format` json_schema (see OpenAI Text Generation)
 
 **Outputs:**
 - `analysis`: Text analysis of the image(s)

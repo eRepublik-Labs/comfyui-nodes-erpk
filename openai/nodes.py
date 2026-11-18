@@ -545,6 +545,14 @@ class OpenAIVision(IO.ComfyNode):
                     control_after_generate="randomize",
                     tooltip="Seed for reproducible outputs (best-effort). Randomizes by default.",
                 ),
+                IO.Combo.Input(
+                    "response_format",
+                    options=RESPONSE_FORMAT_OPTIONS,
+                    default="default",
+                    optional=True,
+                    tooltip=RESPONSE_FORMAT_TOOLTIP,
+                ),
+                json_schema_input(),
             ],
             outputs=[
                 IO.String.Output("analysis"),
@@ -568,9 +576,13 @@ class OpenAIVision(IO.ComfyNode):
         reasoning_effort = kwargs.get("reasoning_effort", "default")
         verbosity = kwargs.get("verbosity", "default")
         seed = kwargs.get("seed", -1)
+        response_format = kwargs.get("response_format", "default")
+        json_schema = kwargs.get("json_schema", "")
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
+
+        resp_format = build_response_format(response_format, json_schema)
 
         if client is None:
             client = OpenAIClient(api_key=None)
@@ -588,6 +600,7 @@ class OpenAIVision(IO.ComfyNode):
                 max_tokens=max_tokens,
                 temperature=temperature,
                 model=model,
+                response_format=resp_format,
                 seed=seed if seed != -1 else None,
                 reasoning_effort=reasoning_effort,
                 verbosity=verbosity if verbosity and verbosity != "default" else None,
