@@ -183,7 +183,7 @@ class GrokClient:
 
         xAI takes seeds of 1 and up on every text model: a live probe on
         2026-11-18 got INVALID_ARGUMENT "Seed must be positive but seed = 0".
-        The node's 0 (its default) and -1 therefore send no seed.
+        The node's 0 and -1 (its default) therefore send no seed.
         """
         return seed if seed >= 1 else None
 

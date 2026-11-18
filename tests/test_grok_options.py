@@ -2,6 +2,7 @@
 # ABOUTME: SDK-backed tests build real xai-sdk requests and skip when xai_sdk is not installed.
 
 import asyncio
+import math
 
 import pytest
 
@@ -81,16 +82,21 @@ def test_system_prompt_is_optional_multiline_and_starts_empty(node):
 
 
 @pytest.mark.parametrize("node", sorted(TEXT_WIDGETS_AT_RELEASE))
-def test_default_seed_keeps_a_saved_workflow_cached(node):
-    # A workflow saved before the seed existed loads its default. Before the
-    # seed, re-queuing identical inputs was a cache hit; the default must keep
-    # it one, so the fingerprint is the seed itself and the control is fixed.
+def test_default_seed_re_runs_on_every_queue_like_openai_and_gemini(node):
+    # The seed stays optional: a required one would sort ahead of the optional
+    # widgets and shift every saved widgets_values slot after it.
     cls = _node(node)
     inp = _input(cls, "seed")
-    assert (inp.default, inp.control_after_generate, inp.optional) == (0, "fixed", True)
-    assert cls.fingerprint_inputs(seed=inp.default) == 0
+    assert (inp.default, inp.control_after_generate, inp.optional) == (-1, "randomize", True)
+    assert math.isnan(cls.fingerprint_inputs(seed=-1))
     # An API-format prompt saved before the seed existed has no seed key at all.
-    assert cls.fingerprint_inputs() == 0
+    assert math.isnan(cls.fingerprint_inputs())
+
+
+@pytest.mark.parametrize("node", sorted(TEXT_WIDGETS_AT_RELEASE))
+@pytest.mark.parametrize("seed", [0, 1, 2147483647])
+def test_any_other_seed_caches(node, seed):
+    assert _node(node).fingerprint_inputs(seed=seed) == seed
 
 
 @pytest.mark.parametrize("node", sorted(TEXT_WIDGETS_AT_RELEASE))

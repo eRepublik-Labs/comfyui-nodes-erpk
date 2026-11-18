@@ -57,21 +57,20 @@ def _system_prompt_input(tooltip: str):
 
 
 def _seed_input():
-    # Default 0 with a fixed control: a workflow saved before this input existed
-    # loads 0, sends no seed and stays cached exactly as it was. Switch the
-    # control to randomize to re-roll on every queue.
+    # Optional so it sorts after the optional widgets: a required input would
+    # land ahead of them and shift every saved widgets_values slot.
     return IO.Int.Input(
         "seed",
-        default=0,
+        default=-1,
         min=-1,
         max=2**31 - 1,
         optional=True,
-        control_after_generate="fixed",
+        control_after_generate="randomize",
         tooltip=(
-            "1 or more is sent to xAI as the sampling seed (not deterministic: the same seed "
-            "can still give a different reply) and reuses the cached reply while unchanged. "
-            "0 sends no seed and also caches. -1 sends no seed and re-runs on every queue. "
-            "Set the control to randomize for a new reply on each queue."
+            "Randomizes by default, so every queue calls Grok again. 1 or more is sent to xAI "
+            "as the sampling seed (best-effort: the same seed can still give a different reply). "
+            "xAI rejects 0, so 0 and -1 send no seed. -1 re-runs on every queue; any other "
+            "value with the control set to fixed reuses the cached reply."
         ),
     )
 
@@ -242,8 +241,7 @@ class GrokTextGeneration(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        # Falls back to the widget default, 0, so a prompt saved without a seed stays cached.
-        seed = kwargs.get("seed", 0)
+        seed = kwargs.get("seed", -1)
         return float("NaN") if seed == -1 else seed
 
     @classmethod
@@ -272,7 +270,7 @@ class GrokTextGeneration(IO.ComfyNode):
                 max_tokens=max_tokens,
                 reasoning_effort=reasoning_effort,
                 agent_count=agent_count,
-                seed=GrokClient.resolve_seed(kwargs.get("seed", 0)),
+                seed=GrokClient.resolve_seed(kwargs.get("seed", -1)),
             )
             text = result.get("text", "")
             print(f"[Grok] Text generated ({len(text)} chars) via {model}")
@@ -364,8 +362,7 @@ class GrokChat(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
-        # Falls back to the widget default, 0, so a prompt saved without a seed stays cached.
-        seed = kwargs.get("seed", 0)
+        seed = kwargs.get("seed", -1)
         return float("NaN") if seed == -1 else seed
 
     @classmethod
@@ -402,7 +399,7 @@ class GrokChat(IO.ComfyNode):
                 max_tokens=max_tokens,
                 reasoning_effort=reasoning_effort,
                 agent_count=agent_count,
-                seed=GrokClient.resolve_seed(kwargs.get("seed", 0)),
+                seed=GrokClient.resolve_seed(kwargs.get("seed", -1)),
             )
             text = result.get("text", "")
             messages.append({"role": "assistant", "content": text})

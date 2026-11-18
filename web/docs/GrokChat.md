@@ -18,7 +18,7 @@ Maintains a multi-turn conversation by threading message history between Grok Ch
 | max_tokens | Int | 4096 | Maximum visible response tokens; reasoning tokens are not counted. Range: 256–128000. A reply cut off at this limit raises an error instead of returning partial text. grok-4.20-multi-agent-0309 does not honour it (optional) |
 | reasoning_effort | Combo | (model default) | Options: (model default), none, low, medium, high, xhigh. grok-4.7 receives it (low to xhigh; `none` is sent as `low` because grok-4.7 rejects it). On grok-4.20-multi-agent-0309 it sets `agent_count` instead: low/medium = 4 agents, high/xhigh = 16 agents (about 12x the prompt tokens of the default), `none` sends nothing. The other models reject the field, so it is not sent to them. (model default) sends nothing (optional) |
 | system_prompt | String | (empty) | Instructions sent as a system message ahead of the conversation and stored in `chat_session`, so later turns keep them. A non-empty value replaces the system prompt of a connected session; an empty one keeps the session's, or sends none (optional) |
-| seed | Int | 0 | 1 or more goes to xAI as the sampling seed (the same seed can still give a different reply). 0 sends no seed. -1 sends no seed and re-runs the node on every queue. The control after the widget starts at `fixed`; set it to `randomize` for a fresh reply on each queue. Range: -1 to 2147483647 (optional) |
+| seed | Int | -1 | 1 or more goes to xAI as the sampling seed (the same seed can still give a different reply). 0 and -1 send no seed. The control after the widget starts at `randomize`, so each queue gets a new seed and a fresh reply; set it to `fixed` to keep one. Range: -1 to 2147483647 (optional) |
 
 ## Output
 
@@ -32,4 +32,4 @@ Maintains a multi-turn conversation by threading message history between Grok Ch
 - Full message history is sent on each turn (client-side state). Survives ComfyUI restarts and isn't subject to the xAI server-side 30-day response retention.
 - To branch a conversation: connect the same `chat_session` to two downstream Chat nodes with different prompts.
 - `reset_conversation=true` overrides any connected `chat_session` and starts over from the new prompt.
-- Caching follows the seed. With any seed other than -1, re-queuing identical inputs reuses the cached reply and bills nothing; a changed seed, or the `randomize` control, calls Grok again. -1 calls Grok on every queue. xAI rejects a seed of 0, so the node never sends 0 or -1.
+- Caching follows the seed. By default every queue calls Grok and bills again: -1 always re-runs, and the `randomize` control picks a new seed after each queue. With the control on `fixed` and any seed other than -1, re-queuing identical inputs reuses the cached reply and bills nothing. xAI rejects a seed of 0, so the node never sends 0 or -1.
