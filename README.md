@@ -42,6 +42,11 @@ ComfyUI-Custom-Nodes/
 │   ├── nodes.py                   # Config, Text, Chat, Image nodes
 │   ├── video_nodes.py             # Text-to-Video, Ref-to-Video, Edit, Extend
 │   └── grok_api/                  # API integration layer
+├── byteplus/                      # BytePlus ModelArk (Seedance, Seedream) integration
+│   ├── README.md                  # Package documentation
+│   ├── nodes.py                   # API Client, Seedream Text to Image and Image Edit
+│   ├── video_nodes.py             # Seedance Text, Image and Reference to Video
+│   └── byteplus_api/              # HTTP client, per-model capability tables, media
 ├── utils/                         # String and general utilities
 │   ├── __init__.py                # Module exports
 │   ├── concat_strings.py          # String concatenation node
@@ -274,6 +279,20 @@ xAI Grok integration — text, multi-turn chat, image generation/editing (up to 
 
 **Installation & Documentation:** See [grok/README.md](grok/README.md)
 
+### ERPK/BytePlus
+
+Seedance video and Seedream image generation called directly on BytePlus ModelArk with your own API key, over plain HTTPS. These nodes do not go through WaveSpeed, so the bill and the model activation are on your BytePlus account.
+
+**Category in ComfyUI:** `ERPK/BytePlus` and `ERPK/BytePlus/Video`
+
+- **BytePlus API Client** - Optional config node holding the ModelArk key; without it the nodes read ComfyUI Settings or `byteplus/config.ini`
+- **BytePlus Seedance Text to Video** / **Image to Video** / **Reference to Video** - All seven current Seedance models: 2.5, 2.5 flash, 2.0, 2.0 fast, 2.0 mini (default), 1.0 pro and 1.0 pro fast. Image to Video takes a start frame and an optional end frame; Reference to Video takes reference images plus reference video and audio URLs. Every documented option is a widget: resolution up to 4k, ratio incl. adaptive, duration, 1.0 frames, seed, camera_fixed, audio, watermark, last frame, mov output, flex tier, priority, 2.5 drafts and draft renders, task expiry and a custom endpoint ID. Each outputs the video URL, the last-frame URL and the task ID
+- **BytePlus Seedream Text to Image** / **Image Edit** - Seedream 5.5 (default), 5.0 pro, 5.0 flash, 5.0 lite, 4.5 and 4.0: size presets or an exact size, sequential batches of up to 15, PNG or JPEG, transparent backgrounds, prompt optimization mode and watermark. Image Edit adds up to 14 references, a mask for reference alpha, and layer decomposition. Both output an IMAGE batch plus its alpha
+
+A combination the selected model rejects stops before any call, with a message naming the model and the value. ModelArk documents a seed for Seedance 1.0 only, so elsewhere the seed widget is cache control only.
+
+**Installation & Documentation:** See [byteplus/README.md](byteplus/README.md)
+
 ### Background Removal (Removed)
 
 Background removal nodes have been removed from this package. For background removal in ComfyUI, use [ComfyUI-RMBG](https://github.com/1038lab/ComfyUI-RMBG) instead.
@@ -458,8 +477,9 @@ Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishe
    - **Gemini:** See [gemini/README.md](gemini/README.md#installation)
    - **OpenAI:** See [openai/README.md](openai/README.md#installation)
    - **Grok:** See [grok/README.md](grok/README.md#installation)
+   - **BytePlus ModelArk:** See [byteplus/README.md](byteplus/README.md#installation)
 
-2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, `ERPK/Gemini`, `ERPK/OpenAI`, `ERPK/Grok`, and `ERPK/utils`
+2. Find nodes under their respective categories: `ERPK/WaveSpeedAI`, `ERPK/Claude`, `ERPK/Gemini`, `ERPK/OpenAI`, `ERPK/Grok`, `ERPK/BytePlus`, and `ERPK/utils`
 
 ## Backward Compatibility
 
