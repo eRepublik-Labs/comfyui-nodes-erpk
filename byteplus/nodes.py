@@ -292,9 +292,11 @@ def _recover(decoded) -> str:
     if not keep:
         return "No image decoded, so none could be saved."
     try:
-        return f"The billed images are saved as {', '.join(save_recovered_images(keep))}"
+        saved, errors = save_recovered_images(keep)
     except Exception as e:
         return f"Saving the billed images to ComfyUI's output folder failed: {e}"
+    parts = [f"The billed images are saved as {', '.join(saved)}"] if saved else []
+    return ". ".join(parts + errors)
 
 
 def _seed_fingerprint(kwargs):

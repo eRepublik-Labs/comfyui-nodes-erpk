@@ -423,3 +423,18 @@ def test_a_url_that_is_not_text_is_named_and_the_other_images_are_saved(transpor
     assert str(excinfo.value) == ("Seedream images could not be decoded: image 2 of 2: Seedream returned a url that "
                                   f"is not text: {{'href': 'x'}}. The billed images are saved as {saved}")
     assert _size_on_disk(saved) == (64, 48)
+
+
+def test_a_recovery_write_that_fails_midway_names_the_saved_files_and_leaves_no_partial_file(output_dir):
+    from erpk.byteplus.nodes import _recover
+
+    class FullDisk:
+        def save(self, handle, format):
+            handle.write(b"half a png")
+            raise OSError("No space left on device")
+
+    message = _recover([Image.new("RGB", (64, 48)), FullDisk(), Image.new("RGB", (32, 16))])
+    first, third = output_dir / "20261118-120000-000000-01.png", output_dir / "20261118-120000-000000-03.png"
+    assert message == (f"The billed images are saved as {first}, {third}. Saving image 2 of 3 failed: "
+                       "No space left on device")
+    assert sorted(output_dir.iterdir()) == [first, third]

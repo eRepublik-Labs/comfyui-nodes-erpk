@@ -194,18 +194,33 @@ def _create_new(directory: str, stem: str):
             attempt += 1
 
 
-def save_recovered_images(images: Sequence) -> List[str]:
-    """Write billed images as PNG under ComfyUI's output/byteplus_recovered and return the paths.
+def save_recovered_images(images: Sequence) -> Tuple[List[str], List[str]]:
+    """Write billed images as PNG under ComfyUI's output/byteplus_recovered. Returns the paths
+    written and one error per image that could not be written; a failed write leaves no file.
     Names come from the local clock and the index, never from response data."""
     import folder_paths
 
     directory = os.path.join(folder_paths.get_output_directory(), "byteplus_recovered")
     os.makedirs(directory, exist_ok=True)
     stamp = _timestamp()
-    paths = []
+    paths: List[str] = []
+    errors: List[str] = []
     for index, image in enumerate(images, 1):
-        path, handle = _create_new(directory, f"{stamp}-{index:02d}")
-        with handle:
-            image.save(handle, format="PNG")
+        try:
+            path, handle = _create_new(directory, f"{stamp}-{index:02d}")
+        except OSError as e:
+            errors.append(f"Saving image {index} of {len(images)} failed: {e}")
+            continue
+        try:
+            with handle:
+                image.save(handle, format="PNG")
+        except Exception as e:
+            error = f"Saving image {index} of {len(images)} failed: {e}"
+            try:
+                os.remove(path)
+            except OSError as remove_error:
+                error += f"; the partial file {path} could not be removed ({remove_error})"
+            errors.append(error)
+            continue
         paths.append(path)
-    return paths
+    return paths, errors
