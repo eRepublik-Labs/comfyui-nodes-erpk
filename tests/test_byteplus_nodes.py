@@ -439,13 +439,33 @@ def test_seedream_images_returned_after_cancel_was_pressed_are_also_saved_and_na
 
 def test_seedream_images_saved_on_cancel_are_saved_once_when_the_node_is_then_cancelled(
         monkeypatch, console, output_dir):
-    monkeypatch.setattr(client_module, "_resolve_interrupt_checker", lambda: (lambda: True))
     fake = BlockingTransport((200, {"data": [{"b64_json": _png_b64(Image.new("RGB", (64, 48)))}]}))
+    monkeypatch.setattr(client_module, "_resolve_interrupt_checker", lambda: (lambda: len(fake.sent) == 1))
     _cancel_while_in_flight(monkeypatch, fake, BytePlusSeedreamTextToImage.execute(**SEEDREAM_KWARGS))
     saved = output_dir / "20261118-120000-000000-01.png"
     assert console().splitlines()[-1] == ("[BytePlus] The ComfyUI run ended before Seedream's images "
                                                         f"were returned. The billed images are saved as {saved}")
     assert sorted(output_dir.iterdir()) == [saved]
+
+
+@pytest.mark.parametrize("node, kwargs, message", [
+    (BytePlusSeedreamImageEdit, dict(client=CLIENT, prompt="the kite at night", images=torch.zeros((1, 64, 64, 3))),
+     "Cancel was pressed before the Seedream request was sent, so nothing was sent or billed."),
+    (BytePlusSeedanceImageToVideo, SEEDANCE_KWARGS,
+     "Cancel was pressed before the Seedance task was created, so nothing was sent or billed."),
+])
+def test_cancel_pressed_before_the_request_leaves_sends_nothing(transport, monkeypatch, console, node, kwargs,
+                                                                message):
+    from erpk.byteplus.byteplus_api.client import BytePlusInterrupted
+
+    sent, replies = transport
+    replies.append((200, {"id": "cgt-9", "data": [{"b64_json": _png_b64(Image.new("RGB", (64, 48)))}]}))
+    monkeypatch.setattr(client_module, "_resolve_interrupt_checker", lambda: (lambda: True))
+    with pytest.raises(BytePlusInterrupted) as excinfo:
+        asyncio.run(node.execute(**kwargs))
+    assert str(excinfo.value) == message
+    assert console().splitlines()[-1] == f"[BytePlus] {message}"
+    assert sent == []
 
 
 def test_a_billed_result_reaches_exactly_one_side_whichever_finishes_first():

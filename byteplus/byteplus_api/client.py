@@ -299,6 +299,12 @@ def _interrupted(message: str) -> BytePlusInterrupted:
     return BytePlusInterrupted(message)
 
 
+def raise_if_interrupted(message: str) -> None:
+    """Stop with ComfyUI's interrupt if Cancel was pressed; call it right before a billed POST."""
+    if _resolve_interrupt_checker()():
+        raise _interrupted(message)
+
+
 def task_failure_message(task_id: str, task: dict) -> str:
     status = task.get("status")
     if status == "failed":

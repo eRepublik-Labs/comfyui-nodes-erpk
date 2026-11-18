@@ -7,7 +7,7 @@ import re
 from comfy_api.latest import IO
 
 from .byteplus_api import emit, seedance
-from .byteplus_api.client import BytePlusClient, task_failure_message
+from .byteplus_api.client import BytePlusClient, raise_if_interrupted, task_failure_message
 from .byteplus_api.media import SEEDANCE_IMAGE_LIMITS, images_to_data_uris
 from .nodes import CLIENT_TOOLTIP, make_client, url_lines
 
@@ -166,6 +166,7 @@ async def _run(kwargs, media: seedance.VideoMedia) -> IO.NodeOutput:
     client: BytePlusClient = make_client(kwargs.get("client"))
     emit(f"Seedance {media.mode().value} request: model={body['model']}, "
          f"resolution={options.resolution}")
+    raise_if_interrupted("Cancel was pressed before the Seedance task was created, so nothing was sent or billed.")
     task_id = await client.create_video_task(body)
     task = await client.wait_for_video_task(task_id, options.execution_expires_after + _POLL_MARGIN_SECONDS)
 

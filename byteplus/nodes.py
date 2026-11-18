@@ -193,6 +193,8 @@ async def _generate(kwargs, images: List[str]) -> IO.NodeOutput:
     client = make_client(kwargs.get("client"))
     emit(f"Seedream request: model={body['model']}, size={body['size']}, "
          f"reference images={len(images)}")
+    client_module.raise_if_interrupted("Cancel was pressed before the Seedream request was sent, so nothing was "
+                                       "sent or billed.")
     handoff = _Handoff()
     try:
         image_tensor, alpha = await asyncio.to_thread(
