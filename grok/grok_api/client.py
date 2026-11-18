@@ -21,10 +21,14 @@ class GrokClient:
 
     DEFAULT_TEXT_MODEL = "grok-4.7"
     DEFAULT_IMAGE_MODEL = "grok-imagine-image-2.0"
+    # Video Edit and Video Extend need video input, which only grok-imagine-video takes.
     DEFAULT_VIDEO_MODEL = "grok-imagine-video"
     # docs.x.ai video overview recommends 1.5-lite for simple videos. It takes no
-    # reference images or video input, so the other video nodes keep DEFAULT_VIDEO_MODEL.
+    # reference images or video input.
     DEFAULT_TEXT_TO_VIDEO_MODEL = "grok-imagine-video-1.5-lite"
+    # docs.x.ai video overview recommends 1.5 when you need references: 14 images
+    # and 15 s against 7 and 10 s on grok-imagine-video, at $0.08/s against $0.05/s.
+    DEFAULT_REFERENCE_VIDEO_MODEL = "grok-imagine-video-1.5"
     VIDEO_MODELS = ["grok-imagine-video", "grok-imagine-video-1.5"]
     # grok-imagine-video-1.5-lite is text/image-to-video only: it rejects
     # reference images, so it is not in VIDEO_MODELS (reference-to-video).

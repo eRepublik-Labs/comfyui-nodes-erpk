@@ -88,8 +88,8 @@ Complete xAI Grok integration providing text generation, multi-turn chat, image 
 | `grok-4.20-multi-agent-0309` | Text Generation, Chat | 1M context; tighter rate limits (9 rps / 450 rpm) than its siblings; ignores `max_tokens`. `reasoning_effort` low/medium runs 4 agents, high/xhigh 16 agents (about 12x the prompt tokens of the default). At 4 agents the reply can carry the leader's reasoning text after the answer |
 | `grok-build-0.1` | Text Generation, Chat | Coding model (replaces the retired grok-code-fast-1) |
 | `grok-imagine-image-2.0` | Image Generation, Image Edit (default) | Per image: low $0.04 (1k) / $0.06 (2k); medium $0.06 (1k) / $0.08 (2k) |
-| `grok-imagine-video` | Reference to Video, Video Edit, Video Extend (default); Text to Video | The only model with video input, so the only option on Video Edit and Video Extend. Up to 720p |
-| `grok-imagine-video-1.5` | Text to Video, Reference to Video | No video input. Native 1080p on Text to Video |
+| `grok-imagine-video` | Video Edit, Video Extend (default); Text to Video, Reference to Video | $0.05/s. The only model with video input, so the only option on Video Edit and Video Extend. Up to 720p |
+| `grok-imagine-video-1.5` | Reference to Video (default); Text to Video | $0.08/s. No video input. Native 1080p on Text to Video |
 | `grok-imagine-video-1.5-lite` | Text to Video (default) | Cheapest video model ($0.02/s). 1080p is upscaled from 720p. Takes no reference images or video input |
 
 Removed on 2026-10-01: `grok-4.6`, `grok-4.5`, `grok-4.3`, `grok-4.20-0309-reasoning`, `grok-imagine-image` and `grok-imagine-image-quality`. A saved workflow that selected one of them fails ComfyUI's validation until you pick a current model.

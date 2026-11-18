@@ -239,7 +239,7 @@ class TestGrokRefToVideo:
         cls = _get_video_node("GrokRefToVideo")
         schema = cls.define_schema()
         inp = _schema_input(schema, "model")
-        assert inp.default == GrokClient.DEFAULT_VIDEO_MODEL
+        assert inp.default == GrokClient.DEFAULT_REFERENCE_VIDEO_MODEL
 
 
 class TestGrokVideoEdit:

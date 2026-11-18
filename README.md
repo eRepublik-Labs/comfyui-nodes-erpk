@@ -268,7 +268,7 @@ xAI Grok integration — text, multi-turn chat, image generation/editing (up to 
 #### Video Nodes
 
 - **Grok Text to Video** - Text-to-video via grok-imagine-video-1.5-lite (default), grok-imagine-video-1.5 or grok-imagine-video, 1-15s, 7 aspect ratios, 480p/720p/1080p (1080p on 1.5 and 1.5-lite)
-- **Grok Reference to Video** - Up to 7 (grok-imagine-video) or 14 (grok-imagine-video-1.5) reference images guide generation; `<IMAGE_0>`, `<IMAGE_1>`, ... token addressing
+- **Grok Reference to Video** - Up to 14 (grok-imagine-video-1.5, default, $0.08/s) or 7 (grok-imagine-video, $0.05/s) reference images guide generation; `<IMAGE_0>`, `<IMAGE_1>`, ... token addressing
 - **Grok Video Edit** - Edit an existing video (URL or data URI) with a text prompt (output capped at 8.7 s and 720p)
 - **Grok Video Extend** - Append 2-10 seconds of new content to an existing video
 

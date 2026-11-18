@@ -88,6 +88,13 @@ def test_reference_to_video_does_not_offer_lite():
     assert inp.options == ["grok-imagine-video", "grok-imagine-video-1.5"]
 
 
+def test_reference_to_video_defaults_to_newest_model():
+    # docs.x.ai video overview: grok-imagine-video-1.5 is the model for
+    # references (14 images, 15 s). Saved workflows keep their chosen model.
+    inp = _input(_video_node("GrokRefToVideo"), "model")
+    assert inp.default == "grok-imagine-video-1.5"
+
+
 def test_text_to_video_offers_1080p_last():
     inp = _input(_video_node("GrokTextToVideo"), "resolution")
     assert inp.options == ["480p", "720p", "1080p"]

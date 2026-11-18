@@ -174,9 +174,12 @@ class GrokRefToVideo(IO.ComfyNode):
                 IO.Combo.Input(
                     "model",
                     options=GrokClient.VIDEO_MODELS,
-                    default=GrokClient.DEFAULT_VIDEO_MODEL,
+                    default=GrokClient.DEFAULT_REFERENCE_VIDEO_MODEL,
                     optional=True,
-                    tooltip="xAI video model.",
+                    tooltip=(
+                        "xAI video model. grok-imagine-video-1.5 ($0.08/s) takes up to 14 images "
+                        "and 15 s; grok-imagine-video ($0.05/s) up to 7 images and 10 s."
+                    ),
                 ),
                 IO.Combo.Input(
                     "aspect_ratio",
@@ -233,7 +236,7 @@ class GrokRefToVideo(IO.ComfyNode):
         client_dict = kwargs.get("client")
         prompt = kwargs.get("prompt", "")
         reference_images = kwargs.get("reference_images")
-        model = kwargs.get("model", GrokClient.DEFAULT_VIDEO_MODEL)
+        model = kwargs.get("model", GrokClient.DEFAULT_REFERENCE_VIDEO_MODEL)
         aspect_ratio = kwargs.get("aspect_ratio", "16:9")
         resolution = kwargs.get("resolution", "720p")
         duration = kwargs.get("duration", 5)

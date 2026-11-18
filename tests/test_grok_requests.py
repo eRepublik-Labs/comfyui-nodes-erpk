@@ -149,9 +149,9 @@ def test_text_to_video_sends_no_reference_images(wire, model):
     assert len(wire.requests[0].reference_images) == 0
 
 
-def test_reference_to_video_defaults_to_grok_imagine_video_and_sends_its_images(wire):
+def test_reference_to_video_defaults_to_grok_imagine_video_1_5_and_sends_its_images(wire):
     asyncio.run(video_nodes.GrokRefToVideo.execute(
         prompt="<IMAGE_0> walks past <IMAGE_1>", reference_images=[SOURCE] * 2, client=CLIENT,
     ))
-    assert wire.requests[0].model == "grok-imagine-video"
+    assert wire.requests[0].model == "grok-imagine-video-1.5"
     assert [r.image_url for r in wire.requests[0].reference_images] == [SOURCE] * 2
