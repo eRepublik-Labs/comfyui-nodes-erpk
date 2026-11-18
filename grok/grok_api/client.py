@@ -177,6 +177,16 @@ class GrokClient:
         """
         return cls.AGENT_COUNT_BY_EFFORT.get(model, {}).get(effort)
 
+    @staticmethod
+    def resolve_seed(seed: int) -> Optional[int]:
+        """Return the seed to send, or None to omit it.
+
+        xAI takes seeds of 1 and up on every text model: a live probe on
+        2026-11-18 got INVALID_ARGUMENT "Seed must be positive but seed = 0".
+        The node's 0 (its default) and -1 therefore send no seed.
+        """
+        return seed if seed >= 1 else None
+
     def _generate_text_sync(
         self,
         messages: List[Dict[str, str]],

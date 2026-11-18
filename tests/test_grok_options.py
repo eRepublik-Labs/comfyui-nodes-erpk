@@ -70,7 +70,7 @@ TEXT_WIDGETS_AT_RELEASE = {
 def test_text_node_inputs_trail_every_saved_widget(node):
     from tests.test_grok_image_edit_grid import frontend_widget_order
     assert frontend_widget_order(_node(node).define_schema()) == TEXT_WIDGETS_AT_RELEASE[node] + [
-        "system_prompt",
+        "system_prompt", "seed",
     ]
 
 
@@ -78,6 +78,27 @@ def test_text_node_inputs_trail_every_saved_widget(node):
 def test_system_prompt_is_optional_multiline_and_starts_empty(node):
     inp = _input(_node(node), "system_prompt")
     assert (inp.optional, inp.multiline, inp.default) == (True, True, "")
+
+
+@pytest.mark.parametrize("node", sorted(TEXT_WIDGETS_AT_RELEASE))
+def test_default_seed_keeps_a_saved_workflow_cached(node):
+    # A workflow saved before the seed existed loads its default. Before the
+    # seed, re-queuing identical inputs was a cache hit; the default must keep
+    # it one, so the fingerprint is the seed itself and the control is fixed.
+    cls = _node(node)
+    inp = _input(cls, "seed")
+    assert (inp.default, inp.control_after_generate, inp.optional) == (0, "fixed", True)
+    assert cls.fingerprint_inputs(seed=inp.default) == 0
+    # An API-format prompt saved before the seed existed has no seed key at all.
+    assert cls.fingerprint_inputs() == 0
+
+
+@pytest.mark.parametrize("node", sorted(TEXT_WIDGETS_AT_RELEASE))
+def test_seed_range_reaches_the_largest_seed_xai_takes(node):
+    # The request field is int32; live probe 2026-11-18: grok-4.7 answered
+    # seed=2147483647.
+    inp = _input(_node(node), "seed")
+    assert (inp.min, inp.max) == (-1, 2147483647)
 
 
 # ---------------------------------------------------------------------------

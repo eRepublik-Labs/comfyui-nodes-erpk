@@ -174,6 +174,33 @@ def test_chat_does_not_alter_the_upstream_session(wire):
 
 
 # ---------------------------------------------------------------------------
+# Seed. Live probe 2026-11-18 on grok-4.7, grok-4.20-0309-non-reasoning,
+# grok-4.20-multi-agent-0309 and grok-build-0.1: seed=1 answered, seed=0
+# returned INVALID_ARGUMENT "Seed must be positive but seed = 0".
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("node", TEXT_NODES)
+@pytest.mark.parametrize("seed", [1, 42, 2147483647])
+def test_positive_seed_reaches_xai(wire, node, seed):
+    _run_text(node, seed=seed)
+    assert wire.requests[0].HasField("seed")
+    assert wire.requests[0].seed == seed
+
+
+@pytest.mark.parametrize("node", TEXT_NODES)
+@pytest.mark.parametrize("seed", [0, -1])
+def test_seed_below_one_sends_no_seed(wire, node, seed):
+    _run_text(node, seed=seed)
+    assert not wire.requests[0].HasField("seed")
+
+
+@pytest.mark.parametrize("node", TEXT_NODES)
+def test_a_saved_workflow_without_a_seed_sends_none(wire, node):
+    _run_text(node)
+    assert not wire.requests[0].HasField("seed")
+
+
+# ---------------------------------------------------------------------------
 # Image edit sources. docs.x.ai multi-image editing: grok-imagine-image-2.0
 # takes up to 5 source images.
 # ---------------------------------------------------------------------------

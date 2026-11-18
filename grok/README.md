@@ -60,8 +60,8 @@ Complete xAI Grok integration providing text generation, multi-turn chat, image 
 
 | Node | Output | Purpose |
 |---|---|---|
-| **Grok Text Generation** | `STRING` | One-shot prompt → text. Stateless. Optional `system_prompt`. |
-| **Grok Chat** | `STRING` + `GROK_CHAT_SESSION` | Stateful multi-turn dialog. Thread the `chat_session` output into the next Chat node's input to continue. An optional `system_prompt` travels in the session; a non-empty one on a later node replaces it. |
+| **Grok Text Generation** | `STRING` | One-shot prompt → text. Stateless. Optional `system_prompt`. `seed` 1 or more goes to xAI; 0 (default) sends none. Both cache on identical inputs. |
+| **Grok Chat** | `STRING` + `GROK_CHAT_SESSION` | Stateful multi-turn dialog. Thread the `chat_session` output into the next Chat node's input to continue. An optional `system_prompt` travels in the session; a non-empty one on a later node replaces it. Same `seed` as Text Generation. |
 
 ### Image (2)
 
