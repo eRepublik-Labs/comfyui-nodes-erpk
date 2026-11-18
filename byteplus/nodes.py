@@ -92,8 +92,9 @@ def _image_option_inputs(edit: bool):
         ),
         IO.Int.Input(
             "max_images", default=15, min=1, max=15, optional=True,
-            tooltip=("Upper bound for sequential auto; reference images plus max_images must be at most 15. "
-                     "Rate limits are reserved for the full max_images up front; billing counts images returned."),
+            tooltip=("Upper bound for sequential auto. ModelArk allows 15 reference plus generated images, so "
+                     "next to references the node sends at most 15 minus their count and logs it. Rate limits "
+                     "are reserved for the max_images sent, up front; billing counts images returned."),
         ),
         IO.Combo.Input(
             "output_format", options=seedream.OUTPUT_FORMATS, default=seedream.MODEL_DEFAULT, optional=True,
@@ -184,6 +185,11 @@ async def _generate(kwargs, images: List[str]) -> IO.NodeOutput:
     options = _image_options(kwargs)
     body = seedream.build_image_body(model_id, kwargs.get("prompt", ""), images, options,
                                      kwargs.get("endpoint_id", ""))
+    sent_max = body.get("sequential_image_generation_options", {}).get("max_images", options.max_images)
+    if sent_max != options.max_images:
+        print(f"[BytePlus] ModelArk allows {seedream.MAX_SEQUENTIAL_TOTAL} reference plus generated images, so "
+              f"max_images {options.max_images} is sent as {sent_max} next to {len(images)} reference "
+              f"image{'' if len(images) == 1 else 's'}.")
     client = make_client(kwargs.get("client"))
     print(f"[BytePlus] Seedream request: model={body['model']}, size={body['size']}, "
           f"reference images={len(images)}")

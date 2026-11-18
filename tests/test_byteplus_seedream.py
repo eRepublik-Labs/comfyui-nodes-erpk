@@ -45,6 +45,13 @@ def test_sequential_edit_on_4_0_with_custom_size_and_fast_mode():
     }
 
 
+def test_sequential_max_images_is_lowered_to_what_the_references_leave_of_15():
+    body = build_image_body(LITE, "a comic", (IMG,) * 12, ImageOptions(sequential="auto", max_images=4))
+    assert body["sequential_image_generation_options"] == {"max_images": 3}
+    body = build_image_body(LITE, "a comic", (IMG,) * 11, ImageOptions(sequential="auto", max_images=4))
+    assert body["sequential_image_generation_options"] == {"max_images": 4}
+
+
 def test_layer_decomposition_on_5_5_sends_one_image_and_layer_options():
     options = ImageOptions(size="auto", layer_decomposition=True, layer_max_images=12, text_recognition=True,
                            safety_identifier="user-hash")
@@ -84,8 +91,6 @@ def test_layer_decomposition_on_5_5_sends_one_image_and_layer_options():
      "inline image without a mask is sent as JPEG. Connect a mask to images."),
     (V55, "x", (), ImageOptions(sequential="auto"),
      "dola-seedream-5-5-261028 has no sequential generation; it returns one image per request."),
-    (LITE, "x", (IMG,) * 12, ImageOptions(sequential="auto", max_images=4),
-     "Reference images plus max_images must be at most 15, got 12 + 4."),
     (V40, "x", (), ImageOptions(output_format="png"),
      "seedream-4-0-250828 outputs jpeg only, not png."),
     (V55, "x", (), ImageOptions(output_format="jpeg", background="transparent"),

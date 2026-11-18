@@ -88,6 +88,19 @@ def test_image_to_video_rejects_a_bad_combination_before_any_request(transport):
     assert sent == []
 
 
+def test_image_edit_with_a_reference_and_the_default_max_images_sends_what_fits_in_15(transport, capsys):
+    sent, replies = transport
+    replies.append((200, {"data": [{"b64_json": _png_b64(Image.new("RGB", (64, 48)))}]}))
+    images, _ = asyncio.run(BytePlusSeedreamImageEdit.execute(
+        client=CLIENT, prompt="the same kite at night", images=torch.zeros((1, 1024, 1024, 3)),
+        model="seedream-4-0-250828", sequential="auto", response_format="b64_json",
+    )).args
+    assert tuple(images.shape) == (1, 48, 64, 3)
+    assert sent[0][2]["sequential_image_generation_options"] == {"max_images": 14}
+    assert ("[BytePlus] ModelArk allows 15 reference plus generated images, so max_images 15 is sent as 14 "
+            "next to 1 reference image.") in capsys.readouterr().out.splitlines()
+
+
 def test_layer_decomposition_returns_the_base_then_each_layer_with_alpha(transport):
     sent, replies = transport
     base = Image.new("RGB", (600, 500), (10, 20, 30))

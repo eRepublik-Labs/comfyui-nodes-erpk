@@ -100,8 +100,8 @@ BACKGROUNDS = [MODEL_DEFAULT, "auto", "transparent", "opaque"]
 RESPONSE_FORMATS = ["url", "b64_json"]
 PROMPT_MODES = ["standard", "fast"]
 SEQUENTIAL_MODES = ["disabled", "auto"]
-# image-generation-api, max_images: reference images + generated images <= 15. Checked against max_images,
-# the most a request can generate, so it is stricter than the documented rule.
+# image-generation-api, max_images: reference images + generated images <= 15. max_images is only an upper
+# bound, so the body sends at most what the references leave.
 MAX_SEQUENTIAL_TOTAL = 15
 # Every model's explicit width x height must keep width / height within [1/16, 16].
 ASPECT_RATIO_LIMIT = 16
@@ -207,9 +207,9 @@ def _check_sequential(model: SeedreamModel, options: ImageOptions, image_count: 
         raise ValueError(f"{model.model_id} has no sequential generation; it returns one image per request.")
     if not 1 <= options.max_images <= MAX_SEQUENTIAL_TOTAL:
         raise ValueError(f"max_images must be 1-{MAX_SEQUENTIAL_TOTAL}, got {options.max_images}.")
-    if image_count + options.max_images > MAX_SEQUENTIAL_TOTAL:
-        raise ValueError(f"Reference images plus max_images must be at most {MAX_SEQUENTIAL_TOTAL}, "
-                         f"got {image_count} + {options.max_images}.")
+    if image_count >= MAX_SEQUENTIAL_TOTAL:
+        raise ValueError(f"Sequential generation needs fewer than {MAX_SEQUENTIAL_TOTAL} reference images, "
+                         f"got {image_count}.")
 
 
 def build_image_body(model_id: str, prompt: str, images: Sequence[str], options: ImageOptions,
@@ -256,7 +256,8 @@ def build_image_body(model_id: str, prompt: str, images: Sequence[str], options:
         body["image"] = list(images)
     if options.sequential == "auto":
         body["sequential_image_generation"] = "auto"
-        body["sequential_image_generation_options"] = {"max_images": options.max_images}
+        body["sequential_image_generation_options"] = {
+            "max_images": min(options.max_images, MAX_SEQUENTIAL_TOTAL - count)}
     if options.output_format != MODEL_DEFAULT and model.output_formats:
         body["output_format"] = options.output_format
     if options.background != MODEL_DEFAULT:
