@@ -206,7 +206,7 @@ Generate images from text descriptions using OpenAI's image generation models.
 - `output_format`: png (default), jpeg, webp, gif (gif on GPT Image 2.6 only; the node refuses other models before the request)
 - `output_compression`: 0-100 (default 100), sent only with jpeg or webp
 - `complexity`: auto (default), low, medium, high. How much detail GPT Image 2.6 puts in; `auto` sends nothing (OpenAI documents high). Other models reject the parameter, so the node leaves it out there and logs a note
-- `frame_count`: 2-16 (default 9), frames per GIF animation; sent only with gif
+- `frame_count`: 2-16 (default 9), frames per GIF animation; sent only with gif. A saved workflow holding more than 16 loads as 16
 - `frame_duration_ms`: 20-2000 in steps of 10 (default 200), how long each GIF frame shows; sent only with gif
 
 **Outputs:**

@@ -23,7 +23,7 @@ Generates images with OpenAI's GPT Image models: gpt-image-2 and the GPT Image 2
 | output_format | Combo | png | Output file format: png, jpeg, webp, gif (optional). `transparent` background needs png or webp. gif works on GPT Image 2.6 only; see Notes |
 | output_compression | Int | 100 | Compression 0–100 (optional). Sent only with jpeg or webp; png and gif send neither field |
 | complexity | Combo | auto | How much detail the image holds: auto, low, medium, high (optional). GPT Image 2.6 only; `auto` sends nothing, which OpenAI documents as high. On other models the node leaves it out and logs a note, since they reject it |
-| frame_count | Int | 9 | Frames per GIF animation, 2–16, the API's range (optional). Sent only with gif |
+| frame_count | Int | 9 | Frames per GIF animation, 2–16, the API's range (optional). Sent only with gif. A saved workflow holding more than 16 loads as 16 in the editor; an API-format prompt with more than 16 fails ComfyUI's own range check |
 | frame_duration_ms | Int | 200 | How long each GIF frame shows, 20–2000 ms in steps of 10 (optional). Sent only with gif |
 
 ## Output
