@@ -33,6 +33,11 @@ def transport(monkeypatch):
     return sent, replies
 
 
+def _size_on_disk(path):
+    with Image.open(path) as image:
+        return image.size
+
+
 def _png_b64(image):
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
@@ -96,8 +101,22 @@ def test_layer_decomposition_returns_the_base_then_each_layer_with_alpha(transpo
     assert body["layer_decomposition_options"] == {"max_images": 5, "text_recognition": False}
 
 
-def test_url_results_download_off_the_event_loop_and_print_before_a_partial_failure_raises(
-        transport, monkeypatch, capsys):
+@pytest.fixture
+def output_dir(monkeypatch, tmp_path):
+    import sys
+    import types
+
+    from erpk.byteplus.byteplus_api import media
+
+    fake = types.ModuleType("folder_paths")
+    fake.get_output_directory = lambda: str(tmp_path)
+    monkeypatch.setitem(sys.modules, "folder_paths", fake)
+    monkeypatch.setattr(media, "_timestamp", lambda: "20261118-120000-000000")
+    return tmp_path / "byteplus_recovered"
+
+
+def test_url_results_download_off_the_event_loop_and_a_partial_batch_keeps_its_billed_images(
+        transport, monkeypatch, capsys, output_dir):
     import threading
 
     import erpk.utils.safe_fetch as safe_fetch
@@ -118,17 +137,39 @@ def test_url_results_download_off_the_event_loop_and_print_before_a_partial_fail
     kwargs = dict(client=CLIENT, prompt="a kite", model="seedream-4-0-250828", sequential="auto", max_images=2)
 
     replies.append((200, reply))
-    with pytest.raises(ValueError) as excinfo:
-        asyncio.run(BytePlusSeedreamTextToImage.execute(**kwargs))
-    assert str(excinfo.value) == ("Seedream returned 1 of 2 images; failures: "
-                                  "OutputImageSensitiveContentDetected: blocked")
-    assert "https://cdn.example.com/a.png" in capsys.readouterr().out
+    images, alpha = asyncio.run(BytePlusSeedreamTextToImage.execute(**kwargs)).args
+    assert tuple(images.shape) == (1, 48, 64, 3) and alpha.min().item() == 1.0
+    out = capsys.readouterr().out
+    assert "https://cdn.example.com/a.png" in out
+    assert "[BytePlus] Seedream refused 1 of 2 images: OutputImageSensitiveContentDetected: blocked" in out
 
     replies.append((200, reply))
-    images, alpha = asyncio.run(BytePlusSeedreamTextToImage.execute(**kwargs, fail_on_partial=False)).args
-    assert tuple(images.shape) == (1, 48, 64, 3) and alpha.min().item() == 1.0
-    assert downloads == [("https://cdn.example.com/a.png", False)]
+    with pytest.raises(ValueError) as excinfo:
+        asyncio.run(BytePlusSeedreamTextToImage.execute(**kwargs, fail_on_partial=True))
+    saved = output_dir / "20261118-120000-000000-01.png"
+    assert str(excinfo.value) == ("Seedream returned 1 of 2 images; failures: OutputImageSensitiveContentDetected: "
+                                  f"blocked. The billed images are saved as {saved}")
+    assert _size_on_disk(saved) == (64, 48)
+    assert downloads == [("https://cdn.example.com/a.png", False)] * 2
 
+
+def test_a_layer_that_cannot_be_placed_saves_every_billed_image_and_never_overwrites(transport, output_dir):
+    _, replies = transport
+    output_dir.mkdir()
+    (output_dir / "20261118-120000-000000-01.png").write_bytes(b"earlier run")
+    replies.append((200, {"data": [
+        {"b64_json": _png_b64(Image.new("RGB", (600, 500))), "z_index": 0},
+        {"b64_json": _png_b64(Image.new("RGBA", (100, 50))), "z_index": 1},
+    ]}))
+    with pytest.raises(ValueError) as excinfo:
+        asyncio.run(BytePlusSeedreamImageEdit.execute(
+            client=CLIENT, images=torch.zeros((1, 520, 520, 3)), layer_decomposition=True, size="auto",
+            response_format="b64_json"))
+    first, second = output_dir / "20261118-120000-000000-01-1.png", output_dir / "20261118-120000-000000-02.png"
+    assert str(excinfo.value) == ("A Seedream layer is 100x50 with no bounding box on a 600x500 base. The billed "
+                                  f"images are saved as {first}, {second}")
+    assert (output_dir / "20261118-120000-000000-01.png").read_bytes() == b"earlier run"
+    assert _size_on_disk(first) == (600, 500) and _size_on_disk(second) == (100, 50)
 
 MINI = "dreamina-seedance-2-0-mini-260615"
 VIDEO = "https://cdn.example.com/v.mp4"

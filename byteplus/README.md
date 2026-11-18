@@ -88,6 +88,8 @@ The final render reuses the draft's prompt, inputs, duration, ratio, seed and au
 - A rejected request raises `ModelArk POST ... returned HTTP <status> <code>: <message>`.
 - Task creation is never retried, so a network error cannot start a second billed task. Status polling retries through connection errors, 429 and 5xx.
 - After each run the console shows the tokens or images used and the estimated cost from ModelArk's price list.
+- A Seedream image is billed once ModelArk returns it, so the node never discards one. A partial batch (some images refused by moderation) returns the rest and logs the refusals; with `fail_on_partial` on it raises instead. Before any raise after ModelArk answered, the node saves every decoded image as PNG in ComfyUI's `output/byteplus_recovered` and names the files in the error.
+- Seedream images of different sizes in one response are letterboxed onto the largest, centered, with bars the `alpha` output marks transparent.
 
 ## Installation
 

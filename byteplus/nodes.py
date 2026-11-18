@@ -9,7 +9,8 @@ from comfy_api.latest import IO
 from .byteplus_api import seedream
 from .byteplus_api.client import BytePlusClient
 from .byteplus_api.media import (
-    SEEDREAM_IMAGE_LIMITS, SEEDREAM_LAYER_IMAGE_LIMITS, images_to_data_uris, response_to_images,
+    SEEDREAM_IMAGE_LIMITS, SEEDREAM_LAYER_IMAGE_LIMITS, compose, decode_items, images_to_data_uris,
+    save_recovered_images,
 )
 
 CLIENT_TOOLTIP = ("BytePlus API client from the BytePlus API Client node. If not connected, the key comes "
@@ -113,9 +114,10 @@ def _image_option_inputs(edit: bool):
         IO.Boolean.Input("watermark", default=False, optional=True,
                          tooltip="Adds the 'AI-generated' mark. ModelArk's own default is on; this node sends off."),
         IO.Boolean.Input(
-            "fail_on_partial", default=True, optional=True,
-            tooltip=("In a sequential batch one image can fail moderation while the others succeed. On: raise. "
-                     "Off: return the images that succeeded and log the failures."),
+            "fail_on_partial", default=False, optional=True,
+            tooltip=("In a sequential batch one image can fail moderation while the others succeed. Off: return "
+                     "the images that succeeded and log the refusals. On: raise, after saving the billed images "
+                     "to output/byteplus_recovered."),
         ),
     ]
     if edit:
@@ -191,24 +193,47 @@ async def _generate(kwargs, images: List[str]) -> IO.NodeOutput:
     urls = [item["url"] for item in succeeded if item.get("url")]
     if urls:
         print(f"[BytePlus] Seedream result URLs (valid 24 h): {' '.join(urls)}")
-    if failed:
-        reasons = "; ".join(f"{e.get('code')}: {e.get('message', '')}" for e in failed)
-        if kwargs.get("fail_on_partial", True) or not succeeded:
-            raise ValueError(f"Seedream returned {len(succeeded)} of {len(items)} images; failures: {reasons}")
-        print(f"[BytePlus] Seedream dropped {len(failed)} of {len(items)} images: {reasons}")
     if not succeeded:
         raise ValueError(f"Seedream returned no images: {str(response)[:300]}")
+    reasons = "; ".join(f"{e.get('code')}: {e.get('message', '')}" for e in failed)
+    if failed:
+        print(f"[BytePlus] Seedream refused {len(failed)} of {len(items)} images: {reasons}")
 
-    image_tensor, alpha = await asyncio.to_thread(response_to_images, succeeded, options.layer_decomposition)
-    sizes = [(image_tensor.shape[2], image_tensor.shape[1])] * image_tensor.shape[0]
+    # Every image from here on is billed: no failure below may discard one.
+    decoded, decode_errors = await asyncio.to_thread(decode_items, succeeded)
+    problem = None
+    if decode_errors:
+        problem = f"Seedream images could not be decoded: {'; '.join(decode_errors)}."
+    elif failed and kwargs.get("fail_on_partial", False):
+        problem = f"Seedream returned {len(succeeded)} of {len(items)} images; failures: {reasons}."
+    else:
+        try:
+            image_tensor, alpha = await asyncio.to_thread(compose, succeeded, decoded,
+                                                          options.layer_decomposition)
+        except Exception as e:
+            problem = str(e) or type(e).__name__
+    if problem:
+        raise ValueError(f"{problem} {await asyncio.to_thread(_recover, decoded)}")
+
     try:
-        cost = seedream.image_cost_usd(model_id, sizes, input_images=len(images),
+        cost = seedream.image_cost_usd(model_id, [image.size for image in decoded], input_images=len(images),
                                        layers=options.layer_decomposition)
-        print(f"[BytePlus] Seedream returned {image_tensor.shape[0]} image(s), about ${cost:.4f}")
+        print(f"[BytePlus] Seedream returned {len(decoded)} image(s), about ${cost:.4f}")
     except ValueError as e:
         # The images are already billed; a gap in the price list must not discard them.
-        print(f"[BytePlus] Seedream returned {image_tensor.shape[0]} image(s); cost unknown: {e}")
+        print(f"[BytePlus] Seedream returned {len(decoded)} image(s); cost unknown: {e}")
     return IO.NodeOutput(image_tensor, alpha)
+
+
+def _recover(decoded) -> str:
+    """Save the decoded images and say where, for the error that is about to discard them."""
+    keep = [image for image in decoded if image is not None]
+    if not keep:
+        return "No image decoded, so none could be saved."
+    try:
+        return f"The billed images are saved as {', '.join(save_recovered_images(keep))}"
+    except Exception as e:
+        return f"Saving the billed images to ComfyUI's output folder failed: {e}"
 
 
 def _seed_fingerprint(kwargs):

@@ -1,9 +1,11 @@
 # ABOUTME: Media conversion for BytePlus ModelArk: ComfyUI IMAGE/MASK to data URIs within the
-# ABOUTME: documented input limits, and Seedream response items back to IMAGE plus alpha tensors.
+# ABOUTME: documented input limits, Seedream response items back to IMAGE plus alpha, and billed-image recovery.
 
 import base64
 import io
+import os
 from dataclasses import dataclass
+from datetime import datetime
 from typing import List, Optional, Sequence, Tuple
 
 MAX_IMAGE_BYTES = 30 * 1024 * 1024
@@ -96,6 +98,20 @@ def _item_image(item: dict):
     return image.convert("RGBA")
 
 
+def decode_items(data: Sequence[dict]) -> Tuple[List, List[str]]:
+    """Decode every successful response item to RGBA, one at a time, so a bad item never
+    costs the others. Returns the images (None where decoding failed) and one error per failure."""
+    images: List = []
+    errors: List[str] = []
+    for index, item in enumerate(data):
+        try:
+            images.append(_item_image(item))
+        except Exception as e:
+            images.append(None)
+            errors.append(f"image {index + 1} of {len(data)}: {e}")
+    return images, errors
+
+
 def _to_tensors(rgba_images: Sequence) -> Tuple:
     import numpy as np
     import torch
@@ -115,6 +131,8 @@ def _place_layer(layer, canvas_size: Tuple[int, int], bounding_box: Optional[dic
                              f"on a {canvas_size[0]}x{canvas_size[1]} base.")
         return layer
     left, top, right, bottom = (int(round(v)) for v in absolute)
+    if right <= left or bottom <= top:
+        raise ValueError(f"A Seedream layer has an empty bounding box {list(absolute)}.")
     if layer.size != (right - left, bottom - top):
         layer = layer.resize((right - left, bottom - top), Image.LANCZOS)
     canvas = Image.new("RGBA", canvas_size, (0, 0, 0, 0))
@@ -122,20 +140,70 @@ def _place_layer(layer, canvas_size: Tuple[int, int], bounding_box: Optional[dic
     return canvas
 
 
-def response_to_images(data: Sequence[dict], layers: bool) -> Tuple:
-    """Return (IMAGE batch, alpha batch with 1 = opaque) for the successful response items.
+def _letterbox(images: List) -> List:
+    """Center each image on the largest width and height, with mid-grey, fully transparent bars,
+    as the Image Grid Loader letterboxes mixed sizes."""
+    from PIL import Image
 
-    With layers, item 0 is the base image and every later item is placed on a canvas of
-    the base's size at its bounding box, ordered by z_index.
+    width = max(image.size[0] for image in images)
+    height = max(image.size[1] for image in images)
+    listed = ", ".join(f"{w}x{h}" for w, h in sorted({image.size for image in images}))
+    print(f"[BytePlus] Seedream returned images of different sizes ({listed}); letterboxed onto {width}x{height}.")
+    boxed = []
+    for image in images:
+        canvas = Image.new("RGBA", (width, height), (128, 128, 128, 0))
+        canvas.paste(image, ((width - image.size[0]) // 2, (height - image.size[1]) // 2))
+        boxed.append(canvas)
+    return boxed
+
+
+def compose(data: Sequence[dict], images: Sequence, layers: bool) -> Tuple:
+    """Return (IMAGE batch, alpha batch with 1 = opaque) from decoded response items.
+
+    With layers, the base is the item with z_index 0 (else the first), and every other item
+    is scaled to its bounding box on a canvas of the base's size, in ascending z_index.
+    Mixed sizes are letterboxed onto the largest.
     """
-    images = [_item_image(item) for item in data]
+    images = list(images)
     if layers:
-        base, rest = images[0], list(zip(images[1:], data[1:]))
-        rest.sort(key=lambda pair: pair[1].get("z_index", 0))
+        pairs = list(zip(images, data))
+        base_index = next((i for i, item in enumerate(data) if item.get("z_index") == 0), 0)
+        base = images[base_index]
+        rest = sorted((pair for i, pair in enumerate(pairs) if i != base_index),
+                      key=lambda pair: pair[1].get("z_index", 0))
         images = [base] + [_place_layer(image, base.size, item.get("bounding_box")) for image, item in rest]
-    sizes = sorted({image.size for image in images})
-    if len(sizes) > 1:
-        listed = ", ".join(f"{w}x{h}" for w, h in sizes)
-        raise ValueError(f"Seedream returned images of different sizes ({listed}); "
-                         "they cannot share one IMAGE batch.")
+    if len({image.size for image in images}) > 1:
+        images = _letterbox(images)
     return _to_tensors(images)
+
+
+def _timestamp() -> str:
+    return datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+
+
+def _create_new(directory: str, stem: str):
+    """Open a new PNG for writing without ever replacing an existing file."""
+    attempt = 0
+    while True:
+        path = os.path.join(directory, f"{stem}{f'-{attempt}' if attempt else ''}.png")
+        try:
+            return path, open(path, "xb")
+        except FileExistsError:
+            attempt += 1
+
+
+def save_recovered_images(images: Sequence) -> List[str]:
+    """Write billed images as PNG under ComfyUI's output/byteplus_recovered and return the paths.
+    Names come from the local clock and the index, never from response data."""
+    import folder_paths
+
+    directory = os.path.join(folder_paths.get_output_directory(), "byteplus_recovered")
+    os.makedirs(directory, exist_ok=True)
+    stamp = _timestamp()
+    paths = []
+    for index, image in enumerate(images, 1):
+        path, handle = _create_new(directory, f"{stamp}-{index:02d}")
+        with handle:
+            image.save(handle, format="PNG")
+        paths.append(path)
+    return paths

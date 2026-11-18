@@ -10,8 +10,14 @@ torch = pytest.importorskip("torch")
 Image = pytest.importorskip("PIL.Image")
 
 from erpk.byteplus.byteplus_api.media import (  # noqa: E402
-    SEEDANCE_IMAGE_LIMITS, SEEDREAM_IMAGE_LIMITS, images_to_data_uris, response_to_images,
+    SEEDANCE_IMAGE_LIMITS, SEEDREAM_IMAGE_LIMITS, compose, decode_items, images_to_data_uris,
 )
+
+
+def response_to_images(data, layers):
+    images, errors = decode_items(data)
+    assert errors == []
+    return compose(data, images, layers)
 
 
 def _png_b64(image):
@@ -58,8 +64,43 @@ def test_layers_are_placed_on_the_base_canvas_at_their_bounding_box():
     assert alpha[1].sum().item() == 6.0
 
 
-def test_mismatched_output_sizes_raise_instead_of_batching():
-    data = [{"b64_json": _png_b64(Image.new("RGB", (4, 4)))}, {"b64_json": _png_b64(Image.new("RGB", (4, 5)))}]
+def test_mixed_output_sizes_are_letterboxed_onto_the_largest_with_transparent_bars():
+    data = [{"b64_json": _png_b64(Image.new("RGB", (4, 4), (255, 255, 255)))},
+            {"b64_json": _png_b64(Image.new("RGB", (4, 5), (0, 0, 0)))}]
+    images, alpha = response_to_images(data, layers=False)
+    assert tuple(images.shape) == (2, 5, 4, 3) and tuple(alpha.shape) == (2, 5, 4)
+    assert images[0, 0, 0].tolist() == [1.0, 1.0, 1.0] and alpha[0, :4].min().item() == 1.0
+    assert images[0, 4, 0].tolist() == pytest.approx([128 / 255] * 3) and alpha[0, 4].max().item() == 0.0
+    assert alpha[1].min().item() == 1.0
+
+
+def test_the_layer_base_is_the_item_with_z_index_0_wherever_it_sits():
+    base = Image.new("RGB", (8, 6), (0, 0, 255))
+    layer = Image.new("RGBA", (2, 3), (255, 0, 0, 255))
+    data = [
+        {"b64_json": _png_b64(layer), "z_index": 1, "bounding_box": {"absolute": [5, 2, 7, 5]}},
+        {"b64_json": _png_b64(base), "z_index": 0},
+    ]
+    images, alpha = response_to_images(data, layers=True)
+    assert images[0, 0, 0].tolist() == [0.0, 0.0, 1.0] and alpha[0].min().item() == 1.0
+    assert images[1, 2, 5].tolist() == [1.0, 0.0, 0.0] and alpha[1].sum().item() == 6.0
+
+
+@pytest.mark.parametrize("box, message", [
+    (None, "A Seedream layer is 2x3 with no bounding box on a 8x6 base."),
+    ({"absolute": [5, 2, 5, 5]}, "A Seedream layer has an empty bounding box [5, 2, 5, 5]."),
+])
+def test_a_layer_that_cannot_be_placed_raises(box, message):
+    data = [{"b64_json": _png_b64(Image.new("RGB", (8, 6))), "z_index": 0},
+            {"b64_json": _png_b64(Image.new("RGBA", (2, 3))), "z_index": 1, "bounding_box": box}]
     with pytest.raises(ValueError) as excinfo:
-        response_to_images(data, layers=False)
-    assert str(excinfo.value) == "Seedream returned images of different sizes (4x4, 4x5); they cannot share one IMAGE batch."
+        response_to_images(data, layers=True)
+    assert str(excinfo.value) == message
+
+
+def test_decoding_keeps_every_image_that_decodes_and_names_the_rest():
+    data = [{"b64_json": _png_b64(Image.new("RGB", (4, 4)))}, {"b64_json": "bm90IGFuIGltYWdl"}, {"size": "4x4"}]
+    images, errors = decode_items(data)
+    assert images[0].size == (4, 4) and images[1:] == [None, None]
+    assert errors[0].startswith("image 2 of 3: ")
+    assert errors[1] == "image 3 of 3: Seedream returned an image with neither url nor b64_json: ['size']"

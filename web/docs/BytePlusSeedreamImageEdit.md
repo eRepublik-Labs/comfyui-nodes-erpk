@@ -26,7 +26,7 @@ Edits or combines reference images, or splits one image into layers, with Seedre
 | optimize_prompt_mode | Combo | standard | standard, fast. fast on 5.0 pro and 4.0 only |
 | response_format | Combo | url | url (downloaded by the node) or b64_json (inline) |
 | watermark | Boolean | false | "AI-generated" mark. ModelArk's own default is on; the node sends off unless set |
-| fail_on_partial | Boolean | true | When some images of a sequential batch fail moderation: raise (on), or return the rest and log the failures (off) |
+| fail_on_partial | Boolean | false | When some images of a sequential batch fail moderation: return the rest and log which were refused and why (off), or raise after saving the billed images to `output/byteplus_recovered` (on) |
 | layer_decomposition | Boolean | false | 5.5, 5.0 pro, 5.0 flash: split one image (at least 262,144 pixels) into a base plus transparent layers. Size must be a preset or auto |
 | layer_max_images | Int | 30 | 5.5 only: most images returned, base included (2-100). Rate limits reserve this count up front |
 | text_recognition | Boolean | false | 5.5 layer decomposition only: rich-text OCR on text layers |
@@ -46,5 +46,7 @@ Edits or combines reference images, or splits one image into layers, with Seedre
 - The call is synchronous. ModelArk answers with the images, so there is no task to poll or cancel.
 - The console logs the estimated cost at ModelArk's list price per image tier, plus priced input images (5.5: $0.008 each; 5.0 pro: first free, then $0.003).
 - Result URLs are valid for 24 h; the node downloads them right away.
+- ModelArk bills every image it returns, so the node never discards one. When it must raise after ModelArk answered (a partial batch with `fail_on_partial` on, an image that does not decode, a layer that cannot be placed), it first saves every decoded image as PNG in ComfyUI's `output/byteplus_recovered` folder and names the files in the error. URL results are also printed.
+- Images of different sizes in one response are letterboxed onto the largest width and height, centered, with mid-grey bars that the `alpha` output marks transparent. The Image Grid Loader handles mixed sizes the same way.
 - Layer decomposition: any failed layer fails the whole request. 5.0 pro bills layers at $0.0225 / $0.045 per image.
-- ModelArk returns each layer cropped to its bounding box; the node places it back on a base-sized canvas so the batch stacks and recomposes directly.
+- ModelArk returns each layer at about the requested size, not at its box size. The node scales each layer to its `bounding_box.absolute` and places it on a base-sized canvas, in ascending `z_index`, so the batch stacks and recomposes directly. The base is the item with `z_index` 0, or the first item when none has it.

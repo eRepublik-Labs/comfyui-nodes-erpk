@@ -23,7 +23,7 @@ Generates images from a text prompt with Seedream, called directly on BytePlus M
 | optimize_prompt_mode | Combo | standard | standard, fast. fast on 5.0 pro and 4.0 only |
 | response_format | Combo | url | url (downloaded by the node) or b64_json (inline) |
 | watermark | Boolean | false | "AI-generated" mark. ModelArk's own default is on; the node sends off unless set |
-| fail_on_partial | Boolean | true | When some images of a sequential batch fail moderation: raise (on), or return the rest and log the failures (off) |
+| fail_on_partial | Boolean | false | When some images of a sequential batch fail moderation: return the rest and log which were refused and why (off), or raise after saving the billed images to `output/byteplus_recovered` (on) |
 | safety_identifier | String | (empty) | Optional hashed end-user ID, max 64 characters. Sent to 5.5, 5.0 pro and 5.0 flash only |
 | seed | Int | -1 | Cache control only and not sent, because ModelArk documents no Seedream seed. -1 re-runs every queue |
 
@@ -40,4 +40,6 @@ Generates images from a text prompt with Seedream, called directly on BytePlus M
 - The call is synchronous. ModelArk answers with the images, so there is no task to poll or cancel.
 - The console logs the estimated cost at ModelArk's list price per image tier, plus priced input images (5.5: $0.008 each; 5.0 pro: first free, then $0.003).
 - Result URLs are valid for 24 h; the node downloads them right away.
+- ModelArk bills every image it returns, so the node never discards one. When it must raise after ModelArk answered (a partial batch with `fail_on_partial` on, an image that does not decode, a layer that cannot be placed), it first saves every decoded image as PNG in ComfyUI's `output/byteplus_recovered` folder and names the files in the error. URL results are also printed.
+- Images of different sizes in one response are letterboxed onto the largest width and height, centered, with mid-grey bars that the `alpha` output marks transparent. The Image Grid Loader handles mixed sizes the same way.
 - 5.5 makes transparent images from text alone; 5.0 pro and flash need Image Edit with one reference that carries alpha.
