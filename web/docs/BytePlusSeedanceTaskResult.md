@@ -19,7 +19,7 @@ Fetches a Seedance task's video URL, last-frame URL and status by task ID. Use i
 | Output | Type | Description |
 |--------|------|-------------|
 | video_url | String | Video URL once the task succeeded, else empty. Valid 24 h (a 2.5 URL allows at most 100 downloads) |
-| last_frame_url | String | Final-frame JPEG URL if the task was created with `return_last_frame`, else empty |
+| last_frame_url | String | Final-frame image URL (PNG when measured on 2026-11-18) if the task was created with `return_last_frame`, else empty |
 | status | String | `queued`, `running`, `succeeded`, `failed`, `expired` or `cancelled` |
 
 ## Notes

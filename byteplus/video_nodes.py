@@ -61,7 +61,7 @@ def _option_inputs(default_duration: int, reference: bool = False):
                          tooltip="Adds the 'AI Generated' mark in the lower-right corner. All models."),
         IO.Boolean.Input(
             "return_last_frame", default=False, optional=True,
-            tooltip="Also return the final frame as a JPEG URL (no watermark) on the last_frame_url output.",
+            tooltip="Also return the final frame as a PNG URL (no watermark) on the last_frame_url output.",
         ),
         IO.Combo.Input(
             "output_format", options=seedance.OUTPUT_FORMATS, default="mp4", optional=True,
@@ -117,7 +117,7 @@ def _option_inputs(default_duration: int, reference: bool = False):
 
 _OUTPUTS = [
     IO.String.Output("video_url", tooltip="MP4/MOV URL, valid 24 h (2.5: at most 100 downloads)."),
-    IO.String.Output("last_frame_url", tooltip="Final-frame JPEG URL when return_last_frame is on, else empty."),
+    IO.String.Output("last_frame_url", tooltip="Final-frame PNG URL when return_last_frame is on, else empty."),
     IO.String.Output("task_id", tooltip="ModelArk task ID; a draft's ID feeds draft_task_id."),
 ]
 

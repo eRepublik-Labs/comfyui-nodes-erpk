@@ -23,7 +23,7 @@ Generates, edits or extends a video from reference images, videos and audio with
 | frames | Int | 0 | 1.0 only: exact frame count 29-289, 25 + 4n, at 24 fps. Overrides duration. 0 = off; any other value with a 2.x model stops before the call |
 | generate_audio | Boolean | true | 2.x only: synchronized stereo audio. Not sent to 1.0 |
 | watermark | Boolean | false | "AI Generated" mark in the lower-right corner |
-| return_last_frame | Boolean | false | Also return the final frame as a JPEG URL on `last_frame_url` |
+| return_last_frame | Boolean | false | Also return the final frame as an image URL on `last_frame_url` (PNG when measured on 2026-11-18) |
 | output_format | Combo | mp4 | mp4, mov. mov (H.264 yuv444p, PCM audio) on 2.5 and 2.5 flash only |
 | camera_fixed | Boolean | false | 1.0 only: keep the camera still. On with a 2.x model stops before the call |
 | service_tier | Combo | default | default, flex. flex runs offline at half price, 1.0 only |
@@ -40,7 +40,7 @@ Generates, edits or extends a video from reference images, videos and audio with
 | Output | Type | Description |
 |--------|------|-------------|
 | video_url | String | Video URL, valid 24 h (a 2.5 URL allows at most 100 downloads). Chain into WaveSpeed Preview Video or Preview Anything |
-| last_frame_url | String | Final-frame JPEG URL when `return_last_frame` is on, else empty |
+| last_frame_url | String | Final-frame image URL (PNG when measured on 2026-11-18) when `return_last_frame` is on, else empty |
 | task_id | String | ModelArk task ID. A draft's ID feeds `draft_task_id` |
 
 ## Notes
