@@ -323,7 +323,7 @@ Every offered model has a 1M-token context window, up to 128K output tokens, ada
 - **Claude Sonnet 5**: $2/1M in, $10/1M out - Previous Sonnet
 - **Claude Opus 5.5**: $4/1M in, $20/1M out - Highest-capability Opus; cache reads at 0.05x
 - **Claude Opus 5**: $5/1M in, $25/1M out - Previous Opus
-- **Claude Fable 5.2**: $8/1M in, $40/1M out - Most capable model, for demanding reasoning and long-horizon agentic work; cache reads at 0.025x; needs an organization with data retention enabled
+- **Claude Fable 5.2**: $8/1M in, $40/1M out - For demanding reasoning and long-horizon agentic work, or when Opus 5.5 at higher effort falls short; cache reads at 0.025x; needs an organization with data retention enabled
 - **Claude Fable 5.1**: $10/1M in, $50/1M out - Previous Fable; needs data retention too
 - **Claude Fable 5**: $10/1M in, $50/1M out - Oldest Fable; needs data retention too
 - **Claude Haiku 5.5**: $0.10/1M in, $0.50/1M out - Fastest and cheapest; default effort medium. A prompt over 100,000 tokens (input plus cache reads and writes) bills the whole request at 5x: $0.50 in, $2.50 out. Usage Stats and Token Counter apply this tier

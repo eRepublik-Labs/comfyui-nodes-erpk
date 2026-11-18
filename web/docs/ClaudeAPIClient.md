@@ -23,7 +23,7 @@ Initializes a Claude API client for use by other nodes. Optional if your API key
 ## Notes
 
 - API key resolution order: ComfyUI Settings > node widget > config.ini
-- Sonnet 5.5 is the default general-purpose model; Opus 5.5 is the highest-capability tier; Haiku 5.5 is the fastest and cheapest
+- Sonnet 5.5 is the default general-purpose model; Fable 5.2 is for demanding reasoning and long-horizon agentic work, or when Opus 5.5 at higher effort falls short; Opus 5.5 suits long-running agentic coding and knowledge work; Haiku 5.5 is the fastest and cheapest
 - Every offered model uses adaptive thinking and rejects temperature/top_p/top_k, so the client never sends them
 - Fable 5, Fable 5.1 and Fable 5.2 need an organization with data retention enabled; other organizations get a 404 or a "data retention" 400
 - Prompt caching is enabled by default; Usage Stats shows the cache reads and writes it produced
