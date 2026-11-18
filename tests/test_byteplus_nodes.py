@@ -267,3 +267,31 @@ def test_size_auto_is_offered_only_where_layer_decomposition_is():
 
     assert "auto" not in size_options(BytePlusSeedreamTextToImage)
     assert "auto" in size_options(BytePlusSeedreamImageEdit)
+
+
+def test_cancel_while_task_result_waits_stops_waiting_and_never_deletes_the_task(transport, monkeypatch, capsys):
+    from erpk.byteplus.byteplus_api.client import BytePlusInterrupted
+    from erpk.byteplus.video_nodes import BytePlusSeedanceTaskResult
+
+    monkeypatch.setattr(client_module, "_resolve_interrupt_checker", lambda: (lambda: True))
+    sent, replies = transport
+    replies += [(200, {"id": "cgt-9", "status": "queued"}), (200, {})]
+    with pytest.raises(BytePlusInterrupted) as excinfo:
+        asyncio.run(BytePlusSeedanceTaskResult.execute(client=CLIENT, task_id="cgt-9"))
+    message = ("Stopped waiting for Seedance task cgt-9. The Task Result node only reads a task, so the task "
+               "is untouched.")
+    assert str(excinfo.value) == message
+    assert capsys.readouterr().out.splitlines()[-1] == f"[BytePlus] {message}"
+    assert sent == []
+
+
+def test_task_result_with_wait_on_raises_the_vendor_reason_for_a_failed_task(transport):
+    from erpk.byteplus.byteplus_api.client import BytePlusTaskFailed
+    from erpk.byteplus.video_nodes import BytePlusSeedanceTaskResult
+
+    _, replies = transport
+    replies.append((200, {"id": "cgt-9", "status": "failed",
+                          "error": {"code": "OutputVideoSensitiveContentDetected", "message": "blocked"}}))
+    with pytest.raises(BytePlusTaskFailed) as excinfo:
+        asyncio.run(BytePlusSeedanceTaskResult.execute(client=CLIENT, task_id="cgt-9"))
+    assert str(excinfo.value) == "Seedance task cgt-9 failed: OutputVideoSensitiveContentDetected: blocked"

@@ -371,7 +371,8 @@ class BytePlusSeedanceTaskResult(IO.ComfyNode):
         client = make_client(kwargs.get("client"))
         if kwargs.get("wait", True):
             # ModelArk expires any task within EXPIRES_MAX of its creation, so this bound always ends the wait.
-            task = await client.wait_for_video_task(task_id, seedance.EXPIRES_MAX + _POLL_MARGIN_SECONDS)
+            task = await client.wait_for_video_task(task_id, seedance.EXPIRES_MAX + _POLL_MARGIN_SECONDS,
+                                                    cancel_on_interrupt=False)
         else:
             task = await client.get_video_task(task_id)
         status = task.get("status") or ""

@@ -6,7 +6,7 @@ import configparser
 import json
 import os
 import time
-from typing import Callable, Optional, Tuple
+from typing import Awaitable, Callable, Optional, Tuple
 
 import requests
 
@@ -194,24 +194,26 @@ class BytePlusClient:
             raise BytePlusAPIError(f"ModelArk POST {IMAGES_PATH} returned {error['code']}: {error.get('message', '')}")
         return response
 
-    async def wait_for_video_task(self, task_id: str, timeout: float) -> dict:
+    async def wait_for_video_task(self, task_id: str, timeout: float, cancel_on_interrupt: bool = True) -> dict:
         """Poll until the task succeeds; raise BytePlusTaskFailed on any other final state.
 
         Connection errors, unreadable replies, 429 and 5xx keep polling; other HTTP errors raise.
+        On Cancel, a queued task is deleted unless cancel_on_interrupt is False.
         """
         is_interrupted = _resolve_interrupt_checker()
+        on_interrupt = self._cancel_on_interrupt if cancel_on_interrupt else _leave_on_interrupt
         deadline = time.monotonic() + timeout
         last_status = None
         while time.monotonic() < deadline:
             if is_interrupted():
-                await self._cancel_on_interrupt(task_id)
+                await on_interrupt(task_id)
             try:
                 task = await self.get_video_task(task_id)
             except (requests.RequestException, BytePlusAPIError) as e:
                 if isinstance(e, BytePlusAPIError) and not e.transient:
                     raise
                 print(f"[BytePlus] Polling task {task_id} hit a transient error, retrying: {e}")
-                await self._sleep(task_id, is_interrupted)
+                await self._sleep(task_id, is_interrupted, on_interrupt)
                 continue
             status = task.get("status")
             if status != last_status:
@@ -221,14 +223,15 @@ class BytePlusClient:
                 return task
             if status not in ("queued", "running"):
                 raise BytePlusTaskFailed(task_failure_message(task_id, task))
-            await self._sleep(task_id, is_interrupted)
+            await self._sleep(task_id, is_interrupted, on_interrupt)
         raise BytePlusTaskFailed(f"Seedance task {task_id} did not finish within {timeout:.0f} s.")
 
-    async def _sleep(self, task_id: str, is_interrupted: Callable[[], bool]) -> None:
+    async def _sleep(self, task_id: str, is_interrupted: Callable[[], bool],
+                     on_interrupt: Callable[[str], Awaitable[None]]) -> None:
         elapsed = 0.0
         while elapsed < self.poll_interval:
             if is_interrupted():
-                await self._cancel_on_interrupt(task_id)
+                await on_interrupt(task_id)
             step = min(0.5, self.poll_interval - elapsed)
             await asyncio.sleep(step)
             elapsed += step
@@ -257,6 +260,11 @@ class BytePlusClient:
             raise _interrupted(f"Stopped waiting for Seedance task {task_id}, which had already succeeded "
                                f"and is billed. Video URL: {video_url}")
         raise _interrupted(f"Stopped waiting for Seedance task {task_id} (status {status}).")
+
+
+async def _leave_on_interrupt(task_id: str) -> None:
+    raise _interrupted(f"Stopped waiting for Seedance task {task_id}. The Task Result node only reads a task, "
+                       "so the task is untouched.")
 
 
 def _interrupted(message: str) -> BytePlusInterrupted:
