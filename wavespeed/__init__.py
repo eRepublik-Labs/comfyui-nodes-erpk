@@ -1,5 +1,5 @@
 # ABOUTME: WaveSpeed AI provider package for ComfyUI V3.
-# ABOUTME: Exports flat NODES list of all 67 WaveSpeed node classes for ERPKExtension.
+# ABOUTME: Exports flat NODES list of all 75 WaveSpeed node classes for ERPKExtension.
 
 from .nodes import WaveSpeedAIAPIClient, PreviewVideo, SaveAudio, UploadImage
 from .seedream_v4 import SeedreamV4Node
@@ -30,6 +30,14 @@ from .seedream_v5_lite_edit_sequential import SeedreamV5LiteEditSequentialNode
 from .seedream_v5_pro import SeedreamV5ProNode
 from .seedream_v5_pro_edit import SeedreamV5ProEditNode
 from .seedream_v5_pro_layers import SeedreamV5ProLayersNode
+from .seedream_v5_5 import SeedreamV5_5Node
+from .seedream_v5_5_edit import SeedreamV5_5EditNode
+from .seedream_v5_5_layers import SeedreamV5_5LayersNode
+from .seedream_v5_flash import SeedreamV5FlashNode
+from .seedream_v5_flash_edit import SeedreamV5FlashEditNode
+from .seedream_v5_flash_layers import SeedreamV5FlashLayersNode
+from .flux_2_pro import Flux2ProNode
+from .flux_2_pro_edit import Flux2ProEditNode
 from .qwen_image_max import QwenImageMaxNode
 from .qwen_image_max_edit import QwenImageMaxEditNode
 from .jibmix_qwen_image import JibMixQwenImageNode
@@ -99,6 +107,14 @@ NODES = [
     SeedreamV5ProNode,
     SeedreamV5ProEditNode,
     SeedreamV5ProLayersNode,
+    SeedreamV5_5Node,
+    SeedreamV5_5EditNode,
+    SeedreamV5_5LayersNode,
+    SeedreamV5FlashNode,
+    SeedreamV5FlashEditNode,
+    SeedreamV5FlashLayersNode,
+    Flux2ProNode,
+    Flux2ProEditNode,
     QwenImageMaxNode,
     QwenImageMaxEditNode,
     JibMixQwenImageNode,

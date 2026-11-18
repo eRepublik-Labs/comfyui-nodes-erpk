@@ -92,15 +92,54 @@ def imageurl2tensor_rgba(image_urls: List[str]):
                 alpha_np = numpy.array(a, dtype=numpy.float32) / 255.0
                 alpha_masks.append(torch.from_numpy(alpha_np))
         except Exception as e:
-            print(f"[WaveSpeed] Error downloading/processing RGBA image from {url}: {e}")
-            continue
-
-    if not rgb_images:
-        return torch.zeros((1, 1, 1, 3)), torch.zeros((1, 1, 1))
+            raise RuntimeError(f"Could not load generated image {url}: {e}") from e
 
     rgb_tensor = images2tensor(rgb_images)
     alpha_tensor = torch.stack(alpha_masks)
     return rgb_tensor, alpha_tensor
+
+
+def load_decomposed_layers(urls: List[str]):
+    """
+    Load a layer-decomposition result: the clean base image, then one RGBA PNG per layer.
+
+    Each layer is cropped to its object and has its own size, so the layers are
+    returned as lists of single-image tensors rather than as one batch.
+
+    Args:
+        urls: The API's outputs, base image first
+
+    Returns:
+        tuple: (base (1, H, W, 3), [layer RGB (1, H, W, 3)], [layer alpha (1, H, W)])
+    """
+    if len(urls) < 2:
+        images_word = "image" if len(urls) == 1 else "images"
+        raise ValueError(
+            f"Layer decomposition returned {len(urls)} {images_word}, so there are no layers to output")
+
+    import numpy
+    import torch
+    import PIL.Image
+    from ...utils.safe_fetch import fetch_remote_bytes, safe_image_decode
+
+    def fetch(url):
+        data = fetch_remote_bytes(url, max_bytes=100 * 1024 * 1024, timeout=30,
+                                  user_agent="ERPK-WaveSpeed-Layers/1.0")
+        with safe_image_decode(), io.BytesIO(data) as buffer:
+            image = PIL.Image.open(buffer)
+            image.load()
+            return image
+
+    def to_tensor(pixels):
+        return torch.from_numpy(numpy.asarray(pixels, dtype=numpy.float32) / 255.0).unsqueeze(0)
+
+    base = to_tensor(fetch(urls[0]).convert("RGB"))
+    layers, masks = [], []
+    for url in urls[1:]:
+        rgba = fetch(url).convert("RGBA")
+        layers.append(to_tensor(rgba.convert("RGB")))
+        masks.append(to_tensor(rgba.getchannel("A")))
+    return base, layers, masks
 
 
 def images2tensor(images):

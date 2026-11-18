@@ -16,6 +16,9 @@ ComfyUI-Custom-Nodes/
 │   ├── nodes.py                   # Core nodes
 │   ├── seedream_v4*.py            # Seedream V4 nodes (4 variants)
 │   ├── seedream_v4_5*.py          # Seedream V4.5 nodes (4 variants)
+│   ├── seedream_v5_5*.py          # Seedream V5.5 nodes (3 variants)
+│   ├── seedream_v5_flash*.py      # Seedream V5.0 Flash nodes (3 variants)
+│   ├── flux_2_pro*.py             # FLUX.2 Pro nodes (2 variants)
 │   ├── qwen_image_*.py            # Qwen Image nodes
 │   └── wavespeed_api/             # API integration layer
 ├── claude/                        # Claude API integration
@@ -78,6 +81,23 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 - **Seedream V4.5 Sequential** - Multi-image generation with typography support (1-15 images, $0.027/image)
 - **Seedream V4.5 Edit** - Image editing with enhanced text rendering (up to 10 reference images)
 - **Seedream V4.5 Edit Sequential** - Multi-image editing with typography (1-15 images, $0.027/image)
+
+#### ByteDance Seedream V5.5 Models
+
+- **Seedream V5.5** - Text-to-image with a transparent background option and an alpha `mask` output ($0.02/image at 1k or 1.5k, $0.035 at 2k)
+- **Seedream V5.5 Edit** - Image editing from up to 10 reference images, same outputs (as above, plus $0.008 per input image)
+- **Seedream V5.5 Layers** - Splits an image into a clean base plus one layer and mask per object (`max_images` x the per-image price, $0.20 at the default of 10 at 1k)
+
+#### ByteDance Seedream V5.0 Flash Models
+
+- **Seedream V5.0 Flash** - Text-to-image at a flat price for every resolution tier ($0.027/image)
+- **Seedream V5.0 Flash Edit** - Image editing from up to 10 reference images ($0.027/image, however many images go in)
+- **Seedream V5.0 Flash Layers** - Splits an image into a clean base plus up to 16 layers with masks ($0.459/run)
+
+#### FLUX.2 Pro Models
+
+- **FLUX.2 Pro** - Text-to-image at 256-2048px with a seed sent to the API ($0.03/image)
+- **FLUX.2 Pro Edit** - Image editing from up to 3 reference images, with an image grid and an optional output size ($0.06/image)
 
 Every Seedream edit node, Sequential included, also has an image grid. With nothing on `images`, the node sends up to 10 grid files at their own size. It reads the URL text only when the grid is empty.
 

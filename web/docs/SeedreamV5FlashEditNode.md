@@ -1,0 +1,43 @@
+<!-- ABOUTME: Help documentation for the Bytedance Seedream V5.0 Flash Edit ComfyUI node. -->
+<!-- ABOUTME: Edits from up to 10 images at a flat price per result. -->
+
+# Bytedance Seedream V5.0 Flash Edit
+
+Edits images from a text prompt with ByteDance's Seedream V5.0 Flash, using up to 10 input images.
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| prompt | String | "" | Text description of the desired modifications |
+| images | Image | -- | Images to edit as an IMAGE batch, one image per slice, up to 10 (optional). Sent inline as base64, no upload. Takes precedence over the grid and image_url. Batched images must share one size, so combine different sizes on the grid or through URLs |
+| image_url | String | (empty) | Image URL(s) to edit, one per line or comma separated, up to 10. Needed unless images is connected or the grid holds images |
+| aspect_ratio | Combo | "auto" | auto uses the supported ratio closest to the first image; otherwise one of 1:1, 1:2, 2:1, 1:3, 3:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 9:21, 21:9 |
+| resolution | Combo | "1k" | Output resolution tier: 1k, 1.5k or 2k |
+| client | WAVESPEED_AI_API_CLIENT | -- | WaveSpeed API client (optional if API key is configured in Settings) |
+| output_format | Combo | "jpeg" | jpeg or png (optional) |
+| seed | Int | -1 | Cache control only, not sent to the API. -1 generates again every run; a fixed value reuses the cached result |
+| grid_images | String | `[]` | Hidden. The grid stores its ordered file list here as a JSON array of names in the `input` folder |
+
+## Output
+
+| Output | Type | Description |
+|--------|------|-------------|
+| image | IMAGE | Edited image |
+
+## Image grid
+
+With nothing connected to `images`, the node sends the files on its grid. Pick or drop PNG, JPG, or WebP files, drag a cell to reorder it, click a cell to see the image full size, and hover a cell and click **×** to remove it. Click **Reference images** at the top of the grid to collapse it to its header, which still shows the count, and click it again to expand it. While `images` is connected, the grid dims and the node ignores it.
+
+- Each file goes to the API as its own image, at its own size, in cell order.
+- The node applies EXIF orientation, drops any alpha channel, and sends each file as JPEG.
+- The grid holds up to 10 files, the model's limit.
+- The grid wins over `image_url`, so the node reads the URL text only when the grid is empty.
+- When you queue, ComfyUI checks that every grid file exists in the `input` folder, even with `images` connected.
+- `Connect an image or add images to the grid, or enter at least one image URL` means `images`, the grid and `image_url` are all empty.
+
+## Notes
+
+- **Pricing:** $0.027 per image at every resolution tier, however many input images you send
+- **API Docs:** [Bytedance Seedream V5.0 Flash Edit](https://wavespeed.ai/docs/docs-api/bytedance/seedream-v5.0-flash/edit)
+- More than 10 input images is an error that names the count; nothing is dropped silently

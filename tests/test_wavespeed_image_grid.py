@@ -157,6 +157,12 @@ NODES = [
     Node("seedream_v5_pro_edit", "SeedreamV5ProEditNode", "images", "image_url", 10, "Seedream",
          ["prompt", "image_url", "aspect_ratio", "resolution", "seed", "output_format",
           "prompt_optimization_mode", "enable_sync_mode", "enable_base64_output"]),
+    Node("seedream_v5_5_edit", "SeedreamV5_5EditNode", "images", "image_url", 10, "Seedream",
+         ["prompt", "image_url", "aspect_ratio", "resolution", "seed", "output_format", "background"]),
+    Node("seedream_v5_flash_edit", "SeedreamV5FlashEditNode", "images", "image_url", 10, "Seedream",
+         ["prompt", "image_url", "aspect_ratio", "resolution", "seed", "output_format"]),
+    Node("flux_2_pro_edit", "Flux2ProEditNode", "images", "image_url", 3, "FLUX.2 Pro",
+         ["prompt", "image_url", "width", "height", "seed"]),
     Node("minimax_h3_image_edit", "MinimaxH3ImageEditNode", "images", "image_urls", 9, "MiniMax H3 Image Edit",
          ["prompt", "image_urls", "aspect_ratio", "resolution", "output_format", "seed"]),
 ]
@@ -194,7 +200,9 @@ def _sent(node, **inputs):
     import torch
 
     with patch("erpk.wavespeed.wavespeed_api.client.WaveSpeedClient.send_request", fake_send), \
-         patch("erpk.wavespeed.wavespeed_api.utils.imageurl2tensor", return_value=torch.zeros(1, 8, 8, 3)):
+         patch("erpk.wavespeed.wavespeed_api.utils.imageurl2tensor", return_value=torch.zeros(1, 8, 8, 3)), \
+         patch("erpk.wavespeed.wavespeed_api.utils.imageurl2tensor_rgba",
+               return_value=(torch.zeros(1, 8, 8, 3), torch.zeros(1, 8, 8))):
         asyncio.run(node.cls.execute(client={"api_key": "test-key"}, **node.run_kwargs, **inputs))
     return sent["images"]
 
