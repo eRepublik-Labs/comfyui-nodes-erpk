@@ -4,6 +4,7 @@
 import asyncio
 import json
 import math
+import warnings
 
 from comfy_api.latest import IO
 
@@ -41,6 +42,10 @@ def _parse_stop_sequences(text):
 # 4 Carbon and 4 Hydrogen probed 2026-11-18). The node clamps minimal up to low for them.
 _NO_MINIMAL_THINKING = {"gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.1-pro-preview",
                         "gemini-4-argon", "gemini-4-carbon", "gemini-4-hydrogen"}
+
+# Models that accept thinking_level=xhigh (probed 2026-11-18: 200 on 4 Hydrogen,
+# 400 on every other text model). The node lowers xhigh to high for the rest.
+_XHIGH_THINKING = {"gemini-4-hydrogen"}
 
 
 # Output resolutions each image model accepts, smallest first, per
@@ -185,7 +190,13 @@ def _build_thinking_config(thinking_level, model):
         return None
     if thinking_level == "minimal" and model in _NO_MINIMAL_THINKING:
         thinking_level = "low"
-    return genai_types.ThinkingConfig(thinking_level=thinking_level.upper())
+    if thinking_level == "xhigh" and model not in _XHIGH_THINKING:
+        thinking_level = "high"
+    # google-genai's ThinkingLevel enum lacks XHIGH and warns that it is
+    # invalid, but still sends it and the API accepts it.
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="XHIGH is not a valid ThinkingLevel")
+        return genai_types.ThinkingConfig(thinking_level=thinking_level.upper())
 
 
 # --- Model lists for COMBO inputs ---
@@ -394,13 +405,13 @@ class GeminiTextGeneration(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "thinking_level",
-                    options=["none", "minimal", "low", "medium", "high"],
+                    options=["none", "minimal", "low", "medium", "high", "xhigh"],
                     default="none",
                     optional=True,
                     tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
                              "default level (it does not turn thinking off). minimal is raised to low on "
                              "models that reject it: 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash, "
-                             "3.8 Flash."),
+                             "3.8 Flash. xhigh is sent only to 4 Hydrogen; other models get high."),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -589,13 +600,13 @@ class GeminiChat(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "thinking_level",
-                    options=["none", "minimal", "low", "medium", "high"],
+                    options=["none", "minimal", "low", "medium", "high", "xhigh"],
                     default="none",
                     optional=True,
                     tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
                              "default level (it does not turn thinking off). minimal is raised to low on "
                              "models that reject it: 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash, "
-                             "3.8 Flash."),
+                             "3.8 Flash. xhigh is sent only to 4 Hydrogen; other models get high."),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -643,14 +654,20 @@ class GeminiChat(IO.ComfyNode):
         if model is None:
             model = GeminiClient.DEFAULT_MODEL
 
+        continuing = not reset_conversation and chat_session is not None
+        if continuing:
+            # A continued session answers with the model it was started on, so
+            # thinking clamps and the timeout follow that model, not the widget.
+            model = chat_session._model
+
         thinking_cfg = _build_thinking_config(thinking_level, model)
 
         try:
-            if reset_conversation or chat_session is None:
+            if continuing:
+                print(f"[Gemini] Continuing conversation with {model}")
+            else:
                 chat_session = client.start_chat(model=model, thinking_config=thinking_cfg)
                 print(f"[Gemini] Started new conversation with {model}")
-            else:
-                print(f"[Gemini] Continuing conversation")
 
             from google.genai import types
             import json
@@ -800,13 +817,13 @@ class GeminiVision(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "thinking_level",
-                    options=["none", "minimal", "low", "medium", "high"],
+                    options=["none", "minimal", "low", "medium", "high", "xhigh"],
                     default="none",
                     optional=True,
                     tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
                              "default level (it does not turn thinking off). minimal is raised to low on "
                              "models that reject it: 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash, "
-                             "3.8 Flash."),
+                             "3.8 Flash. xhigh is sent only to 4 Hydrogen; other models get high."),
                 ),
                 IO.Int.Input(
                     "seed",

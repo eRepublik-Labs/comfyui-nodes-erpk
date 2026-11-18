@@ -96,7 +96,7 @@ General-purpose text generation and completion.
 - `stop_sequences`: Newline-separated sequences where generation stops (max 5)
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
-- `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. The node raises "minimal" to "low" on 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it
+- `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high", "xhigh". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. The node raises "minimal" to "low" on 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it. Only 4 Hydrogen takes "xhigh"; every other model gets "high"
 
 **Outputs:**
 - `response`: Generated text
@@ -127,7 +127,7 @@ Multi-turn conversation with message history preservation.
 - `stop_sequences`: Newline-separated sequences where generation stops (max 5)
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
-- `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. The node raises "minimal" to "low" on 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it
+- `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high", "xhigh". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. The node raises "minimal" to "low" on 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it. Only 4 Hydrogen takes "xhigh"; every other model gets "high"
 
 **Outputs:**
 - `response`: Chat response
@@ -157,7 +157,7 @@ Analyze images with questions or instructions.
 - `stop_sequences`: Newline-separated sequences where generation stops (max 5)
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
-- `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. The node raises "minimal" to "low" on 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it
+- `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high", "xhigh". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. The node raises "minimal" to "low" on 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it. Only 4 Hydrogen takes "xhigh"; every other model gets "high"
 
 **Outputs:**
 - `analysis`: Text analysis of the image(s)
@@ -354,7 +354,7 @@ but `gemini-omni-1.2-flash` rejects it.
 | Model | Best For | Context Window | Notes |
 |-------|----------|----------------|-------|
 | **gemini-4-carbon** | Strongest reasoning | 1M tokens | $2/$10 per 1M through 2026-11-30, then $4/$20. Thinking low/medium/high (the node raises `minimal` to `low`). Ignores temperature, top_p and top_k. Each call gets at least a 15-minute timeout, as Google advises; set `max_tokens` to 32768 or more |
-| **gemini-4-hydrogen** | Fast coding and agentic work | 1M tokens | $1.50/$7.50 per 1M. Thinking low/medium/high, default high (the node raises `minimal` to `low`). Ignores temperature, top_p and top_k. Google advises `max_tokens` of 65536 |
+| **gemini-4-hydrogen** | Fast coding and agentic work | 1M tokens | $1.50/$7.50 per 1M. Thinking low/medium/high/xhigh, default high (the node raises `minimal` to `low`); the only model that takes `xhigh`. Ignores temperature, top_p and top_k. Google advises `max_tokens` of 65536 |
 | **gemini-4-argon** | Flagship reasoning | 1M tokens | $2/$10 per 1M through 2026-11-30, then $4/$20. Thinking low/medium/high (`minimal` is clamped to `low`). Ignores temperature, top_p and top_k. Each call gets at least a 15-minute timeout, as Google advises; set `max_tokens` to 32768 or more for hard prompts |
 | **gemini-3.1-pro-preview** | Most advanced reasoning | 1M tokens | `minimal` thinking is clamped to `low` |
 | **gemini-3.8-flash** | Latest Flash generation | 1M tokens | **Default**, same price as 3.6/3.7; `minimal` thinking is clamped to `low` |

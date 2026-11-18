@@ -62,6 +62,7 @@ class _RecordingSession:
 
     def __init__(self):
         self.configs = []
+        self._model = "gemini-3.8-flash"
 
     def send_message(self, message, config):
         self.configs.append(config)

@@ -246,6 +246,8 @@ def test_argon_chat_turn_carries_the_long_http_timeout():
     sent = {}
 
     class _Session:
+        _model = ARGON
+
         def send_message(self, message, config):
             sent["config"] = config
             return SimpleNamespace(text="OK", candidates=[])

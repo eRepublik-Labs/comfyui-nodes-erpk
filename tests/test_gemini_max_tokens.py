@@ -86,7 +86,7 @@ class TestCutOffReplies:
         assert _cut_off_message(8192) in str(error.value)
 
     def test_chat_raises(self):
-        session = SimpleNamespace(send_message=lambda message, config: _response(
+        session = SimpleNamespace(_model="gemini-3.8-flash", send_message=lambda message, config: _response(
             CUT_OFF_TEXT, types.FinishReason.MAX_TOKENS))
         with pytest.raises(ValueError) as error:
             asyncio.run(GeminiChat.execute(prompt="Prove it.", client=GeminiClient(api_key="test-key"),
@@ -120,7 +120,7 @@ class TestRepliesWithNoText:
         assert "Response blocked by safety filters. Reason: SAFETY" in str(error.value)
 
     def test_chat_reports_the_finish_reason(self):
-        session = SimpleNamespace(send_message=lambda message, config: _response(
+        session = SimpleNamespace(_model="gemini-3.8-flash", send_message=lambda message, config: _response(
             None, types.FinishReason.SAFETY))
         with pytest.raises(ValueError) as error:
             asyncio.run(GeminiChat.execute(prompt="Hi", client=GeminiClient(api_key="test-key"),

@@ -202,7 +202,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 
 **Key Benefits:**
 - Support for Gemini 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.8 Flash (default), 3.7, 3.6 and 3.5 Flash, and 3.5 Flash-Lite
-- **Thinking level** control across all models (none/minimal/low/medium/high). `none` keeps the model's default thinking; `minimal` is raised to `low` on models that reject it
+- **Thinking level** control across all models (none/minimal/low/medium/high/xhigh). `none` keeps the model's default thinking; the node raises `minimal` to `low` and lowers `xhigh` to `high` on models that reject them (only Gemini 4 Hydrogen takes `xhigh`)
 - **Omni Flash video generation** from text, a start image or reference images
 - Each node selects its own model for maximum flexibility
 - State-of-the-art reasoning with Gemini 3.1 Pro Preview

@@ -19,7 +19,7 @@ Generates text using Gemini models. Supports structured JSON output, thinking/re
 | stop_sequences | String | "" | Stop generation at these sequences, one per line, max 5 (optional) |
 | response_mime_type | Combo | default | Output format: default, text/plain, or application/json (optional) |
 | response_schema | String | "" | JSON schema for structured output, used with application/json (optional) |
-| thinking_level | Combo | none | Reasoning depth: none, minimal, low, medium, high. none sends no setting, so the model thinks at its own default level (it does not turn thinking off). The node raises minimal to low on 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it (optional) |
+| thinking_level | Combo | none | Reasoning depth: none, minimal, low, medium, high, xhigh. none sends no setting, so the model thinks at its own default level (it does not turn thinking off). The node raises minimal to low on 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it. Only 4 Hydrogen takes xhigh; every other model gets high (optional) |
 
 ## Output
 
