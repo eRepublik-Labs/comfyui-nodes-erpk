@@ -45,6 +45,7 @@ Animates a start frame, optionally toward an end frame, with Seedance on BytePlu
 ## Notes
 
 - Before any call, the node checks the request against the selected model's row in `byteplus/byteplus_api/seedance.py` and raises a `ValueError` naming the model and the value when the model rejects it.
+- Cancel pressed before the node creates the task stops it before it calls ModelArk, so ModelArk bills nothing.
 - Polling runs every 8 s. Cancel in ComfyUI deletes a `queued` task; ModelArk cannot cancel a `running` one, so it finishes and bills.
 - The console prints the task ID as soon as ModelArk creates the task, even when ComfyUI stopped the run during the request. Every cancel outcome is printed too. Fetch the video of a stopped run with the BytePlus Seedance Task Result node.
 - `failed`, `expired` and `cancelled` tasks raise with ModelArk's code and message, including moderation codes. Failed and moderated generations are not billed.
