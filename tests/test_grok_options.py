@@ -56,6 +56,31 @@ def test_edit_aspect_options_have_no_duplicates():
 
 
 # ---------------------------------------------------------------------------
+# Text node widgets. widgets_values is positional and these nodes add no DOM
+# widget, so inputs added after release must trail every saved widget.
+# ---------------------------------------------------------------------------
+
+TEXT_WIDGETS_AT_RELEASE = {
+    "GrokTextGeneration": ["prompt", "model", "temperature", "max_tokens", "reasoning_effort"],
+    "GrokChat": ["prompt", "model", "reset_conversation", "temperature", "max_tokens", "reasoning_effort"],
+}
+
+
+@pytest.mark.parametrize("node", sorted(TEXT_WIDGETS_AT_RELEASE))
+def test_text_node_inputs_trail_every_saved_widget(node):
+    from tests.test_grok_image_edit_grid import frontend_widget_order
+    assert frontend_widget_order(_node(node).define_schema()) == TEXT_WIDGETS_AT_RELEASE[node] + [
+        "system_prompt",
+    ]
+
+
+@pytest.mark.parametrize("node", sorted(TEXT_WIDGETS_AT_RELEASE))
+def test_system_prompt_is_optional_multiline_and_starts_empty(node):
+    inp = _input(_node(node), "system_prompt")
+    assert (inp.optional, inp.multiline, inp.default) == (True, True, "")
+
+
+# ---------------------------------------------------------------------------
 # Video edit / extend take a video input, which only grok-imagine-video has
 # ---------------------------------------------------------------------------
 
@@ -181,13 +206,13 @@ NO_EFFORT_MODELS = [
 
 
 @pytest.mark.parametrize("node", ["GrokTextGeneration", "GrokChat"])
-def test_reasoning_effort_widget_is_appended_last(node):
-    # widgets_values is positional: a new widget must be the last input.
-    inputs = _node(node).define_schema().inputs
-    assert inputs[-1].id == "reasoning_effort"
-    assert inputs[-1].options == EFFORT_OPTIONS
-    assert inputs[-1].default == "(model default)"
-    assert inputs[-1].optional is True
+def test_reasoning_effort_widget_options(node):
+    # Its position among the saved widgets is pinned by
+    # test_text_node_inputs_trail_every_saved_widget.
+    inp = _input(_node(node), "reasoning_effort")
+    assert inp.options == EFFORT_OPTIONS
+    assert inp.default == "(model default)"
+    assert inp.optional is True
 
 
 @pytest.mark.parametrize("effort", ["low", "medium", "high", "xhigh"])

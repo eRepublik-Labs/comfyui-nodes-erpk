@@ -17,6 +17,7 @@ Maintains a multi-turn conversation by threading message history between Grok Ch
 | temperature | Float | 0.7 | Creativity. Range: 0.0–2.0 (optional) |
 | max_tokens | Int | 4096 | Maximum visible response tokens; reasoning tokens are not counted. Range: 256–128000. A reply cut off at this limit raises an error instead of returning partial text. grok-4.20-multi-agent-0309 does not honour it (optional) |
 | reasoning_effort | Combo | (model default) | Options: (model default), none, low, medium, high, xhigh. grok-4.7 receives it (low to xhigh; `none` is sent as `low` because grok-4.7 rejects it). On grok-4.20-multi-agent-0309 it sets `agent_count` instead: low/medium = 4 agents, high/xhigh = 16 agents (about 12x the prompt tokens of the default), `none` sends nothing. The other models reject the field, so it is not sent to them. (model default) sends nothing (optional) |
+| system_prompt | String | (empty) | Instructions sent as a system message ahead of the conversation and stored in `chat_session`, so later turns keep them. A non-empty value replaces the system prompt of a connected session; an empty one keeps the session's, or sends none (optional) |
 
 ## Output
 

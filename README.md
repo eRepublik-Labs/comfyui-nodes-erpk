@@ -256,8 +256,8 @@ xAI Grok integration — text, multi-turn chat, image generation/editing (up to 
 #### Text & Chat Nodes
 
 - **Grok API Client** - Initialize the xAI client (optional for downstream nodes)
-- **Grok Text Generation** - One-shot text completion via `grok-4.7` / `grok-4.20-0309-non-reasoning` / `grok-4.20-multi-agent-0309` / `grok-build-0.1`, with `reasoning_effort` for grok-4.7 and agent count (4 or 16) for grok-4.20-multi-agent-0309
-- **Grok Chat** - Multi-turn conversation threaded via `GROK_CHAT_SESSION`
+- **Grok Text Generation** - One-shot text completion via `grok-4.7` / `grok-4.20-0309-non-reasoning` / `grok-4.20-multi-agent-0309` / `grok-build-0.1`, with `reasoning_effort` for grok-4.7, agent count (4 or 16) for grok-4.20-multi-agent-0309, and an optional `system_prompt`
+- **Grok Chat** - Multi-turn conversation threaded via `GROK_CHAT_SESSION`, with an optional `system_prompt` that the session carries to later turns
 - A Grok Text Generation or Chat reply cut off at `max_tokens` raises an error instead of returning partial text
 
 #### Image Nodes

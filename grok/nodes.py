@@ -46,6 +46,29 @@ _CLIENT_TOOLTIP = (
 )
 
 
+def _system_prompt_input(tooltip: str):
+    return IO.String.Input(
+        "system_prompt",
+        multiline=True,
+        default="",
+        optional=True,
+        tooltip=tooltip,
+    )
+
+
+def _with_system_prompt(messages: List[dict], system_prompt: str) -> List[dict]:
+    """Return `messages` led by `system_prompt` as the one system message.
+
+    A blank system_prompt returns `messages` unchanged. A given one replaces a
+    system message already at the head, so a chat never carries two.
+    """
+    text = (system_prompt or "").strip()
+    if not text:
+        return messages
+    rest = messages[1:] if messages and messages[0].get("role") == "system" else messages
+    return [{"role": "system", "content": text}] + rest
+
+
 def _make_grok_client(client_dict) -> GrokClient:
     """Reconstruct a GrokClient from a client dict or create one via auto-resolution.
 
@@ -187,6 +210,9 @@ class GrokTextGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip=_REASONING_EFFORT_TOOLTIP,
                 ),
+                _system_prompt_input(
+                    "Instructions sent as a system message before the prompt. Leave empty to send none."
+                ),
             ],
             outputs=[
                 IO.String.Output("response"),
@@ -207,7 +233,9 @@ class GrokTextGeneration(IO.ComfyNode):
             raise ValueError("Prompt cannot be empty.")
 
         grok = _make_grok_client(client_dict)
-        messages = [{"role": "user", "content": prompt.strip()}]
+        messages = _with_system_prompt(
+            [{"role": "user", "content": prompt.strip()}], kwargs.get("system_prompt", "")
+        )
 
         try:
             result = await grok.generate_text(
@@ -293,6 +321,11 @@ class GrokChat(IO.ComfyNode):
                     optional=True,
                     tooltip=_REASONING_EFFORT_TOOLTIP,
                 ),
+                _system_prompt_input(
+                    "Instructions sent as a system message ahead of the conversation, and carried "
+                    "in chat_session to the next turn. Replaces the system prompt of a connected "
+                    "session; leave empty to keep that one, or to send none."
+                ),
             ],
             outputs=[
                 IO.String.Output("response"),
@@ -323,6 +356,7 @@ class GrokChat(IO.ComfyNode):
             print(f"[Grok] Continuing conversation ({len(messages)} messages)")
 
         messages.append({"role": "user", "content": prompt.strip()})
+        messages = _with_system_prompt(messages, kwargs.get("system_prompt", ""))
 
         grok = _make_grok_client(client_dict)
         try:
