@@ -30,6 +30,9 @@ from .seedream_v5_lite_edit_sequential import SeedreamV5LiteEditSequentialNode
 from .seedream_v5_pro import SeedreamV5ProNode
 from .seedream_v5_pro_edit import SeedreamV5ProEditNode
 from .seedream_v5_pro_layers import SeedreamV5ProLayersNode
+from .seedream_v5_5 import SeedreamV5_5Node
+from .seedream_v5_5_edit import SeedreamV5_5EditNode
+from .seedream_v5_5_layers import SeedreamV5_5LayersNode
 from .qwen_image_max import QwenImageMaxNode
 from .qwen_image_max_edit import QwenImageMaxEditNode
 from .jibmix_qwen_image import JibMixQwenImageNode
@@ -99,6 +102,9 @@ NODES = [
     SeedreamV5ProNode,
     SeedreamV5ProEditNode,
     SeedreamV5ProLayersNode,
+    SeedreamV5_5Node,
+    SeedreamV5_5EditNode,
+    SeedreamV5_5LayersNode,
     QwenImageMaxNode,
     QwenImageMaxEditNode,
     JibMixQwenImageNode,

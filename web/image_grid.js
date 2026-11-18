@@ -33,6 +33,7 @@ const GRID_NODES = [
     { nodeId: "SeedreamV5LiteEditNode", socket: "images" },
     { nodeId: "SeedreamV5LiteEditSequentialNode", socket: "images" },
     { nodeId: "SeedreamV5ProEditNode", socket: "images" },
+    { nodeId: "SeedreamV5_5EditNode", socket: "images" },
     { nodeId: "MinimaxH3ImageEditNode", socket: "images" },
 ];
 

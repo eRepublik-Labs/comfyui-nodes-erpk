@@ -61,6 +61,16 @@ Sized by an aspect ratio (15 options) plus a 1k/1.5k/2k resolution tier instead 
 
 Pro Layers outputs its layers and masks as lists rather than batches, because each layer comes back cropped to its object at its own size. No positions are returned, so layers cannot be placed back on the base automatically.
 
+### ByteDance Seedream V5.5 Models
+
+Sized by an aspect ratio (15 options) plus a 1k/1.5k/2k resolution tier. The endpoints take no seed, so the seed input only controls ComfyUI's cache. The image and edit nodes default to png, offer an auto, transparent or opaque background, and output the result's alpha as a `mask` (1 where opaque).
+
+| Node | Description | Size | Input Images | Output | Pricing | API Docs |
+|------|-------------|------|--------------|--------|---------|----------|
+| **Seedream V5.5** | Text-to-image with optional transparent background | Aspect ratio + 1k/1.5k/2k | N/A | Image + mask | $0.02 (1k, 1.5k), $0.035 (2k) | [Link](https://wavespeed.ai/docs/docs-api/bytedance/seedream-v5.5) |
+| **Seedream V5.5 Edit** | Image editing; aspect ratio can follow the first image | Aspect ratio or auto + 1k/1.5k/2k | Up to 10, IMAGE batch, grid or URLs | Image + mask | As above, +$0.008 for every input image | [Link](https://wavespeed.ai/docs/docs-api/bytedance/seedream-v5.5/edit) |
+| **Seedream V5.5 Layers** | Splits an image into a clean base plus one layer and mask per object | 1k/1.5k/2k | Exactly 1, IMAGE or URL | Base image + layer and mask lists | `max_images` x $0.02 (1k, 1.5k) or x $0.035 (2k), billed even when fewer images return. Default 10 images is $0.20 at 1k | [Link](https://wavespeed.ai/docs/docs-api/bytedance/seedream-v5.5/layer-decomposition) |
+
 ### Qwen Image Models
 
 | Node | Models | Description | Dimensions | Input Images | Language | Output | Pricing | API Docs |
@@ -550,7 +560,7 @@ pip install -r requirements.txt
 ```
 [ERPK] Loaded <N> V3 nodes
 ```
-The WaveSpeed module alone contributes 67 nodes.
+The WaveSpeed module alone contributes 70 nodes.
 
 ### Common Issues
 
@@ -567,7 +577,7 @@ All WaveSpeed nodes are located under the **ERPK/WaveSpeedAI** category:
 3. Navigate to: **ERPK → WaveSpeedAI**
 4. Select your desired node
 
-**Available nodes (67 total):**
+**Available nodes (70 total):**
 
 Client & I/O:
 - WaveSpeed Client
@@ -580,6 +590,7 @@ Image (ByteDance Seedream):
 - Bytedance Seedream V4.5 / V4.5 Sequential / V4.5 Edit / V4.5 Edit Sequential
 - Bytedance Seedream V5.0 Lite / V5.0 Lite Sequential / V5.0 Lite Edit / V5.0 Lite Edit Sequential
 - Bytedance Seedream V5.0 Pro / V5.0 Pro Edit / V5.0 Pro Layers
+- Bytedance Seedream V5.5 / V5.5 Edit / V5.5 Layers
 
 Image (Qwen):
 - Qwen Image 2.0 Text-to-Image

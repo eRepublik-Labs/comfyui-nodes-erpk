@@ -139,7 +139,7 @@ def _schema_of(node_id):
 
 
 def test_every_grid_node_in_the_frontend_has_caps():
-    assert len(GRID_NODE_IDS) == 18
+    assert len(GRID_NODE_IDS) == 19
     assert sorted(set(GRID_NODE_IDS) - set(image_grid.GRID_CAPS)) == []
 
 
