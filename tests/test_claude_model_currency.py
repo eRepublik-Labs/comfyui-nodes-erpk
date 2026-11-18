@@ -90,8 +90,11 @@ FABLE_5_2 = "claude-fable-5-2"
 # --- Fable 5.2 --------------------------------------------------------------
 # READ https://platform.claude.com/docs/en/models/fable-5-2/overview on
 # 2026-11-18: released 2026-11-09, 1M context, 128K output, $8 / $40 per MTok,
-# 5m cache write $10, cache read $0.20. Not measured: this organization's key
-# gets 400 "data retention enabled" on every Fable model.
+# 5m cache write $10, cache read $0.20. READ build-with-claude/effort and
+# thinking-troubleshooting: all five effort levels, default high; adaptive
+# thinking always on, "disabled" returns 400 (test_claude_client_requests
+# covers that rule). Not measured: this organization's key gets 400 "data
+# retention enabled" on every Fable model.
 
 
 def test_fable_5_2_offered_in_every_dropdown():

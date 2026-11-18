@@ -328,7 +328,7 @@ The same five nodes have a `thinking` widget after `effort`. `adaptive` (the def
 | Haiku 5.5 | `{"type": "disabled"}` | (model default), low, medium, high |
 | Opus 5.5, Fable 5.2, Fable 5.1, Fable 5 | always think | none |
 
-A choice outside this table stops the node with an error before any request, so Anthropic bills nothing and nothing runs with thinking quietly back on. Measured on the live API on 2026-11-18, except the Fable rows, which come from Anthropic's thinking troubleshooting page because this organization's key cannot reach Fable models.
+A choice outside this table stops the node with an error before any request, so Anthropic bills nothing and nothing runs with thinking quietly back on. Measured on the live API on 2026-11-18, except the Fable rows. Those come from Anthropic's thinking troubleshooting page and are unmeasured, because the key used for testing has no Fable access.
 
 ### Token Management
 - Use Token Counter node to check prompt lengths before generation
