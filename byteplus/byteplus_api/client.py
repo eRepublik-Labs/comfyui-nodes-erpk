@@ -13,7 +13,8 @@ import requests
 try:
     from comfy.model_management import InterruptProcessingException as _InterruptBase
 except Exception:
-    _InterruptBase = Exception
+    # ComfyUI's InterruptProcessingException derives from BaseException; match it outside ComfyUI.
+    _InterruptBase = BaseException
 
 # (method, url, headers, body bytes or None, timeout seconds) -> (HTTP status, response text)
 Transport = Callable[[str, str, dict, Optional[bytes], float], Tuple[int, str]]
@@ -233,25 +234,31 @@ class BytePlusClient:
         try:
             task = await self.get_video_task(task_id)
         except Exception as e:
-            raise BytePlusInterrupted(f"Stopped waiting for Seedance task {task_id} without cancelling it: "
-                                      f"reading its status failed ({e}). {_CHECK_TASK}") from e
+            raise _interrupted(f"Stopped waiting for Seedance task {task_id} without cancelling it: "
+                               f"reading its status failed ({e}). {_CHECK_TASK}") from e
         status = task.get("status")
         if status == "queued":
             try:
                 await self.delete_video_task(task_id)
             except Exception as e:
-                raise BytePlusInterrupted(f"Stopped waiting for Seedance task {task_id}, but cancelling it "
-                                          f"failed ({e}). {_CHECK_TASK}") from e
-            raise BytePlusInterrupted(f"Cancelled queued Seedance task {task_id}.")
+                raise _interrupted(f"Stopped waiting for Seedance task {task_id}, but cancelling it "
+                                   f"failed ({e}). {_CHECK_TASK}") from e
+            raise _interrupted(f"Cancelled queued Seedance task {task_id}.")
         if status == "running":
-            raise BytePlusInterrupted(f"Stopped waiting for Seedance task {task_id}. It is already running, "
-                                      "which ModelArk cannot cancel, so it will finish and be billed.")
+            raise _interrupted(f"Stopped waiting for Seedance task {task_id}. It is already running, "
+                               "which ModelArk cannot cancel, so it will finish and be billed.")
         if status == "succeeded":
             video_url = (task.get("content") or {}).get("video_url")
-            print(f"[BytePlus] Task {task_id} had already succeeded and is billed. Video URL: {video_url}")
-            raise BytePlusInterrupted(f"Stopped waiting for Seedance task {task_id}, which had already succeeded "
-                                      f"and is billed. Video URL: {video_url}")
-        raise BytePlusInterrupted(f"Stopped waiting for Seedance task {task_id} (status {status}).")
+            raise _interrupted(f"Stopped waiting for Seedance task {task_id}, which had already succeeded "
+                               f"and is billed. Video URL: {video_url}")
+        raise _interrupted(f"Stopped waiting for Seedance task {task_id} (status {status}).")
+
+
+def _interrupted(message: str) -> BytePlusInterrupted:
+    # ComfyUI shows no text for an interrupt, so the console line is the user's only record.
+    print(f"[BytePlus] {message}")
+    return BytePlusInterrupted(message)
+
 
 def task_failure_message(task_id: str, task: dict) -> str:
     status = task.get("status")

@@ -128,22 +128,6 @@ def test_create_is_sent_once_and_surfaces_the_sync_error_envelope(monkeypatch):
     assert len(transport.calls) == 1
 
 
-def test_interrupt_cancels_a_queued_task_and_leaves_a_running_one(monkeypatch):
-    client, transport = _client([_task("queued"), (200, "")], interrupted=lambda: True,
-                                monkeypatch=monkeypatch)
-    with pytest.raises(BytePlusInterrupted) as excinfo:
-        asyncio.run(client.wait_for_video_task("cgt-1", timeout=60))
-    assert str(excinfo.value) == "Cancelled queued Seedance task cgt-1."
-    assert [m for m, _, _ in transport.calls] == ["GET", "DELETE"]
-
-    client, transport = _client([_task("running")], interrupted=lambda: True, monkeypatch=monkeypatch)
-    with pytest.raises(BytePlusInterrupted) as excinfo:
-        asyncio.run(client.wait_for_video_task("cgt-1", timeout=60))
-    assert str(excinfo.value) == ("Stopped waiting for Seedance task cgt-1. It is already running, which "
-                                  "ModelArk cannot cancel, so it will finish and be billed.")
-    assert [m for m, _, _ in transport.calls] == ["GET"]
-
-
 def test_image_response_errors(monkeypatch):
     client, _ = _client([(200, {"model": "m", "data": [], "error": {"code": "InternalServiceError",
                                                                      "message": "boom"}})],
@@ -220,29 +204,30 @@ def test_a_post_that_may_have_billed_is_sent_once_and_says_so(monkeypatch, call,
     assert transport.calls == [("POST", f"{BASE}{path}", {"model": "m"})]
 
 
-def test_interrupt_is_never_replaced_by_an_error_while_cancelling(monkeypatch, capsys):
-    client, _ = _client([requests.ConnectionError("reset")], interrupted=lambda: True, monkeypatch=monkeypatch)
-    with pytest.raises(BytePlusInterrupted) as excinfo:
-        asyncio.run(client.wait_for_video_task("cgt-1", timeout=60))
-    assert str(excinfo.value) == ("Stopped waiting for Seedance task cgt-1 without cancelling it: reading its "
-                                  "status failed (reset). It may still run and bill; check it with the BytePlus "
-                                  "Seedance Task Result node.")
+CHECK_TASK = "It may still run and bill; check it with the BytePlus Seedance Task Result node."
 
-    client, transport = _client([_task("queued"), (500, "boom")], interrupted=lambda: True,
-                                monkeypatch=monkeypatch)
-    with pytest.raises(BytePlusInterrupted) as excinfo:
-        asyncio.run(client.wait_for_video_task("cgt-1", timeout=60))
-    assert str(excinfo.value) == ("Stopped waiting for Seedance task cgt-1, but cancelling it failed (ModelArk "
-                                  "DELETE /contents/generations/tasks/cgt-1 returned HTTP 500: boom). It may still "
-                                  "run and bill; check it with the BytePlus Seedance Task Result node.")
-    assert [m for m, _, _ in transport.calls] == ["GET", "DELETE"]
 
+@pytest.mark.parametrize("replies, methods, message", [
+    ([_task("queued"), (200, "")], ["GET", "DELETE"], "Cancelled queued Seedance task cgt-1."),
+    ([_task("running")], ["GET"], "Stopped waiting for Seedance task cgt-1. It is already running, which "
+                                  "ModelArk cannot cancel, so it will finish and be billed."),
+    ([_task("succeeded", content={"video_url": "https://cdn.example.com/v.mp4"})], ["GET"],
+     "Stopped waiting for Seedance task cgt-1, which had already succeeded and is billed. "
+     "Video URL: https://cdn.example.com/v.mp4"),
+    ([_task("failed")], ["GET"], "Stopped waiting for Seedance task cgt-1 (status failed)."),
+    ([requests.ConnectionError("reset")], ["GET"],
+     f"Stopped waiting for Seedance task cgt-1 without cancelling it: reading its status failed (reset). {CHECK_TASK}"),
+    ([_task("queued"), (500, "boom")], ["GET", "DELETE"],
+     "Stopped waiting for Seedance task cgt-1, but cancelling it failed (ModelArk DELETE "
+     f"/contents/generations/tasks/cgt-1 returned HTTP 500: boom). {CHECK_TASK}"),
+])
+def test_every_cancel_outcome_is_printed_and_raised_as_comfyuis_interrupt(monkeypatch, capsys, replies, methods,
+                                                                          message):
+    client, transport = _client(replies, interrupted=lambda: True, monkeypatch=monkeypatch)
     capsys.readouterr()
-    client, transport = _client([_task("succeeded", content={"video_url": "https://cdn.example.com/v.mp4"})],
-                                interrupted=lambda: True, monkeypatch=monkeypatch)
     with pytest.raises(BytePlusInterrupted) as excinfo:
         asyncio.run(client.wait_for_video_task("cgt-1", timeout=60))
-    assert str(excinfo.value) == ("Stopped waiting for Seedance task cgt-1, which had already succeeded and is "
-                                  "billed. Video URL: https://cdn.example.com/v.mp4")
-    assert "Video URL: https://cdn.example.com/v.mp4" in capsys.readouterr().out
-    assert [m for m, _, _ in transport.calls] == ["GET"]
+    assert str(excinfo.value) == message
+    assert capsys.readouterr().out == f"[BytePlus] {message}\n"
+    assert [m for m, _, _ in transport.calls] == methods
+    assert not isinstance(excinfo.value, Exception)
