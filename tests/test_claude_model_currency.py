@@ -84,6 +84,56 @@ def test_opus_5_has_1m_context():
 
 
 
+FABLE_5_2 = "claude-fable-5-2"
+
+
+# --- Fable 5.2 --------------------------------------------------------------
+# READ https://platform.claude.com/docs/en/models/fable-5-2/overview on
+# 2026-11-18: released 2026-11-09, 1M context, 128K output, $8 / $40 per MTok,
+# 5m cache write $10, cache read $0.20. READ build-with-claude/effort and
+# thinking-troubleshooting: all five effort levels, default high; adaptive
+# thinking always on, "disabled" returns 400 (test_claude_client_requests
+# covers that rule). Not measured: this organization's key gets 400 "data
+# retention enabled" on every Fable model.
+
+
+def test_fable_5_2_offered_in_every_dropdown():
+    for node in (ClaudeAPIClient, ClaudeTokenCounter, ClaudeVisionAnalysis):
+        assert FABLE_5_2 in _combo_options(node)
+
+
+def test_fable_5_2_is_listed_ahead_of_older_fables():
+    options = _combo_options(ClaudeAPIClient)
+    assert options.index(FABLE_5_2) + 1 == options.index(FABLE_5_1)
+
+
+def test_fable_5_2_is_not_the_default():
+    assert _combo_options(ClaudeAPIClient)[0] != FABLE_5_2
+
+
+def test_fable_5_2_priced_at_published_rate():
+    entry = _pricing()[FABLE_5_2]
+    assert entry["input_price_per_mtok"] == 8.0
+    assert entry["output_price_per_mtok"] == 40.0
+    assert entry["cache_read_price_per_mtok"] == 0.2
+    assert entry["cache_write_5m_price_per_mtok"] == 10.0
+
+
+def test_fable_5_2_in_token_counter_fallback(monkeypatch):
+    import claude.token_counter as token_counter
+
+    def unreadable(*args, **kwargs):
+        raise OSError("pricing.json unreadable")
+
+    monkeypatch.setattr(token_counter, "open", unreadable, raising=False)
+    pricing, _ = ClaudeTokenCounter.load_pricing()
+    assert pricing[FABLE_5_2] == {"input": 8.0, "output": 40.0}
+
+
+def test_fable_5_2_has_1m_context():
+    assert TokenManager.CONTEXT_WINDOWS[FABLE_5_2] == 1_000_000
+
+
 def test_fable_5_1_offered_in_every_dropdown():
     for node in (ClaudeAPIClient, ClaudeTokenCounter, ClaudeVisionAnalysis):
         assert FABLE_5_1 in _combo_options(node)
@@ -318,6 +368,7 @@ def test_every_offered_model_has_a_published_5m_cache_write_price():
     published = {
         SONNET_5_5: 2.5, SONNET_5: 2.5, OPUS_5_5: 5.0, OPUS_5: 6.25, FABLE_5_1: 12.5, FABLE_5: 12.5,
         HAIKU_5_5: 0.125,  # read 2026-10-14
+        FABLE_5_2: 10.0,  # read 2026-11-18
     }
     pricing = _pricing()
     assert set(published) == set(_combo_options(ClaudeAPIClient))

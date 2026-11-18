@@ -191,11 +191,24 @@ def _widgets(name):
 @pytest.mark.parametrize("name", PRIOR_WIDGETS)
 def test_effort_is_appended_after_every_existing_widget(name):
     widgets = _widgets(name)
-    assert [w.id for w in widgets] == PRIOR_WIDGETS[name] + ["effort"]
-    effort = widgets[-1]
+    prior = len(PRIOR_WIDGETS[name])
+    assert [w.id for w in widgets[:prior + 1]] == PRIOR_WIDGETS[name] + ["effort"]
+    effort = widgets[prior]
     assert list(effort.options) == EFFORT_OPTIONS
     assert effort.default == "(model default)"
     assert effort.optional is True
+
+
+@pytest.mark.parametrize("name", PRIOR_WIDGETS)
+def test_thinking_is_appended_after_effort(name):
+    # No Claude node has a web/ extension adding a DOM widget, so the last
+    # Python widget is also the last widgets_values slot.
+    widgets = _widgets(name)
+    assert [w.id for w in widgets] == PRIOR_WIDGETS[name] + ["effort", "thinking"]
+    thinking = widgets[-1]
+    assert list(thinking.options) == ["adaptive", "off"]
+    assert thinking.default == "adaptive"
+    assert thinking.optional is True
 
 
 @pytest.mark.parametrize("name", PRIOR_WIDGETS)
@@ -233,6 +246,38 @@ def test_model_default_effort_sends_no_effort(monkeypatch, name):
     wire = Wire((200, message_body(text="{}")))
     _run(name, _client(monkeypatch, wire), effort="(model default)")
     assert "effort" not in wire.bodies[-1].get("output_config", {})
+
+
+@pytest.mark.parametrize("name", PRIOR_WIDGETS)
+def test_thinking_off_is_sent_as_the_models_off_setting(monkeypatch, name):
+    # Sonnet 5 accepts {"type": "disabled"} (measured 2026-11-18).
+    wire = Wire((200, message_body(text="{}")))
+    _run(name, _client(monkeypatch, wire, model="claude-sonnet-5"), thinking="off")
+    assert wire.bodies[-1]["thinking"] == {"type": "disabled"}
+
+
+@pytest.mark.parametrize("name", PRIOR_WIDGETS)
+def test_adaptive_thinking_widget_sends_adaptive_thinking(monkeypatch, name):
+    wire = Wire((200, message_body(text="{}")))
+    _run(name, _client(monkeypatch, wire), thinking="adaptive")
+    assert wire.bodies[-1]["thinking"] == {"type": "adaptive", "display": "summarized"}
+
+
+@pytest.mark.parametrize("name", PRIOR_WIDGETS)
+def test_thinking_off_on_opus_5_5_fails_the_node_without_a_request(monkeypatch, name):
+    # Opus 5.5 rejects every way of turning thinking off (measured 2026-11-18).
+    wire = Wire((200, message_body(text="{}")))
+    with pytest.raises(ValueError, match="claude-opus-5-5 cannot turn thinking off"):
+        _run(name, _client(monkeypatch, wire, model="claude-opus-5-5"), thinking="off")
+    assert wire.requests == []
+
+
+def test_streaming_text_generation_sends_thinking_off(monkeypatch):
+    wire = Wire()
+    client = _client(monkeypatch, wire, enable_streaming=True, model="claude-haiku-5-5")
+    assert _run_text_generation(client, use_streaming=True, thinking="off") == "ok"
+    assert wire.bodies[-1]["stream"] is True
+    assert wire.bodies[-1]["thinking"] == {"type": "disabled"}
 
 
 def test_streaming_text_generation_sends_effort(monkeypatch):
@@ -300,6 +345,35 @@ def test_token_counter_prices_a_100001_token_haiku_prompt_at_the_long_context_ra
     summary = _token_summary("a" * 400_004)
     assert "As Input:    $0.050001" in summary  # 100,001 x $0.50/M = 0.0500005
     assert "Long context:" in summary
+
+
+def test_token_counter_counts_with_its_model_widget_when_a_client_is_connected(monkeypatch):
+    # The summary prices and sizes the count for the widget's model, so the
+    # API must count with that model too, not the client's.
+    from claude.token_counter import ClaudeTokenCounter
+    wire = Wire()
+    client = _client(monkeypatch, wire, model="claude-sonnet-5-5")
+    count, summary = asyncio.run(
+        ClaudeTokenCounter.execute(text="hello", model="claude-haiku-5-5", client=client)
+    ).args
+    request = wire.requests[-1]
+    assert request.url.path == "/v1/messages/count_tokens"
+    assert wire.bodies[-1]["model"] == "claude-haiku-5-5"
+    assert count == 42
+    assert "Model:            claude-haiku-5-5" in summary
+
+
+def test_token_counter_fails_when_the_api_count_fails(monkeypatch):
+    # With a client connected the node promises the API's count. When the API
+    # refuses (measured 2026-11-18 on claude-fable-5-2), the node must fail
+    # rather than pass a 4-chars-per-token guess, or 0, downstream.
+    from claude.token_counter import ClaudeTokenCounter
+    from tests.claude_wire import error_body
+    wire = Wire(error_body(400, "invalid_request_error",
+                           "In order to access this model, your organization or workspace must have data retention enabled."))
+    client = _client(monkeypatch, wire)
+    with pytest.raises(ValueError, match="Failed to count tokens: .*data retention enabled"):
+        asyncio.run(ClaudeTokenCounter.execute(text="hello world, count me", model="claude-fable-5-2", client=client))
 
 
 # --- A reply cut off at max_tokens is an error, never partial output ------------

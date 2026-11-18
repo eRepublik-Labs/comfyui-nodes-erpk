@@ -22,7 +22,7 @@ from anthropic import Anthropic
 from anthropic._constants import MODEL_NONSTREAMING_TOKENS
 import configparser
 
-from ..models import DEFAULT_TEXT_MODEL
+from ..models import DEFAULT_TEXT_MODEL, thinking_off_config
 
 
 @functools.lru_cache(maxsize=1)
@@ -190,13 +190,15 @@ class ClaudeClient:
         max_tokens: Optional[int],
         model: Optional[str],
         effort: Optional[str],
+        thinking_off: bool,
         kwargs: Dict[str, Any],
     ) -> Dict[str, Any]:
+        model = model or self.model
         params = {
-            "model": model or self.model,
+            "model": model,
             "max_tokens": max_tokens or self.DEFAULT_MAX_TOKENS,
             "messages": messages,
-            "thinking": self.THINKING,
+            "thinking": thinking_off_config(model, effort) if thinking_off else self.THINKING,
         }
         if system:
             params["system"] = system
@@ -268,9 +270,10 @@ class ClaudeClient:
         max_tokens: Optional[int] = None,
         model: Optional[str] = None,
         effort: Optional[str] = None,
+        thinking_off: bool = False,
         **kwargs
     ):
-        params = self._build_params(messages, system, max_tokens, model, effort, kwargs)
+        params = self._build_params(messages, system, max_tokens, model, effort, thinking_off, kwargs)
         if self._sdk_requires_streaming(params):
             with self.client.messages.stream(**params) as stream:
                 response = stream.get_final_message()
@@ -288,6 +291,7 @@ class ClaudeClient:
         max_tokens: Optional[int] = None,
         model: Optional[str] = None,
         effort: Optional[str] = None,
+        thinking_off: bool = False,
         **kwargs
     ):
         """
@@ -302,6 +306,8 @@ class ClaudeClient:
             max_tokens: Maximum tokens to generate (thinking counts toward it)
             model: Override default model
             effort: output_config.effort level; None leaves the model default
+            thinking_off: Answer without thinking first, sent as the model's
+                own off setting (see models.THINKING_OFF)
             **kwargs: Additional Messages API parameters
 
         Returns:
@@ -310,7 +316,9 @@ class ClaudeClient:
         Raises:
             anthropic.APIError: The SDK's own error, once retries are exhausted
                 or immediately for a non-retryable 4xx
-            ValueError: The reply stopped at max_tokens, or Claude refused it
+            ValueError: The reply stopped at max_tokens, or Claude refused it,
+                or (before any request) the model cannot turn thinking off at
+                this effort
         """
         return await asyncio.to_thread(
             self._send_request_sync,
@@ -319,6 +327,7 @@ class ClaudeClient:
             max_tokens=max_tokens,
             model=model,
             effort=effort,
+            thinking_off=thinking_off,
             **kwargs,
         )
 
@@ -329,6 +338,7 @@ class ClaudeClient:
         max_tokens: Optional[int] = None,
         model: Optional[str] = None,
         effort: Optional[str] = None,
+        thinking_off: bool = False,
         **kwargs
     ) -> Generator[str, None, None]:
         """
@@ -341,9 +351,11 @@ class ClaudeClient:
 
         Raises:
             anthropic.APIError: The SDK's own error
-            ValueError: The reply stopped at max_tokens (after its chunks), or Claude refused it
+            ValueError: The reply stopped at max_tokens (after its chunks), or
+                Claude refused it, or (before any request) the model cannot
+                turn thinking off at this effort
         """
-        params = self._build_params(messages, system, max_tokens, model, effort, kwargs)
+        params = self._build_params(messages, system, max_tokens, model, effort, thinking_off, kwargs)
         with self.client.messages.stream(**params) as stream:
             for text in stream.text_stream:
                 yield text
@@ -352,47 +364,33 @@ class ClaudeClient:
             raise_if_refused(final)
             raise_if_truncated(final, params["max_tokens"])
 
-    def _count_tokens_sync(self, messages: list, system: Optional[str] = None) -> int:
-        try:
-            params = {
-                "model": self.model,
-                "messages": messages
-            }
-            if system:
-                params["system"] = system
+    def _count_tokens_sync(self, messages: list, system: Optional[str] = None, model: Optional[str] = None) -> int:
+        params = {
+            "model": model or self.model,
+            "messages": messages
+        }
+        if system:
+            params["system"] = system
+        return self.client.messages.count_tokens(**params).input_tokens
 
-            response = self.client.messages.count_tokens(**params)
-            return response.input_tokens
-
-        except Exception as e:
-            # Fallback to rough estimation if API fails
-            print(f"[Claude] Token counting API failed, using estimation: {e}")
-            total_text = ""
-            if system:
-                total_text += system + " "
-            for msg in messages:
-                content = msg.get("content", "")
-                if isinstance(content, str):
-                    total_text += content + " "
-                elif isinstance(content, list):
-                    for item in content:
-                        if isinstance(item, dict) and item.get("type") == "text":
-                            total_text += item.get("text", "") + " "
-            # Rough estimate: ~4 characters per token
-            return len(total_text) // 4
-
-    async def count_tokens(self, messages: list, system: Optional[str] = None) -> int:
+    async def count_tokens(self, messages: list, system: Optional[str] = None, model: Optional[str] = None) -> int:
         """
-        Count tokens in a message list using Anthropic's API.
+        Count tokens in a message list using Anthropic's API (the SDK retries
+        transient errors).
 
         Args:
             messages: List of message dicts
             system: Optional system prompt
+            model: Model to count for; None counts with the client's model
 
         Returns:
             Token count
+
+        Raises:
+            anthropic.APIError: The SDK's own error, once retries are exhausted
+                or immediately for a non-retryable 4xx
         """
-        return await asyncio.to_thread(self._count_tokens_sync, messages, system)
+        return await asyncio.to_thread(self._count_tokens_sync, messages, system, model)
 
     def get_usage_stats(self) -> Dict[str, Any]:
         """

@@ -85,6 +85,84 @@ def test_effort_merges_with_a_caller_output_format(monkeypatch):
     assert wire.bodies[-1]["output_config"] == {"format": fmt, "effort": "low"}
 
 
+# --- Thinking off ---------------------------------------------------------------
+# Which request turns thinking off, per model, and which efforts it rejects:
+# - MEASURED 2026-11-18 (model-study anthropic_probes.json and
+#   claude_thinking_off_probes.json): Haiku 5.5, Sonnet 5 and Opus 5 accept
+#   {"type": "disabled"}; Sonnet 5.5 rejects it and accepts {"type": "between_tools"};
+#   Opus 5.5 rejects both. Effort xhigh and max return 400 with thinking off on
+#   Sonnet 5.5, Opus 5 and Haiku 5.5; Sonnet 5 answered 200 at both.
+#   GET /v1/models thinking.types agrees for all five.
+# - READ build-with-claude/thinking-troubleshooting, 2026-11-18: Fable 5.2,
+#   Fable 5.1 and Fable 5 reject "disabled" (adaptive only, always on). This
+#   organization's key cannot reach any Fable model, so that part is unmeasured.
+
+OFF_ACCEPTED = (
+    [("claude-sonnet-5-5", effort, {"type": "between_tools"}) for effort in (None, "low", "medium", "high")]
+    + [("claude-sonnet-5", effort, {"type": "disabled"}) for effort in (None, "low", "medium", "high", "xhigh", "max")]
+    + [("claude-opus-5", effort, {"type": "disabled"}) for effort in (None, "low", "medium", "high")]
+    + [("claude-haiku-5-5", effort, {"type": "disabled"}) for effort in (None, "low", "medium", "high")]
+)
+ALWAYS_THINKS = ("claude-opus-5-5", "claude-fable-5-2", "claude-fable-5-1", "claude-fable-5")
+OFF_EFFORT_REJECTED = [
+    (model, effort)
+    for model in ("claude-sonnet-5-5", "claude-opus-5", "claude-haiku-5-5")
+    for effort in ("xhigh", "max")
+]
+
+
+@pytest.mark.parametrize("model,effort,expected", OFF_ACCEPTED)
+def test_thinking_off_sends_the_models_own_off_setting(monkeypatch, model, effort, expected):
+    wire = Wire()
+    client = _client(monkeypatch, wire)
+    asyncio.run(client.send_request(messages=USER, model=model, effort=effort, thinking_off=True))
+    body = wire.bodies[-1]
+    assert body["thinking"] == expected
+    assert body.get("output_config", {}).get("effort") == effort
+
+
+def test_thinking_off_streams_the_models_own_off_setting(monkeypatch):
+    wire = Wire()
+    client = _client(monkeypatch, wire)
+    assert _stream(client, model="claude-sonnet-5-5", effort="low", thinking_off=True) == "ok"
+    assert wire.bodies[-1]["thinking"] == {"type": "between_tools"}
+
+
+def test_thinking_off_follows_the_clients_model_without_an_override(monkeypatch):
+    wire = Wire()
+    client = _client(monkeypatch, wire, model="claude-haiku-5-5")
+    asyncio.run(client.send_request(messages=USER, thinking_off=True))
+    assert wire.bodies[-1]["thinking"] == {"type": "disabled"}
+
+
+@pytest.mark.parametrize("model", ALWAYS_THINKS)
+def test_thinking_off_on_a_model_that_always_thinks_raises_before_any_request(monkeypatch, model):
+    wire = Wire()
+    client = _client(monkeypatch, wire)
+    with pytest.raises(ValueError, match=f"{model} cannot turn thinking off"):
+        asyncio.run(client.send_request(messages=USER, model=model, thinking_off=True))
+    with pytest.raises(ValueError, match=f"{model} cannot turn thinking off"):
+        _stream(client, model=model, thinking_off=True)
+    assert wire.requests == []
+
+
+def test_thinking_off_on_the_clients_always_thinking_model_raises(monkeypatch):
+    wire = Wire()
+    client = _client(monkeypatch, wire, model="claude-opus-5-5")
+    with pytest.raises(ValueError, match="claude-opus-5-5 cannot turn thinking off"):
+        asyncio.run(client.send_request(messages=USER, thinking_off=True))
+    assert wire.requests == []
+
+
+@pytest.mark.parametrize("model,effort", OFF_EFFORT_REJECTED)
+def test_thinking_off_above_high_effort_raises_before_any_request(monkeypatch, model, effort):
+    wire = Wire()
+    client = _client(monkeypatch, wire)
+    with pytest.raises(ValueError, match=f"{model} rejects effort '{effort}' with thinking off"):
+        asyncio.run(client.send_request(messages=USER, model=model, effort=effort, thinking_off=True))
+    assert wire.requests == []
+
+
 def test_streaming_sends_effort(monkeypatch):
     wire = Wire()
     client = _client(monkeypatch, wire)
@@ -187,6 +265,17 @@ def test_server_error_is_retried_on_count_tokens(monkeypatch):
     client = _client(monkeypatch, wire)
     assert asyncio.run(client.count_tokens(messages=USER)) == 7
     assert len(wire.requests) == 2
+
+
+def test_count_tokens_error_raises_the_sdk_error(monkeypatch):
+    # Measured 2026-11-18: count_tokens on claude-fable-5-2 returns this 400 on
+    # an organization without data retention. A guessed count would hide it.
+    wire = Wire(error_body(400, "invalid_request_error",
+                           "In order to access this model, your organization or workspace must have data retention enabled."))
+    client = _client(monkeypatch, wire)
+    with pytest.raises(anthropic.BadRequestError, match="data retention enabled"):
+        asyncio.run(client.count_tokens(messages=USER, model="claude-fable-5-2"))
+    assert len(wire.requests) == 1
 
 
 def test_streaming_error_raises_the_sdk_error(monkeypatch):

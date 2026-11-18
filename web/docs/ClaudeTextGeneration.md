@@ -17,6 +17,7 @@ General-purpose text generation using Claude for completion, creative writing, a
 | use_streaming | Boolean | False | Enable streaming responses (optional) |
 | model | Combo | (inherit from client) | Model override for this call (optional). Choose a model from the list, or inherit the connected client's model. Without a client, inherit means the Claude API client's default model |
 | effort | Combo | (model default) | How much effort Claude spends: thinking depth, tool calls and answer length (optional). Options: (model default), low, medium, high, xhigh, max. (model default) sends nothing, so the model keeps its own default (high; medium on Opus 5.5 and Haiku 5.5). Higher levels cost more tokens and time |
+| thinking | Combo | adaptive | Whether Claude thinks before it answers (optional). Options: adaptive, off. adaptive lets Claude decide when and how much to think, steered by effort. off answers without thinking first, on Sonnet 5 at any effort and on Sonnet 5.5, Opus 5 and Haiku 5.5 at effort high or below. Opus 5.5 and every Fable always think, so off stops the node with an error before any request |
 
 ## Output
 

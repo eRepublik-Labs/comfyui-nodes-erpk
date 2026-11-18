@@ -5,7 +5,7 @@ import copy
 import json
 from comfy_api.latest import IO
 
-from .models import effort_input, effort_kwargs
+from .models import effort_input, effort_kwargs, thinking_input, thinking_kwargs
 
 
 def strict_object_schema(schema):
@@ -100,6 +100,7 @@ class ClaudeStructuredOutput(IO.ComfyNode):
                     tooltip="Seed for cache control. Randomizes by default to ensure fresh results each run.",
                 ),
                 effort_input(),
+                thinking_input(),
             ],
             outputs=[
                 IO.String.Output("json_output"),
@@ -143,6 +144,7 @@ class ClaudeStructuredOutput(IO.ComfyNode):
             max_tokens=max_tokens,
             output_config={"format": {"type": "json_schema", "schema": schema}},
             **effort_kwargs(kwargs.get("effort")),
+            **thinking_kwargs(kwargs.get("thinking")),
         )
 
         from .claude_api.client import response_text

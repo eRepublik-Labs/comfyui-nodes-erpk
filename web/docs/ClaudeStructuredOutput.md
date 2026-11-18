@@ -17,6 +17,7 @@ Gets JSON from Claude that matches a tool definition's schema. Uses Anthropic's 
 | max_tokens | Int | 4096 | Maximum tokens for the response; thinking counts toward it (optional). Min: 256, Max: 128000, Step: 128 |
 | seed | Int | -1 | Cache control. A fixed seed reuses the previous result; -1 re-runs every queue |
 | effort | Combo | (model default) | How much effort Claude spends: thinking depth, tool calls and answer length (optional). Options: (model default), low, medium, high, xhigh, max. (model default) sends nothing, so the model keeps its own default (high; medium on Opus 5.5 and Haiku 5.5). Higher levels cost more tokens and time |
+| thinking | Combo | adaptive | Whether Claude thinks before it answers (optional). Options: adaptive, off. adaptive lets Claude decide when and how much to think, steered by effort. off answers without thinking first, on Sonnet 5 at any effort and on Sonnet 5.5, Opus 5 and Haiku 5.5 at effort high or below. Opus 5.5 and every Fable always think, so off stops the node with an error before any request |
 
 ## Output
 

@@ -12,12 +12,13 @@ Analyzes images using Claude's multimodal vision capabilities. Supports single o
 | image | IMAGE | (required) | Images to analyze. The node sends every image in the batch |
 | question | String (multiline) | Describe this image in detail. | Question or instruction about the image(s) |
 | client | CLAUDE_API_CLIENT | (none) | Claude API client (optional if API key is configured in Settings) |
-| model | Combo | (inherit from client) | Override the client's model for this vision call (optional). Options: (inherit from client), claude-sonnet-5-5, claude-sonnet-5, claude-opus-5-5, claude-opus-5, claude-fable-5-1, claude-fable-5, claude-haiku-5-5 |
+| model | Combo | (inherit from client) | Override the client's model for this vision call (optional). Options: (inherit from client), claude-sonnet-5-5, claude-sonnet-5, claude-opus-5-5, claude-opus-5, claude-fable-5-2, claude-fable-5-1, claude-fable-5, claude-haiku-5-5 |
 | additional_images | IMAGE | (none) | Additional images, sent after the primary batch (optional). Up to 600 images in total |
 | detail_level | Combo | high | Level of detail in analysis (optional). Options: low, medium, high |
 | max_tokens | Int | 8192 | Maximum length of analysis; thinking counts toward it (optional). Min: 256, Max: 128000, Step: 128 |
 | seed | Int | -1 | Cache control. A fixed seed reuses the previous result; -1 re-runs every queue (optional) |
 | effort | Combo | (model default) | How much effort Claude spends: thinking depth, tool calls and answer length (optional). Options: (model default), low, medium, high, xhigh, max. (model default) sends nothing, so the model keeps its own default (high; medium on Opus 5.5 and Haiku 5.5). Higher levels cost more tokens and time |
+| thinking | Combo | adaptive | Whether Claude thinks before it answers (optional). Options: adaptive, off. adaptive lets Claude decide when and how much to think, steered by effort. off answers without thinking first, on Sonnet 5 at any effort and on Sonnet 5.5, Opus 5 and Haiku 5.5 at effort high or below. Opus 5.5 and every Fable always think, so off stops the node with an error before any request |
 
 ## Output
 

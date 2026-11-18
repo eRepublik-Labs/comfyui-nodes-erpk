@@ -22,7 +22,7 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 
 - ComfyUI installed and running
 - Python 3.10 or higher
-- `anthropic>=1.11.0` (installed by `claude/requirements.txt`; an existing install on an older SDK must upgrade with `pip install -U -r claude/requirements.txt`)
+- `anthropic>=2.4.0` (installed by `claude/requirements.txt`; an existing install on an older SDK must upgrade with `pip install -U -r claude/requirements.txt`)
 - Anthropic API key ([get one here](https://console.anthropic.com/settings/keys))
 
 ### Steps
@@ -76,7 +76,7 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 Initializes the Claude API client. Optional if API key is configured in ComfyUI Settings — generation nodes can run standalone.
 
 **Inputs:**
-- `model`: claude-sonnet-5-5 (default), claude-sonnet-5, claude-opus-5-5, claude-opus-5, claude-fable-5-1, claude-fable-5, claude-haiku-5-5
+- `model`: claude-sonnet-5-5 (default), claude-sonnet-5, claude-opus-5-5, claude-opus-5, claude-fable-5-2, claude-fable-5-1, claude-fable-5, claude-haiku-5-5
 - `api_key`: Optional API key (uses Settings/config if empty)
 - `enable_streaming`: Enable streaming responses
 - `enable_caching`: Send automatic prompt caching (see [Prompt Caching](#prompt-caching))
@@ -97,6 +97,7 @@ Initializes the Claude API client. Optional if API key is configured in ComfyUI 
 - `use_streaming`: Enable streaming
 - `model`: Model override for this call, or inherit the client's model (default)
 - `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
+- `thinking`: adaptive (default) or off (see [Thinking](#thinking))
 
 **Outputs:**
 - `enhanced_prompt`: Detailed, styled prompt
@@ -120,6 +121,7 @@ Analyzes images using Claude's multimodal capabilities.
 - `max_tokens`: 256-128000 (default 8192; thinking counts toward it)
 - `model`: Model override for this call, or inherit the client's model (default)
 - `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
+- `thinking`: adaptive (default) or off (see [Thinking](#thinking))
 
 **Outputs:**
 - `analysis`: Detailed image analysis text
@@ -144,6 +146,7 @@ General-purpose text generation.
 - `use_streaming`: Enable streaming
 - `model`: Model override for this call, or inherit the client's model (default)
 - `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
+- `thinking`: adaptive (default) or off (see [Thinking](#thinking))
 
 **Outputs:**
 - `response`: Generated text
@@ -164,6 +167,7 @@ Multi-turn conversations with message history.
 - `max_tokens`: 256-128000 (default 8192; thinking counts toward it)
 - `model`: Model override for this call, or inherit the client's model (default)
 - `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
+- `thinking`: adaptive (default) or off (see [Thinking](#thinking))
 
 **Outputs:**
 - `response`: Claude's response
@@ -185,8 +189,8 @@ Count tokens and estimate API costs.
 
 **Inputs:**
 - `text`: Text to analyze
-- `model`: Model for pricing
-- `client`: Optional (for accurate counting)
+- `model`: Model for pricing, and for the API count when you connect a client
+- `client`: Optional (for accurate counting). If the API refuses the count, the node fails with the API's error instead of estimating
 
 **Outputs:**
 - `token_count`: Number of tokens
@@ -245,6 +249,7 @@ Gets JSON from Claude that matches your tool's schema. Uses Anthropic's structur
 - `temperature`: Ignored. Current Claude models reject it, so it is never sent; kept so saved workflows load
 - `max_tokens`: 256-128000 (default 4096; thinking counts toward it)
 - `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
+- `thinking`: adaptive (default) or off (see [Thinking](#thinking))
 
 **Outputs:**
 - `json_output`: The JSON reply (pretty-printed)
@@ -299,7 +304,7 @@ Enabled by default (`enable_caching` on Claude API Client). Each request carries
 
 **How it works:**
 - The first request writes the prefix to a 5-minute cache, billed at 1.25x the input price
-- A repeat within 5 minutes reads it at the cache-read price: 0.1x input on most models, 0.05x on Opus 5.5 and Sonnet 5.5, 0.025x on Fable 5.1
+- A repeat within 5 minutes reads it at the cache-read price: 0.1x input on most models, 0.05x on Opus 5.5 and Sonnet 5.5, 0.025x on Fable 5.2 and Fable 5.1
 - Prompts below the model's minimum cacheable length are not cached
 - Measured 2026-10-01 on Sonnet 5.5: a 7,226-token system prompt sent twice wrote 7,226 cache tokens on the first call and read 7,226 on the second
 
@@ -312,6 +317,19 @@ Enabled by default (`enable_caching` on Claude API Client). Each request carries
 ### Effort
 Text Generation, Conversation, Prompt Enhancer, Vision Analysis and Structured Output have an `effort` widget (low, medium, high, xhigh, max). Lower effort spends fewer thinking and output tokens. `(model default)` sends nothing, so each model keeps its own default (high; medium on Opus 5.5 and Haiku 5.5)
 
+### Thinking
+The same five nodes have a `thinking` widget after `effort`. `adaptive` (the default) lets Claude decide when and how much to think, steered by effort. `off` answers without thinking first. Each model takes a different setting for that, and the client sends the right one:
+
+| Model | `off` sends | Effort allowed with `off` |
+|---|---|---|
+| Sonnet 5.5 | `{"type": "between_tools"}` | (model default), low, medium, high |
+| Sonnet 5 | `{"type": "disabled"}` | any |
+| Opus 5 | `{"type": "disabled"}` | (model default), low, medium, high |
+| Haiku 5.5 | `{"type": "disabled"}` | (model default), low, medium, high |
+| Opus 5.5, Fable 5.2, Fable 5.1, Fable 5 | always think | none |
+
+A choice outside this table stops the node with an error before any request, so Anthropic bills nothing and nothing runs with thinking quietly back on. Measured on the live API on 2026-11-18, except the Fable rows. Those come from Anthropic's thinking troubleshooting page and are unmeasured, because the key used for testing has no Fable access.
+
 ### Token Management
 - Use Token Counter node to check prompt lengths before generation
 - Enable auto-trim in Conversation nodes to stay within context window
@@ -323,8 +341,9 @@ Every offered model has a 1M-token context window, up to 128K output tokens, ada
 - **Claude Sonnet 5**: $2/1M in, $10/1M out - Previous Sonnet
 - **Claude Opus 5.5**: $4/1M in, $20/1M out - Highest-capability Opus; cache reads at 0.05x
 - **Claude Opus 5**: $5/1M in, $25/1M out - Previous Opus
-- **Claude Fable 5.1**: $10/1M in, $50/1M out - Most capable model; needs an organization with data retention enabled
-- **Claude Fable 5**: $10/1M in, $50/1M out - Previous Fable; same access requirement
+- **Claude Fable 5.2**: $8/1M in, $40/1M out - For demanding reasoning and long-horizon agentic work, or when Opus 5.5 at higher effort falls short; cache reads at 0.025x; needs an organization with data retention enabled
+- **Claude Fable 5.1**: $10/1M in, $50/1M out - Previous Fable; needs data retention too
+- **Claude Fable 5**: $10/1M in, $50/1M out - Oldest Fable; needs data retention too
 - **Claude Haiku 5.5**: $0.10/1M in, $0.50/1M out - Fastest and cheapest; default effort medium. A prompt over 100,000 tokens (input plus cache reads and writes) bills the whole request at 5x: $0.50 in, $2.50 out. Usage Stats and Token Counter apply this tier
 
 Removed 2026-10-01: claude-opus-4-8, claude-opus-4-7, claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001, claude-sonnet-4-5-20250929. A saved workflow that selects one fails validation until you pick a current model.
@@ -379,7 +398,7 @@ Go to **Settings > ERPK > API Keys** (or right-click canvas > **ERPK Settings**)
 4. Verify dependencies installed: `pip list | grep anthropic`
 
 ### "data retention enabled" (400) or "model: claude-fable-5" (404)
-**Cause:** Fable models are only available to organizations with data retention enabled.
+**Cause:** Fable models (claude-fable-5-2, claude-fable-5-1, claude-fable-5) are only available to organizations with data retention enabled.
 **Solution:** Pick another model, or enable data retention for your organization in the Anthropic Console.
 
 ### "unexpected keyword argument" TypeError

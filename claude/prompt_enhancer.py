@@ -4,7 +4,7 @@
 import asyncio
 
 from comfy_api.latest import IO
-from .models import INHERIT_FROM_CLIENT, TEXT_MODELS, effort_input, effort_kwargs
+from .models import INHERIT_FROM_CLIENT, TEXT_MODELS, effort_input, effort_kwargs, thinking_input, thinking_kwargs
 
 
 class ClaudePromptEnhancer(IO.ComfyNode):
@@ -291,6 +291,7 @@ Emphasize architectural beauty and structural design."""
                     tooltip="Override the client's model for this call. Without a client the default is the Claude API client's default model.",
                 ),
                 effort_input(),
+                thinking_input(),
             ],
             outputs=[
                 IO.String.Output("enhanced_prompt"),
@@ -315,6 +316,7 @@ Emphasize architectural beauty and structural design."""
         model = kwargs.get("model", INHERIT_FROM_CLIENT)
         request_kwargs = {} if model == INHERIT_FROM_CLIENT else {"model": model}
         request_kwargs.update(effort_kwargs(kwargs.get("effort")))
+        request_kwargs.update(thinking_kwargs(kwargs.get("thinking")))
 
         if client is None:
             client = ClaudeClient(api_key=None)

@@ -1,6 +1,6 @@
 {
   "_comment": "Claude API Pricing - Update from https://www.anthropic.com/pricing",
-  "_last_updated": "2026-10-14",
+  "_last_updated": "2026-11-18",
   "_version": "1.0",
 
   "models": {
@@ -31,6 +31,13 @@
       "output_price_per_mtok": 25.0,
       "cache_read_price_per_mtok": 0.5,
       "cache_write_5m_price_per_mtok": 6.25
+    },
+    "claude-fable-5-2": {
+      "name": "Claude Fable 5.2",
+      "input_price_per_mtok": 8.0,
+      "output_price_per_mtok": 40.0,
+      "cache_read_price_per_mtok": 0.2,
+      "cache_write_5m_price_per_mtok": 10.0
     },
     "claude-fable-5-1": {
       "name": "Claude Fable 5.1",
@@ -63,7 +70,7 @@
   },
 
   "notes": {
-    "cache_multiplier": "Cache read prices are usually 0.1x of input prices (0.05x on Opus 5.5 and Sonnet 5.5, 0.025x on Fable 5.1); 5-minute cache writes are 1.25x",
+    "cache_multiplier": "Cache read prices are usually 0.1x of input prices (0.05x on Opus 5.5 and Sonnet 5.5, 0.025x on Fable 5.2 and Fable 5.1); 5-minute cache writes are 1.25x",
     "long_context": "A request whose prompt (input + cache reads + cache writes) exceeds above_prompt_tokens is billed entirely at the long_context rates (Haiku 5.5 only)",
     "pricing_page": "https://www.anthropic.com/pricing",
     "currency": "USD"

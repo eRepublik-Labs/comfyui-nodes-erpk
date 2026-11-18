@@ -3,7 +3,7 @@
 
 from comfy_api.latest import IO
 
-from .models import INHERIT_FROM_CLIENT, TEXT_MODELS, effort_input, effort_kwargs
+from .models import INHERIT_FROM_CLIENT, TEXT_MODELS, effort_input, effort_kwargs, thinking_input, thinking_kwargs
 
 
 class ClaudeVisionAnalysis(IO.ComfyNode):
@@ -77,6 +77,7 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
                     tooltip="Seed for cache control. Randomizes by default to ensure fresh results each run.",
                 ),
                 effort_input(),
+                thinking_input(),
             ],
             outputs=[
                 IO.String.Output("analysis"),
@@ -120,6 +121,7 @@ class ClaudeVisionAnalysis(IO.ComfyNode):
                 "system": system,
                 "max_tokens": max_tokens,
                 **effort_kwargs(kwargs.get("effort")),
+                **thinking_kwargs(kwargs.get("thinking")),
             }
             if model and model != "(inherit from client)":
                 send_kwargs["model"] = model
