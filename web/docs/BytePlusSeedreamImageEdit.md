@@ -12,7 +12,7 @@ Edits or combines reference images, or splits one image into layers, with Seedre
 | prompt | String | (empty) | The edit to make. Optional for layer decomposition |
 | images | IMAGE | none | Reference image batch, sent inline (JPEG, or PNG with alpha when you connect `mask`). Max 10 on 5.5/5.0 pro/5.0 flash, 14 on 5.0 lite/4.5/4.0, counted with `images_url` |
 | images_url | String | (empty) | More reference images, one https URL per line, after the batch |
-| mask | MASK | none | Alpha for `images` in LoadImage convention (1 = transparent). 5.0 pro and flash need it for a transparent background |
+| mask | MASK | none | Alpha for `images` in LoadImage convention (1 = transparent). 5.0 pro and flash need it for a transparent background. A Seedream `alpha` output is the inverse: pass it through InvertMask first |
 | client | BYTEPLUS_API_CLIENT | none | BytePlus API Client (optional when the key is in Settings or config.ini) |
 | model | Combo | dola-seedream-5-5-261028 | dola-seedream-5-5-261028, dola-seedream-5-0-pro-260628, dola-seedream-5-0-flash-260915, seedream-5-0-260128 (5.0 lite), seedream-4-5-251128, seedream-4-0-250828 |
 | endpoint_id | String | (empty) | Custom ModelArk endpoint ID sent instead of the model ID. The model widget still decides which options apply |
@@ -38,7 +38,7 @@ Edits or combines reference images, or splits one image into layers, with Seedre
 | Output | Type | Description |
 |--------|------|-------------|
 | images | IMAGE | The returned images as one batch. With layer decomposition: the base, then each layer on a base-sized canvas |
-| alpha | MASK | Per-image alpha, 1 = opaque, 0 = transparent |
+| alpha | MASK | Per-image alpha, 1 = opaque, 0 = transparent. Invert it (InvertMask) before a mask input that uses the LoadImage convention |
 
 ## Notes
 

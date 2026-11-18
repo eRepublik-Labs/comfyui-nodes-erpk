@@ -32,7 +32,7 @@ Generates images from a text prompt with Seedream, called directly on BytePlus M
 | Output | Type | Description |
 |--------|------|-------------|
 | images | IMAGE | The returned images as one batch. With layer decomposition: the base, then each layer on a base-sized canvas |
-| alpha | MASK | Per-image alpha, 1 = opaque, 0 = transparent |
+| alpha | MASK | Per-image alpha, 1 = opaque, 0 = transparent. Invert it (InvertMask) before a mask input that uses the LoadImage convention |
 
 ## Notes
 
