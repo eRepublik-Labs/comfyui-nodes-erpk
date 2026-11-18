@@ -40,8 +40,11 @@ class TestModelsDict:
     def test_offered_text_models_are_exactly_the_current_set(self):
         # Alex's 2026-10-01 ruling: the 2.5 family, 3 Flash Preview and
         # 3.1 Flash-Lite are withdrawn; these six remain. gemini-4-argon went
-        # GA on 2026-10-13 (Gemini API changelog).
+        # GA on 2026-10-13; gemini-4-carbon on 2026-11-10 and gemini-4-hydrogen
+        # on 2026-11-12 (Gemini API changelog).
         assert set(GeminiClient.MODELS) == {
+            "gemini-4-carbon",
+            "gemini-4-hydrogen",
             "gemini-4-argon",
             "gemini-3.1-pro-preview",
             "gemini-3.8-flash",

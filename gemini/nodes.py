@@ -37,10 +37,10 @@ def _parse_stop_sequences(text):
 
 
 # Models that reject thinking_level=minimal with a 400 (3.7/3.8 Flash per their
-# reference pages; 3.1 Pro Preview probed 2026-10-01; 4 Argon probed 2026-10-14).
-# The node clamps minimal up to low for them.
+# reference pages; 3.1 Pro Preview probed 2026-10-01; 4 Argon probed 2026-10-14;
+# 4 Carbon and 4 Hydrogen probed 2026-11-18). The node clamps minimal up to low for them.
 _NO_MINIMAL_THINKING = {"gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.1-pro-preview",
-                        "gemini-4-argon"}
+                        "gemini-4-argon", "gemini-4-carbon", "gemini-4-hydrogen"}
 
 
 # Output resolutions each image model accepts, smallest first, per
@@ -342,7 +342,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level (0.0=focused, 2.0=very creative) Ignored by Gemini 4 Argon.",
+                    tooltip="Creativity level (0.0=focused, 2.0=very creative) Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.Int.Input(
                     "max_tokens",
@@ -351,7 +351,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     max=65536,
                     step=128,
                     optional=True,
-                    tooltip="Maximum length of response. Google recommends at least 32768 for Gemini 4 Argon.",
+                    tooltip="Maximum length of response. Google recommends at least 32768 for Gemini 4 Argon and 4 Carbon, and 65536 for 4 Hydrogen.",
                 ),
                 IO.Float.Input(
                     "top_p",
@@ -360,7 +360,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon.",
+                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.Int.Input(
                     "top_k",
@@ -369,7 +369,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     max=100,
                     step=1,
                     optional=True,
-                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon.",
+                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.String.Input(
                     "stop_sequences",
@@ -399,7 +399,8 @@ class GeminiTextGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
                              "default level (it does not turn thinking off). minimal is raised to low on "
-                             "models that reject it: 4 Argon, 3.1 Pro Preview, 3.7 Flash, 3.8 Flash."),
+                             "models that reject it: 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash, "
+                             "3.8 Flash."),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -536,7 +537,7 @@ class GeminiChat(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level Ignored by Gemini 4 Argon.",
+                    tooltip="Creativity level Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.Int.Input(
                     "max_tokens",
@@ -545,7 +546,7 @@ class GeminiChat(IO.ComfyNode):
                     max=65536,
                     step=128,
                     optional=True,
-                    tooltip="Maximum length of response. Google recommends at least 32768 for Gemini 4 Argon.",
+                    tooltip="Maximum length of response. Google recommends at least 32768 for Gemini 4 Argon and 4 Carbon, and 65536 for 4 Hydrogen.",
                 ),
                 IO.Float.Input(
                     "top_p",
@@ -554,7 +555,7 @@ class GeminiChat(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon.",
+                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.Int.Input(
                     "top_k",
@@ -563,7 +564,7 @@ class GeminiChat(IO.ComfyNode):
                     max=100,
                     step=1,
                     optional=True,
-                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon.",
+                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.String.Input(
                     "stop_sequences",
@@ -593,7 +594,8 @@ class GeminiChat(IO.ComfyNode):
                     optional=True,
                     tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
                              "default level (it does not turn thinking off). minimal is raised to low on "
-                             "models that reject it: 4 Argon, 3.1 Pro Preview, 3.7 Flash, 3.8 Flash."),
+                             "models that reject it: 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash, "
+                             "3.8 Flash."),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -746,7 +748,7 @@ class GeminiVision(IO.ComfyNode):
                     max=65536,
                     step=128,
                     optional=True,
-                    tooltip="Maximum length of analysis. Google recommends at least 32768 for Gemini 4 Argon.",
+                    tooltip="Maximum length of analysis. Google recommends at least 32768 for Gemini 4 Argon and 4 Carbon, and 65536 for 4 Hydrogen.",
                 ),
                 IO.Float.Input(
                     "temperature",
@@ -755,7 +757,7 @@ class GeminiVision(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level (lower=more factual) Ignored by Gemini 4 Argon.",
+                    tooltip="Creativity level (lower=more factual) Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.Float.Input(
                     "top_p",
@@ -764,7 +766,7 @@ class GeminiVision(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon.",
+                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.Int.Input(
                     "top_k",
@@ -773,7 +775,7 @@ class GeminiVision(IO.ComfyNode):
                     max=100,
                     step=1,
                     optional=True,
-                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon.",
+                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.String.Input(
                     "stop_sequences",
@@ -803,7 +805,8 @@ class GeminiVision(IO.ComfyNode):
                     optional=True,
                     tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
                              "default level (it does not turn thinking off). minimal is raised to low on "
-                             "models that reject it: 4 Argon, 3.1 Pro Preview, 3.7 Flash, 3.8 Flash."),
+                             "models that reject it: 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash, "
+                             "3.8 Flash."),
                 ),
                 IO.Int.Input(
                     "seed",

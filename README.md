@@ -201,7 +201,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Gemini Omni Reference to Video** - Generate video featuring the subjects in reference images via Gemini Omni Flash
 
 **Key Benefits:**
-- Support for Gemini 4 Argon, 3.1 Pro Preview, 3.8 Flash (default), 3.7, 3.6 and 3.5 Flash, and 3.5 Flash-Lite
+- Support for Gemini 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.8 Flash (default), 3.7, 3.6 and 3.5 Flash, and 3.5 Flash-Lite
 - **Thinking level** control across all models (none/minimal/low/medium/high). `none` keeps the model's default thinking; `minimal` is raised to `low` on models that reject it
 - **Omni Flash video generation** from text, a start image or reference images
 - Each node selects its own model for maximum flexibility

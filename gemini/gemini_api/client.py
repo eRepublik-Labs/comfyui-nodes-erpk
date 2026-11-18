@@ -69,6 +69,8 @@ class GeminiClient:
 
     # Available models
     MODELS = {
+        "gemini-4-carbon": "Gemini 4 Carbon (Strongest reasoning; low/medium/high thinking; ignores temperature/top_p/top_k)",
+        "gemini-4-hydrogen": "Gemini 4 Hydrogen (Fast coding and agentic model; low/medium/high thinking; ignores temperature/top_p/top_k)",
         "gemini-4-argon": "Gemini 4 Argon (Flagship reasoning; low/medium/high thinking; ignores temperature/top_p/top_k)",
         "gemini-3.1-pro-preview": "Gemini 3.1 Pro Preview (Most advanced reasoning)",
         "gemini-3.8-flash": "Gemini 3.8 Flash (Latest Flash; no minimal thinking)",

@@ -271,6 +271,67 @@ def test_argon_guidance_is_in_the_text_node_tooltips():
         assert "4 Argon" in _text_input(node_cls, "thinking_level").tooltip
 
 
+# --- Gemini 4 Carbon and 4 Hydrogen (aistudio.google.com/docs/models/gemini-4-carbon,
+# /docs/models/gemini-4-hydrogen and /docs/pricing, read 2026-11-18; thinking
+# levels probed 2026-11-18) ---------------------------------------------------
+
+CARBON = "gemini-4-carbon"
+HYDROGEN = "gemini-4-hydrogen"
+
+
+def test_carbon_and_hydrogen_offered_on_text_nodes():
+    assert CARBON in TEXT_MODELS
+    assert HYDROGEN in TEXT_MODELS
+
+
+def test_carbon_and_hydrogen_clamp_minimal_thinking_to_low():
+    # 400 "Thinking level MINIMAL is not supported for this model" on both;
+    # low, medium and high returned 200 (probed 2026-11-18).
+    from erpk.gemini.nodes import _build_thinking_config
+    for model in (CARBON, HYDROGEN):
+        assert _build_thinking_config("minimal", model).thinking_level == "LOW", model
+        for level in ("low", "medium", "high"):
+            assert _build_thinking_config(level, model).thinking_level == level.upper(), model
+
+
+def test_carbon_priced_at_intro_rate():
+    # Pricing page: $2.00 / $10.00 per 1M through 2026-11-30, then $4.00 / $20.00.
+    entry = _pricing()[CARBON]
+    assert entry["input_price_per_mtok"] == 2.0
+    assert entry["output_price_per_mtok"] == 10.0
+    assert "2026-12-01" in entry["name"] and "4.00/20.00" in entry["name"]
+
+
+def test_hydrogen_priced():
+    # Pricing page: $1.50 / $7.50 per 1M.
+    entry = _pricing()[HYDROGEN]
+    assert entry["input_price_per_mtok"] == 1.50
+    assert entry["output_price_per_mtok"] == 7.50
+
+
+def test_carbon_gets_a_fifteen_minute_timeout():
+    # Carbon's what's-new page asks for HTTP timeouts of at least 15 minutes;
+    # Hydrogen's gives no figure, so it keeps the default.
+    from erpk.gemini.gemini_api.cooperative_call import resolve_timeout_ms
+    assert resolve_timeout_ms(CARBON) == FIFTEEN_MINUTES_MS
+    assert resolve_timeout_ms(HYDROGEN) == FIVE_MINUTES_MS
+
+
+def test_carbon_and_hydrogen_guidance_is_in_the_text_node_tooltips():
+    # Carbon and Hydrogen pages: max_output_tokens of at least 32,768 on Carbon
+    # and 65,536 on Hydrogen. API reference: temperature, top_p and top_k are
+    # "silently ignored on Gemini 3.6 Flash and newer".
+    from erpk.gemini.nodes import GeminiChat, GeminiTextGeneration, GeminiVision
+    for node_cls in (GeminiTextGeneration, GeminiChat, GeminiVision):
+        assert "65536 for 4 Hydrogen" in _text_input(node_cls, "max_tokens").tooltip
+        assert "4 Carbon" in _text_input(node_cls, "max_tokens").tooltip
+        for name in ("temperature", "top_p", "top_k"):
+            tooltip = _text_input(node_cls, name).tooltip
+            assert "4 Carbon" in tooltip and "4 Hydrogen" in tooltip, name
+        thinking = _text_input(node_cls, "thinking_level").tooltip
+        assert "4 Carbon" in thinking and "4 Hydrogen" in thinking
+
+
 # --- Nano Banana 2.1 (ai.google.dev/gemini-api/docs/models/gemini-nano-banana-2.1
 # and /docs/image-generation, read 2026-10-14) --------------------------------
 
