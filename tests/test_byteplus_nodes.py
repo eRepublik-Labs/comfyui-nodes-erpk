@@ -398,6 +398,39 @@ def test_seedream_images_billed_after_the_node_was_cancelled_are_saved_and_named
     assert sorted(output_dir.iterdir()) == saved
 
 
+@pytest.mark.parametrize("cancel_pressed", [True, False])
+def test_seedream_images_returned_after_cancel_was_pressed_are_also_saved_and_named(
+        transport, monkeypatch, capsys, output_dir, cancel_pressed):
+    sent, replies = transport
+    replies.append((200, {"data": [{"b64_json": _png_b64(Image.new("RGB", (64, 48)))},
+                                   {"b64_json": _png_b64(Image.new("RGB", (64, 48), (9, 9, 9)))}]}))
+    monkeypatch.setattr(client_module, "_resolve_interrupt_checker",
+                        lambda: (lambda: cancel_pressed and len(sent) == 1))
+    images, _ = asyncio.run(BytePlusSeedreamTextToImage.execute(**SEEDREAM_KWARGS)).args
+    assert tuple(images.shape) == (2, 48, 64, 3)
+    last_line = capsys.readouterr().out.splitlines()[-1]
+    if not cancel_pressed:
+        assert not output_dir.exists()
+        assert last_line == "[BytePlus] Seedream returned 2 image(s), about $0.0600"
+        return
+    saved = [output_dir / f"20261118-120000-000000-{index:02d}.png" for index in (1, 2)]
+    assert last_line == ("[BytePlus] Cancel was pressed while Seedream was generating, so the run stops before the "
+                         f"next node. The billed images are saved as {saved[0]}, {saved[1]}")
+    assert sorted(output_dir.iterdir()) == saved
+    assert [_size_on_disk(path) for path in saved] == [(64, 48), (64, 48)]
+
+
+def test_seedream_images_saved_on_cancel_are_saved_once_when_the_node_is_then_cancelled(
+        monkeypatch, capsys, output_dir):
+    monkeypatch.setattr(client_module, "_resolve_interrupt_checker", lambda: (lambda: True))
+    fake = BlockingTransport((200, {"data": [{"b64_json": _png_b64(Image.new("RGB", (64, 48)))}]}))
+    _cancel_while_in_flight(monkeypatch, fake, BytePlusSeedreamTextToImage.execute(**SEEDREAM_KWARGS))
+    saved = output_dir / "20261118-120000-000000-01.png"
+    assert capsys.readouterr().out.splitlines()[-1] == ("[BytePlus] The ComfyUI run ended before Seedream's images "
+                                                        f"were returned. The billed images are saved as {saved}")
+    assert sorted(output_dir.iterdir()) == [saved]
+
+
 def test_a_billed_result_reaches_exactly_one_side_whichever_finishes_first():
     from erpk.byteplus.nodes import _Handoff
 

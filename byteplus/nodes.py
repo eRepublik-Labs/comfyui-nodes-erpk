@@ -7,6 +7,7 @@ from typing import Callable, List, Optional
 
 from comfy_api.latest import IO
 
+from .byteplus_api import client as client_module
 from .byteplus_api import seedream
 from .byteplus_api.client import BytePlusClient
 from .byteplus_api.media import (
@@ -226,7 +227,9 @@ class _Handoff:
 def _generate_sync(client: BytePlusClient, body: dict, model_id: str, options: seedream.ImageOptions,
                    input_images: int, fail_on_partial: bool, handoff: _Handoff):
     """POST, decode and compose in one worker thread. ComfyUI cancels a pending node when another
-    node fails, but this thread runs to the end, so images billed after the cancel still reach disk."""
+    node fails, but this thread runs to the end, so images billed after the cancel still reach disk.
+    Cancel pressed while only this node runs raises at the next node instead, after this node has
+    returned, so images that arrive with Cancel pressed are saved here too."""
     response = client.generate_images(body)
     try:
         output, decoded = _images_from_response(response, model_id, options, input_images, fail_on_partial)
@@ -234,8 +237,13 @@ def _generate_sync(client: BytePlusClient, body: dict, model_id: str, options: s
         message = str(e)
         handoff.finish(lambda: print(f"[BytePlus] {message}"))
         raise
+    saved = None
+    if client_module._resolve_interrupt_checker()():
+        saved = _recover(decoded)
+        print("[BytePlus] Cancel was pressed while Seedream was generating, so the run stops before the next "
+              f"node. {saved}")
     handoff.finish(lambda: print("[BytePlus] The ComfyUI run ended before Seedream's images were returned. "
-                                 f"{_recover(decoded)}"))
+                                 f"{saved or _recover(decoded)}"))
     return output
 
 
