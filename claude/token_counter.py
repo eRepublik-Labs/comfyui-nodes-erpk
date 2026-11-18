@@ -160,4 +160,4 @@ Source: anthropic.com/pricing
         except Exception as e:
             error_msg = f"Failed to count tokens: {str(e)}"
             print(f"[Claude] Error: {error_msg}")
-            return IO.NodeOutput(0, error_msg)
+            raise ValueError(error_msg) from e

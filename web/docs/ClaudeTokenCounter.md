@@ -22,7 +22,7 @@ Counts tokens in text and provides cost estimates for Claude API usage. Supports
 
 ## Notes
 
-- With a client connected: uses the Anthropic token counting API for accurate counts (counted against the client's model)
+- With a client connected: uses the Anthropic token counting API for accurate counts, counted for the `model` widget's model. If the API refuses (a model your organization cannot use, a bad key), the node stops with the API's error rather than passing a guess downstream
 - Without a client: estimates at ~4 characters per token
 - Shows cost estimates for the text as both input and output tokens
 - Claude Haiku 5.5: text over 100,000 tokens is priced as input at the long-context rate ($0.50/MTok) and the summary says so; the output estimate stays at the base rate because the prompt it would answer is unknown

@@ -363,6 +363,19 @@ def test_token_counter_counts_with_its_model_widget_when_a_client_is_connected(m
     assert "Model:            claude-haiku-5-5" in summary
 
 
+def test_token_counter_fails_when_the_api_count_fails(monkeypatch):
+    # With a client connected the node promises the API's count. When the API
+    # refuses (measured 2026-11-18 on claude-fable-5-2), the node must fail
+    # rather than pass a 4-chars-per-token guess, or 0, downstream.
+    from claude.token_counter import ClaudeTokenCounter
+    from tests.claude_wire import error_body
+    wire = Wire(error_body(400, "invalid_request_error",
+                           "In order to access this model, your organization or workspace must have data retention enabled."))
+    client = _client(monkeypatch, wire)
+    with pytest.raises(ValueError, match="Failed to count tokens: .*data retention enabled"):
+        asyncio.run(ClaudeTokenCounter.execute(text="hello world, count me", model="claude-fable-5-2", client=client))
+
+
 # --- A reply cut off at max_tokens is an error, never partial output ------------
 # Measured 2026-10-14 on claude-haiku-5-5: PromptEnhancer at max_tokens=256
 # came back with stop_reason "max_tokens" and a half-written prompt; with

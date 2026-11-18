@@ -189,8 +189,8 @@ Count tokens and estimate API costs.
 
 **Inputs:**
 - `text`: Text to analyze
-- `model`: Model for pricing
-- `client`: Optional (for accurate counting)
+- `model`: Model for pricing, and for the API count when you connect a client
+- `client`: Optional (for accurate counting). If the API refuses the count, the node fails with the API's error instead of estimating
 
 **Outputs:**
 - `token_count`: Number of tokens

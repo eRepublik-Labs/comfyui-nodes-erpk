@@ -267,6 +267,17 @@ def test_server_error_is_retried_on_count_tokens(monkeypatch):
     assert len(wire.requests) == 2
 
 
+def test_count_tokens_error_raises_the_sdk_error(monkeypatch):
+    # Measured 2026-11-18: count_tokens on claude-fable-5-2 returns this 400 on
+    # an organization without data retention. A guessed count would hide it.
+    wire = Wire(error_body(400, "invalid_request_error",
+                           "In order to access this model, your organization or workspace must have data retention enabled."))
+    client = _client(monkeypatch, wire)
+    with pytest.raises(anthropic.BadRequestError, match="data retention enabled"):
+        asyncio.run(client.count_tokens(messages=USER, model="claude-fable-5-2"))
+    assert len(wire.requests) == 1
+
+
 def test_streaming_error_raises_the_sdk_error(monkeypatch):
     wire = Wire(error_body(400, "invalid_request_error", "bad stream"))
     client = _client(monkeypatch, wire)

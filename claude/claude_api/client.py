@@ -365,37 +365,18 @@ class ClaudeClient:
             raise_if_truncated(final, params["max_tokens"])
 
     def _count_tokens_sync(self, messages: list, system: Optional[str] = None, model: Optional[str] = None) -> int:
-        try:
-            params = {
-                "model": model or self.model,
-                "messages": messages
-            }
-            if system:
-                params["system"] = system
-
-            response = self.client.messages.count_tokens(**params)
-            return response.input_tokens
-
-        except Exception as e:
-            # Fallback to rough estimation if API fails
-            print(f"[Claude] Token counting API failed, using estimation: {e}")
-            total_text = ""
-            if system:
-                total_text += system + " "
-            for msg in messages:
-                content = msg.get("content", "")
-                if isinstance(content, str):
-                    total_text += content + " "
-                elif isinstance(content, list):
-                    for item in content:
-                        if isinstance(item, dict) and item.get("type") == "text":
-                            total_text += item.get("text", "") + " "
-            # Rough estimate: ~4 characters per token
-            return len(total_text) // 4
+        params = {
+            "model": model or self.model,
+            "messages": messages
+        }
+        if system:
+            params["system"] = system
+        return self.client.messages.count_tokens(**params).input_tokens
 
     async def count_tokens(self, messages: list, system: Optional[str] = None, model: Optional[str] = None) -> int:
         """
-        Count tokens in a message list using Anthropic's API.
+        Count tokens in a message list using Anthropic's API (the SDK retries
+        transient errors).
 
         Args:
             messages: List of message dicts
@@ -404,6 +385,10 @@ class ClaudeClient:
 
         Returns:
             Token count
+
+        Raises:
+            anthropic.APIError: The SDK's own error, once retries are exhausted
+                or immediately for a non-retryable 4xx
         """
         return await asyncio.to_thread(self._count_tokens_sync, messages, system, model)
 
