@@ -5,6 +5,7 @@ import asyncio
 import json
 
 import pytest
+import requests
 
 import erpk.settings
 from erpk.byteplus.byteplus_api import client as client_module
@@ -116,6 +117,14 @@ def test_create_is_sent_once_and_surfaces_the_sync_error_envelope(monkeypatch):
     with pytest.raises(BytePlusAPIError) as excinfo:
         asyncio.run(client.generate_images({"model": "m"}))
     assert str(excinfo.value) == "ModelArk POST /images/generations returned HTTP 502: <html>bad gateway</html>"
+    assert len(transport.calls) == 1
+
+    client, transport = _client([requests.ReadTimeout("read timed out")], monkeypatch=monkeypatch)
+    with pytest.raises(BytePlusAPIError) as excinfo:
+        asyncio.run(client.create_video_task({"model": "m"}))
+    assert str(excinfo.value) == (
+        "ModelArk POST /contents/generations/tasks got no reply (read timed out). The task may exist and "
+        "bill anyway: check Video generation tasks in the ModelArk console before queueing again.")
     assert len(transport.calls) == 1
 
 

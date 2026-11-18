@@ -1,6 +1,8 @@
 # ABOUTME: Seedance V3 video nodes on BytePlus ModelArk: text, image (first/last frame) and
 # ABOUTME: reference to video. Each outputs the video URL, the last-frame URL and the task ID.
 
+import asyncio
+
 from comfy_api.latest import IO
 
 from .byteplus_api import seedance
@@ -139,12 +141,12 @@ def _options(kwargs) -> seedance.VideoOptions:
     )
 
 
-def _single_image(image, url: str, name: str):
+async def _single_image(image, url: str, name: str):
     """A connected IMAGE (one frame) takes precedence over the URL field."""
     if image is not None:
         if image.shape[0] != 1:
             raise ValueError(f"{name} takes one image, got a batch of {image.shape[0]}.")
-        return images_to_data_uris(image, SEEDANCE_IMAGE_LIMITS, name)[0]
+        return (await asyncio.to_thread(images_to_data_uris, image, SEEDANCE_IMAGE_LIMITS, name))[0]
     return url.strip() or None
 
 
@@ -247,8 +249,8 @@ class BytePlusSeedanceImageToVideo(IO.ComfyNode):
     @classmethod
     async def execute(cls, **kwargs) -> IO.NodeOutput:
         media = seedance.VideoMedia(
-            first_frame=_single_image(kwargs.get("first_frame"), kwargs.get("first_frame_url", ""), "first_frame"),
-            last_frame=_single_image(kwargs.get("last_frame"), kwargs.get("last_frame_url", ""), "last_frame"),
+            first_frame=await _single_image(kwargs.get("first_frame"), kwargs.get("first_frame_url", ""), "first_frame"),
+            last_frame=await _single_image(kwargs.get("last_frame"), kwargs.get("last_frame_url", ""), "last_frame"),
             draft_task_id=kwargs.get("draft_task_id", "").strip(),
         )
         if media.first_frame is None and media.last_frame is None and not media.draft_task_id:
@@ -298,7 +300,8 @@ class BytePlusSeedanceReferenceToVideo(IO.ComfyNode):
     @classmethod
     async def execute(cls, **kwargs) -> IO.NodeOutput:
         batch = kwargs.get("reference_images")
-        inline = images_to_data_uris(batch, SEEDANCE_IMAGE_LIMITS, "reference_images") if batch is not None else []
+        inline = (await asyncio.to_thread(images_to_data_uris, batch, SEEDANCE_IMAGE_LIMITS, "reference_images")
+                  if batch is not None else [])
         media = seedance.VideoMedia(
             reference_images=tuple(inline + url_lines(kwargs.get("reference_images_url", ""))),
             reference_videos=tuple(url_lines(kwargs.get("reference_videos_url", ""))),

@@ -1,6 +1,7 @@
 # ABOUTME: BytePlus ModelArk V3 nodes: the optional API Client config node and the Seedream
 # ABOUTME: text-to-image and image-edit nodes, which output an IMAGE batch plus its alpha.
 
+import asyncio
 from typing import List, Optional
 
 from comfy_api.latest import IO
@@ -148,7 +149,8 @@ def _image_option_inputs(edit: bool):
 
 _IMAGE_OUTPUTS = [
     IO.Image.Output("images", tooltip="Generated images as one batch (with layers: base first)."),
-    IO.Mask.Output("alpha", tooltip="Per-image alpha, 1 = opaque, 0 = transparent."),
+    IO.Mask.Output("alpha", tooltip=("Per-image alpha, 1 = opaque, 0 = transparent. Invert it (InvertMask) "
+                                     "before feeding a mask input that uses the LoadImage convention.")),
 ]
 
 
@@ -184,6 +186,9 @@ async def _generate(kwargs, images: List[str]) -> IO.NodeOutput:
     items = [item for item in response.get("data") or [] if isinstance(item, dict)]
     failed = [item["error"] for item in items if item.get("error")]
     succeeded = [item for item in items if not item.get("error")]
+    urls = [item["url"] for item in succeeded if item.get("url")]
+    if urls:
+        print(f"[BytePlus] Seedream result URLs (valid 24 h): {' '.join(urls)}")
     if failed:
         reasons = "; ".join(f"{e.get('code')}: {e.get('message', '')}" for e in failed)
         if kwargs.get("fail_on_partial", True) or not succeeded:
@@ -192,7 +197,7 @@ async def _generate(kwargs, images: List[str]) -> IO.NodeOutput:
     if not succeeded:
         raise ValueError(f"Seedream returned no images: {str(response)[:300]}")
 
-    image_tensor, alpha = response_to_images(succeeded, layers=options.layer_decomposition)
+    image_tensor, alpha = await asyncio.to_thread(response_to_images, succeeded, options.layer_decomposition)
     sizes = [(image_tensor.shape[2], image_tensor.shape[1])] * image_tensor.shape[0]
     try:
         cost = seedream.image_cost_usd(model_id, sizes, input_images=len(images),
@@ -259,7 +264,8 @@ class BytePlusSeedreamImageEdit(IO.ComfyNode):
                 IO.Mask.Input("mask", optional=True,
                               tooltip=("Alpha for the connected images (LoadImage convention, 1 = transparent): "
                                        "they are sent as PNG with that transparency. 5.0 pro and flash need it "
-                                       "for a transparent background.")),
+                                       "for a transparent background. The alpha output of a Seedream node is "
+                                       "the inverse: pass it through InvertMask first.")),
                 *_image_option_inputs(edit=True),
             ],
             outputs=_IMAGE_OUTPUTS,
@@ -275,7 +281,8 @@ class BytePlusSeedreamImageEdit(IO.ComfyNode):
         if kwargs.get("mask") is not None and batch is None:
             raise ValueError("The mask applies to the images input; connect images too.")
         limits = SEEDREAM_LAYER_IMAGE_LIMITS if kwargs.get("layer_decomposition") else SEEDREAM_IMAGE_LIMITS
-        inline = images_to_data_uris(batch, limits, "images", mask=kwargs.get("mask")) if batch is not None else []
+        inline = (await asyncio.to_thread(images_to_data_uris, batch, limits, "images", kwargs.get("mask"))
+                  if batch is not None else [])
         images = inline + url_lines(kwargs.get("images_url", ""))
         if not images:
             raise ValueError("Connect images or enter at least one image URL.")

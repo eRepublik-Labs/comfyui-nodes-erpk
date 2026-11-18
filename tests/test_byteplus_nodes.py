@@ -12,7 +12,7 @@ torch = pytest.importorskip("torch")
 Image = pytest.importorskip("PIL.Image")
 
 from erpk.byteplus.byteplus_api import client as client_module  # noqa: E402
-from erpk.byteplus.nodes import BytePlusSeedreamImageEdit  # noqa: E402
+from erpk.byteplus.nodes import BytePlusSeedreamImageEdit, BytePlusSeedreamTextToImage  # noqa: E402
 from erpk.byteplus.video_nodes import BytePlusSeedanceImageToVideo  # noqa: E402
 
 CLIENT = {"api_key": "test-key"}
@@ -94,3 +94,37 @@ def test_layer_decomposition_returns_the_base_then_each_layer_with_alpha(transpo
     assert body["image"].startswith("data:image/jpeg;base64,")
     assert body["layer_decomposition"] is True
     assert body["layer_decomposition_options"] == {"max_images": 5, "text_recognition": False}
+
+
+def test_url_results_download_off_the_event_loop_and_print_before_a_partial_failure_raises(
+        transport, monkeypatch, capsys):
+    import threading
+
+    import erpk.utils.safe_fetch as safe_fetch
+
+    _, replies = transport
+    downloads = []
+
+    def fake_fetch(url, **_):
+        downloads.append((url, threading.current_thread() is threading.main_thread()))
+        buffer = io.BytesIO()
+        Image.new("RGB", (64, 48), (1, 2, 3)).save(buffer, format="PNG")
+        return buffer.getvalue()
+
+    monkeypatch.setattr(safe_fetch, "fetch_remote_bytes", fake_fetch)
+    reply = {"data": [{"url": "https://cdn.example.com/a.png", "size": "64x48"},
+                      {"error": {"code": "OutputImageSensitiveContentDetected", "message": "blocked"}}],
+             "usage": {"generated_images": 1}}
+    kwargs = dict(client=CLIENT, prompt="a kite", model="seedream-4-0-250828", sequential="auto", max_images=2)
+
+    replies.append((200, reply))
+    with pytest.raises(ValueError) as excinfo:
+        asyncio.run(BytePlusSeedreamTextToImage.execute(**kwargs))
+    assert str(excinfo.value) == ("Seedream returned 1 of 2 images; failures: "
+                                  "OutputImageSensitiveContentDetected: blocked")
+    assert "https://cdn.example.com/a.png" in capsys.readouterr().out
+
+    replies.append((200, reply))
+    images, alpha = asyncio.run(BytePlusSeedreamTextToImage.execute(**kwargs, fail_on_partial=False)).args
+    assert tuple(images.shape) == (1, 48, 64, 3) and alpha.min().item() == 1.0
+    assert downloads == [("https://cdn.example.com/a.png", False)]

@@ -135,7 +135,12 @@ class BytePlusClient:
 
     async def create_video_task(self, body: dict) -> str:
         """POST a Seedance task once (never retried: a retry could start a second billed task)."""
-        response = await self._call("POST", VIDEO_TASKS_PATH, body)
+        try:
+            response = await self._call("POST", VIDEO_TASKS_PATH, body, timeout=300)
+        except requests.RequestException as e:
+            raise BytePlusAPIError(
+                f"ModelArk POST {VIDEO_TASKS_PATH} got no reply ({e}). The task may exist and bill anyway: "
+                "check Video generation tasks in the ModelArk console before queueing again.") from e
         task_id = response.get("id")
         if not task_id:
             raise BytePlusAPIError(f"ModelArk created a video task without an id: {str(response)[:_ERROR_TEXT_LIMIT]}")
