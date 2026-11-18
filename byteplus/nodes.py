@@ -142,7 +142,7 @@ def _image_option_inputs(edit: bool):
                         tooltip="Optional hashed end-user ID (max 64 characters). Sent to 5.5, 5.0 pro and 5.0 flash."),
         IO.Int.Input(
             "seed", default=-1, min=-1, max=2**31 - 1, optional=True, control_after_generate="randomize",
-            tooltip=("Cache control only: ModelArk documents no seed for Seedream, so it is not sent. -1 "
+            tooltip=("Cache control only, not sent: Seedream echoes a seed but does not reproduce an image with it. -1 "
                      "re-runs every queue; a fixed value reuses the cached result."),
         ),
     ]

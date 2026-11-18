@@ -14,7 +14,7 @@ Generates a video from a text prompt with Seedance, called directly on BytePlus 
 | model | Combo | dreamina-seedance-2-0-mini-260615 | dreamina-seedance-2-5-260628, -2-5-flash-261115, -2-0-260128, -2-0-fast-260128, -2-0-mini-260615, seedance-1-0-pro-250528, seedance-1-0-pro-fast-251015 |
 | endpoint_id | String | (empty) | Custom ModelArk endpoint ID sent instead of the model ID. Needed by accounts that get `ModelIDAccessDisabled`. The model widget still decides which options apply |
 | resolution | Combo | 720p | 480p, 720p on every model; 1080p on 2.5, 2.0, 1.0; 4k on 2.5 and 2.0 |
-| ratio | Combo | adaptive | adaptive, 16:9, 4:3, 1:1, 3:4, 9:16, 21:9. 2.5 first-frame and first+last-frame tasks accept adaptive only; 1.0 text-to-video needs a fixed ratio |
+| ratio | Combo | adaptive | adaptive, 16:9, 4:3, 1:1, 3:4, 9:16, 21:9. adaptive lets a 2.x model pick; 1.0 needs a fixed ratio here |
 | duration | Int | 5 | Seconds. 2.5: 4-30; 2.0 series: 4-15; 1.0: 2-12. -1 lets a 2.x model pick |
 | frames | Int | 0 | 1.0 only: exact frame count 29-289, 25 + 4n, at 24 fps. Overrides duration. 0 = off; any other value with a 2.x model stops before the call |
 | generate_audio | Boolean | true | 2.x only: synchronized stereo audio. Not sent to 1.0 |
@@ -28,7 +28,7 @@ Generates a video from a text prompt with Seedance, called directly on BytePlus 
 | draft_task_id | String | (empty) | Render this 2.5 draft at 1080p or 4k. Clear the prompt and disconnect every media input |
 | execution_expires_after | Int | 172800 | Seconds before ModelArk expires a task still queued or running (3600-259200) |
 | safety_identifier | String | (empty) | Optional hashed end-user ID, max 64 characters |
-| seed | Int | -1 | Sent on 1.0 when 0 or more. On 2.x cache control only, not sent (ModelArk documents seed for 1.0 only). -1 re-runs every queue |
+| seed | Int | -1 | Sent on 1.0 when 0 or more. On 2.x cache control only and not sent: 2.x echoes a seed but two identical requests still return different videos (measured on 2.0 mini). -1 re-runs every queue; a fixed value reuses the cached video URL, which expires after 24 h |
 
 ## Output
 

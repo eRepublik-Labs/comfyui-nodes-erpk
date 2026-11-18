@@ -107,9 +107,9 @@ def _option_inputs(default_duration: int, reference: bool = False):
                         tooltip="Optional hashed end-user ID (max 64 characters) for ModelArk's abuse checks."),
         IO.Int.Input(
             "seed", default=-1, min=-1, max=seedance.SEED_MAX, optional=True, control_after_generate="randomize",
-            tooltip=("On Seedance 1.0, 0 or more is sent as the generation seed. ModelArk documents seed for "
-                     "1.0 only, so on 2.x it only controls ComfyUI's cache. -1 re-runs every queue; a fixed "
-                     "value reuses the cached result."),
+            tooltip=("On Seedance 1.0, 0 or more is sent as the generation seed. 2.x echoes a seed but does not "
+                     "reproduce a video with it, so there it only controls ComfyUI's cache. -1 re-runs every queue; "
+                     "a fixed value reuses the cached result, a video URL that expires after 24 h."),
         ),
     ]
     return inputs

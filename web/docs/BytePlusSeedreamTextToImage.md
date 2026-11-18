@@ -25,7 +25,7 @@ Generates images from a text prompt with Seedream, called directly on BytePlus M
 | watermark | Boolean | false | "AI-generated" mark. ModelArk's own default is on; the node sends off unless set |
 | fail_on_partial | Boolean | false | When some images of a sequential batch fail moderation: return the rest and log which were refused and why (off), or raise after saving the billed images to `output/byteplus_recovered` (on) |
 | safety_identifier | String | (empty) | Optional hashed end-user ID, max 64 characters. Sent to 5.5, 5.0 pro and 5.0 flash only |
-| seed | Int | -1 | Cache control only and not sent, because ModelArk documents no Seedream seed. -1 re-runs every queue |
+| seed | Int | -1 | Cache control only and not sent: Seedream echoes a seed but two identical requests still return different images (measured on 5.0 flash). -1 re-runs every queue |
 
 ## Output
 

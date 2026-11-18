@@ -31,7 +31,7 @@ Edits or combines reference images, or splits one image into layers, with Seedre
 | layer_max_images | Int | 30 | 5.5 only: most images returned, base included (2-100). Rate limits reserve this count up front |
 | text_recognition | Boolean | false | 5.5 layer decomposition only: rich-text OCR on text layers |
 | safety_identifier | String | (empty) | Optional hashed end-user ID, max 64 characters. Sent to 5.5, 5.0 pro and 5.0 flash only |
-| seed | Int | -1 | Cache control only and not sent, because ModelArk documents no Seedream seed. -1 re-runs every queue |
+| seed | Int | -1 | Cache control only and not sent: Seedream echoes a seed but two identical requests still return different images (measured on 5.0 flash). -1 re-runs every queue |
 
 ## Output
 

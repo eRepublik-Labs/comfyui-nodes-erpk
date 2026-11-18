@@ -52,7 +52,7 @@ Every model outputs 24 fps; ModelArk has no fps parameter. `generate_audio` and 
 
 A custom size must also keep width / height within 1:16-16:1 on every model. Size `auto` exists only for layer decomposition, so only Image Edit offers it.
 
-The `dola-` prefix on the 5.x IDs follows the ModelArk model list. ComfyUI's own partner nodes send the IDs without it.
+The `dola-` prefix on the 5.x IDs follows the ModelArk model list. ComfyUI's own partner nodes send the IDs without it, but on 2026-11-18 the unprefixed 5.5 and 5.0 flash IDs returned `404 InvalidEndpointOrModel.NotFound`.
 
 ## Which options reach the request
 
@@ -64,7 +64,9 @@ Each model's capabilities live in one table, in `byteplus_api/seedance.py` and `
 
 ## Seed
 
-ModelArk documents a request seed for Seedance 1.0 only, and for no Seedream model. On Seedance 1.0 the node sends a seed of 0 or more. Everywhere else the seed is cache control only and stays local: -1 (randomize) runs a new, billed generation on every queue, and a fixed value lets ComfyUI reuse the result it already paid for.
+ModelArk documents a request seed for Seedance 1.0 only. On 2026-11-18, Seedance 2.0 mini and Seedream 5.0 flash accepted a `seed` field and echoed it back, yet two identical requests with the same seed returned different videos and different images. A seed does not reproduce a result there, so the node sends one to Seedance 1.0 only (0 or more). Everywhere else the seed is cache control only and stays local: -1 (randomize) runs a new, billed generation on every queue, and a fixed value lets ComfyUI reuse the result it already paid for.
+
+A cached Seedance result is the video URL, not the video. The URL expires 24 hours after the task finishes, and a Seedance 2.5 URL allows at most 100 downloads. After that a fixed seed keeps returning a dead link, so save the video while the URL works (WaveSpeed Preview Video saves it). Changing the seed then makes, and bills, a new video.
 
 ## Seedance 2.5 drafts
 
@@ -109,3 +111,4 @@ If your account returns `InvalidEndpointOrModel.ModelIDAccessDisabled`, create a
 - `callback_url` (webhooks), because the node polls instead.
 - `stream` (Seedream server-sent events), because it only changes how the same images arrive.
 - `fps` and `guidance_scale`, because ModelArk documents neither for current models.
+- The region. The nodes call `ap-southeast-1` (Johor), the only region whose docs list both Seedance and Seedream.
