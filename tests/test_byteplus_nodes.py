@@ -162,9 +162,13 @@ def test_url_results_download_off_the_event_loop_and_a_partial_batch_keeps_its_b
     replies.append((200, reply))
     images, alpha = asyncio.run(BytePlusSeedreamTextToImage.execute(**kwargs)).args
     assert tuple(images.shape) == (1, 48, 64, 3) and alpha.min().item() == 1.0
-    out = capsys.readouterr().out
-    assert "https://cdn.example.com/a.png" in out
-    assert "[BytePlus] Seedream refused 1 of 2 images: OutputImageSensitiveContentDetected: blocked" in out
+    assert capsys.readouterr().out.splitlines() == [
+        "[BytePlus] Using API key from node input",
+        "[BytePlus] Seedream request: model=seedream-4-0-250828, size=2K, reference images=0",
+        "[BytePlus] Seedream result URLs (valid 24 h): https://cdn.example.com/a.png",
+        "[BytePlus] Seedream refused 1 of 2 images: OutputImageSensitiveContentDetected: blocked",
+        "[BytePlus] Seedream returned 1 image(s), about $0.0300",
+    ]
 
     replies.append((200, reply))
     with pytest.raises(ValueError) as excinfo:
@@ -231,7 +235,7 @@ def test_a_billed_video_is_returned_even_without_its_last_frame(transport, capsy
     assert tuple(output.args) == (VIDEO, "", "cgt-9")
     warning = ("[BytePlus] Task cgt-9 returned no last_frame_url although return_last_frame was on; "
                "returning the video without it.")
-    assert (warning in capsys.readouterr().out) is warned
+    assert (warning in capsys.readouterr().out.splitlines()) is warned
 
 
 def test_a_gap_in_the_seedance_price_list_does_not_discard_the_video(transport, monkeypatch, capsys):
@@ -247,7 +251,7 @@ def test_a_gap_in_the_seedance_price_list_does_not_discard_the_video(transport, 
         client=CLIENT, first_frame=torch.zeros((1, 320, 480, 3)), model=MINI, resolution="480p"))
     assert tuple(output.args) == (VIDEO, "", "cgt-9")
     assert ("[BytePlus] Task cgt-9: 40594 tokens; cost unknown: dreamina-seedance-2-0-mini-260615 has no "
-            "price for 480p.") in capsys.readouterr().out
+            "price for 480p.") in capsys.readouterr().out.splitlines()
 
 
 def test_task_result_waits_for_a_task_and_returns_its_urls_and_status(transport, monkeypatch):
