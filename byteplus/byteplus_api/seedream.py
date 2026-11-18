@@ -100,6 +100,8 @@ BACKGROUNDS = [MODEL_DEFAULT, "auto", "transparent", "opaque"]
 RESPONSE_FORMATS = ["url", "b64_json"]
 PROMPT_MODES = ["standard", "fast"]
 SEQUENTIAL_MODES = ["disabled", "auto"]
+# image-generation-api, max_images: reference images + generated images <= 15. Checked against max_images,
+# the most a request can generate, so it is stricter than the documented rule.
 MAX_SEQUENTIAL_TOTAL = 15
 # Every model's explicit width x height must keep width / height within [1/16, 16].
 ASPECT_RATIO_LIMIT = 16

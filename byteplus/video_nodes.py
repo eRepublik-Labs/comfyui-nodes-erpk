@@ -342,13 +342,15 @@ class BytePlusSeedanceTaskResult(IO.ComfyNode):
                 IO.Boolean.Input(
                     "wait", default=True, optional=True,
                     tooltip=("On: poll until the task finishes and raise if it failed. Off: read the status once; "
-                             "the URLs are empty until it succeeds."),
+                             "the URLs are empty until it succeeds. Keep seed on randomize while the task is "
+                             "unfinished, or a cached queued or running status is served again."),
                 ),
                 IO.Int.Input(
                     "seed", default=-1, min=-1, max=seedance.SEED_MAX, optional=True,
                     control_after_generate="randomize",
-                    tooltip=("Cache control only, never sent. -1 reads the task again on every queue; a fixed "
-                             "value reuses the last answer."),
+                    tooltip=("Cache control only, never sent. Randomize reads the task again on every queue; a "
+                             "fixed value reuses the last answer, even a queued or running status from before "
+                             "the task finished."),
                 ),
             ],
             outputs=[

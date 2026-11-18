@@ -85,7 +85,7 @@ The final render reuses the draft's prompt, inputs, duration, ratio, seed and au
 ## Cancel and errors
 
 - Pressing Cancel in ComfyUI checks the task. The node deletes a `queued` task, which makes ModelArk cancel it. ModelArk cannot cancel a `running` task, so it finishes and bills; the node stops waiting and says so. If the task had already succeeded, the node prints its video URL.
-- **BytePlus Seedance Task Result** reads a task back by ID for free. Give it the `task_id` of a run you cancelled or lost to collect the billed video. It never cancels a task: Cancel only stops its wait. Task IDs stay valid for 7 days.
+- **BytePlus Seedance Task Result** reads a task back by ID for free. Give it the `task_id` of a run you cancelled or lost to collect the billed video. It never cancels a task: Cancel only stops its wait. With `wait` off, keep its `seed` on randomize until the task finishes, or a fixed seed serves a cached `queued` or `running` status. A task ID stays valid for 7 days from creation (a 2.5 draft ID created since 2026-10-28, 14 days); ModelArk deletes a `cancelled` task's record after 24 hours.
 - Task failures (`failed`, `expired`, `cancelled`) raise with ModelArk's error code and message, including moderation codes such as `OutputVideoSensitiveContentDetected`. ModelArk does not bill failed or moderated generations.
 - A rejected request raises `ModelArk POST ... returned HTTP <status> <code>: <message>`.
 - Task creation is never retried, so a network error cannot start a second billed task. Status polling retries through connection errors, 429 and 5xx. A Seedream result download is free, so it gets 3 attempts on connection errors, timeouts, 429 and 5xx; one that still fails names its URL in the error.

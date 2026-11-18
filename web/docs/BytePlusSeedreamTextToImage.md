@@ -17,7 +17,7 @@ Generates images from a text prompt with Seedream, called directly on BytePlus M
 | width | Int | 2048 | Used when size is custom |
 | height | Int | 2048 | Used when size is custom. Total pixels: 921,600-4,624,220 on 5.5/5.0 pro/5.0 flash; 3,686,400-16,777,216 on 5.0 lite and 4.5; 921,600-16,777,216 on 4.0. Every model also needs an aspect ratio within 1:16-16:1 |
 | sequential | Combo | disabled | disabled, auto. auto returns a related set of up to max_images on 5.0 lite, 4.5 and 4.0 |
-| max_images | Int | 15 | Upper bound for sequential auto (1-15); reference images plus max_images must be at most 15 |
+| max_images | Int | 15 | Upper bound for sequential auto (1-15). ModelArk allows at most 15 reference plus generated images; the node checks reference images plus max_images before the call, which is stricter, so lower max_images when you add references |
 | output_format | Combo | (model default) | png, jpeg. 5.5 defaults to png, 5.0 models to jpeg; 4.5 and 4.0 make jpeg only |
 | background | Combo | (model default) | 5.5: auto, transparent, opaque. 5.0 pro and flash: opaque, transparent (from exactly one reference with alpha). Transparent needs png |
 | optimize_prompt_mode | Combo | standard | standard, fast. fast on 5.0 pro and 4.0 only |
