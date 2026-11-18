@@ -186,7 +186,7 @@ def test_key_order_is_settings_then_widget_then_config_ini_and_never_env(monkeyp
         "  3. byteplus/config.ini")
 
 
-@pytest.mark.parametrize("body", ["<html>gateway</html>", "[]", "null"])
+@pytest.mark.parametrize("body", ["<html>gateway</html>", "[]", "null", ""])
 def test_a_2xx_reply_that_is_not_a_json_object_keeps_polling(monkeypatch, body):
     client, transport = _client([(200, body), _task("succeeded", content={"video_url": "https://cdn.example.com/v.mp4"})],
                                 monkeypatch=monkeypatch)
@@ -207,6 +207,8 @@ IMAGES_MAY_BILL = ("The images may have been generated and billed: check your Mo
     ("generate_images", "/images/generations", (200, "<html>ok</html>"),
      f"ModelArk POST /images/generations returned an unreadable reply (HTTP 200: <html>ok</html>). "
      f"{IMAGES_MAY_BILL}"),
+    ("create_video_task", "/contents/generations/tasks", (200, ""),
+     f"ModelArk POST /contents/generations/tasks returned an unreadable reply (HTTP 200: ). {TASK_MAY_BILL}"),
     ("generate_images", "/images/generations", requests.ReadTimeout("read timed out"),
      f"ModelArk POST /images/generations got no reply (read timed out). {IMAGES_MAY_BILL}"),
 ])

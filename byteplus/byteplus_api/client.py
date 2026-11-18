@@ -130,7 +130,8 @@ class BytePlusClient:
             "  3. byteplus/config.ini"
         )
 
-    def _call_sync(self, method: str, path: str, payload: Optional[dict] = None, timeout: float = 60) -> dict:
+    def _call_sync(self, method: str, path: str, payload: Optional[dict] = None, timeout: float = 60,
+                   allow_empty: bool = False) -> dict:
         data = None
         if payload is not None:
             data = json.dumps(payload).encode("utf-8")
@@ -141,7 +142,7 @@ class BytePlusClient:
         status, text = self._transport(method, f"{BASE_URL}{path}", headers, data, timeout)
         if status >= 400:
             raise BytePlusAPIError(f"ModelArk {method} {path} returned {_error_description(status, text)}", status)
-        if not text.strip():
+        if allow_empty and not text.strip():
             return {}
         try:
             body = json.loads(text)
@@ -152,8 +153,9 @@ class BytePlusClient:
                                           f"(HTTP {status}: {text[:_ERROR_TEXT_LIMIT]})", status)
         return body
 
-    async def _call(self, method: str, path: str, payload: Optional[dict] = None, timeout: float = 60) -> dict:
-        return await asyncio.to_thread(self._call_sync, method, path, payload, timeout)
+    async def _call(self, method: str, path: str, payload: Optional[dict] = None, timeout: float = 60,
+                    allow_empty: bool = False) -> dict:
+        return await asyncio.to_thread(self._call_sync, method, path, payload, timeout, allow_empty)
 
     async def _post_once(self, path: str, body: dict, timeout: float, may_bill: str) -> dict:
         """POST once, never retried: a retry could start a second billed generation."""
@@ -175,7 +177,8 @@ class BytePlusClient:
         return await self._call("GET", f"{VIDEO_TASKS_PATH}/{task_id}", timeout=30)
 
     async def delete_video_task(self, task_id: str) -> None:
-        await self._call("DELETE", f"{VIDEO_TASKS_PATH}/{task_id}", timeout=30)
+        # DELETE has no response parameters, so an empty body is a valid answer.
+        await self._call("DELETE", f"{VIDEO_TASKS_PATH}/{task_id}", timeout=30, allow_empty=True)
 
     async def generate_images(self, body: dict) -> dict:
         """The response carries the images; there is no task to poll."""
