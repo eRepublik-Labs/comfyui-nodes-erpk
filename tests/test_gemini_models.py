@@ -1,5 +1,5 @@
 # ABOUTME: Tests that the MODELS dict contains expected model entries.
-# ABOUTME: Verifies all Gemini model IDs are registered and DEFAULT_MODEL is the current Flash.
+# ABOUTME: Verifies all Gemini model IDs are registered and DEFAULT_MODEL is Gemini 4 Hydrogen.
 
 import pytest
 
@@ -16,11 +16,11 @@ class TestModelsDict:
         desc = GeminiClient.MODELS["gemini-3.1-pro-preview"]
         assert "reasoning" in desc.lower() or "advanced" in desc.lower()
 
-    def test_default_model_is_gemini_38_flash(self):
-        # gemini-3.5-flash was deprecated 2026-10-08 and is served by
-        # gemini-3.6-flash (generate_content model_version, probed 2026-10-14);
-        # Alex's 2026-10-14 ruling makes 3.8 Flash the default.
-        assert GeminiClient.DEFAULT_MODEL == "gemini-3.8-flash"
+    def test_default_model_is_gemini_4_hydrogen(self):
+        # The models page calls 3.8 Flash "previous-generation"; Alex's
+        # 2026-11-18 ruling makes 4 Hydrogen the default, knowing it costs
+        # twice 3.8 Flash until 2027-01-01.
+        assert GeminiClient.DEFAULT_MODEL == "gemini-4-hydrogen"
 
     def test_gemini_35_flash_in_models(self):
         # Deprecated but still answering; removing a combo ID breaks saved workflows.

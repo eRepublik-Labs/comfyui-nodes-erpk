@@ -186,7 +186,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 #### Nodes
 
 - **Gemini API Config** - Initialize Gemini API connection (API key configuration). Optional if API key is configured in ComfyUI Settings or config.ini -- Gemini nodes can run standalone.
-- **Gemini Text Generation** - General-purpose text generation with model selection (Gemini 3.1 Pro Preview, 3.8/3.7/3.6/3.5 Flash, 3.5 Flash-Lite)
+- **Gemini Text Generation** - General-purpose text generation with model selection (Gemini 4 Hydrogen, 4 Carbon, 4 Argon, 3.1 Pro Preview, 3.8/3.7/3.6/3.5 Flash, 3.5 Flash-Lite)
 - **Gemini Chat** - Multi-turn conversations with automatic context preservation
 - **Gemini Vision** - Analyze images with multimodal capabilities. Vision and Detect take a `media_resolution` widget; `low` spends about a quarter of the image tokens of `high`
 - **Gemini Detect** - Open-vocabulary object detection: name objects (or leave empty to detect everything prominent) and get normalized regions on an `ERPK_REGIONS` output that wires into the Regional Prompt Builder's `regions` input
@@ -201,7 +201,7 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Gemini Omni Reference to Video** - Generate video featuring the subjects in reference images via Gemini Omni Flash
 
 **Key Benefits:**
-- Support for Gemini 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.8 Flash (default), 3.7, 3.6 and 3.5 Flash, and 3.5 Flash-Lite
+- Support for Gemini 4 Hydrogen (default), 4 Carbon, 4 Argon, 3.1 Pro Preview, 3.8, 3.7, 3.6 and 3.5 Flash, and 3.5 Flash-Lite
 - **Thinking level** control across all models (none/minimal/low/medium/high/xhigh). `none` keeps the model's default thinking; the node raises `minimal` to `low` and lowers `xhigh` to `high` on models that reject them (only Gemini 4 Hydrogen takes `xhigh`)
 - **Omni Flash video generation** from text, a start image or reference images
 - Each node selects its own model for maximum flexibility

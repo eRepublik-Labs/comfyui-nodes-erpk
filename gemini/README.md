@@ -88,7 +88,7 @@ General-purpose text generation and completion.
 **Inputs:**
 - `client`: Gemini API client (optional)
 - `prompt`: Text prompt
-- `model`: gemini-3.8-flash (default), gemini-4-carbon, gemini-4-hydrogen, gemini-4-argon, gemini-3.1-pro-preview, gemini-3.7-flash (deprecated, served by 3.8 Flash), gemini-3.6-flash, gemini-3.5-flash (deprecated, served by 3.6 Flash), gemini-3.5-flash-lite
+- `model`: gemini-4-hydrogen (default), gemini-4-carbon, gemini-4-argon, gemini-3.1-pro-preview, gemini-3.8-flash, gemini-3.7-flash (deprecated, served by 3.8 Flash), gemini-3.6-flash, gemini-3.5-flash (deprecated, served by 3.6 Flash), gemini-3.5-flash-lite
 - `temperature`: 0.0-2.0 (creativity level, default: 0.7). Gemini 4 Argon, 4 Carbon and 4 Hydrogen ignore temperature, top_p and top_k
 - `max_tokens`: 256-65536 (output length, default: 8192). Google recommends at least 32768 for Gemini 4 Argon and 4 Carbon, and 65536 for 4 Hydrogen. Thinking counts toward it; a reply cut off at the limit raises an error
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
@@ -117,7 +117,7 @@ Multi-turn conversation with message history preservation.
 **Inputs:**
 - `client`: Gemini API client (optional)
 - `prompt`: Your message
-- `model`: gemini-3.8-flash (default), gemini-4-carbon, gemini-4-hydrogen, gemini-4-argon, gemini-3.1-pro-preview, gemini-3.7-flash (deprecated, served by 3.8 Flash), gemini-3.6-flash, gemini-3.5-flash (deprecated, served by 3.6 Flash), gemini-3.5-flash-lite
+- `model`: gemini-4-hydrogen (default), gemini-4-carbon, gemini-4-argon, gemini-3.1-pro-preview, gemini-3.8-flash, gemini-3.7-flash (deprecated, served by 3.8 Flash), gemini-3.6-flash, gemini-3.5-flash (deprecated, served by 3.6 Flash), gemini-3.5-flash-lite
 - `chat_session`: Previous chat session (optional, connects from previous chat node)
 - `reset_conversation`: Start new conversation (default: false)
 - `temperature`: 0.0-2.0 (default: 0.7). Gemini 4 Argon, 4 Carbon and 4 Hydrogen ignore temperature, top_p and top_k
@@ -149,7 +149,7 @@ Analyze images with questions or instructions.
 - `client`: Gemini API client (optional)
 - `image`: ComfyUI image tensor (supports batches)
 - `prompt`: Question or instruction about the image(s)
-- `model`: gemini-3.8-flash (default), gemini-4-carbon, gemini-4-hydrogen, gemini-4-argon, gemini-3.1-pro-preview, gemini-3.7-flash (deprecated, served by 3.8 Flash), gemini-3.6-flash, gemini-3.5-flash (deprecated, served by 3.6 Flash), gemini-3.5-flash-lite
+- `model`: gemini-4-hydrogen (default), gemini-4-carbon, gemini-4-argon, gemini-3.1-pro-preview, gemini-3.8-flash, gemini-3.7-flash (deprecated, served by 3.8 Flash), gemini-3.6-flash, gemini-3.5-flash (deprecated, served by 3.6 Flash), gemini-3.5-flash-lite
 - `max_tokens`: 256-65536 (default: 8192). Google recommends at least 32768 for Gemini 4 Argon and 4 Carbon, and 65536 for 4 Hydrogen. Thinking counts toward it; a reply cut off at the limit raises an error
 - `temperature`: 0.0-2.0 (default: 0.4, lower for more factual). Gemini 4 Argon, 4 Carbon and 4 Hydrogen ignore temperature, top_p and top_k
 - `top_p`: 0.0-1.0 (nucleus sampling, default: 0.95, set 0.0 to disable)
@@ -355,10 +355,10 @@ but `gemini-omni-1.2-flash` rejects it.
 | Model | Best For | Context Window | Notes |
 |-------|----------|----------------|-------|
 | **gemini-4-carbon** | Strongest reasoning | 1M tokens | $2/$10 per 1M through 2026-11-30, then $4/$20. Thinking low/medium/high (the node raises `minimal` to `low`). Ignores temperature, top_p and top_k. Each call gets at least a 15-minute timeout, as Google advises; set `max_tokens` to 32768 or more |
-| **gemini-4-hydrogen** | Fast coding and agentic work | 1M tokens | $1.50/$7.50 per 1M. Thinking low/medium/high/xhigh, default high (the node raises `minimal` to `low`); the only model that takes `xhigh`. Ignores temperature, top_p and top_k. Google advises `max_tokens` of 65536 |
+| **gemini-4-hydrogen** | Fast coding and agentic work | 1M tokens | **Default**. $1.50/$7.50 per 1M, twice 3.8 Flash until 3.8 Flash's price rises on 2027-01-01. Thinking low/medium/high/xhigh, default high (the node raises `minimal` to `low`); the only model that takes `xhigh`. Ignores temperature, top_p and top_k. Google advises `max_tokens` of 65536 |
 | **gemini-4-argon** | Flagship reasoning | 1M tokens | $2/$10 per 1M through 2026-11-30, then $4/$20. Thinking low/medium/high (`minimal` is clamped to `low`). Ignores temperature, top_p and top_k. Each call gets at least a 15-minute timeout, as Google advises; set `max_tokens` to 32768 or more for hard prompts |
 | **gemini-3.1-pro-preview** | Most advanced reasoning | 1M tokens | `minimal` thinking is clamped to `low` |
-| **gemini-3.8-flash** | Latest Flash generation | 1M tokens | **Default**, same price as 3.6/3.7; `minimal` thinking is clamped to `low` |
+| **gemini-3.8-flash** | Previous-generation Flash | 1M tokens | Same price as 3.6/3.7; the node raises `minimal` thinking to `low` |
 | **gemini-3.7-flash** | Previous Flash generation | 1M tokens | Deprecated 2026-10-08: Google serves these requests with 3.8 Flash; `minimal` thinking is clamped to `low` |
 | **gemini-3.6-flash** | Improved token efficiency | 1M tokens | Cheaper than 3.5 Flash |
 | **gemini-3.5-flash** | Previous default | 1M tokens | Deprecated 2026-10-08: Google serves these requests with 3.6 Flash. Kept so saved workflows still load |
@@ -444,7 +444,7 @@ https://ai.google.dev/pricing
 
 ### Model not available
 - Preview models (like gemini-3.1-pro-preview) may have limited availability
-- Try gemini-3.8-flash (the default) as a stable alternative
+- Try gemini-4-hydrogen (the default) as a stable alternative
 
 ### Cannot save video file
 - Ensure the output directory exists and is writable

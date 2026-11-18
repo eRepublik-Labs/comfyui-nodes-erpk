@@ -12,7 +12,7 @@ Analyzes images using Gemini's multimodal vision capabilities. Supports single i
 | image | IMAGE | - | Image(s) to analyze (supports batches) |
 | prompt | String | "Describe this image in detail." | Question or instruction about the image(s) |
 | client | GEMINI_API_CLIENT | - | Gemini API client (optional if API key is configured in Settings) |
-| model | Combo | gemini-3.8-flash | Model to use: gemini-4-carbon, gemini-4-hydrogen, gemini-4-argon, gemini-3.1-pro-preview, gemini-3.8-flash, gemini-3.7-flash (deprecated, served by 3.8 Flash), gemini-3.6-flash, gemini-3.5-flash (deprecated, served by 3.6 Flash), gemini-3.5-flash-lite (optional) |
+| model | Combo | gemini-4-hydrogen | Model to use: gemini-4-hydrogen, gemini-4-carbon, gemini-4-argon, gemini-3.1-pro-preview, gemini-3.8-flash, gemini-3.7-flash (deprecated, served by 3.8 Flash), gemini-3.6-flash, gemini-3.5-flash (deprecated, served by 3.6 Flash), gemini-3.5-flash-lite (optional) |
 | max_tokens | Int | 8192 | Maximum analysis length, 256-65536. Google recommends at least 32768 for Gemini 4 Argon and 4 Carbon, and 65536 for 4 Hydrogen. Thinking counts toward it, and a reply cut off at the limit raises an error rather than returning partial text (optional) |
 | temperature | Float | 0.4 | Creativity level, lower=more factual, 0.0-2.0 Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen (optional) |
 | top_p | Float | 0.95 | Nucleus sampling threshold, 0.0=disabled. Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen (optional) |
