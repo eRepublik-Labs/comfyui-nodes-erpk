@@ -363,3 +363,42 @@ def test_a_seedance_node_cancelled_while_waiting_prints_that_the_task_may_still_
     assert lines[-1] == ("[BytePlus] Stopped waiting for Seedance task cgt-9 when the ComfyUI run ended. It may "
                          "still finish and bill; fetch it with the BytePlus Seedance Task Result node.")
     assert [method for method, _, _ in sent] == ["POST", "GET"]
+
+
+SEEDREAM_KWARGS = dict(client=CLIENT, prompt="a kite", model="seedream-4-0-250828", sequential="auto", max_images=2,
+                       response_format="b64_json")
+
+
+@pytest.mark.parametrize("data, fail_on_partial, saved_count, printed", [
+    ([{"b64_json": "A"}, {"b64_json": "B"}], False, 2,
+     "[BytePlus] The ComfyUI run ended before Seedream's images were returned. The billed images are saved as {}"),
+    ([{"b64_json": "A"}, {"error": {"code": "OutputImageSensitiveContentDetected", "message": "blocked"}}], True, 1,
+     "[BytePlus] Seedream returned 1 of 2 images; failures: OutputImageSensitiveContentDetected: blocked. "
+     "The billed images are saved as {}"),
+])
+def test_seedream_images_billed_after_the_node_was_cancelled_are_saved_and_named(
+        monkeypatch, capsys, output_dir, data, fail_on_partial, saved_count, printed):
+    pngs = {"A": _png_b64(Image.new("RGB", (64, 48))), "B": _png_b64(Image.new("RGB", (32, 16)))}
+    data = [{"b64_json": pngs[item["b64_json"]]} if "b64_json" in item else item for item in data]
+    fake = BlockingTransport((200, {"data": data}))
+    _cancel_while_in_flight(monkeypatch, fake, BytePlusSeedreamTextToImage.execute(
+        **SEEDREAM_KWARGS, fail_on_partial=fail_on_partial))
+    saved = [output_dir / f"20261118-120000-000000-{index:02d}.png" for index in range(1, saved_count + 1)]
+    assert capsys.readouterr().out.splitlines()[-1] == printed.format(", ".join(str(path) for path in saved))
+    assert [_size_on_disk(path) for path in saved] == [(64, 48), (32, 16)][:saved_count]
+    assert sorted(output_dir.iterdir()) == saved
+
+
+def test_a_billed_result_reaches_exactly_one_side_whichever_finishes_first():
+    from erpk.byteplus.nodes import _Handoff
+
+    ran = []
+    received = _Handoff()
+    received.finish(lambda: ran.append("received"))
+    cancelled_after = _Handoff()
+    cancelled_after.finish(lambda: ran.append("cancelled after the worker finished"))
+    cancelled_after.abandon()
+    cancelled_before = _Handoff()
+    cancelled_before.abandon()
+    cancelled_before.finish(lambda: ran.append("cancelled before the worker finished"))
+    assert ran == ["cancelled after the worker finished", "cancelled before the worker finished"]

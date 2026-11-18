@@ -2,7 +2,8 @@
 # ABOUTME: text-to-image and image-edit nodes, which output an IMAGE batch plus its alpha.
 
 import asyncio
-from typing import List, Optional
+import threading
+from typing import Callable, List, Optional
 
 from comfy_api.latest import IO
 
@@ -185,8 +186,63 @@ async def _generate(kwargs, images: List[str]) -> IO.NodeOutput:
     client = make_client(kwargs.get("client"))
     print(f"[BytePlus] Seedream request: model={body['model']}, size={body['size']}, "
           f"reference images={len(images)}")
-    response = await asyncio.to_thread(client.generate_images, body)
+    handoff = _Handoff()
+    try:
+        image_tensor, alpha = await asyncio.to_thread(
+            _generate_sync, client, body, model_id, options, len(images), kwargs.get("fail_on_partial", False),
+            handoff)
+    except asyncio.CancelledError:
+        handoff.abandon()
+        raise
+    return IO.NodeOutput(image_tensor, alpha)
 
+
+class _Handoff:
+    """Hands a worker thread's billed result to its node, or to the worker's fallback when ComfyUI
+    cancelled the node first. Whichever side comes second runs the fallback, so it runs at most once."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._abandoned = False
+        self._fallback: Optional[Callable[[], None]] = None
+
+    def finish(self, fallback: Callable[[], None]) -> None:
+        """Worker: done; `fallback` saves or prints the result if the node never receives it."""
+        with self._lock:
+            if not self._abandoned:
+                self._fallback = fallback
+                return
+        fallback()
+
+    def abandon(self) -> None:
+        """Node: cancelled, so it will not receive the result."""
+        with self._lock:
+            self._abandoned = True
+            fallback, self._fallback = self._fallback, None
+        if fallback is not None:
+            fallback()
+
+
+def _generate_sync(client: BytePlusClient, body: dict, model_id: str, options: seedream.ImageOptions,
+                   input_images: int, fail_on_partial: bool, handoff: _Handoff):
+    """POST, decode and compose in one worker thread. ComfyUI cancels a pending node when another
+    node fails, but this thread runs to the end, so images billed after the cancel still reach disk."""
+    response = client.generate_images(body)
+    try:
+        output, decoded = _images_from_response(response, model_id, options, input_images, fail_on_partial)
+    except Exception as e:
+        message = str(e)
+        handoff.finish(lambda: print(f"[BytePlus] {message}"))
+        raise
+    handoff.finish(lambda: print("[BytePlus] The ComfyUI run ended before Seedream's images were returned. "
+                                 f"{_recover(decoded)}"))
+    return output
+
+
+def _images_from_response(response: dict, model_id: str, options: seedream.ImageOptions, input_images: int,
+                          fail_on_partial: bool):
+    """((IMAGE, alpha), decoded images) from a Seedream response; every raise after billing first
+    saves the decoded images and names them."""
     items = [item for item in response.get("data") or [] if isinstance(item, dict)]
     failed = [item["error"] for item in items if item.get("error")]
     succeeded = [item for item in items if not item.get("error")]
@@ -200,29 +256,28 @@ async def _generate(kwargs, images: List[str]) -> IO.NodeOutput:
         print(f"[BytePlus] Seedream refused {len(failed)} of {len(items)} images: {reasons}")
 
     # Every image from here on is billed: no failure below may discard one.
-    decoded, decode_errors = await asyncio.to_thread(decode_items, succeeded)
+    decoded, decode_errors = decode_items(succeeded)
     problem = None
     if decode_errors:
         problem = f"Seedream images could not be decoded: {'; '.join(decode_errors)}."
-    elif failed and kwargs.get("fail_on_partial", False):
+    elif failed and fail_on_partial:
         problem = f"Seedream returned {len(succeeded)} of {len(items)} images; failures: {reasons}."
     else:
         try:
-            image_tensor, alpha = await asyncio.to_thread(compose, succeeded, decoded,
-                                                          options.layer_decomposition)
+            output = compose(succeeded, decoded, options.layer_decomposition)
         except Exception as e:
             problem = str(e) or type(e).__name__
     if problem:
-        raise ValueError(f"{problem} {await asyncio.to_thread(_recover, decoded)}")
+        raise ValueError(f"{problem} {_recover(decoded)}")
 
     try:
-        cost = seedream.image_cost_usd(model_id, [image.size for image in decoded], input_images=len(images),
+        cost = seedream.image_cost_usd(model_id, [image.size for image in decoded], input_images=input_images,
                                        layers=options.layer_decomposition)
         print(f"[BytePlus] Seedream returned {len(decoded)} image(s), about ${cost:.4f}")
     except ValueError as e:
         # The images are already billed; a gap in the price list must not discard them.
         print(f"[BytePlus] Seedream returned {len(decoded)} image(s); cost unknown: {e}")
-    return IO.NodeOutput(image_tensor, alpha)
+    return output, decoded
 
 
 def _recover(decoded) -> str:
