@@ -11,7 +11,7 @@ from PIL import Image
 
 torch = pytest.importorskip("torch")
 
-from erpk.wavespeed.wavespeed_api.utils import load_decomposed_layers
+from erpk.wavespeed.wavespeed_api.utils import imageurl2tensor_rgba, load_decomposed_layers
 
 
 def _node(module, name):
@@ -126,10 +126,20 @@ def test_mask_uses_the_same_convention_as_the_layer_nodes():
     assert torch.equal(result.result[1], layer_masks[0])
 
 
-def test_transparent_background_in_jpeg_is_refused_before_the_paid_call():
-    error = _refused(_node("seedream_v5_5", "SeedreamV5_5Node"), prompt="a logo",
-                     background="transparent", output_format="jpeg")
-    assert error.errors()[0]["msg"] == 'Value error, background "transparent" needs output_format "png", got "jpeg"'
+def test_transparent_background_with_jpeg_selected_is_sent_as_chosen():
+    # WaveSpeed documents that a transparent background always returns PNG, whatever output_format says.
+    node = _node("seedream_v5_5", "SeedreamV5_5Node")
+    request, _ = _run(node, ["https://example.com/out.png"], prompt="a logo",
+                      background="transparent", output_format="jpeg")
+    payload = request.build_payload()
+    assert (payload["background"], payload["output_format"]) == ("transparent", "jpeg")
+
+
+def test_a_generated_image_that_cannot_be_downloaded_is_an_error():
+    with patch("erpk.utils.safe_fetch.fetch_remote_bytes", side_effect=OSError("connection reset")):
+        with pytest.raises(RuntimeError) as error:
+            imageurl2tensor_rgba(["https://example.com/out.png"])
+    assert str(error.value) == "Could not load generated image https://example.com/out.png: connection reset"
 
 
 # ---- edit ------------------------------------------------------------------

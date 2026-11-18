@@ -15,7 +15,7 @@ Edits images from a text prompt with ByteDance's Seedream V5.5, using up to 10 i
 | aspect_ratio | Combo | "auto" | auto keeps the ratio of the first image; otherwise one of 1:1, 1:2, 2:1, 1:3, 3:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 9:21, 21:9 |
 | resolution | Combo | "1k" | Output resolution tier: 1k, 1.5k or 2k |
 | client | WAVESPEED_AI_API_CLIENT | -- | WaveSpeed API client (optional if API key is configured in Settings) |
-| output_format | Combo | "png" | jpeg or png (optional). A transparent background needs png |
+| output_format | Combo | "png" | jpeg or png (optional). A transparent background always returns png |
 | background | Combo | "auto" | auto, transparent or opaque (optional) |
 | seed | Int | -1 | Cache control only, not sent to the API. -1 generates again every run; a fixed value reuses the cached result |
 | grid_images | String | `[]` | Hidden. The grid stores its ordered file list here as a JSON array of names in the `input` folder |
@@ -43,4 +43,3 @@ With nothing connected to `images`, the node sends the files on its grid. Pick o
 - **Pricing:** $0.02 per image at 1k or 1.5k, $0.035 at 2k, plus $0.008 for every input image, including the first
 - **API Docs:** [Bytedance Seedream V5.5 Edit](https://wavespeed.ai/docs/docs-api/bytedance/seedream-v5.5/edit)
 - More than 10 input images is an error that names the count; nothing is dropped silently
-- `background` transparent with `output_format` jpeg is an error before anything is billed, because JPEG cannot hold transparency

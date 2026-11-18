@@ -2,7 +2,7 @@
 # ABOUTME: Sized by aspect ratio plus a resolution tier, with an auto, transparent or opaque background.
 
 from typing import Optional
-from pydantic import Field, model_validator
+from pydantic import Field
 from ..utils import BaseRequest
 
 BACKGROUNDS = ["auto", "transparent", "opaque"]
@@ -21,13 +21,6 @@ class SeedreamV5_5(BaseRequest):
     resolution: Optional[str] = Field(default="1k", description="Output resolution tier: 1k, 1.5k or 2k.")
     output_format: Optional[str] = Field(default="png", description="Output image format: jpeg or png.")
     background: Optional[str] = Field(default="auto", description="Background: auto, transparent or opaque.")
-
-    @model_validator(mode="after")
-    def _transparency_needs_png(self):
-        # JPEG has no alpha channel, so the paid result would come back fully opaque.
-        if self.background == "transparent" and self.output_format != "png":
-            raise ValueError(f'background "transparent" needs output_format "png", got "{self.output_format}"')
-        return self
 
     def build_payload(self) -> dict:
         """Builds the request payload dictionary."""

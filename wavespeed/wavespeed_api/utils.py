@@ -92,11 +92,7 @@ def imageurl2tensor_rgba(image_urls: List[str]):
                 alpha_np = numpy.array(a, dtype=numpy.float32) / 255.0
                 alpha_masks.append(torch.from_numpy(alpha_np))
         except Exception as e:
-            print(f"[WaveSpeed] Error downloading/processing RGBA image from {url}: {e}")
-            continue
-
-    if not rgb_images:
-        return torch.zeros((1, 1, 1, 3)), torch.zeros((1, 1, 1))
+            raise RuntimeError(f"Could not load generated image {url}: {e}") from e
 
     rgb_tensor = images2tensor(rgb_images)
     alpha_tensor = torch.stack(alpha_masks)
