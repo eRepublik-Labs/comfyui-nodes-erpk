@@ -26,8 +26,9 @@ def load_pricing(path=PRICING_PATH, on=None):
     in strictly increasing date order; each change applies from its date onward.
 
     A missing or unreadable file yields ({}, "unknown") — pricing is best-effort
-    metadata, never a reason to fail a scan. A malformed price_changes list
-    raises ValueError naming the model and the bad value.
+    metadata, never a reason to fail a scan. A file that loads but holds a
+    missing or bad price, or a malformed price_changes list, raises ValueError
+    naming the model, the key and the bad value.
     """
     try:
         with open(path) as f:
@@ -38,11 +39,12 @@ def load_pricing(path=PRICING_PATH, on=None):
     rates = {}
     for model_id, model_data in data.get("models", {}).items():
         if not isinstance(model_data, dict):
-            continue
-        rate = {
-            "input": model_data.get("input_price_per_mtok", 0) or 0,
-            "output": model_data.get("output_price_per_mtok", 0) or 0,
-        }
+            raise ValueError(
+                f"{path}: {model_id} entry must be an object with input_price_per_mtok "
+                f"and output_price_per_mtok, got {model_data!r}")
+        for key in _PRICE_KEYS:
+            _require_price(f"{path}: {model_id}", key, model_data.get(key))
+        rate = {"input": model_data["input_price_per_mtok"], "output": model_data["output_price_per_mtok"]}
         for effective_from, change in _parse_price_changes(path, model_id, model_data):
             if effective_from <= day:
                 rate = {"input": change["input_price_per_mtok"], "output": change["output_price_per_mtok"]}
@@ -69,11 +71,14 @@ def _parse_price_changes(path, model_id, model_data):
                 f"{where} dates must be strictly increasing, got {raw_day!r} "
                 f"after {parsed[-1][0].isoformat()!r}")
         for key in _PRICE_KEYS:
-            value = change.get(key)
-            if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
-                raise ValueError(f"{where} entry {raw_day!r} {key} {value!r} is not a non-negative number")
+            _require_price(f"{where} entry {raw_day!r}", key, change.get(key))
         parsed.append((effective_from, change))
     return parsed
+
+
+def _require_price(where, key, value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+        raise ValueError(f"{where} {key} {value!r} is not a non-negative number")
 
 
 def _parse_iso_day(value):

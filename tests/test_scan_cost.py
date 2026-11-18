@@ -214,3 +214,41 @@ class TestPriceChangesValidation:
             f"{tmp_path / 'pricing.json'}: gemini-4-argon price_changes must be a list of "
             "{effective_from, input_price_per_mtok, output_price_per_mtok}, got "
             "['2026-12-01']")
+
+
+class TestBaseRateValidation:
+    """Every model entry carries both base prices; a missing or bad one fails at load."""
+
+    def _load(self, tmp_path, entry):
+        load_pricing(_write_pricing(tmp_path, {"gemini-4-hydrogen": entry}), on=date(2026, 12, 1))
+
+    @pytest.mark.parametrize("key", ["input_price_per_mtok", "output_price_per_mtok"])
+    def test_missing_base_price(self, tmp_path, key):
+        entry = {"name": "Plain", "input_price_per_mtok": 1.5, "output_price_per_mtok": 7.5}
+        del entry[key]
+        with pytest.raises(ValueError) as err:
+            self._load(tmp_path, entry)
+        assert str(err.value) == (
+            f"{tmp_path / 'pricing.json'}: gemini-4-hydrogen {key} None is not a non-negative number")
+
+    @pytest.mark.parametrize("bad", [None, "1.50", False, -0.5])
+    def test_bad_base_price(self, tmp_path, bad):
+        entry = {"name": "Plain", "input_price_per_mtok": bad, "output_price_per_mtok": 7.5}
+        with pytest.raises(ValueError) as err:
+            self._load(tmp_path, entry)
+        assert str(err.value) == (
+            f"{tmp_path / 'pricing.json'}: gemini-4-hydrogen input_price_per_mtok {bad!r} "
+            "is not a non-negative number")
+
+    def test_zero_base_price_is_free_not_an_error(self, tmp_path):
+        path = _write_pricing(tmp_path, {
+            "free": {"name": "Free", "input_price_per_mtok": 0, "output_price_per_mtok": 0.0}})
+        rates, _ = load_pricing(path, on=date(2026, 12, 1))
+        assert rates["free"] == {"input": 0, "output": 0.0}
+
+    def test_entry_not_an_object(self, tmp_path):
+        with pytest.raises(ValueError) as err:
+            self._load(tmp_path, [1.5, 7.5])
+        assert str(err.value) == (
+            f"{tmp_path / 'pricing.json'}: gemini-4-hydrogen entry must be an object with "
+            "input_price_per_mtok and output_price_per_mtok, got [1.5, 7.5]")
