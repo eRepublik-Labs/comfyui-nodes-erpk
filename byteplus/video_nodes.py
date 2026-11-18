@@ -169,7 +169,7 @@ async def _run(kwargs, media: seedance.VideoMedia) -> IO.NodeOutput:
                          f"was on. The video is at {video_url}")
     tokens = (task.get("usage") or {}).get("completion_tokens")
     if tokens:
-        cost = seedance.video_cost_usd(model_id, task.get("resolution", options.resolution), tokens,
+        cost = seedance.video_cost_usd(model_id, options.resolution, tokens,
                                        has_video_input=bool(media.reference_videos),
                                        flex=options.service_tier == "flex")
         print(f"[BytePlus] Task {task_id}: {tokens} tokens, about ${cost:.4f}")

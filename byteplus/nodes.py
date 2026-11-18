@@ -194,8 +194,13 @@ async def _generate(kwargs, images: List[str]) -> IO.NodeOutput:
 
     image_tensor, alpha = response_to_images(succeeded, layers=options.layer_decomposition)
     sizes = [(image_tensor.shape[2], image_tensor.shape[1])] * image_tensor.shape[0]
-    cost = seedream.image_cost_usd(model_id, sizes, input_images=len(images), layers=options.layer_decomposition)
-    print(f"[BytePlus] Seedream returned {image_tensor.shape[0]} image(s), about ${cost:.4f}")
+    try:
+        cost = seedream.image_cost_usd(model_id, sizes, input_images=len(images),
+                                       layers=options.layer_decomposition)
+        print(f"[BytePlus] Seedream returned {image_tensor.shape[0]} image(s), about ${cost:.4f}")
+    except ValueError as e:
+        # The images are already billed; a gap in the price list must not discard them.
+        print(f"[BytePlus] Seedream returned {image_tensor.shape[0]} image(s); cost unknown: {e}")
     return IO.NodeOutput(image_tensor, alpha)
 
 
