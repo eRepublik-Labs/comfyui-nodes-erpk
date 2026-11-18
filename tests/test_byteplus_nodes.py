@@ -128,3 +128,47 @@ def test_url_results_download_off_the_event_loop_and_print_before_a_partial_fail
     images, alpha = asyncio.run(BytePlusSeedreamTextToImage.execute(**kwargs, fail_on_partial=False)).args
     assert tuple(images.shape) == (1, 48, 64, 3) and alpha.min().item() == 1.0
     assert downloads == [("https://cdn.example.com/a.png", False)]
+
+
+MINI = "dreamina-seedance-2-0-mini-260615"
+VIDEO = "https://cdn.example.com/v.mp4"
+
+
+def _succeeded(**content):
+    return (200, {"id": "cgt-9", "status": "succeeded", "content": {"video_url": VIDEO, **content},
+                  "usage": {"completion_tokens": 40_594, "total_tokens": 40_594}})
+
+
+@pytest.mark.parametrize("return_last_frame, content, warned", [
+    (False, {"last_frame_url": None}, False),
+    (True, {"last_frame_url": None}, True),
+    (True, {}, True),
+])
+def test_a_billed_video_is_returned_even_without_its_last_frame(transport, capsys, return_last_frame, content,
+                                                                 warned):
+    _, replies = transport
+    replies += [(200, {"id": "cgt-9"}), _succeeded(**content)]
+    output = asyncio.run(BytePlusSeedanceImageToVideo.execute(
+        client=CLIENT, first_frame=torch.zeros((1, 320, 480, 3)), model=MINI, resolution="480p",
+        return_last_frame=return_last_frame))
+    assert tuple(output.args) == (VIDEO, "", "cgt-9")
+    warning = ("[BytePlus] Task cgt-9 returned no last_frame_url although return_last_frame was on; "
+               "returning the video without it.")
+    assert (warning in capsys.readouterr().out) is warned
+
+
+def test_a_gap_in_the_seedance_price_list_does_not_discard_the_video(transport, monkeypatch, capsys):
+    from dataclasses import replace
+
+    from erpk.byteplus.byteplus_api import seedance
+
+    monkeypatch.setitem(seedance.SEEDANCE_MODELS, MINI,
+                        replace(seedance.SEEDANCE_MODELS[MINI], price_per_million={}))
+    _, replies = transport
+    replies += [(200, {"id": "cgt-9"}), _succeeded()]
+    output = asyncio.run(BytePlusSeedanceImageToVideo.execute(
+        client=CLIENT, first_frame=torch.zeros((1, 320, 480, 3)), model=MINI, resolution="480p"))
+    assert tuple(output.args) == (VIDEO, "", "cgt-9")
+    assert ("[BytePlus] Task cgt-9: 40594 tokens; cost unknown: dreamina-seedance-2-0-mini-260615 has no "
+            "price for 480p.") in capsys.readouterr().out
+

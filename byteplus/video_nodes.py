@@ -150,6 +150,12 @@ async def _single_image(image, url: str, name: str):
     return url.strip() or None
 
 
+def _task_urls(task: dict):
+    """(video_url, last_frame_url) of a task, each "" when absent or null."""
+    content = task.get("content") or {}
+    return content.get("video_url") or "", content.get("last_frame_url") or ""
+
+
 async def _run(kwargs, media: seedance.VideoMedia) -> IO.NodeOutput:
     model_id = kwargs.get("model", seedance.DEFAULT_MODEL)
     options = _options(kwargs)
@@ -161,20 +167,22 @@ async def _run(kwargs, media: seedance.VideoMedia) -> IO.NodeOutput:
           f"resolution={options.resolution}")
     task = await client.wait_for_video_task(task_id, options.execution_expires_after + _POLL_MARGIN_SECONDS)
 
-    content = task.get("content") or {}
-    video_url = content.get("video_url")
+    video_url, last_frame_url = _task_urls(task)
     if not video_url:
         raise ValueError(f"Seedance task {task_id} succeeded without a video_url: {str(task)[:300]}")
-    last_frame_url = content.get("last_frame_url", "")
     if options.return_last_frame and not last_frame_url:
-        raise ValueError(f"Seedance task {task_id} returned no last_frame_url although return_last_frame "
-                         f"was on. The video is at {video_url}")
+        print(f"[BytePlus] Task {task_id} returned no last_frame_url although return_last_frame was on; "
+              "returning the video without it.")
     tokens = (task.get("usage") or {}).get("completion_tokens")
-    if tokens:
-        cost = seedance.video_cost_usd(model_id, options.resolution, tokens,
-                                       has_video_input=bool(media.reference_videos),
-                                       flex=options.service_tier == "flex")
-        print(f"[BytePlus] Task {task_id}: {tokens} tokens, about ${cost:.4f}")
+    if isinstance(tokens, int) and tokens > 0:
+        try:
+            cost = seedance.video_cost_usd(model_id, options.resolution, tokens,
+                                           has_video_input=bool(media.reference_videos),
+                                           flex=options.service_tier == "flex")
+            print(f"[BytePlus] Task {task_id}: {tokens} tokens, about ${cost:.4f}")
+        except ValueError as e:
+            # The video is already billed; a gap in the price list must not discard it.
+            print(f"[BytePlus] Task {task_id}: {tokens} tokens; cost unknown: {e}")
     print(f"[BytePlus] Video URL: {video_url}")
     return IO.NodeOutput(video_url, last_frame_url, task_id)
 
@@ -311,3 +319,4 @@ class BytePlusSeedanceReferenceToVideo(IO.ComfyNode):
         if media.mode() is seedance.Mode.TEXT:
             raise ValueError("Connect reference_images or enter at least one reference URL.")
         return await _run(kwargs, media)
+

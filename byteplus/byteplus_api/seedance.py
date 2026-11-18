@@ -385,7 +385,10 @@ def video_cost_usd(model_id: str, resolution: str, completion_tokens: int,
     if flex:
         rate = model.flex_price_per_million
     elif has_video_input:
-        rate = model.price_per_million_with_video_input[resolution]
+        rate = model.price_per_million_with_video_input.get(resolution)
     else:
-        rate = model.price_per_million[resolution]
+        rate = model.price_per_million.get(resolution)
+    if rate is None:
+        tier = "flex " if flex else "with-video " if has_video_input else ""
+        raise ValueError(f"{model_id} has no {tier}price for {resolution}.")
     return completion_tokens * rate / 1_000_000
