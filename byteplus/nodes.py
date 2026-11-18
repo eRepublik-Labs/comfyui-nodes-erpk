@@ -70,10 +70,10 @@ def _image_option_inputs(edit: bool):
                      "decides which options apply."),
         ),
         IO.Combo.Input(
-            "size", options=seedream.SIZES, default="2K", optional=True,
+            "size", options=seedream.EDIT_SIZES if edit else seedream.SIZES, default="2K", optional=True,
             tooltip=("Preset (the model picks the aspect from the prompt): 1K/1.5K/2K on 5.5, 5.0 pro, 5.0 "
-                     "flash; 2K/3K/4K on 5.0 lite; 2K/4K on 4.5; 1K/2K/4K on 4.0. custom sends width x height. "
-                     "auto is for layer decomposition."),
+                     "flash; 2K/3K/4K on 5.0 lite; 2K/4K on 4.5; 1K/2K/4K on 4.0. custom sends width x height."
+                     + (" auto is for layer decomposition." if edit else "")),
         ),
         IO.Int.Input(
             "width", default=2048, min=15, max=8192, optional=True,
@@ -81,7 +81,7 @@ def _image_option_inputs(edit: bool):
                      "3,686,400-16,777,216 on 5.0 lite and 4.5, 921,600-16,777,216 on 4.0."),
         ),
         IO.Int.Input("height", default=2048, min=15, max=8192, optional=True,
-                     tooltip="Used when size is custom. 5.5 also needs an aspect ratio within 1:16-16:1."),
+                     tooltip="Used when size is custom. Every model needs an aspect ratio within 1:16-16:1."),
         IO.Combo.Input(
             "sequential", options=seedream.SEQUENTIAL_MODES, default="disabled", optional=True,
             tooltip=("auto lets 5.0 lite, 4.5 and 4.0 return a related set of up to max_images images. "
@@ -147,11 +147,13 @@ def _image_option_inputs(edit: bool):
     return inputs
 
 
-_IMAGE_OUTPUTS = [
-    IO.Image.Output("images", tooltip="Generated images as one batch (with layers: base first)."),
-    IO.Mask.Output("alpha", tooltip=("Per-image alpha, 1 = opaque, 0 = transparent. Invert it (InvertMask) "
-                                     "before feeding a mask input that uses the LoadImage convention.")),
-]
+def _image_outputs(edit: bool):
+    images_tip = "Generated images as one batch (with layers: base first)." if edit else "Generated images as one batch."
+    return [
+        IO.Image.Output("images", tooltip=images_tip),
+        IO.Mask.Output("alpha", tooltip=("Per-image alpha, 1 = opaque, 0 = transparent. Invert it (InvertMask) "
+                                         "before feeding a mask input that uses the LoadImage convention.")),
+    ]
 
 
 def _image_options(kwargs) -> seedream.ImageOptions:
@@ -229,7 +231,7 @@ class BytePlusSeedreamTextToImage(IO.ComfyNode):
                 IO.String.Input("prompt", multiline=True, default="", tooltip="What the image shows."),
                 *_image_option_inputs(edit=False),
             ],
-            outputs=_IMAGE_OUTPUTS,
+            outputs=_image_outputs(edit=False),
         )
 
     @classmethod
@@ -260,7 +262,8 @@ class BytePlusSeedreamImageEdit(IO.ComfyNode):
                                tooltip=("Reference image batch, sent inline. Max 10 on 5.5/5.0 pro/5.0 flash, 14 "
                                         "on 5.0 lite/4.5/4.0, counted together with images_url.")),
                 IO.String.Input("images_url", multiline=True, default="", optional=True,
-                                tooltip="More reference images, one https URL per line, after the batch."),
+                                tooltip=("More reference images, one https URL or data:image/ URI per line, "
+                                         "after the batch.")),
                 IO.Mask.Input("mask", optional=True,
                               tooltip=("Alpha for the connected images (LoadImage convention, 1 = transparent): "
                                        "they are sent as PNG with that transparency. 5.0 pro and flash need it "
@@ -268,7 +271,7 @@ class BytePlusSeedreamImageEdit(IO.ComfyNode):
                                        "the inverse: pass it through InvertMask first.")),
                 *_image_option_inputs(edit=True),
             ],
-            outputs=_IMAGE_OUTPUTS,
+            outputs=_image_outputs(edit=True),
         )
 
     @classmethod

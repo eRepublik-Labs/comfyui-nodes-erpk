@@ -2,7 +2,9 @@
 # ABOUTME: /images/generations body builder that enforces those rows, and the per-image price.
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple
+
+from .seedance import check_urls
 
 
 @dataclass(frozen=True)
@@ -14,8 +16,6 @@ class SeedreamModel:
     size_presets: Tuple[str, ...]
     min_pixels: int
     max_pixels: int
-    # Only 5.5 documents an aspect-ratio bound for explicit sizes.
-    aspect_ratio_limit: Optional[float]
     sequential: bool
     layer_decomposition: bool
     layer_options: bool
@@ -39,7 +39,7 @@ _FIVE_X_PRESETS = ("1K", "1.5K", "2K")
 SEEDREAM_MODELS: Dict[str, SeedreamModel] = {m.model_id: m for m in (
     SeedreamModel(
         model_id="dola-seedream-5-5-261028", max_reference_images=10, size_presets=_FIVE_X_PRESETS,
-        min_pixels=921_600, max_pixels=4_624_220, aspect_ratio_limit=16.0, sequential=False,
+        min_pixels=921_600, max_pixels=4_624_220, sequential=False,
         layer_decomposition=True, layer_options=True, output_formats=("png", "jpeg"),
         backgrounds=("auto", "transparent", "opaque"), transparent_from_text=True, fast_prompt_mode=False,
         safety_identifier=True, output_price_tiers=((2_601_123.84, 0.020), (4_624_220.16, 0.035)),
@@ -48,7 +48,7 @@ SEEDREAM_MODELS: Dict[str, SeedreamModel] = {m.model_id: m for m in (
     ),
     SeedreamModel(
         model_id="dola-seedream-5-0-pro-260628", max_reference_images=10, size_presets=_FIVE_X_PRESETS,
-        min_pixels=921_600, max_pixels=4_624_220, aspect_ratio_limit=None, sequential=False,
+        min_pixels=921_600, max_pixels=4_624_220, sequential=False,
         layer_decomposition=True, layer_options=False, output_formats=("jpeg", "png"),
         backgrounds=("opaque", "transparent"), transparent_from_text=False, fast_prompt_mode=True,
         safety_identifier=True, output_price_tiers=((2_610_000, 0.045), (4_624_220.16, 0.09)),
@@ -57,7 +57,7 @@ SEEDREAM_MODELS: Dict[str, SeedreamModel] = {m.model_id: m for m in (
     ),
     SeedreamModel(
         model_id="dola-seedream-5-0-flash-260915", max_reference_images=10, size_presets=_FIVE_X_PRESETS,
-        min_pixels=921_600, max_pixels=4_624_220, aspect_ratio_limit=None, sequential=False,
+        min_pixels=921_600, max_pixels=4_624_220, sequential=False,
         layer_decomposition=True, layer_options=False, output_formats=("jpeg", "png"),
         backgrounds=("opaque", "transparent"), transparent_from_text=False, fast_prompt_mode=False,
         safety_identifier=True, output_price_tiers=((4_624_220.16, 0.018),),
@@ -65,7 +65,7 @@ SEEDREAM_MODELS: Dict[str, SeedreamModel] = {m.model_id: m for m in (
     ),
     SeedreamModel(
         model_id="seedream-5-0-260128", max_reference_images=14, size_presets=("2K", "3K", "4K"),
-        min_pixels=3_686_400, max_pixels=16_777_216, aspect_ratio_limit=None, sequential=True,
+        min_pixels=3_686_400, max_pixels=16_777_216, sequential=True,
         layer_decomposition=False, layer_options=False, output_formats=("jpeg", "png"),
         backgrounds=(), transparent_from_text=False, fast_prompt_mode=False, safety_identifier=False,
         output_price_tiers=((16_777_216, 0.035),), layer_price_tiers=(),
@@ -73,7 +73,7 @@ SEEDREAM_MODELS: Dict[str, SeedreamModel] = {m.model_id: m for m in (
     ),
     SeedreamModel(
         model_id="seedream-4-5-251128", max_reference_images=14, size_presets=("2K", "4K"),
-        min_pixels=3_686_400, max_pixels=16_777_216, aspect_ratio_limit=None, sequential=True,
+        min_pixels=3_686_400, max_pixels=16_777_216, sequential=True,
         layer_decomposition=False, layer_options=False, output_formats=(),
         backgrounds=(), transparent_from_text=False, fast_prompt_mode=False, safety_identifier=False,
         output_price_tiers=((16_777_216, 0.04),), layer_price_tiers=(),
@@ -81,7 +81,7 @@ SEEDREAM_MODELS: Dict[str, SeedreamModel] = {m.model_id: m for m in (
     ),
     SeedreamModel(
         model_id="seedream-4-0-250828", max_reference_images=14, size_presets=("1K", "2K", "4K"),
-        min_pixels=921_600, max_pixels=16_777_216, aspect_ratio_limit=None, sequential=True,
+        min_pixels=921_600, max_pixels=16_777_216, sequential=True,
         layer_decomposition=False, layer_options=False, output_formats=(),
         backgrounds=(), transparent_from_text=False, fast_prompt_mode=True, safety_identifier=False,
         output_price_tiers=((16_777_216, 0.03),), layer_price_tiers=(),
@@ -91,7 +91,9 @@ SEEDREAM_MODELS: Dict[str, SeedreamModel] = {m.model_id: m for m in (
 
 MODEL_IDS: List[str] = list(SEEDREAM_MODELS)
 DEFAULT_MODEL = "dola-seedream-5-5-261028"
-SIZES = ["2K", "1K", "1.5K", "3K", "4K", "auto", "custom"]
+SIZES = ["2K", "1K", "1.5K", "3K", "4K", "custom"]
+# auto is a layer-decomposition size, so only Image Edit offers it.
+EDIT_SIZES = SIZES[:-1] + ["auto", "custom"]
 MODEL_DEFAULT = "(model default)"
 OUTPUT_FORMATS = [MODEL_DEFAULT, "png", "jpeg"]
 BACKGROUNDS = [MODEL_DEFAULT, "auto", "transparent", "opaque"]
@@ -99,6 +101,9 @@ RESPONSE_FORMATS = ["url", "b64_json"]
 PROMPT_MODES = ["standard", "fast"]
 SEQUENTIAL_MODES = ["disabled", "auto"]
 MAX_SEQUENTIAL_TOTAL = 15
+# Every model's explicit width x height must keep width / height within [1/16, 16].
+ASPECT_RATIO_LIMIT = 16
+IMAGE_URL_PREFIXES = ("https://", "http://", "data:image/")
 LAYER_MAX_IMAGES_MIN, LAYER_MAX_IMAGES_MAX = 2, 100
 SAFETY_IDENTIFIER_MAX = 64
 
@@ -141,9 +146,9 @@ def _size(model: SeedreamModel, options: ImageOptions) -> str:
         if not model.min_pixels <= pixels <= model.max_pixels:
             raise ValueError(f"{model.model_id} needs {model.min_pixels}-{model.max_pixels} total pixels, "
                              f"got {w}x{h} = {pixels}.")
-        limit = model.aspect_ratio_limit
-        if limit is not None and not 1 / limit <= w / h <= limit:
-            raise ValueError(f"{model.model_id} needs an aspect ratio within 1/{limit:g}-{limit:g}, got {w}x{h}.")
+        if not 1 / ASPECT_RATIO_LIMIT <= w / h <= ASPECT_RATIO_LIMIT:
+            raise ValueError(f"{model.model_id} needs an aspect ratio within 1/{ASPECT_RATIO_LIMIT}-"
+                             f"{ASPECT_RATIO_LIMIT}, got {w}x{h}.")
         return f"{w}x{h}"
     if options.size not in model.size_presets:
         raise ValueError(f"{model.model_id} takes size {', '.join(model.size_presets)} or custom, "
@@ -159,7 +164,7 @@ def _check_output_format(model: SeedreamModel, options: ImageOptions) -> None:
         raise ValueError(f"{model.model_id} outputs jpeg only, not {fmt}.")
 
 
-def _check_background(model: SeedreamModel, options: ImageOptions, image_count: int) -> None:
+def _check_background(model: SeedreamModel, options: ImageOptions, images: Sequence[str]) -> None:
     background = options.background
     if background == MODEL_DEFAULT:
         return
@@ -171,9 +176,13 @@ def _check_background(model: SeedreamModel, options: ImageOptions, image_count: 
         raise ValueError(f"{model.model_id} takes background {' or '.join(model.backgrounds)}, not {background}.")
     if background != "transparent":
         return
-    if not model.transparent_from_text and image_count != 1:
-        raise ValueError(f"{model.model_id} makes transparent images only from exactly one reference "
-                         "image with alpha.")
+    if not model.transparent_from_text:
+        if len(images) != 1:
+            raise ValueError(f"{model.model_id} makes transparent images only from exactly one reference "
+                             "image with alpha.")
+        if images[0].startswith("data:image/jpeg"):
+            raise ValueError(f"{model.model_id} makes a transparent image only from a reference that carries "
+                             "alpha, and an inline image without a mask is sent as JPEG. Connect a mask to images.")
     fmt = options.output_format if options.output_format != MODEL_DEFAULT else model.output_formats[0]
     if fmt != "png":
         raise ValueError(f"A transparent background needs png output, not {fmt}.")
@@ -219,7 +228,8 @@ def build_image_body(model_id: str, prompt: str, images: Sequence[str], options:
         raise ValueError(f"safety_identifier is at most {SAFETY_IDENTIFIER_MAX} characters, "
                          f"got {len(options.safety_identifier)}.")
     _check_output_format(model, options)
-    _check_background(model, options, count)
+    check_urls("Reference image", images, IMAGE_URL_PREFIXES)
+    _check_background(model, options, images)
     if options.layer_decomposition:
         _check_layers(model, options, count)
     if options.sequential == "auto":

@@ -11,14 +11,14 @@ Edits or combines reference images, or splits one image into layers, with Seedre
 |-----------|------|---------|-------------|
 | prompt | String | (empty) | The edit to make. Optional for layer decomposition |
 | images | IMAGE | none | Reference image batch, sent inline (JPEG, or PNG with alpha when you connect `mask`). Max 10 on 5.5/5.0 pro/5.0 flash, 14 on 5.0 lite/4.5/4.0, counted with `images_url` |
-| images_url | String | (empty) | More reference images, one https URL per line, after the batch |
-| mask | MASK | none | Alpha for `images` in LoadImage convention (1 = transparent). 5.0 pro and flash need it for a transparent background. A Seedream `alpha` output is the inverse: pass it through InvertMask first |
+| images_url | String | (empty) | More reference images, one https URL or `data:image/` URI per line, after the batch. Any other line stops the run before the call |
+| mask | MASK | none | Alpha for `images` in LoadImage convention (1 = transparent). 5.0 pro and flash need it for a transparent background: without it the image goes as JPEG, which has no alpha, and the node stops before the call. A Seedream `alpha` output is the inverse: pass it through InvertMask first |
 | client | BYTEPLUS_API_CLIENT | none | BytePlus API Client (optional when the key is in Settings or config.ini) |
 | model | Combo | dola-seedream-5-5-261028 | dola-seedream-5-5-261028, dola-seedream-5-0-pro-260628, dola-seedream-5-0-flash-260915, seedream-5-0-260128 (5.0 lite), seedream-4-5-251128, seedream-4-0-250828 |
 | endpoint_id | String | (empty) | Custom ModelArk endpoint ID sent instead of the model ID. The model widget still decides which options apply |
 | size | Combo | 2K | 1K/1.5K/2K on 5.5, 5.0 pro, 5.0 flash; 2K/3K/4K on 5.0 lite; 2K/4K on 4.5; 1K/2K/4K on 4.0. custom sends width x height. auto is for layer decomposition |
 | width | Int | 2048 | Used when size is custom |
-| height | Int | 2048 | Used when size is custom. Total pixels: 921,600-4,624,220 on 5.5/5.0 pro/5.0 flash (5.5 also 1:16-16:1); 3,686,400-16,777,216 on 5.0 lite and 4.5; 921,600-16,777,216 on 4.0 |
+| height | Int | 2048 | Used when size is custom. Total pixels: 921,600-4,624,220 on 5.5/5.0 pro/5.0 flash; 3,686,400-16,777,216 on 5.0 lite and 4.5; 921,600-16,777,216 on 4.0. Every model also needs an aspect ratio within 1:16-16:1 |
 | sequential | Combo | disabled | disabled, auto. auto returns a related set of up to max_images on 5.0 lite, 4.5 and 4.0 |
 | max_images | Int | 15 | Upper bound for sequential auto (1-15); reference images plus max_images must be at most 15 |
 | output_format | Combo | (model default) | png, jpeg. 5.5 defaults to png, 5.0 models to jpeg; 4.5 and 4.0 make jpeg only |

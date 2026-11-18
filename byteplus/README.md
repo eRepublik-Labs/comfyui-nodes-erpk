@@ -43,12 +43,14 @@ Every model outputs 24 fps; ModelArk has no fps parameter. `generate_audio` and 
 
 | Model ID | Max refs | Size presets | Custom size (total pixels) | Sequential batch | Layers | Transparent output |
 |---|---|---|---|---|---|---|
-| `dola-seedream-5-5-261028` (default) | 10 | 1K, 1.5K, 2K | 921,600-4,624,220, ratio 1:16-16:1 | N | base + up to 99, text recognition | from text or references |
+| `dola-seedream-5-5-261028` (default) | 10 | 1K, 1.5K, 2K | 921,600-4,624,220 | N | base + up to 99, text recognition | from text or references |
 | `dola-seedream-5-0-pro-260628` | 10 | 1K, 1.5K, 2K | 921,600-4,624,220 | N | base + up to 16 | from one reference with alpha |
 | `dola-seedream-5-0-flash-260915` | 10 | 1K, 1.5K, 2K | 921,600-4,624,220 | N | base + up to 16 | from one reference with alpha |
 | `seedream-5-0-260128` (5.0 lite) | 14 | 2K, 3K, 4K | 3,686,400-16,777,216 | up to 15 | N | N |
 | `seedream-4-5-251128` | 14 | 2K, 4K | 3,686,400-16,777,216 | up to 15 | N | N, JPEG only |
 | `seedream-4-0-250828` | 14 | 1K, 2K, 4K | 921,600-16,777,216 | up to 15 | N | N, JPEG only |
+
+A custom size must also keep width / height within 1:16-16:1 on every model. Size `auto` exists only for layer decomposition, so only Image Edit offers it.
 
 The `dola-` prefix on the 5.x IDs follows the ModelArk model list. ComfyUI's own partner nodes send the IDs without it.
 

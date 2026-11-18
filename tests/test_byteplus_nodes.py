@@ -204,3 +204,11 @@ def test_task_result_refuses_a_task_id_that_is_not_one(transport):
     assert str(excinfo.value) == ("task_id must be a ModelArk task ID such as cgt-20261119021437-q68pg, "
                                   "got 'cgt-9/../../x'.")
     assert sent == []
+
+
+def test_size_auto_is_offered_only_where_layer_decomposition_is():
+    def size_options(node):
+        return next(i for i in node.define_schema().inputs if i.id == "size").options
+
+    assert "auto" not in size_options(BytePlusSeedreamTextToImage)
+    assert "auto" in size_options(BytePlusSeedreamImageEdit)

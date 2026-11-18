@@ -71,6 +71,17 @@ def test_layer_decomposition_on_5_5_sends_one_image_and_layer_options():
      "dola-seedream-5-5-261028 needs 921600-4624220 total pixels, got 640x640 = 409600."),
     (V55, "x", (), ImageOptions(size="custom", width=4096, height=240),
      "dola-seedream-5-5-261028 needs an aspect ratio within 1/16-16, got 4096x240."),
+    (FLASH, "x", (), ImageOptions(size="custom", width=240, height=4096),
+     "dola-seedream-5-0-flash-260915 needs an aspect ratio within 1/16-16, got 240x4096."),
+    (LITE, "x", (), ImageOptions(size="custom", width=8000, height=461),
+     "seedream-5-0-260128 needs an aspect ratio within 1/16-16, got 8000x461."),
+    (V40, "x", (), ImageOptions(size="custom", width=4000, height=240),
+     "seedream-4-0-250828 needs an aspect ratio within 1/16-16, got 4000x240."),
+    (V55, "x", ("/tmp/a.png",), ImageOptions(),
+     "Reference image '/tmp/a.png' must start with one of https://, http://, data:image/"),
+    (PRO, "x", ("data:image/jpeg;base64,AAAA",), ImageOptions(background="transparent", output_format="png"),
+     "dola-seedream-5-0-pro-260628 makes a transparent image only from a reference that carries alpha, and an "
+     "inline image without a mask is sent as JPEG. Connect a mask to images."),
     (V55, "x", (), ImageOptions(sequential="auto"),
      "dola-seedream-5-5-261028 has no sequential generation; it returns one image per request."),
     (LITE, "x", (IMG,) * 12, ImageOptions(sequential="auto", max_images=4),
@@ -107,6 +118,12 @@ def test_combinations_the_model_rejects_raise_before_any_call(model, prompt, ima
     with pytest.raises(ValueError) as excinfo:
         build_image_body(model, prompt, images, options)
     assert str(excinfo.value) == message
+
+
+def test_transparent_output_on_5_0_flash_from_one_png_reference_with_alpha():
+    body = build_image_body(FLASH, "cut out the cup", (IMG,), ImageOptions(background="transparent",
+                                                                            output_format="png"))
+    assert body["background"] == "transparent" and body["image"] == [IMG]
 
 
 def test_cost_uses_the_pixel_tier_and_input_image_price():

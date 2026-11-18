@@ -13,9 +13,9 @@ Generates images from a text prompt with Seedream, called directly on BytePlus M
 | client | BYTEPLUS_API_CLIENT | none | BytePlus API Client (optional when the key is in Settings or config.ini) |
 | model | Combo | dola-seedream-5-5-261028 | dola-seedream-5-5-261028, dola-seedream-5-0-pro-260628, dola-seedream-5-0-flash-260915, seedream-5-0-260128 (5.0 lite), seedream-4-5-251128, seedream-4-0-250828 |
 | endpoint_id | String | (empty) | Custom ModelArk endpoint ID sent instead of the model ID. The model widget still decides which options apply |
-| size | Combo | 2K | 1K/1.5K/2K on 5.5, 5.0 pro, 5.0 flash; 2K/3K/4K on 5.0 lite; 2K/4K on 4.5; 1K/2K/4K on 4.0. custom sends width x height. auto is for layer decomposition |
+| size | Combo | 2K | 1K/1.5K/2K on 5.5, 5.0 pro, 5.0 flash; 2K/3K/4K on 5.0 lite; 2K/4K on 4.5; 1K/2K/4K on 4.0. custom sends width x height |
 | width | Int | 2048 | Used when size is custom |
-| height | Int | 2048 | Used when size is custom. Total pixels: 921,600-4,624,220 on 5.5/5.0 pro/5.0 flash (5.5 also 1:16-16:1); 3,686,400-16,777,216 on 5.0 lite and 4.5; 921,600-16,777,216 on 4.0 |
+| height | Int | 2048 | Used when size is custom. Total pixels: 921,600-4,624,220 on 5.5/5.0 pro/5.0 flash; 3,686,400-16,777,216 on 5.0 lite and 4.5; 921,600-16,777,216 on 4.0. Every model also needs an aspect ratio within 1:16-16:1 |
 | sequential | Combo | disabled | disabled, auto. auto returns a related set of up to max_images on 5.0 lite, 4.5 and 4.0 |
 | max_images | Int | 15 | Upper bound for sequential auto (1-15); reference images plus max_images must be at most 15 |
 | output_format | Combo | (model default) | png, jpeg. 5.5 defaults to png, 5.0 models to jpeg; 4.5 and 4.0 make jpeg only |
@@ -31,7 +31,7 @@ Generates images from a text prompt with Seedream, called directly on BytePlus M
 
 | Output | Type | Description |
 |--------|------|-------------|
-| images | IMAGE | The returned images as one batch. With layer decomposition: the base, then each layer on a base-sized canvas |
+| images | IMAGE | The returned images as one batch |
 | alpha | MASK | Per-image alpha, 1 = opaque, 0 = transparent. Invert it (InvertMask) before a mask input that uses the LoadImage convention |
 
 ## Notes

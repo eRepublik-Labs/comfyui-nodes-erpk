@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass, field, replace
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 
 @dataclass(frozen=True)
@@ -201,7 +201,7 @@ def get_model(model_id: str) -> SeedanceModel:
         raise ValueError(f"Unknown Seedance model {model_id!r}. Known: {', '.join(MODEL_IDS)}") from None
 
 
-def _check_urls(kind: str, urls: Tuple[str, ...], prefixes: Tuple[str, ...]) -> None:
+def check_urls(kind: str, urls: Sequence[str], prefixes: Tuple[str, ...]) -> None:
     for url in urls:
         if not url.startswith(prefixes):
             raise ValueError(f"{kind} {url[:80]!r} must start with one of {', '.join(prefixes)}")
@@ -222,9 +222,9 @@ def _check_references(model: SeedanceModel, media: VideoMedia) -> None:
     if media.reference_audios and not (media.reference_images or media.reference_videos) \
             and not model.audio_only_reference:
         raise ValueError(f"{model.model_id} needs a reference image or video alongside reference audio.")
-    _check_urls("Reference image", media.reference_images, _IMAGE_URL_PREFIXES)
-    _check_urls("Reference video", media.reference_videos, _VIDEO_URL_PREFIXES)
-    _check_urls("Reference audio", media.reference_audios, _AUDIO_URL_PREFIXES)
+    check_urls("Reference image", media.reference_images, _IMAGE_URL_PREFIXES)
+    check_urls("Reference video", media.reference_videos, _VIDEO_URL_PREFIXES)
+    check_urls("Reference audio", media.reference_audios, _AUDIO_URL_PREFIXES)
 
 
 def _content(prompt: str, media: VideoMedia, mode: Mode) -> List[dict]:
@@ -344,7 +344,7 @@ def build_video_body(model_id: str, prompt: str, media: VideoMedia, options: Vid
         _check_references(model, media)
     if mode in (Mode.FIRST_FRAME, Mode.FIRST_LAST_FRAME):
         frames = (media.first_frame,) + ((media.last_frame,) if media.last_frame else ())
-        _check_urls("Frame image", frames, _IMAGE_URL_PREFIXES)
+        check_urls("Frame image", frames, _IMAGE_URL_PREFIXES)
     _check_ratio(model, options, mode)
     if options.draft:
         if not model.draft:
