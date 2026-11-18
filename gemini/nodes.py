@@ -199,6 +199,18 @@ def _build_thinking_config(thinking_level, model):
         return genai_types.ThinkingConfig(thinking_level=thinking_level.upper())
 
 
+# Request-wide image token budgets (Google's media-resolution page; ultra_high
+# exists per item only). "default" sends nothing, which Gemini bills like high:
+# one 32x32 PNG cost 296 / 569 / 1129 prompt tokens at low / medium / high and
+# 1129 unset (probed 2026-11-18 on 4 Carbon and 4 Hydrogen).
+MEDIA_RESOLUTIONS = ["default", "low", "medium", "high"]
+
+
+def _media_resolution(level):
+    """The SDK media_resolution value for a widget level, or None for "default"."""
+    return None if level == "default" else f"MEDIA_RESOLUTION_{level.upper()}"
+
+
 # --- Model lists for COMBO inputs ---
 TEXT_MODELS = list(GeminiClient.MODELS.keys())
 IMAGE_MODELS = GeminiClient.IMAGE_MODELS
@@ -833,6 +845,14 @@ class GeminiVision(IO.ComfyNode):
                     control_after_generate="randomize",
                     tooltip="Seed for reproducible outputs. Randomizes by default.",
                 ),
+                IO.Combo.Input(
+                    "media_resolution",
+                    options=MEDIA_RESOLUTIONS,
+                    default="default",
+                    optional=True,
+                    tooltip=("Tokens spent on each input image. low costs about a quarter of high. "
+                             "'default' sends nothing, which Gemini bills like high."),
+                ),
             ],
             outputs=[
                 IO.String.Output("analysis"),
@@ -861,6 +881,7 @@ class GeminiVision(IO.ComfyNode):
         response_schema = kwargs.get("response_schema", "")
         thinking_level = kwargs.get("thinking_level", "none")
         seed = kwargs.get("seed", -1)
+        media_resolution = kwargs.get("media_resolution", "default")
 
         if model is None:
             model = GeminiClient.DEFAULT_MODEL
@@ -899,6 +920,7 @@ class GeminiVision(IO.ComfyNode):
                 response_schema=schema_obj,
                 thinking_config=thinking_cfg,
                 seed=seed if seed != -1 else None,
+                media_resolution=_media_resolution(media_resolution),
             )
 
             if response.get("blocked", False):
@@ -979,6 +1001,14 @@ class GeminiDetect(IO.ComfyNode):
                     control_after_generate="randomize",
                     tooltip="Seed for reproducible detection. Randomizes by default.",
                 ),
+                IO.Combo.Input(
+                    "media_resolution",
+                    options=MEDIA_RESOLUTIONS,
+                    default="default",
+                    optional=True,
+                    tooltip=("Tokens spent on the input image. low costs about a quarter of high but "
+                             "may miss small objects. 'default' sends nothing, which Gemini bills like high."),
+                ),
             ],
             outputs=[
                 IO.Custom("ERPK_REGIONS").Output(
@@ -1004,6 +1034,7 @@ class GeminiDetect(IO.ComfyNode):
         temperature = kwargs.get("temperature", 0.0)
         max_objects = kwargs.get("max_objects", 20)
         seed = kwargs.get("seed", -1)
+        media_resolution = kwargs.get("media_resolution", "default")
 
         if model is None:
             model = GeminiClient.DEFAULT_MODEL
@@ -1023,6 +1054,7 @@ class GeminiDetect(IO.ComfyNode):
                 response_mime_type="application/json",
                 response_schema=DETECTION_SCHEMA,
                 seed=seed if seed != -1 else None,
+                media_resolution=_media_resolution(media_resolution),
             )
 
             if response.get("blocked", False):

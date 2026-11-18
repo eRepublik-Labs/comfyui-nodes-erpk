@@ -158,6 +158,7 @@ Analyze images with questions or instructions.
 - `response_mime_type`: Output format - "default", "text/plain", or "application/json"
 - `response_schema`: JSON schema for structured output (used with application/json)
 - `thinking_level`: Reasoning depth - "none" (default), "minimal", "low", "medium", "high", "xhigh". "none" sends no setting, so the model thinks at its own default level rather than turning thinking off. The node raises "minimal" to "low" on 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it. Only 4 Hydrogen takes "xhigh"; every other model gets "high"
+- `media_resolution`: Tokens spent on each input image - "default", "low", "medium", "high". "low" costs about a quarter of "high" (296 against 1129 prompt tokens for a small image, measured on 4 Carbon and 4 Hydrogen). "default" sends nothing, which Gemini bills like "high". Gemini Detect has the same widget
 
 **Outputs:**
 - `analysis`: Text analysis of the image(s)

@@ -21,6 +21,7 @@ Analyzes images using Gemini's multimodal vision capabilities. Supports single i
 | response_mime_type | Combo | default | Output format: default, text/plain, or application/json (optional) |
 | response_schema | String | "" | JSON schema for structured output, used with application/json (optional) |
 | thinking_level | Combo | none | Reasoning depth: none, minimal, low, medium, high, xhigh. none sends no setting, so the model thinks at its own default level (it does not turn thinking off). The node raises minimal to low on 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash and 3.8 Flash, which reject it. Only 4 Hydrogen takes xhigh; every other model gets high (optional) |
+| media_resolution | Combo | default | Tokens spent on each input image: default, low, medium, high. low costs about a quarter of high. default sends nothing, which Gemini bills like high (optional) |
 
 ## Output
 
