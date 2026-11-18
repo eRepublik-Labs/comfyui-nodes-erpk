@@ -70,7 +70,7 @@ def _option_inputs(default_duration: int, reference: bool = False):
         ),
         IO.Boolean.Input(
             "camera_fixed", default=False, optional=True,
-            tooltip="1.0 only: keep the camera still. Not sent to 2.x models.",
+            tooltip="1.0 only: keep the camera still. Turning it on with a 2.x model stops before any call.",
         ),
         IO.Combo.Input(
             "service_tier", options=seedance.SERVICE_TIERS, default="default", optional=True,

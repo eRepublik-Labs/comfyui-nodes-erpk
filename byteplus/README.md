@@ -58,9 +58,9 @@ The `dola-` prefix on the 5.x IDs follows the ModelArk model list. ComfyUI's own
 
 Each model's capabilities live in one table, in `byteplus_api/seedance.py` and `byteplus_api/seedream.py`. Before any call, the node builds the request from that table.
 
-- An option the selected model cannot honour, and that would change the result or the price, stops the run with a `ValueError` naming the model and the value. Examples: a resolution the model lacks, reference inputs on Seedance 1.0, a last frame on 1.0 pro fast, `flex` on 2.x, `draft` off 2.5, a PNG request to Seedream 4.5, a size preset the model lacks.
+- An option the selected model cannot honour, and that would change the result or the price, stops the run with a `ValueError` naming the model and the value. Examples: a resolution the model lacks, reference inputs on Seedance 1.0, a last frame on 1.0 pro fast, `flex`, `frames` or `camera_fixed` on 2.x, `draft` off 2.5, a PNG request to Seedream 4.5, a size preset the model lacks.
 - Seedance 2.5 first-frame and first+last-frame tasks accept only `ratio` adaptive. The node raises on any other ratio instead of changing it for you; the widget defaults to adaptive.
-- The node leaves out a toggle the model ignores: `generate_audio` on 1.0, `camera_fixed`, `seed` and `frames` on 2.x, `priority` on 1.0, `omni_reference_task_type` on 2.0, `safety_identifier` on Seedream 5.0 lite, 4.5 and 4.0.
+- The node leaves out a field the model ignores, or that is off: `generate_audio` on 1.0, `seed` and `camera_fixed` off on 2.x, `priority` on 1.0, `omni_reference_task_type` on 2.0, `safety_identifier` on Seedream 5.0 lite, 4.5 and 4.0.
 
 ## Seed
 

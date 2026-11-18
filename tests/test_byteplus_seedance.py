@@ -16,7 +16,7 @@ IMG_B = "https://example.com/b.png"
 
 
 def test_text_to_video_on_2_0_mini_sends_audio_and_omits_1_0_fields():
-    body = build_video_body(MINI, "  a fox runs  ", VideoMedia(), VideoOptions(seed=7, camera_fixed=True))
+    body = build_video_body(MINI, "  a fox runs  ", VideoMedia(), VideoOptions(seed=7))
     assert body == {
         "model": MINI,
         "content": [{"type": "text", "text": "a fox runs"}],
@@ -163,6 +163,10 @@ def test_draft_render_sends_only_the_fields_the_draft_rules_allow():
     (MINI, "", VideoMedia(reference_videos=("/tmp/v.mp4",), reference_images=(IMG_A,)), VideoOptions(),
      "Reference video '/tmp/v.mp4' must start with one of https://, http://, asset://"),
     (MINI, "   ", VideoMedia(), VideoOptions(), "Text-to-video needs a prompt."),
+    (MINI, "x", VideoMedia(), VideoOptions(camera_fixed=True),
+     "dreamina-seedance-2-0-mini-260615 has no camera_fixed; it is on Seedance 1.0 only."),
+    (TWO_FIVE, "", VideoMedia(draft_task_id="cgt-1"), VideoOptions(resolution="1080p", camera_fixed=True),
+     "dreamina-seedance-2-5-260628 has no camera_fixed; it is on Seedance 1.0 only."),
 ])
 def test_combinations_the_model_rejects_raise_before_any_call(model, prompt, media, options, message):
     with pytest.raises(ValueError) as excinfo:

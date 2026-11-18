@@ -258,6 +258,8 @@ def _check_common(model: SeedanceModel, options: VideoOptions) -> None:
     if len(options.safety_identifier) > SAFETY_IDENTIFIER_MAX:
         raise ValueError(f"safety_identifier is at most {SAFETY_IDENTIFIER_MAX} characters, "
                          f"got {len(options.safety_identifier)}.")
+    if options.camera_fixed and not model.camera_fixed:
+        raise ValueError(f"{model.model_id} has no camera_fixed; it is on Seedance 1.0 only.")
 
 
 def _output_fields(model: SeedanceModel, options: VideoOptions) -> dict:

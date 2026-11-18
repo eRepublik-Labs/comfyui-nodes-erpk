@@ -20,12 +20,12 @@ Animates a start frame, optionally toward an end frame, with Seedance on BytePlu
 | resolution | Combo | 720p | 480p, 720p on every model; 1080p on 2.5, 2.0, 1.0; 4k on 2.5 and 2.0 |
 | ratio | Combo | adaptive | adaptive, 16:9, 4:3, 1:1, 3:4, 9:16, 21:9. 2.5 first-frame and first+last-frame tasks accept adaptive only; 1.0 text-to-video needs a fixed ratio |
 | duration | Int | 5 | Seconds. 2.5: 4-30; 2.0 series: 4-15; 1.0: 2-12. -1 lets a 2.x model pick |
-| frames | Int | 0 | 1.0 only: exact frame count 29-289, 25 + 4n, at 24 fps. Overrides duration. 0 = off |
+| frames | Int | 0 | 1.0 only: exact frame count 29-289, 25 + 4n, at 24 fps. Overrides duration. 0 = off; any other value with a 2.x model stops before the call |
 | generate_audio | Boolean | true | 2.x only: synchronized stereo audio. Not sent to 1.0 |
 | watermark | Boolean | false | "AI Generated" mark in the lower-right corner |
 | return_last_frame | Boolean | false | Also return the final frame as a JPEG URL on `last_frame_url` |
 | output_format | Combo | mp4 | mp4, mov. mov (H.264 yuv444p, PCM audio) on 2.5 and 2.5 flash only |
-| camera_fixed | Boolean | false | 1.0 only: keep the camera still. Not sent to 2.x |
+| camera_fixed | Boolean | false | 1.0 only: keep the camera still. On with a 2.x model stops before the call |
 | service_tier | Combo | default | default, flex. flex runs offline at half price, 1.0 only |
 | priority | Int | 0 | 2.x only: queue order 0-9 among tasks on the same endpoint. Not sent when 0 |
 | draft | Boolean | false | 2.5 only: 480p preview billed as a 480p video. Its `task_id` feeds `draft_task_id` |
