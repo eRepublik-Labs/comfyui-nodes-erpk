@@ -157,8 +157,8 @@ def test_request_body_over_64_mb_is_refused_before_sending(monkeypatch):
     client, transport = _client([], monkeypatch=monkeypatch)
     with pytest.raises(ValueError) as excinfo:
         asyncio.run(client.create_video_task({"model": "m", "blob": "x" * (64 * 1024 * 1024)}))
-    assert str(excinfo.value).startswith("The request body is 67108") and \
-        str(excinfo.value).endswith("bytes; ModelArk accepts at most 67108864. Pass large media as URLs.")
+    assert str(excinfo.value) == ("The request body is 67108890 bytes; ModelArk accepts at most 67108864. "
+                                  "Pass large media as URLs.")
     assert transport.calls == []
 
 

@@ -174,10 +174,14 @@ def test_combinations_the_model_rejects_raise_before_any_call(model, prompt, med
     assert str(excinfo.value) == message
 
 
-def test_cost_matches_the_billing_examples_in_the_docs():
-    # model-pricing worked examples: 2.0 480p 16:9 5 s = 50,220 tokens -> $0.35;
-    # 2.5 4K 16:9 5 s = 972,000 tokens -> $4.568.
-    assert video_cost_usd("dreamina-seedance-2-0-260128", "480p", 50_220) == pytest.approx(0.35154)
-    assert video_cost_usd(TWO_FIVE, "4k", 972_000) == pytest.approx(4.5684)
-    assert video_cost_usd(MINI, "720p", 1_000_000, has_video_input=True) == pytest.approx(2.1)
-    assert video_cost_usd(PRO_FAST, "1080p", 1_000_000, flex=True) == pytest.approx(0.5)
+def test_cost_matches_the_dollar_figures_in_the_docs():
+    # model-pricing billing examples, rounded as the docs print them.
+    assert round(video_cost_usd("dreamina-seedance-2-0-260128", "480p", 50_220), 2) == 0.35
+    assert round(video_cost_usd(TWO_FIVE, "4k", 972_000), 3) == 4.568
+    assert round(video_cost_usd(PRO, "1080p", 244_800), 2) == 0.61
+    assert round(video_cost_usd(PRO_FAST, "480p", 97_000), 2) == 0.10
+    # Console resource pack: 10M Seedance 2.0 mini tokens for $21, priced at the with-video rate.
+    assert round(video_cost_usd(MINI, "720p", 10_000_000, has_video_input=True), 2) == 21.00
+    # create-video-generation-task-api: flex (offline) costs half of default.
+    assert video_cost_usd(PRO, "1080p", 244_800, flex=True) * 2 == pytest.approx(
+        video_cost_usd(PRO, "1080p", 244_800))
