@@ -19,7 +19,13 @@ class TestThinkingLevelSchema:
     def test_thinking_level_choices(self, node_cls):
         schema = node_cls.define_schema()
         thinking_input = [i for i in schema.inputs if i.id == "thinking_level"][0]
-        assert set(thinking_input.options) == {"none", "minimal", "low", "medium", "high"}
+        assert set(thinking_input.options) == {"none", "minimal", "low", "medium", "high", "xhigh"}
+
+    @pytest.mark.parametrize("node_cls", [GeminiTextGeneration, GeminiChat, GeminiVision])
+    def test_xhigh_tooltip_names_the_one_model_that_takes_it(self, node_cls):
+        schema = node_cls.define_schema()
+        tooltip = [i for i in schema.inputs if i.id == "thinking_level"][0].tooltip
+        assert "xhigh is sent only to 4 Hydrogen" in tooltip
 
     @pytest.mark.parametrize("node_cls", [GeminiTextGeneration, GeminiChat, GeminiVision])
     def test_thinking_level_default_is_none(self, node_cls):
@@ -90,3 +96,57 @@ class TestBuildThinkingConfig:
         from erpk.gemini.nodes import _build_thinking_config
         assert _build_thinking_config("none", "gemini-3.5-flash") is None
         assert _build_thinking_config("none", "gemini-3.1-pro-preview") is None
+
+
+# Probed 2026-11-18 with generateContent: xhigh returned 200 on gemini-4-hydrogen
+# and 400 "Thinking level XHIGH is not supported for this model" on each of these.
+XHIGH_REJECTED = ["gemini-4-carbon", "gemini-4-argon", "gemini-3.1-pro-preview",
+                  "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash",
+                  "gemini-3.5-flash", "gemini-3.5-flash-lite"]
+
+
+class TestXhighThinking:
+
+    def test_hydrogen_sends_xhigh(self, recwarn):
+        from erpk.gemini.nodes import _build_thinking_config
+        config = _build_thinking_config("xhigh", "gemini-4-hydrogen")
+        assert config.model_dump(mode="json", exclude_none=True) == {"thinking_level": "XHIGH"}
+        # google-genai's ThinkingLevel enum has no XHIGH yet and warns that the
+        # value is invalid, although the API accepts it; the node keeps that
+        # false warning out of the user's console.
+        assert [str(w.message) for w in recwarn] == []
+
+    @pytest.mark.parametrize("model", XHIGH_REJECTED)
+    def test_models_that_reject_xhigh_get_high(self, model):
+        from erpk.gemini.nodes import _build_thinking_config
+        assert _build_thinking_config("xhigh", model).model_dump(
+            mode="json", exclude_none=True) == {"thinking_level": "HIGH"}
+
+    def test_continued_chat_clamps_for_the_model_the_session_runs_on(self):
+        # A continued session answers with the model it was started on, so a
+        # node switched to Hydrogen + xhigh must not send XHIGH to 3.8 Flash.
+        import asyncio
+        from types import SimpleNamespace
+        from erpk.gemini.gemini_api.client import GeminiClient
+
+        sent = {}
+
+        class _Session:
+            _model = "gemini-3.8-flash"
+
+            def send_message(self, message, config):
+                sent["config"] = config
+                return SimpleNamespace(text="OK", candidates=[])
+
+        client = GeminiClient.__new__(GeminiClient)
+        client.system_instruction = None
+        client.safety_settings = None
+        asyncio.run(GeminiChat.execute(prompt="Say OK.", client=client, model="gemini-4-hydrogen",
+                                       thinking_level="xhigh", chat_session=_Session()))
+        assert sent["config"].thinking_config.thinking_level == "HIGH"
+
+    def test_sdk_chat_session_exposes_its_model(self):
+        # The continued-chat clamp reads Chat._model; this fails if the SDK drops it.
+        from google import genai
+        session = genai.Client(api_key="test-key").chats.create(model="gemini-4-hydrogen")
+        assert session._model == "gemini-4-hydrogen"

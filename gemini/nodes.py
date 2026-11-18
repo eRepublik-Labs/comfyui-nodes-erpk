@@ -4,6 +4,7 @@
 import asyncio
 import json
 import math
+import warnings
 
 from comfy_api.latest import IO
 
@@ -37,10 +38,14 @@ def _parse_stop_sequences(text):
 
 
 # Models that reject thinking_level=minimal with a 400 (3.7/3.8 Flash per their
-# reference pages; 3.1 Pro Preview probed 2026-10-01; 4 Argon probed 2026-10-14).
-# The node clamps minimal up to low for them.
+# reference pages; 3.1 Pro Preview probed 2026-10-01; 4 Argon probed 2026-10-14;
+# 4 Carbon and 4 Hydrogen probed 2026-11-18). The node clamps minimal up to low for them.
 _NO_MINIMAL_THINKING = {"gemini-3.7-flash", "gemini-3.8-flash", "gemini-3.1-pro-preview",
-                        "gemini-4-argon"}
+                        "gemini-4-argon", "gemini-4-carbon", "gemini-4-hydrogen"}
+
+# Models that accept thinking_level=xhigh (probed 2026-11-18: 200 on 4 Hydrogen,
+# 400 on every other text model). The node lowers xhigh to high for the rest.
+_XHIGH_THINKING = {"gemini-4-hydrogen"}
 
 
 # Output resolutions each image model accepts, smallest first, per
@@ -185,7 +190,25 @@ def _build_thinking_config(thinking_level, model):
         return None
     if thinking_level == "minimal" and model in _NO_MINIMAL_THINKING:
         thinking_level = "low"
-    return genai_types.ThinkingConfig(thinking_level=thinking_level.upper())
+    if thinking_level == "xhigh" and model not in _XHIGH_THINKING:
+        thinking_level = "high"
+    # google-genai's ThinkingLevel enum lacks XHIGH and warns that it is
+    # invalid, but still sends it and the API accepts it.
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="XHIGH is not a valid ThinkingLevel")
+        return genai_types.ThinkingConfig(thinking_level=thinking_level.upper())
+
+
+# Request-wide image token budgets (Google's media-resolution page; ultra_high
+# exists per item only). "default" sends nothing, which Gemini bills like high:
+# one 32x32 PNG cost 296 / 569 / 1129 prompt tokens at low / medium / high and
+# 1129 unset (probed 2026-11-18 on 4 Carbon and 4 Hydrogen).
+MEDIA_RESOLUTIONS = ["default", "low", "medium", "high"]
+
+
+def _media_resolution(level):
+    """The SDK media_resolution value for a widget level, or None for "default"."""
+    return None if level == "default" else f"MEDIA_RESOLUTION_{level.upper()}"
 
 
 # --- Model lists for COMBO inputs ---
@@ -342,7 +365,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level (0.0=focused, 2.0=very creative) Ignored by Gemini 4 Argon.",
+                    tooltip="Creativity level (0.0=focused, 2.0=very creative) Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.Int.Input(
                     "max_tokens",
@@ -351,7 +374,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     max=65536,
                     step=128,
                     optional=True,
-                    tooltip="Maximum length of response. Google recommends at least 32768 for Gemini 4 Argon.",
+                    tooltip="Maximum length of response. Google recommends at least 32768 for Gemini 4 Argon and 4 Carbon, and 65536 for 4 Hydrogen.",
                 ),
                 IO.Float.Input(
                     "top_p",
@@ -360,7 +383,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon.",
+                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.Int.Input(
                     "top_k",
@@ -369,7 +392,7 @@ class GeminiTextGeneration(IO.ComfyNode):
                     max=100,
                     step=1,
                     optional=True,
-                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon.",
+                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.String.Input(
                     "stop_sequences",
@@ -394,12 +417,13 @@ class GeminiTextGeneration(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "thinking_level",
-                    options=["none", "minimal", "low", "medium", "high"],
+                    options=["none", "minimal", "low", "medium", "high", "xhigh"],
                     default="none",
                     optional=True,
                     tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
                              "default level (it does not turn thinking off). minimal is raised to low on "
-                             "models that reject it: 4 Argon, 3.1 Pro Preview, 3.7 Flash, 3.8 Flash."),
+                             "models that reject it: 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash, "
+                             "3.8 Flash. xhigh is sent only to 4 Hydrogen; other models get high."),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -536,7 +560,7 @@ class GeminiChat(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level Ignored by Gemini 4 Argon.",
+                    tooltip="Creativity level Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.Int.Input(
                     "max_tokens",
@@ -545,7 +569,7 @@ class GeminiChat(IO.ComfyNode):
                     max=65536,
                     step=128,
                     optional=True,
-                    tooltip="Maximum length of response. Google recommends at least 32768 for Gemini 4 Argon.",
+                    tooltip="Maximum length of response. Google recommends at least 32768 for Gemini 4 Argon and 4 Carbon, and 65536 for 4 Hydrogen.",
                 ),
                 IO.Float.Input(
                     "top_p",
@@ -554,7 +578,7 @@ class GeminiChat(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon.",
+                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.Int.Input(
                     "top_k",
@@ -563,7 +587,7 @@ class GeminiChat(IO.ComfyNode):
                     max=100,
                     step=1,
                     optional=True,
-                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon.",
+                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.String.Input(
                     "stop_sequences",
@@ -588,12 +612,13 @@ class GeminiChat(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "thinking_level",
-                    options=["none", "minimal", "low", "medium", "high"],
+                    options=["none", "minimal", "low", "medium", "high", "xhigh"],
                     default="none",
                     optional=True,
                     tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
                              "default level (it does not turn thinking off). minimal is raised to low on "
-                             "models that reject it: 4 Argon, 3.1 Pro Preview, 3.7 Flash, 3.8 Flash."),
+                             "models that reject it: 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash, "
+                             "3.8 Flash. xhigh is sent only to 4 Hydrogen; other models get high."),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -641,14 +666,20 @@ class GeminiChat(IO.ComfyNode):
         if model is None:
             model = GeminiClient.DEFAULT_MODEL
 
+        continuing = not reset_conversation and chat_session is not None
+        if continuing:
+            # A continued session answers with the model it was started on, so
+            # thinking clamps and the timeout follow that model, not the widget.
+            model = chat_session._model
+
         thinking_cfg = _build_thinking_config(thinking_level, model)
 
         try:
-            if reset_conversation or chat_session is None:
+            if continuing:
+                print(f"[Gemini] Continuing conversation with {model}")
+            else:
                 chat_session = client.start_chat(model=model, thinking_config=thinking_cfg)
                 print(f"[Gemini] Started new conversation with {model}")
-            else:
-                print(f"[Gemini] Continuing conversation")
 
             from google.genai import types
             import json
@@ -746,7 +777,7 @@ class GeminiVision(IO.ComfyNode):
                     max=65536,
                     step=128,
                     optional=True,
-                    tooltip="Maximum length of analysis. Google recommends at least 32768 for Gemini 4 Argon.",
+                    tooltip="Maximum length of analysis. Google recommends at least 32768 for Gemini 4 Argon and 4 Carbon, and 65536 for 4 Hydrogen.",
                 ),
                 IO.Float.Input(
                     "temperature",
@@ -755,7 +786,7 @@ class GeminiVision(IO.ComfyNode):
                     max=2.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Creativity level (lower=more factual) Ignored by Gemini 4 Argon.",
+                    tooltip="Creativity level (lower=more factual) Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.Float.Input(
                     "top_p",
@@ -764,7 +795,7 @@ class GeminiVision(IO.ComfyNode):
                     max=1.0,
                     step=0.05,
                     optional=True,
-                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon.",
+                    tooltip="Nucleus sampling - cumulative probability threshold (0.0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.Int.Input(
                     "top_k",
@@ -773,7 +804,7 @@ class GeminiVision(IO.ComfyNode):
                     max=100,
                     step=1,
                     optional=True,
-                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon.",
+                    tooltip="Top-k sampling - limit token selection (0=disabled). Ignored by Gemini 4 Argon, 4 Carbon and 4 Hydrogen.",
                 ),
                 IO.String.Input(
                     "stop_sequences",
@@ -798,12 +829,13 @@ class GeminiVision(IO.ComfyNode):
                 ),
                 IO.Combo.Input(
                     "thinking_level",
-                    options=["none", "minimal", "low", "medium", "high"],
+                    options=["none", "minimal", "low", "medium", "high", "xhigh"],
                     default="none",
                     optional=True,
                     tooltip=("Reasoning depth. 'none' sends no thinking setting, so the model thinks at its own "
                              "default level (it does not turn thinking off). minimal is raised to low on "
-                             "models that reject it: 4 Argon, 3.1 Pro Preview, 3.7 Flash, 3.8 Flash."),
+                             "models that reject it: 4 Carbon, 4 Hydrogen, 4 Argon, 3.1 Pro Preview, 3.7 Flash, "
+                             "3.8 Flash. xhigh is sent only to 4 Hydrogen; other models get high."),
                 ),
                 IO.Int.Input(
                     "seed",
@@ -812,6 +844,14 @@ class GeminiVision(IO.ComfyNode):
                     max=2**31 - 1,
                     control_after_generate="randomize",
                     tooltip="Seed for reproducible outputs. Randomizes by default.",
+                ),
+                IO.Combo.Input(
+                    "media_resolution",
+                    options=MEDIA_RESOLUTIONS,
+                    default="default",
+                    optional=True,
+                    tooltip=("Tokens spent on each input image. low costs about a quarter of high. "
+                             "'default' sends nothing, which Gemini bills like high."),
                 ),
             ],
             outputs=[
@@ -841,6 +881,7 @@ class GeminiVision(IO.ComfyNode):
         response_schema = kwargs.get("response_schema", "")
         thinking_level = kwargs.get("thinking_level", "none")
         seed = kwargs.get("seed", -1)
+        media_resolution = kwargs.get("media_resolution", "default")
 
         if model is None:
             model = GeminiClient.DEFAULT_MODEL
@@ -879,6 +920,7 @@ class GeminiVision(IO.ComfyNode):
                 response_schema=schema_obj,
                 thinking_config=thinking_cfg,
                 seed=seed if seed != -1 else None,
+                media_resolution=_media_resolution(media_resolution),
             )
 
             if response.get("blocked", False):
@@ -959,6 +1001,14 @@ class GeminiDetect(IO.ComfyNode):
                     control_after_generate="randomize",
                     tooltip="Seed for reproducible detection. Randomizes by default.",
                 ),
+                IO.Combo.Input(
+                    "media_resolution",
+                    options=MEDIA_RESOLUTIONS,
+                    default="default",
+                    optional=True,
+                    tooltip=("Tokens spent on the input image. low costs about a quarter of high but "
+                             "may miss small objects. 'default' sends nothing, which Gemini bills like high."),
+                ),
             ],
             outputs=[
                 IO.Custom("ERPK_REGIONS").Output(
@@ -984,6 +1034,7 @@ class GeminiDetect(IO.ComfyNode):
         temperature = kwargs.get("temperature", 0.0)
         max_objects = kwargs.get("max_objects", 20)
         seed = kwargs.get("seed", -1)
+        media_resolution = kwargs.get("media_resolution", "default")
 
         if model is None:
             model = GeminiClient.DEFAULT_MODEL
@@ -1003,6 +1054,7 @@ class GeminiDetect(IO.ComfyNode):
                 response_mime_type="application/json",
                 response_schema=DETECTION_SCHEMA,
                 seed=seed if seed != -1 else None,
+                media_resolution=_media_resolution(media_resolution),
             )
 
             if response.get("blocked", False):

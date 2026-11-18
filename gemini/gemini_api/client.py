@@ -69,9 +69,11 @@ class GeminiClient:
 
     # Available models
     MODELS = {
+        "gemini-4-carbon": "Gemini 4 Carbon (Strongest reasoning; low/medium/high thinking; ignores temperature/top_p/top_k)",
+        "gemini-4-hydrogen": "Gemini 4 Hydrogen (Fast coding and agentic model; low/medium/high/xhigh thinking; ignores temperature/top_p/top_k)",
         "gemini-4-argon": "Gemini 4 Argon (Flagship reasoning; low/medium/high thinking; ignores temperature/top_p/top_k)",
         "gemini-3.1-pro-preview": "Gemini 3.1 Pro Preview (Most advanced reasoning)",
-        "gemini-3.8-flash": "Gemini 3.8 Flash (Latest Flash; no minimal thinking)",
+        "gemini-3.8-flash": "Gemini 3.8 Flash (Previous-generation Flash; no minimal thinking)",
         "gemini-3.7-flash": "Gemini 3.7 Flash (Deprecated 2026-10-08; served by 3.8 Flash)",
         "gemini-3.6-flash": "Gemini 3.6 Flash (Improved token efficiency, cheaper than 3.5 Flash)",
         "gemini-3.5-flash": "Gemini 3.5 Flash (Deprecated 2026-10-08; served by 3.6 Flash)",
@@ -87,7 +89,7 @@ class GeminiClient:
     ]
 
     # Default configuration
-    DEFAULT_MODEL = "gemini-3.8-flash"
+    DEFAULT_MODEL = "gemini-4-hydrogen"
     DEFAULT_IMAGE_MODEL = "gemini-nano-banana-2.1"
     DEFAULT_MAX_TOKENS = 8192
     DEFAULT_TEMPERATURE = 0.7
@@ -249,6 +251,7 @@ class GeminiClient:
         response_schema: Optional[Dict] = None,
         thinking_config: Optional[Any] = None,
         seed: Optional[int] = None,
+        media_resolution: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         max_tokens = max_tokens or self.DEFAULT_MAX_TOKENS
@@ -277,6 +280,8 @@ class GeminiClient:
 
         if seed is not None:
             config_params["seed"] = seed
+        if media_resolution is not None:
+            config_params["media_resolution"] = media_resolution
 
         # Per-request timeout: the genai.Client one is fixed at construction,
         # and some models (Gemini 4 Argon) need longer than the default.
@@ -352,6 +357,7 @@ class GeminiClient:
         response_schema: Optional[Dict] = None,
         thinking_config: Optional[Any] = None,
         seed: Optional[int] = None,
+        media_resolution: Optional[str] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -372,6 +378,8 @@ class GeminiClient:
             stop_sequences: List of sequences where generation stops
             response_mime_type: Output format (e.g., "application/json")
             response_schema: JSON schema dict for structured output
+            media_resolution: Token budget per input image, e.g.
+                "MEDIA_RESOLUTION_LOW" (None leaves the model's default)
             **kwargs: Additional parameters
 
         Returns:
@@ -391,6 +399,7 @@ class GeminiClient:
             response_schema=response_schema,
             thinking_config=thinking_config,
             seed=seed,
+            media_resolution=media_resolution,
             **kwargs,
         )
 

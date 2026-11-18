@@ -27,6 +27,14 @@ DEPTH_SCHEMA = {
     "required": ["order"],
 }
 
+# Thinking level and token cap for the depth-ranking call. At the models'
+# default thinking it spent up to 8189 thought tokens (gemini-4-hydrogen) and
+# 7861 (gemini-3.8-flash) against the client's 8192 cap. At low it spent at most
+# 4397 over 12 runs on those two models and ranked scenes like medium did
+# (measured 2026-11-18). Every text model the scan offers accepts low.
+DEPTH_THINKING_LEVEL = "LOW"
+DEPTH_MAX_TOKENS = 16384
+
 # Structured-output schema for detection: one entry per prominent object with a
 # 0-1000 box, a short label, and a one-sentence description. Gemini supplies no
 # masks here (the SAM stage does), so structured output is safe.
@@ -644,6 +652,7 @@ async def gemini_scan(image, max_objects, model, segmenter=None):
     billable calls (detection + depth) and prices it. The detection call is
     billed even when it finds nothing, so a zero-object scan still reports cost.
     """
+    from google.genai import types
     from ..gemini.gemini_api.client import GeminiClient
 
     client = GeminiClient(api_key=None)
@@ -691,11 +700,13 @@ async def gemini_scan(image, max_objects, model, segmenter=None):
         images=[image],
         temperature=0.0,
         model=model_to_use,
+        max_tokens=DEPTH_MAX_TOKENS,
         response_mime_type="application/json",
         response_schema=DEPTH_SCHEMA,
+        thinking_config=types.ThinkingConfig(thinking_level=DEPTH_THINKING_LEVEL),
     )
-    # A blocked/empty depth call degrades to the detection order rather than
-    # failing the whole scan.
+    # A blocked or empty depth reply degrades to the detection order. A reply
+    # cut off at DEPTH_MAX_TOKENS raises in generate_content and fails the scan.
     depth_text = "" if depth.get("blocked") else depth.get("text", "")
     rank_map = parse_depth_order(depth_text, labels)
     ranked = apply_depth_ranks(objects, rank_map)

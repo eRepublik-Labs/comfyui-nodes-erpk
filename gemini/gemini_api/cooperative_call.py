@@ -11,10 +11,12 @@ _DEFAULT_TIMEOUT_MS = 300000
 
 # Models that need a longer HTTP timeout than the default. Gemini 4 Argon:
 # "Hard prompts can take several minutes ... set HTTP client timeouts to at
-# least 15 minutes" (ai.google.dev/gemini-api/docs/latest-model). Omni Flash
-# renders a whole video inside one call, so a 1080p/4k job can outlast 5
-# minutes and still be billed.
-_MODEL_MIN_TIMEOUT_MS = {"gemini-4-argon": 900000, "gemini-omni-1.2-flash": 900000}
+# least 15 minutes" (ai.google.dev/gemini-api/docs/latest-model). Gemini 4
+# Carbon's what's-new page asks for the same 15 minutes. Omni Flash renders a
+# whole video inside one call, so a 1080p/4k job can outlast 5 minutes and
+# still be billed.
+_MODEL_MIN_TIMEOUT_MS = {"gemini-4-argon": 900000, "gemini-4-carbon": 900000,
+                         "gemini-omni-1.2-flash": 900000}
 
 
 def _configured_timeout_ms() -> int:
@@ -30,7 +32,7 @@ def resolve_timeout_ms(model: Optional[str] = None) -> int:
 
     Configurable via the ERPK.GEMINI_TIMEOUT_MS ComfyUI setting; falls back to
     5 minutes. Read at call time so the setting applies per run with no restart.
-    A model with a minimum (Gemini 4 Argon, Omni Flash) never gets less than
+    A model with a minimum (Gemini 4 Argon, 4 Carbon, Omni Flash) never gets less than
     that minimum, and a longer configured timeout is kept.
     """
     return max(_configured_timeout_ms(), _MODEL_MIN_TIMEOUT_MS.get(model, 0))

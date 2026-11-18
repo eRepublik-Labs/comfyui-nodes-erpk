@@ -13,6 +13,9 @@ cannot express a third rule.
 
 import json
 import os
+from datetime import date
+
+import pytest
 
 from erpk.gemini.gemini_api.client import GeminiClient
 from erpk.gemini.nodes import (
@@ -22,6 +25,7 @@ from erpk.gemini.nodes import (
     _resolve_aspect_ratio,
     _resolve_image_size,
 )
+from utils.scan_cost import price
 
 
 FLASH_3_6 = "gemini-3.6-flash"
@@ -61,14 +65,25 @@ def test_3_7_and_3_8_flash_clamp_minimal_thinking_to_low():
     assert _build_thinking_config("minimal", FLASH_3_6).thinking_level == "MINIMAL"
 
 
-def test_gemini_3_6_through_3_8_flash_priced_at_current_rate():
-    # https://ai.google.dev/gemini-api/docs/pricing (read 2026-09-16): 3.6, 3.7
-    # and 3.8 Flash are "$0.75 [in] / $3.75 [out] through December 31, 2026.
-    # $1.50 / $7.50 starting January 1, 2027." Cost estimates use today's rate.
-    for model in (FLASH_3_6, FLASH_3_7, FLASH_3_8):
-        entry = _pricing()[model]
-        assert entry["input_price_per_mtok"] == 0.75, model
-        assert entry["output_price_per_mtok"] == 3.75, model
+@pytest.mark.parametrize("model", [FLASH_3_6, FLASH_3_7, FLASH_3_8])
+@pytest.mark.parametrize("day, expected_input, expected_output", [
+    (date(2026, 12, 31), 0.75, 3.75),
+    (date(2027, 1, 1), 1.50, 7.50),
+])
+def test_flash_3_6_through_3_8_price_doubles_on_2027_01_01(model, day, expected_input, expected_output):
+    """Standard-tier text prices per 1M tokens.
+
+    3.6 and 3.8 Flash, from https://aistudio.google.com/docs/pricing, READ 2026-11-18:
+    - input: "$0.75 through December 31, 2026." then "$1.50 starting January 1, 2027." (READ)
+    - output: "$3.75 through December 31, 2026." then "$7.50 starting January 1, 2027." (READ)
+
+    3.7 Flash was deprecated on 2026-10-08 and is served by 3.8 Flash; the page no
+    longer lists it. Its figures are the same two rows as READ on
+    ai.google.dev/gemini-api/docs/pricing on 2026-09-16, when the page listed 3.6,
+    3.7 and 3.8 Flash together.
+    """
+    assert price(model, 1_000_000, 0, on=day) == expected_input
+    assert price(model, 0, 1_000_000, on=day) == expected_output
 
 
 def test_gemini_3_5_flash_lite_priced():
@@ -171,13 +186,21 @@ def test_argon_clamps_minimal_thinking_to_low():
         assert _build_thinking_config(level, ARGON).thinking_level == level.upper()
 
 
-def test_argon_priced_at_intro_rate():
-    # Pricing page: "$2.00 / $10.00 per 1M tokens through November 30, 2026;
-    # $4.00 / $20.00 from December 1". Cost estimates use today's rate.
-    entry = _pricing()[ARGON]
-    assert entry["input_price_per_mtok"] == 2.0
-    assert entry["output_price_per_mtok"] == 10.0
-    assert "2026-12-01" in entry["name"] and "4.00/20.00" in entry["name"]
+@pytest.mark.parametrize("model", [ARGON, "gemini-4-carbon"])
+@pytest.mark.parametrize("day, expected_input, expected_output", [
+    (date(2026, 11, 30), 2.0, 10.0),
+    (date(2026, 12, 1), 4.0, 20.0),
+    (date(2027, 6, 1), 4.0, 20.0),
+])
+def test_argon_and_carbon_price_doubles_on_2026_12_01(model, day, expected_input, expected_output):
+    """Standard-tier text prices per 1M tokens, from https://aistudio.google.com/docs/pricing
+    (ai.google.dev/gemini-api/docs/pricing 301s there), READ 2026-11-18. Both models:
+
+    - input: "$2.00 through November 30, 2026." then "$4.00 starting December 1, 2026." (READ)
+    - output: "$10.00 through November 30, 2026." then "$20.00 starting December 1, 2026." (READ)
+    """
+    assert price(model, 1_000_000, 0, on=day) == expected_input
+    assert price(model, 0, 1_000_000, on=day) == expected_output
 
 
 # Argon's latest-model page: "set HTTP client timeouts to at least 15 minutes".
@@ -246,6 +269,8 @@ def test_argon_chat_turn_carries_the_long_http_timeout():
     sent = {}
 
     class _Session:
+        _model = ARGON
+
         def send_message(self, message, config):
             sent["config"] = config
             return SimpleNamespace(text="OK", candidates=[])
@@ -269,6 +294,59 @@ def test_argon_guidance_is_in_the_text_node_tooltips():
         for name in ("temperature", "top_p", "top_k"):
             assert "ignored by gemini 4 argon" in _text_input(node_cls, name).tooltip.lower(), name
         assert "4 Argon" in _text_input(node_cls, "thinking_level").tooltip
+
+
+# --- Gemini 4 Carbon and 4 Hydrogen (aistudio.google.com/docs/models/gemini-4-carbon,
+# /docs/models/gemini-4-hydrogen and /docs/pricing, read 2026-11-18; thinking
+# levels probed 2026-11-18) ---------------------------------------------------
+
+CARBON = "gemini-4-carbon"
+HYDROGEN = "gemini-4-hydrogen"
+
+
+def test_carbon_and_hydrogen_offered_on_text_nodes():
+    assert CARBON in TEXT_MODELS
+    assert HYDROGEN in TEXT_MODELS
+
+
+def test_carbon_and_hydrogen_clamp_minimal_thinking_to_low():
+    # 400 "Thinking level MINIMAL is not supported for this model" on both;
+    # low, medium and high returned 200 (probed 2026-11-18).
+    from erpk.gemini.nodes import _build_thinking_config
+    for model in (CARBON, HYDROGEN):
+        assert _build_thinking_config("minimal", model).thinking_level == "LOW", model
+        for level in ("low", "medium", "high"):
+            assert _build_thinking_config(level, model).thinking_level == level.upper(), model
+
+
+def test_hydrogen_priced():
+    # Pricing page: $1.50 / $7.50 per 1M.
+    entry = _pricing()[HYDROGEN]
+    assert entry["input_price_per_mtok"] == 1.50
+    assert entry["output_price_per_mtok"] == 7.50
+
+
+def test_carbon_gets_a_fifteen_minute_timeout():
+    # Carbon's what's-new page asks for HTTP timeouts of at least 15 minutes;
+    # Hydrogen's gives no figure, so it keeps the default.
+    from erpk.gemini.gemini_api.cooperative_call import resolve_timeout_ms
+    assert resolve_timeout_ms(CARBON) == FIFTEEN_MINUTES_MS
+    assert resolve_timeout_ms(HYDROGEN) == FIVE_MINUTES_MS
+
+
+def test_carbon_and_hydrogen_guidance_is_in_the_text_node_tooltips():
+    # Carbon and Hydrogen pages: max_output_tokens of at least 32,768 on Carbon
+    # and 65,536 on Hydrogen. API reference: temperature, top_p and top_k are
+    # "silently ignored on Gemini 3.6 Flash and newer".
+    from erpk.gemini.nodes import GeminiChat, GeminiTextGeneration, GeminiVision
+    for node_cls in (GeminiTextGeneration, GeminiChat, GeminiVision):
+        assert "65536 for 4 Hydrogen" in _text_input(node_cls, "max_tokens").tooltip
+        assert "4 Carbon" in _text_input(node_cls, "max_tokens").tooltip
+        for name in ("temperature", "top_p", "top_k"):
+            tooltip = _text_input(node_cls, name).tooltip
+            assert "4 Carbon" in tooltip and "4 Hydrogen" in tooltip, name
+        thinking = _text_input(node_cls, "thinking_level").tooltip
+        assert "4 Carbon" in thinking and "4 Hydrogen" in thinking
 
 
 # --- Nano Banana 2.1 (ai.google.dev/gemini-api/docs/models/gemini-nano-banana-2.1

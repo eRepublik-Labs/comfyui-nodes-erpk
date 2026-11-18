@@ -800,6 +800,64 @@ class TestGeminiScanOffloadsSegmentation:
         assert recorded["on_main"] is False
 
 
+class TestGeminiScanDepthRequest:
+    """The depth-ranking call sends its own thinking level and token cap.
+
+    Measured 2026-11-18 on one photo with the scan's own prompts: with no
+    thinking level, the depth call spent 7861 thought tokens on gemini-3.8-flash
+    and 8189 on gemini-4-hydrogen, which hit the 8192 cap and failed the scan.
+    At low it spent at most 4397 over 12 runs on both models and ranked the
+    scene like medium did, so the call sends low with a 16384 cap.
+    """
+
+    def _run_scan(self, monkeypatch, depth_finish):
+        from types import SimpleNamespace
+        from google.genai import types
+        import erpk.gemini.gemini_api.client as gemini_client_module
+        from erpk.utils import scan_engine as erpk_scan_engine
+
+        configs = []
+
+        def reply(text, finish):
+            return types.GenerateContentResponse(candidates=[types.Candidate(
+                content=types.Content(role="model", parts=[types.Part(text=text)]),
+                finish_reason=finish)])
+
+        def generate_content(model, contents, config):
+            configs.append(config)
+            if len(configs) == 1:
+                return reply(json.dumps([{"box_2d": [100, 200, 500, 600], "label": "cat",
+                                          "description": "a cat"}]), types.FinishReason.STOP)
+            return reply(json.dumps({"order": ["cat"]}), depth_finish)
+
+        real_client = gemini_client_module.GeminiClient
+
+        class RecordingClient(real_client):
+            def __init__(self, api_key=None):
+                super().__init__(api_key="test-key")
+                self.client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+
+        monkeypatch.setattr(gemini_client_module, "GeminiClient", RecordingClient)
+        monkeypatch.setattr(erpk_scan_engine, "segment_objects", lambda image, objects, segmenter=None: None)
+        asyncio.run(erpk_scan_engine.gemini_scan("IMG", 5, "gemini-4-hydrogen"))
+        return configs
+
+    def test_depth_call_sends_low_thinking_and_a_16384_cap(self, monkeypatch):
+        from google.genai import types
+        detection, depth = self._run_scan(monkeypatch, types.FinishReason.STOP)
+        assert depth.thinking_config.thinking_level == "LOW"
+        assert depth.max_output_tokens == 16384
+        assert detection.thinking_config is None
+        assert detection.max_output_tokens == 8192
+
+    def test_a_depth_reply_cut_off_at_the_cap_fails_the_scan(self, monkeypatch):
+        from google.genai import types
+        with pytest.raises(ValueError) as error:
+            self._run_scan(monkeypatch, types.FinishReason.MAX_TOKENS)
+        assert str(error.value) == ("Gemini's reply was cut off at max_output_tokens=16384 "
+                                    "(thinking counts toward it); raise max_output_tokens")
+
+
 class TestCacheInitLock:
     """Concurrent first loads of a cache load the backbone exactly once.
 

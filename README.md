@@ -186,9 +186,9 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 #### Nodes
 
 - **Gemini API Config** - Initialize Gemini API connection (API key configuration). Optional if API key is configured in ComfyUI Settings or config.ini -- Gemini nodes can run standalone.
-- **Gemini Text Generation** - General-purpose text generation with model selection (Gemini 3.1 Pro Preview, 3.8/3.7/3.6/3.5 Flash, 3.5 Flash-Lite)
+- **Gemini Text Generation** - General-purpose text generation with model selection (Gemini 4 Hydrogen, 4 Carbon, 4 Argon, 3.1 Pro Preview, 3.8/3.7/3.6/3.5 Flash, 3.5 Flash-Lite)
 - **Gemini Chat** - Multi-turn conversations with automatic context preservation
-- **Gemini Vision** - Analyze images with multimodal capabilities
+- **Gemini Vision** - Analyze images with multimodal capabilities. Vision and Detect take a `media_resolution` widget; `low` spends about a quarter of the image tokens of `high`
 - **Gemini Detect** - Open-vocabulary object detection: name objects (or leave empty to detect everything prominent) and get normalized regions on an `ERPK_REGIONS` output that wires into the Regional Prompt Builder's `regions` input
 - **Gemini Image Generation** - Generate images from text descriptions (Nano Banana 2.1, 3.1 Flash, 3.1 Flash Lite, 3 Pro; 0.5K to 4K resolution, up to 14 aspect ratios, Google Search grounding on all but 3.1 Flash Lite)
 - **Gemini Image Edit** - Edit and modify images with natural language prompts (up to 14 reference images, same model and resolution options). Connect an IMAGE, or pick or drop up to 14 files onto the grid on the node, and each file goes to the model at its own size
@@ -201,8 +201,8 @@ Google Gemini API integration for text generation, vision analysis, multi-turn c
 - **Gemini Omni Reference to Video** - Generate video featuring the subjects in reference images via Gemini Omni Flash
 
 **Key Benefits:**
-- Support for Gemini 4 Argon, 3.1 Pro Preview, 3.8 Flash (default), 3.7, 3.6 and 3.5 Flash, and 3.5 Flash-Lite
-- **Thinking level** control across all models (none/minimal/low/medium/high). `none` keeps the model's default thinking; `minimal` is raised to `low` on models that reject it
+- Support for Gemini 4 Hydrogen (default), 4 Carbon, 4 Argon, 3.1 Pro Preview, 3.8, 3.7, 3.6 and 3.5 Flash, and 3.5 Flash-Lite
+- **Thinking level** control across all models (none/minimal/low/medium/high/xhigh). `none` keeps the model's default thinking; the node raises `minimal` to `low` and lowers `xhigh` to `high` on models that reject them (only Gemini 4 Hydrogen takes `xhigh`)
 - **Omni Flash video generation** from text, a start image or reference images
 - Each node selects its own model for maximum flexibility
 - State-of-the-art reasoning with Gemini 3.1 Pro Preview
@@ -310,7 +310,7 @@ String manipulation and general utility nodes.
 - Wired regions: an optional `regions` input accepts detected regions (e.g. from Gemini Detect) and appends them after the canvas-drawn regions at execute time - the canvas stays untouched, `desc_N`/`ref_N` keep binding canvas regions only, and appended regions render in front where they overlap
 - Undo/redo for everything region-shaped (Ctrl/Cmd+Z / Shift+Z): draws, moves, deletes, typing, depth changes, scans, and Clear all each revert as sensible single steps, 50 deep
 - Object scan: with an image connected, a ✦ button in the canvas corner has Gemini detect the scene's objects - each becomes a real editable region with a layer name (the label) and a per-region prompt (a one-sentence caption that feeds generation), depth pre-ranked back-to-front, while SAM computes segmentation masks locally (weights download once). Masks keep their largest blob, fill holes, and feather their edges; small objects are re-segmented from a cropped close-up for full-resolution edges. The scan replaces the canvas as a single undo step. A ⚙ options window picks the Gemini detection model and the segmentation backbone (saved with the workflow): the segmenter list is filtered to the SAM families this install can run (SAM / SAM-HQ / SAM 2.1, `↓` = downloads on first use) and defaults to SAM ViT-Base
-- Scan cost readout: each scan estimates its price from the API's reported token usage and shows it in the status strip (last scan plus a running session total) with a toast after the scan finishes; it is a paid-tier estimate (the free tier bills nothing) and reads "n/a" for a model with no price on file
+- Scan cost readout: each scan estimates its price from the API's reported token usage and shows it in the status strip (last scan plus a running session total) with a toast after the scan finishes; it is a paid-tier estimate (the free tier bills nothing) at the rate in effect on the scan's UTC date, and reads "n/a" for a model with no price on file
 - Layer groups: Alt-drop a list row to nest regions; parents collapse, group-hide, and move with their children, and section scans group their detections under the scanned region
 - Layer-style region list: right-clicking a region opens a detail view - mask thumbnail, editable name and prompt, exact pixel geometry, per-layer hide/show eye, delete - above the reorderable list, which captions rows by layer name and adds per-row and global hide/show toggles
 - A `masks` output emits a frame-sized MASK batch (one per region, in region order): scanned regions use their segmentation, hand-drawn regions get filled rectangles - ready for inpainting chains; the **Region Mask** node picks a single region's mask out of the batch by canvas number
