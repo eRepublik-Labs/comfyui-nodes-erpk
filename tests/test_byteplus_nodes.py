@@ -464,7 +464,7 @@ def test_cancel_pressed_before_the_request_leaves_sends_nothing(transport, monke
     with pytest.raises(BytePlusInterrupted) as excinfo:
         asyncio.run(node.execute(**kwargs))
     assert str(excinfo.value) == message
-    assert console().splitlines()[-1] == f"[BytePlus] {message}"
+    assert console().splitlines() == ["[BytePlus] Using API key from node input", f"[BytePlus] {message}"]
     assert sent == []
 
 

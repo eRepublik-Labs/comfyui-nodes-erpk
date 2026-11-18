@@ -191,10 +191,10 @@ async def _generate(kwargs, images: List[str]) -> IO.NodeOutput:
              f"max_images {options.max_images} is sent as {sent_max} next to {len(images)} reference "
              f"image{'' if len(images) == 1 else 's'}.")
     client = make_client(kwargs.get("client"))
-    emit(f"Seedream request: model={body['model']}, size={body['size']}, "
-         f"reference images={len(images)}")
     client_module.raise_if_interrupted("Cancel was pressed before the Seedream request was sent, so nothing was "
                                        "sent or billed.")
+    emit(f"Seedream request: model={body['model']}, size={body['size']}, "
+         f"reference images={len(images)}")
     handoff = _Handoff()
     try:
         image_tensor, alpha = await asyncio.to_thread(

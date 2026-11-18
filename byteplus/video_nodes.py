@@ -164,9 +164,9 @@ async def _run(kwargs, media: seedance.VideoMedia) -> IO.NodeOutput:
     body = seedance.build_video_body(model_id, kwargs.get("prompt", ""), media, options,
                                      kwargs.get("endpoint_id", ""))
     client: BytePlusClient = make_client(kwargs.get("client"))
+    raise_if_interrupted("Cancel was pressed before the Seedance task was created, so nothing was sent or billed.")
     emit(f"Seedance {media.mode().value} request: model={body['model']}, "
          f"resolution={options.resolution}")
-    raise_if_interrupted("Cancel was pressed before the Seedance task was created, so nothing was sent or billed.")
     task_id = await client.create_video_task(body)
     task = await client.wait_for_video_task(task_id, options.execution_expires_after + _POLL_MARGIN_SECONDS)
 
