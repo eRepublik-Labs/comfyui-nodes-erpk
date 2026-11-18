@@ -211,7 +211,7 @@ class BytePlusClient:
             if status == "succeeded":
                 return task
             if status not in ("queued", "running"):
-                raise BytePlusTaskFailed(_task_failure_message(task_id, task))
+                raise BytePlusTaskFailed(task_failure_message(task_id, task))
             await self._sleep(task_id, is_interrupted)
         raise BytePlusTaskFailed(f"Seedance task {task_id} did not finish within {timeout:.0f} s.")
 
@@ -250,7 +250,7 @@ class BytePlusClient:
                                       f"and is billed. Video URL: {video_url}")
         raise BytePlusInterrupted(f"Stopped waiting for Seedance task {task_id} (status {status}).")
 
-def _task_failure_message(task_id: str, task: dict) -> str:
+def task_failure_message(task_id: str, task: dict) -> str:
     status = task.get("status")
     if status == "failed":
         error = task.get("error") or {}

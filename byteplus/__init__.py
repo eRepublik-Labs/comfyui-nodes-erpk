@@ -4,6 +4,7 @@
 from .nodes import BytePlusAPIClient, BytePlusSeedreamTextToImage, BytePlusSeedreamImageEdit
 from .video_nodes import (
     BytePlusSeedanceTextToVideo, BytePlusSeedanceImageToVideo, BytePlusSeedanceReferenceToVideo,
+    BytePlusSeedanceTaskResult,
 )
 
 NODES = [
@@ -11,6 +12,7 @@ NODES = [
     BytePlusSeedanceTextToVideo,
     BytePlusSeedanceImageToVideo,
     BytePlusSeedanceReferenceToVideo,
+    BytePlusSeedanceTaskResult,
     BytePlusSeedreamTextToImage,
     BytePlusSeedreamImageEdit,
 ]

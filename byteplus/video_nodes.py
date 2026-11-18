@@ -1,18 +1,20 @@
 # ABOUTME: Seedance V3 video nodes on BytePlus ModelArk: text, image (first/last frame) and
-# ABOUTME: reference to video. Each outputs the video URL, the last-frame URL and the task ID.
+# ABOUTME: reference to video, plus a free node that reads back a task's result by its ID.
 
 import asyncio
+import re
 
 from comfy_api.latest import IO
 
 from .byteplus_api import seedance
-from .byteplus_api.client import BytePlusClient
+from .byteplus_api.client import BytePlusClient, task_failure_message
 from .byteplus_api.media import SEEDANCE_IMAGE_LIMITS, images_to_data_uris
 from .nodes import CLIENT_TOOLTIP, make_client, url_lines
 
 # The poll deadline sits past execution_expires_after so ModelArk reports `expired` first.
 _POLL_MARGIN_SECONDS = 600
 _CATEGORY = "ERPK/BytePlus/Video"
+_TASK_ID = re.compile(r"[A-Za-z0-9_-]+")
 
 
 def _option_inputs(default_duration: int, reference: bool = False):
@@ -320,3 +322,62 @@ class BytePlusSeedanceReferenceToVideo(IO.ComfyNode):
             raise ValueError("Connect reference_images or enter at least one reference URL.")
         return await _run(kwargs, media)
 
+
+class BytePlusSeedanceTaskResult(IO.ComfyNode):
+    """Reads a Seedance task's status and result URLs by ID; a GET, so it bills nothing."""
+
+    @classmethod
+    def define_schema(cls):
+        return IO.Schema(
+            node_id="BytePlusSeedanceTaskResult",
+            display_name="BytePlus Seedance Task Result",
+            category=_CATEGORY,
+            description=("Fetch a Seedance task's video URL, last-frame URL and status by task ID, for example "
+                         "after a run was cancelled or lost. Reading a task is free."),
+            not_idempotent=True,
+            inputs=[
+                IO.String.Input("task_id", default="",
+                                tooltip="ModelArk task ID (cgt-...), from a Seedance node's task_id output or the console."),
+                IO.Custom("BYTEPLUS_API_CLIENT").Input("client", optional=True, tooltip=CLIENT_TOOLTIP),
+                IO.Boolean.Input(
+                    "wait", default=True, optional=True,
+                    tooltip=("On: poll until the task finishes and raise if it failed. Off: read the status once; "
+                             "the URLs are empty until it succeeds."),
+                ),
+                IO.Int.Input(
+                    "seed", default=-1, min=-1, max=seedance.SEED_MAX, optional=True,
+                    control_after_generate="randomize",
+                    tooltip=("Cache control only, never sent. -1 reads the task again on every queue; a fixed "
+                             "value reuses the last answer."),
+                ),
+            ],
+            outputs=[
+                IO.String.Output("video_url", tooltip="Video URL once the task succeeded, else empty. Valid 24 h."),
+                IO.String.Output("last_frame_url",
+                                 tooltip="Final-frame URL if the task was created with return_last_frame, else empty."),
+                IO.String.Output("status", tooltip="queued, running, succeeded, failed, expired or cancelled."),
+            ],
+        )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        return _seed_fingerprint(kwargs)
+
+    @classmethod
+    async def execute(cls, task_id: str = "", **kwargs) -> IO.NodeOutput:
+        task_id = task_id.strip()
+        if not _TASK_ID.fullmatch(task_id):
+            raise ValueError(f"task_id must be a ModelArk task ID such as cgt-20261119021437-q68pg, got {task_id!r}.")
+        client = make_client(kwargs.get("client"))
+        if kwargs.get("wait", True):
+            # ModelArk expires any task within EXPIRES_MAX of its creation, so this bound always ends the wait.
+            task = await client.wait_for_video_task(task_id, seedance.EXPIRES_MAX + _POLL_MARGIN_SECONDS)
+        else:
+            task = await client.get_video_task(task_id)
+        status = task.get("status") or ""
+        if status not in ("queued", "running", "succeeded"):
+            print(f"[BytePlus] {task_failure_message(task_id, task)}")
+        video_url, last_frame_url = _task_urls(task)
+        if video_url:
+            print(f"[BytePlus] Video URL: {video_url}")
+        return IO.NodeOutput(video_url, last_frame_url, status)

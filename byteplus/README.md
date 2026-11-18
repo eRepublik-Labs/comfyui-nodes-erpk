@@ -15,6 +15,7 @@ Seedance video and Seedream image generation called directly on BytePlus ModelAr
 | BytePlus Seedance Text to Video | `BytePlusSeedanceTextToVideo` | `video_url`, `last_frame_url`, `task_id` |
 | BytePlus Seedance Image to Video | `BytePlusSeedanceImageToVideo` | `video_url`, `last_frame_url`, `task_id` |
 | BytePlus Seedance Reference to Video | `BytePlusSeedanceReferenceToVideo` | `video_url`, `last_frame_url`, `task_id` |
+| BytePlus Seedance Task Result | `BytePlusSeedanceTaskResult` | `video_url`, `last_frame_url`, `status` |
 | BytePlus Seedream Text to Image | `BytePlusSeedreamTextToImage` | `images` (`IMAGE`), `alpha` (`MASK`) |
 | BytePlus Seedream Image Edit | `BytePlusSeedreamImageEdit` | `images` (`IMAGE`), `alpha` (`MASK`) |
 
@@ -79,7 +80,8 @@ The final render reuses the draft's prompt, inputs, duration, ratio, seed and au
 
 ## Cancel and errors
 
-- Pressing Cancel in ComfyUI checks the task. The node deletes a `queued` task, which makes ModelArk cancel it. ModelArk cannot cancel a `running` task, so it finishes and bills; the node stops waiting and says so.
+- Pressing Cancel in ComfyUI checks the task. The node deletes a `queued` task, which makes ModelArk cancel it. ModelArk cannot cancel a `running` task, so it finishes and bills; the node stops waiting and says so. If the task had already succeeded, the node prints its video URL.
+- **BytePlus Seedance Task Result** reads a task back by ID for free. Give it the `task_id` of a run you cancelled or lost to collect the billed video. Task IDs stay valid for 7 days.
 - Task failures (`failed`, `expired`, `cancelled`) raise with ModelArk's error code and message, including moderation codes such as `OutputVideoSensitiveContentDetected`. ModelArk does not bill failed or moderated generations.
 - A rejected request raises `ModelArk POST ... returned HTTP <status> <code>: <message>`.
 - Task creation is never retried, so a network error cannot start a second billed task. Status polling retries through connection errors, 429 and 5xx.

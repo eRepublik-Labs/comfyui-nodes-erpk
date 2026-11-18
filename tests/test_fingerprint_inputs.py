@@ -40,6 +40,8 @@ API_NODES = [
     ("erpk.byteplus.video_nodes", "BytePlusSeedanceTextToVideo"),
     ("erpk.byteplus.video_nodes", "BytePlusSeedanceImageToVideo"),
     ("erpk.byteplus.video_nodes", "BytePlusSeedanceReferenceToVideo"),
+    # A free GET, but a task's status changes under the same ID, so the seed lets it re-read on demand.
+    ("erpk.byteplus.video_nodes", "BytePlusSeedanceTaskResult"),
     ("erpk.byteplus.nodes", "BytePlusSeedreamTextToImage"),
     ("erpk.byteplus.nodes", "BytePlusSeedreamImageEdit"),
     # Claude

@@ -172,3 +172,35 @@ def test_a_gap_in_the_seedance_price_list_does_not_discard_the_video(transport, 
     assert ("[BytePlus] Task cgt-9: 40594 tokens; cost unknown: dreamina-seedance-2-0-mini-260615 has no "
             "price for 480p.") in capsys.readouterr().out
 
+
+def test_task_result_waits_for_a_task_and_returns_its_urls_and_status(transport, monkeypatch):
+    from erpk.byteplus.video_nodes import BytePlusSeedanceTaskResult
+
+    async def no_sleep(_):
+        return None
+
+    monkeypatch.setattr(asyncio, "sleep", no_sleep)
+    sent, replies = transport
+    replies += [(200, {"id": "cgt-9", "status": "running"}),
+                _succeeded(last_frame_url="https://cdn.example.com/last.jpeg")]
+    output = asyncio.run(BytePlusSeedanceTaskResult.execute(client=CLIENT, task_id=" cgt-9 "))
+    assert tuple(output.args) == (VIDEO, "https://cdn.example.com/last.jpeg", "succeeded")
+    task_url = "https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks/cgt-9"
+    assert sent == [("GET", task_url, None), ("GET", task_url, None)]
+
+    sent.clear()
+    replies.append((200, {"id": "cgt-9", "status": "queued", "content": None}))
+    output = asyncio.run(BytePlusSeedanceTaskResult.execute(client=CLIENT, task_id="cgt-9", wait=False))
+    assert tuple(output.args) == ("", "", "queued")
+    assert sent == [("GET", task_url, None)]
+
+
+def test_task_result_refuses_a_task_id_that_is_not_one(transport):
+    from erpk.byteplus.video_nodes import BytePlusSeedanceTaskResult
+
+    sent, _ = transport
+    with pytest.raises(ValueError) as excinfo:
+        asyncio.run(BytePlusSeedanceTaskResult.execute(client=CLIENT, task_id="cgt-9/../../x"))
+    assert str(excinfo.value) == ("task_id must be a ModelArk task ID such as cgt-20261119021437-q68pg, "
+                                  "got 'cgt-9/../../x'.")
+    assert sent == []
