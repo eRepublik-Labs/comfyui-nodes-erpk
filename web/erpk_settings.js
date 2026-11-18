@@ -9,6 +9,11 @@ import { api } from "../../scripts/api.js";
 // appears in the rendered list, place it accordingly in this array.
 const API_KEY_SETTINGS = [
     {
+        id: "ERPK.BYTEPLUS_API_KEY",
+        name: "BytePlus ModelArk API Key",
+        nodes: ["BytePlusAPIClient"],
+    },
+    {
         id: "ERPK.XAI_API_KEY",
         name: "xAI (Grok) API Key",
         nodes: ["GrokAPIClient"],
@@ -171,6 +176,7 @@ function maskApiKey(val) {
 // you add a new key to API_KEY_SETTINGS above, add the same name here too.
 const API_KEY_LABELS = new Set([
     "Anthropic API Key",
+    "BytePlus ModelArk API Key",
     "Google API Key",
     "OpenAI API Key",
     "WaveSpeed API Key",

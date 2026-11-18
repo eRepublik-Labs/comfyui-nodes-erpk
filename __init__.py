@@ -5,7 +5,7 @@
 ERPK ComfyUI Custom Nodes
 
 A collection of custom ComfyUI nodes from ERPK, including WaveSpeed AI, Claude API,
-Gemini, OpenAI, and Grok API integrations.
+Gemini, OpenAI, Grok and BytePlus ModelArk API integrations.
 """
 
 import re
@@ -87,6 +87,7 @@ class ERPKExtension(ComfyExtension):
             (".gemini", "Gemini"),
             (".openai", "OpenAI"),
             (".grok", "Grok"),
+            (".byteplus", "BytePlus"),
             (".wavespeed", "WaveSpeed"),
         ]
 
