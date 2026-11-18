@@ -1,5 +1,5 @@
 // ABOUTME: Filters the `size` Combo on the OpenAI image nodes to what the selected model accepts,
-// ABOUTME: and migrates workflows saved before custom_width/height or complexity existed.
+// ABOUTME: and repairs saved values the schema now rejects (size layout, complexity, frame_count).
 
 import { app } from "../../../scripts/app.js";
 
@@ -79,12 +79,25 @@ export function repairComplexity(node) {
     }
 }
 
+// A workflow saved by v2026.11.5-11.7 can hold an OpenAIImageGeneration
+// frame_count up to 64. The API caps GIF frames at 16, and ComfyUI refuses to
+// queue an INT above the widget max even when the output is png. Clamp only a
+// stored value above the max; no value from 17 to 64 ever produced a GIF.
+export function repairFrameCount(node) {
+    const widget = node.widgets?.find((w) => w.name === "frame_count");
+    const max = widget?.options?.max;
+    if (typeof max === "number" && widget.value > max) {
+        widget.value = max;
+    }
+}
+
 function installDynamicSizeFilter(nodeType, sizeMap) {
     const origOnConfigure = nodeType.prototype.onConfigure;
     nodeType.prototype.onConfigure = function (info) {
         const r = origOnConfigure?.apply(this, arguments);
         migrateSizeValues(this, info);
         repairComplexity(this);
+        repairFrameCount(this);
         return r;
     };
 

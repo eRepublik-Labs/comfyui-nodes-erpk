@@ -12,7 +12,7 @@ Generates a vector image as SVG markup with GPT Image 2.6. The image model passe
 | prompt | String | (empty) | Description of the vector image to generate |
 | client | OPENAI_API_CLIENT | — | OpenAI API client (optional when Settings holds the API key) |
 | model | Combo | gpt-image-2.6-flare | Image model: gpt-image-2.6-sunburst, gpt-image-2.6-flare (optional). Only GPT Image 2.6 returns SVG |
-| svg_model | Combo | gpt-6.1-sol | Text model that writes the SVG markup (optional). Offers the same models as the Responses image node |
+| svg_model | Combo | gpt-6.2-sol | Text model that writes the SVG markup (optional). Offers the same models as the Responses image node |
 | size | Combo | 1024x1024 | Size preset or Custom (optional). Same presets and Custom envelope as OpenAI Image Generation |
 | custom_width | Int | 1024 | Width when size is Custom (optional). 256 to 3840, step 16 |
 | custom_height | Int | 1024 | Height when size is Custom (optional). 256 to 3840, step 16 |
@@ -31,5 +31,5 @@ Generates a vector image as SVG markup with GPT Image 2.6. The image model passe
 
 - Each run asks for one SVG. The API takes only `n=1` for SVG output, and it has no streaming, partial images, or compression for it.
 - Nothing in this node turns the SVG into pixels. Save the string as a `.svg` file, or pass it to a node that renders SVG.
-- On 2026-11-05 gpt-6.1-sol returned SVG as `svg_model` on both 2.6 tiers. The node also offers the other text models of the Responses image node, which nobody has yet run as `svg_model`.
+- On 2026-11-05 gpt-6.1-sol returned SVG as `svg_model` on both 2.6 tiers, and on 2026-11-18 gpt-6.2-sol did on gpt-image-2.6-flare. The node also offers the other text models of the Responses image node, which nobody has yet run as `svg_model`.
 - gpt-image-2 and the GPT Image 2.5 models answer 400 "SVG output is not supported for this model.", so the node offers only the 2.6 models.

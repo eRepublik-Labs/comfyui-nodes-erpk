@@ -123,7 +123,8 @@ class TestVerbosityModelsSet:
     @pytest.mark.parametrize("model_id", [
         # verbosity=low returned 200 on chat.completions: gpt-6 tiers
         # 2026-09-23, gpt-6.1-sol 2026-10-01, gpt-6.1-terra low/medium/high
-        # 2026-11-03.
+        # 2026-11-03, gpt-6.2 tiers low/medium/high 2026-11-18.
+        "gpt-6.2-sol", "gpt-6.2-astra",
         "gpt-6.1-sol", "gpt-6.1-terra", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna",
         "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
     ])
@@ -383,14 +384,14 @@ class TestMinimalEffortClamp:
         assert mock_sdk.chat.completions.create.call_args.kwargs["reasoning_effort"] == "low"
 
 
-# Measured on chat.completions 2026-10-14 (gpt-6.1-terra 2026-11-03):
-# reasoning_effort "none" returns 200 on these six and 400 on gpt-6.1-sol and
-# gpt-6-astra; with effort none, temperature and top_p return 200 on the six,
-# while stop still 400s.
+# Measured on chat.completions 2026-10-14 (gpt-6.1-terra 2026-11-03, the
+# gpt-6.2 tiers 2026-11-18): reasoning_effort "none" returns 200 on these six
+# and 400 on the gpt-6.2 tiers, gpt-6.1-sol and gpt-6-astra; with effort none,
+# temperature and top_p return 200 on the six, while stop still 400s.
 ACCEPTS_EFFORT_NONE = [
     "gpt-6.1-terra", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
 ]
-REJECTS_EFFORT_NONE = ["gpt-6.1-sol", "gpt-6-astra"]
+REJECTS_EFFORT_NONE = ["gpt-6.2-sol", "gpt-6.2-astra", "gpt-6.1-sol", "gpt-6-astra"]
 
 
 def _run_node(class_name, model, **inputs):
@@ -478,11 +479,21 @@ STRICT_SCHEMA = {
 
 
 class TestJsonSchemaResponseFormat:
-    """Strict Structured Outputs (response_format json_schema) on the text and
-    chat nodes. The schema is a String widget appended last, so saved
-    workflows keep their widget slots."""
+    """Strict Structured Outputs (response_format json_schema) on the text,
+    chat and vision nodes. The schema is a String widget appended last, so
+    saved workflows keep their widget slots. An image plus a strict schema
+    returned 200 on gpt-6.2-sol and gpt-6.1-sol (measured 2026-11-18)."""
 
-    @pytest.mark.parametrize("class_name", ["OpenAITextGeneration", "OpenAIChat"])
+    def test_vision_appends_the_format_widgets_after_its_saved_ones(self):
+        inputs = _import_node("nodes", "OpenAIVision").define_schema().inputs
+        assert [i.id for i in inputs] == [
+            "image", "prompt", "client", "model", "detail", "max_tokens", "temperature",
+            "reasoning_effort", "verbosity", "seed", "response_format", "json_schema",
+        ]
+        response_format = inputs[-2]
+        assert (response_format.default, response_format.optional) == ("default", True)
+
+    @pytest.mark.parametrize("class_name", TEXT_NODES)
     def test_schema_options_and_widget(self, class_name):
         inputs = _import_node("nodes", class_name).define_schema().inputs
         response_format = next(i for i in inputs if i.id == "response_format")
@@ -492,7 +503,7 @@ class TestJsonSchemaResponseFormat:
         assert last.optional is True
         assert last.multiline is True
 
-    @pytest.mark.parametrize("class_name", ["OpenAITextGeneration", "OpenAIChat"])
+    @pytest.mark.parametrize("class_name", TEXT_NODES)
     def test_schema_sent_strict(self, class_name):
         import json
         kwargs = _run_node(
@@ -505,7 +516,17 @@ class TestJsonSchemaResponseFormat:
             "json_schema": {"name": "response", "strict": True, "schema": STRICT_SCHEMA},
         }
 
-    @pytest.mark.parametrize("class_name", ["OpenAITextGeneration", "OpenAIChat"])
+    def test_vision_sends_the_schema_with_the_image(self):
+        import json
+        kwargs = _run_node(
+            "OpenAIVision", "gpt-6.2-sol",
+            response_format="json_schema", json_schema=json.dumps(STRICT_SCHEMA),
+        )
+        content = kwargs["messages"][-1]["content"]
+        assert [part["type"] for part in content] == ["image_url", "text"]
+        assert kwargs["response_format"]["json_schema"]["schema"] == STRICT_SCHEMA
+
+    @pytest.mark.parametrize("class_name", TEXT_NODES)
     @pytest.mark.parametrize("schema,message", [
         ("{not json", r"json_schema is not valid JSON: Expecting property name"),
         ("", r"response_format 'json_schema' needs a JSON Schema in the json_schema input"),
@@ -514,19 +535,25 @@ class TestJsonSchemaResponseFormat:
     def test_bad_schema_refused_before_the_call(self, class_name, schema, message):
         client, mock_sdk = _make_client_with_mock_sdk()
         cls = _import_node("nodes", class_name)
+        leading = ("image", "hello") if class_name == "OpenAIVision" else ("hello",)
         with pytest.raises(ValueError, match=message):
             asyncio.run(cls.execute(
-                "hello", client=client, model="gpt-6-luna",
+                *leading, client=client, model="gpt-6-luna",
                 response_format="json_schema", json_schema=schema,
             ))
         mock_sdk.chat.completions.create.assert_not_called()
 
-    def test_schema_ignored_unless_selected(self):
+    @pytest.mark.parametrize("class_name", TEXT_NODES)
+    def test_schema_ignored_unless_selected(self, class_name):
         kwargs = _run_node(
-            "OpenAITextGeneration", "gpt-6-luna",
+            class_name, "gpt-6-luna",
             response_format="json_object", json_schema="{not json",
         )
         assert kwargs["response_format"] == {"type": "json_object"}
+
+    def test_vision_sends_no_format_by_default(self):
+        kwargs = _run_node("OpenAIVision", "gpt-6.2-sol")
+        assert "response_format" not in kwargs
 
 
 class TestVisionDetail:

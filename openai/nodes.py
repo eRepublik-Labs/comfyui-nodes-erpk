@@ -13,8 +13,8 @@ REASONING_EFFORT_OPTIONS = ["default", "none", "minimal", "low", "medium", "high
 REASONING_EFFORT_TOOLTIP = (
     "Reasoning depth for the gpt-5.6 and gpt-6.x models. 'default' sends nothing, so "
     "the model reasons at its own default (medium). 'none' turns reasoning off on "
-    "gpt-6.1-terra, gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; gpt-6.1-sol and gpt-6-astra cannot "
-    "turn it off, so there 'none' acts like 'default'. 'minimal' is rejected by every "
+    "gpt-6.1-terra, gpt-6-sol, gpt-6-luna and the gpt-5.6 tiers; the gpt-6.2 tiers, gpt-6.1-sol "
+    "and gpt-6-astra cannot turn it off, so there 'none' acts like 'default'. 'minimal' is rejected by every "
     "current model and is sent as 'low'. Ignored by chat-latest."
 )
 
@@ -545,6 +545,14 @@ class OpenAIVision(IO.ComfyNode):
                     control_after_generate="randomize",
                     tooltip="Seed for reproducible outputs (best-effort). Randomizes by default.",
                 ),
+                IO.Combo.Input(
+                    "response_format",
+                    options=RESPONSE_FORMAT_OPTIONS,
+                    default="default",
+                    optional=True,
+                    tooltip=RESPONSE_FORMAT_TOOLTIP,
+                ),
+                json_schema_input(),
             ],
             outputs=[
                 IO.String.Output("analysis"),
@@ -568,9 +576,13 @@ class OpenAIVision(IO.ComfyNode):
         reasoning_effort = kwargs.get("reasoning_effort", "default")
         verbosity = kwargs.get("verbosity", "default")
         seed = kwargs.get("seed", -1)
+        response_format = kwargs.get("response_format", "default")
+        json_schema = kwargs.get("json_schema", "")
 
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty")
+
+        resp_format = build_response_format(response_format, json_schema)
 
         if client is None:
             client = OpenAIClient(api_key=None)
@@ -588,6 +600,7 @@ class OpenAIVision(IO.ComfyNode):
                 max_tokens=max_tokens,
                 temperature=temperature,
                 model=model,
+                response_format=resp_format,
                 seed=seed if seed != -1 else None,
                 reasoning_effort=reasoning_effort,
                 verbosity=verbosity if verbosity and verbosity != "default" else None,

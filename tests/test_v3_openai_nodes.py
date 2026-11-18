@@ -222,13 +222,15 @@ class TestOpenAIImageSizePresets:
         "Custom",
     ]
 
-    @pytest.mark.parametrize("class_name", ["OpenAIImageGeneration", "OpenAIImageEdit"])
-    def test_size_combo_has_presets_and_custom(self, class_name):
+    @pytest.mark.parametrize("class_name,default", [
+        ("OpenAIImageGeneration", "auto"), ("OpenAIImageEdit", "1024x1024"),
+    ])
+    def test_size_combo_has_presets_and_custom(self, class_name, default):
         cls = _import_node("image_nodes", class_name)
         size = [i for i in cls.define_schema().inputs if i.id == "size"][0]
         assert size.io_type == "COMBO"
         assert list(size.options) == self.PRESETS
-        assert size.default == "1024x1024"
+        assert size.default == default
 
     @pytest.mark.parametrize("class_name", ["OpenAIImageGeneration", "OpenAIImageEdit"])
     def test_custom_dimensions_follow_size(self, class_name):
