@@ -27,4 +27,4 @@ Fetches a Seedance task's video URL, last-frame URL and status by task ID. Use i
 - The node only reads the task, so it starts nothing and bills nothing.
 - Pressing Cancel while it waits behaves like the Seedance nodes: a task still `queued` is deleted, which cancels it; a `running` task cannot be cancelled and finishes and bills.
 - With `wait` off, a `failed`, `expired` or `cancelled` status is returned rather than raised, and the console prints ModelArk's reason.
-- Task IDs stay valid for 7 days (2.5 draft IDs for 14). The video URL itself expires 24 h after the task finishes, so fetch it within a day.
+- Task IDs stay valid for 7 days (2.5 draft IDs for 14). The video URL itself is valid for 24 hours, so fetch it within a day.

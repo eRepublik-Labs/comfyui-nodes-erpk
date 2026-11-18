@@ -171,6 +171,20 @@ def test_a_layer_that_cannot_be_placed_saves_every_billed_image_and_never_overwr
     assert (output_dir / "20261118-120000-000000-01.png").read_bytes() == b"earlier run"
     assert _size_on_disk(first) == (600, 500) and _size_on_disk(second) == (100, 50)
 
+
+def test_an_image_that_does_not_decode_saves_the_others_and_names_it(transport, output_dir):
+    _, replies = transport
+    replies.append((200, {"data": [{"b64_json": _png_b64(Image.new("RGB", (64, 48)))},
+                                   {"b64_json": "bm90IGFuIGltYWdl"}]}))
+    with pytest.raises(ValueError) as excinfo:
+        asyncio.run(BytePlusSeedreamTextToImage.execute(client=CLIENT, prompt="a kite", model="seedream-4-0-250828",
+                                                        sequential="auto", max_images=2, response_format="b64_json"))
+    saved = output_dir / "20261118-120000-000000-01.png"
+    message = str(excinfo.value)
+    assert message.startswith("Seedream images could not be decoded: image 2 of 2: ")
+    assert message.endswith(f". The billed images are saved as {saved}")
+    assert _size_on_disk(saved) == (64, 48)
+
 MINI = "dreamina-seedance-2-0-mini-260615"
 VIDEO = "https://cdn.example.com/v.mp4"
 

@@ -66,7 +66,7 @@ Each model's capabilities live in one table, in `byteplus_api/seedance.py` and `
 
 ModelArk documents a request seed for Seedance 1.0 only. On 2026-11-18, Seedance 2.0 mini and Seedream 5.0 flash accepted a `seed` field and echoed it back, yet two identical requests with the same seed returned different videos and different images. A seed does not reproduce a result there, so the node sends one to Seedance 1.0 only (0 or more). Everywhere else the seed is cache control only and stays local: -1 (randomize) runs a new, billed generation on every queue, and a fixed value lets ComfyUI reuse the result it already paid for.
 
-A cached Seedance result is the video URL, not the video. The URL expires 24 hours after the task finishes, and a Seedance 2.5 URL allows at most 100 downloads. After that a fixed seed keeps returning a dead link, so save the video while the URL works (WaveSpeed Preview Video saves it). Changing the seed then makes, and bills, a new video.
+A cached Seedance result is the video URL, not the video. ModelArk keeps the URL valid for 24 hours, and a Seedance 2.5 URL allows at most 100 downloads. After that a fixed seed keeps returning a dead link, so save the video while the URL works (WaveSpeed Preview Video saves it). Changing the seed then makes, and bills, a new video.
 
 ## Seedance 2.5 drafts
 
