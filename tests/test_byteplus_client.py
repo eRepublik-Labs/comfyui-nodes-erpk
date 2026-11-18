@@ -184,3 +184,63 @@ def test_key_order_is_settings_then_widget_then_config_ini_and_never_env(monkeyp
         "  1. ComfyUI Settings (Settings > ERPK > API Keys > BytePlus ModelArk)\n"
         "  2. The api_key input on the BytePlus API Client node\n"
         "  3. byteplus/config.ini")
+
+
+@pytest.mark.parametrize("body", ["<html>gateway</html>", "[]", "null"])
+def test_a_2xx_reply_that_is_not_a_json_object_keeps_polling(monkeypatch, body):
+    client, transport = _client([(200, body), _task("succeeded", content={"video_url": "https://cdn.example.com/v.mp4"})],
+                                monkeypatch=monkeypatch)
+    task = asyncio.run(client.wait_for_video_task("cgt-1", timeout=60))
+    assert task["status"] == "succeeded" and len(transport.calls) == 2
+
+
+TASK_MAY_BILL = ("The task may exist and bill anyway: check Video generation tasks in the ModelArk console "
+                 "before queueing again.")
+IMAGES_MAY_BILL = ("The images may have been generated and billed: check your ModelArk usage before "
+                   "queueing again.")
+
+
+@pytest.mark.parametrize("call, path, reply, message", [
+    ("create_video_task", "/contents/generations/tasks", (200, "<html>ok</html>"),
+     f"ModelArk POST /contents/generations/tasks returned an unreadable reply (HTTP 200: <html>ok</html>). "
+     f"{TASK_MAY_BILL}"),
+    ("generate_images", "/images/generations", (200, "<html>ok</html>"),
+     f"ModelArk POST /images/generations returned an unreadable reply (HTTP 200: <html>ok</html>). "
+     f"{IMAGES_MAY_BILL}"),
+    ("generate_images", "/images/generations", requests.ReadTimeout("read timed out"),
+     f"ModelArk POST /images/generations got no reply (read timed out). {IMAGES_MAY_BILL}"),
+])
+def test_a_post_that_may_have_billed_is_sent_once_and_says_so(monkeypatch, call, path, reply, message):
+    client, transport = _client([reply], monkeypatch=monkeypatch)
+    with pytest.raises(BytePlusAPIError) as excinfo:
+        asyncio.run(getattr(client, call)({"model": "m"}))
+    assert str(excinfo.value) == message
+    assert transport.calls == [("POST", f"{BASE}{path}", {"model": "m"})]
+
+
+def test_interrupt_is_never_replaced_by_an_error_while_cancelling(monkeypatch, capsys):
+    client, _ = _client([requests.ConnectionError("reset")], interrupted=lambda: True, monkeypatch=monkeypatch)
+    with pytest.raises(BytePlusInterrupted) as excinfo:
+        asyncio.run(client.wait_for_video_task("cgt-1", timeout=60))
+    assert str(excinfo.value) == ("Stopped waiting for Seedance task cgt-1 without cancelling it: reading its "
+                                  "status failed (reset). It may still run and bill; check it with the BytePlus "
+                                  "Seedance Task Result node.")
+
+    client, transport = _client([_task("queued"), (500, "boom")], interrupted=lambda: True,
+                                monkeypatch=monkeypatch)
+    with pytest.raises(BytePlusInterrupted) as excinfo:
+        asyncio.run(client.wait_for_video_task("cgt-1", timeout=60))
+    assert str(excinfo.value) == ("Stopped waiting for Seedance task cgt-1, but cancelling it failed (ModelArk "
+                                  "DELETE /contents/generations/tasks/cgt-1 returned HTTP 500: boom). It may still "
+                                  "run and bill; check it with the BytePlus Seedance Task Result node.")
+    assert [m for m, _, _ in transport.calls] == ["GET", "DELETE"]
+
+    capsys.readouterr()
+    client, transport = _client([_task("succeeded", content={"video_url": "https://cdn.example.com/v.mp4"})],
+                                interrupted=lambda: True, monkeypatch=monkeypatch)
+    with pytest.raises(BytePlusInterrupted) as excinfo:
+        asyncio.run(client.wait_for_video_task("cgt-1", timeout=60))
+    assert str(excinfo.value) == ("Stopped waiting for Seedance task cgt-1, which had already succeeded and is "
+                                  "billed. Video URL: https://cdn.example.com/v.mp4")
+    assert "Video URL: https://cdn.example.com/v.mp4" in capsys.readouterr().out
+    assert [m for m, _, _ in transport.calls] == ["GET"]

@@ -26,6 +26,11 @@ IMAGES_PATH = "/images/generations"
 MAX_BODY_BYTES = 64 * 1024 * 1024
 _ERROR_TEXT_LIMIT = 300
 _AUDIO_POLICY_CODE = "OutputAudioSensitiveContentDetected.PolicyViolation"
+_TASK_MAY_BILL = ("The task may exist and bill anyway: check Video generation tasks in the ModelArk console "
+                  "before queueing again.")
+_IMAGES_MAY_BILL = ("The images may have been generated and billed: check your ModelArk usage before "
+                    "queueing again.")
+_CHECK_TASK = "It may still run and bill; check it with the BytePlus Seedance Task Result node."
 
 
 class BytePlusAPIError(Exception):
@@ -38,6 +43,14 @@ class BytePlusAPIError(Exception):
     @property
     def transient(self) -> bool:
         return self.status is not None and (self.status == 429 or self.status >= 500)
+
+
+class BytePlusUnreadableReply(BytePlusAPIError):
+    """A 2xx reply whose body is not a JSON object. The request may still have taken effect."""
+
+    @property
+    def transient(self) -> bool:
+        return True
 
 
 class BytePlusTaskFailed(Exception):
@@ -128,19 +141,31 @@ class BytePlusClient:
         status, text = self._transport(method, f"{BASE_URL}{path}", headers, data, timeout)
         if status >= 400:
             raise BytePlusAPIError(f"ModelArk {method} {path} returned {_error_description(status, text)}", status)
-        return json.loads(text) if text.strip() else {}
+        if not text.strip():
+            return {}
+        try:
+            body = json.loads(text)
+        except ValueError:
+            body = None
+        if not isinstance(body, dict):
+            raise BytePlusUnreadableReply(f"ModelArk {method} {path} returned an unreadable reply "
+                                          f"(HTTP {status}: {text[:_ERROR_TEXT_LIMIT]})", status)
+        return body
 
     async def _call(self, method: str, path: str, payload: Optional[dict] = None, timeout: float = 60) -> dict:
         return await asyncio.to_thread(self._call_sync, method, path, payload, timeout)
 
-    async def create_video_task(self, body: dict) -> str:
-        """POST a Seedance task once (never retried: a retry could start a second billed task)."""
+    async def _post_once(self, path: str, body: dict, timeout: float, may_bill: str) -> dict:
+        """POST once, never retried: a retry could start a second billed generation."""
         try:
-            response = await self._call("POST", VIDEO_TASKS_PATH, body, timeout=300)
+            return await self._call("POST", path, body, timeout=timeout)
         except requests.RequestException as e:
-            raise BytePlusAPIError(
-                f"ModelArk POST {VIDEO_TASKS_PATH} got no reply ({e}). The task may exist and bill anyway: "
-                "check Video generation tasks in the ModelArk console before queueing again.") from e
+            raise BytePlusAPIError(f"ModelArk POST {path} got no reply ({e}). {may_bill}") from e
+        except BytePlusUnreadableReply as e:
+            raise BytePlusAPIError(f"{e}. {may_bill}") from e
+
+    async def create_video_task(self, body: dict) -> str:
+        response = await self._post_once(VIDEO_TASKS_PATH, body, 300, _TASK_MAY_BILL)
         task_id = response.get("id")
         if not task_id:
             raise BytePlusAPIError(f"ModelArk created a video task without an id: {str(response)[:_ERROR_TEXT_LIMIT]}")
@@ -153,8 +178,8 @@ class BytePlusClient:
         await self._call("DELETE", f"{VIDEO_TASKS_PATH}/{task_id}", timeout=30)
 
     async def generate_images(self, body: dict) -> dict:
-        """POST a Seedream request once; the response carries the images (no task to poll)."""
-        response = await self._call("POST", IMAGES_PATH, body, timeout=600)
+        """The response carries the images; there is no task to poll."""
+        response = await self._post_once(IMAGES_PATH, body, 600, _IMAGES_MAY_BILL)
         error = response.get("error")
         if isinstance(error, dict) and error.get("code"):
             raise BytePlusAPIError(f"ModelArk POST {IMAGES_PATH} returned {error['code']}: {error.get('message', '')}")
@@ -163,7 +188,7 @@ class BytePlusClient:
     async def wait_for_video_task(self, task_id: str, timeout: float) -> dict:
         """Poll until the task succeeds; raise BytePlusTaskFailed on any other final state.
 
-        Connection errors, 429 and 5xx keep polling; other HTTP errors raise.
+        Connection errors, unreadable replies, 429 and 5xx keep polling; other HTTP errors raise.
         """
         is_interrupted = _resolve_interrupt_checker()
         deadline = time.monotonic() + timeout
@@ -201,16 +226,29 @@ class BytePlusClient:
 
     async def _cancel_on_interrupt(self, task_id: str) -> None:
         # DELETE cancels only a queued task; on a finished task it deletes the record,
-        # and a running task cannot be stopped.
-        status = (await self.get_video_task(task_id)).get("status")
+        # and a running task cannot be stopped. Whatever happens, the user's Cancel wins.
+        try:
+            task = await self.get_video_task(task_id)
+        except Exception as e:
+            raise BytePlusInterrupted(f"Stopped waiting for Seedance task {task_id} without cancelling it: "
+                                      f"reading its status failed ({e}). {_CHECK_TASK}") from e
+        status = task.get("status")
         if status == "queued":
-            await self.delete_video_task(task_id)
+            try:
+                await self.delete_video_task(task_id)
+            except Exception as e:
+                raise BytePlusInterrupted(f"Stopped waiting for Seedance task {task_id}, but cancelling it "
+                                          f"failed ({e}). {_CHECK_TASK}") from e
             raise BytePlusInterrupted(f"Cancelled queued Seedance task {task_id}.")
         if status == "running":
             raise BytePlusInterrupted(f"Stopped waiting for Seedance task {task_id}. It is already running, "
                                       "which ModelArk cannot cancel, so it will finish and be billed.")
+        if status == "succeeded":
+            video_url = (task.get("content") or {}).get("video_url")
+            print(f"[BytePlus] Task {task_id} had already succeeded and is billed. Video URL: {video_url}")
+            raise BytePlusInterrupted(f"Stopped waiting for Seedance task {task_id}, which had already succeeded "
+                                      f"and is billed. Video URL: {video_url}")
         raise BytePlusInterrupted(f"Stopped waiting for Seedance task {task_id} (status {status}).")
-
 
 def _task_failure_message(task_id: str, task: dict) -> str:
     status = task.get("status")
