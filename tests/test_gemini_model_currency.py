@@ -13,6 +13,9 @@ cannot express a third rule.
 
 import json
 import os
+from datetime import date
+
+import pytest
 
 from erpk.gemini.gemini_api.client import GeminiClient
 from erpk.gemini.nodes import (
@@ -22,6 +25,7 @@ from erpk.gemini.nodes import (
     _resolve_aspect_ratio,
     _resolve_image_size,
 )
+from utils.scan_cost import price
 
 
 FLASH_3_6 = "gemini-3.6-flash"
@@ -171,13 +175,21 @@ def test_argon_clamps_minimal_thinking_to_low():
         assert _build_thinking_config(level, ARGON).thinking_level == level.upper()
 
 
-def test_argon_priced_at_intro_rate():
-    # Pricing page: "$2.00 / $10.00 per 1M tokens through November 30, 2026;
-    # $4.00 / $20.00 from December 1". Cost estimates use today's rate.
-    entry = _pricing()[ARGON]
-    assert entry["input_price_per_mtok"] == 2.0
-    assert entry["output_price_per_mtok"] == 10.0
-    assert "2026-12-01" in entry["name"] and "4.00/20.00" in entry["name"]
+@pytest.mark.parametrize("model", [ARGON, "gemini-4-carbon"])
+@pytest.mark.parametrize("day, expected_input, expected_output", [
+    (date(2026, 11, 30), 2.0, 10.0),
+    (date(2026, 12, 1), 4.0, 20.0),
+    (date(2027, 6, 1), 4.0, 20.0),
+])
+def test_argon_and_carbon_price_doubles_on_2026_12_01(model, day, expected_input, expected_output):
+    """Standard-tier text prices per 1M tokens, from https://aistudio.google.com/docs/pricing
+    (ai.google.dev/gemini-api/docs/pricing 301s there), READ 2026-11-18. Both models:
+
+    - input: "$2.00 through November 30, 2026." then "$4.00 starting December 1, 2026." (READ)
+    - output: "$10.00 through November 30, 2026." then "$20.00 starting December 1, 2026." (READ)
+    """
+    assert price(model, 1_000_000, 0, on=day) == expected_input
+    assert price(model, 0, 1_000_000, on=day) == expected_output
 
 
 # Argon's latest-model page: "set HTTP client timeouts to at least 15 minutes".
@@ -294,14 +306,6 @@ def test_carbon_and_hydrogen_clamp_minimal_thinking_to_low():
         assert _build_thinking_config("minimal", model).thinking_level == "LOW", model
         for level in ("low", "medium", "high"):
             assert _build_thinking_config(level, model).thinking_level == level.upper(), model
-
-
-def test_carbon_priced_at_intro_rate():
-    # Pricing page: $2.00 / $10.00 per 1M through 2026-11-30, then $4.00 / $20.00.
-    entry = _pricing()[CARBON]
-    assert entry["input_price_per_mtok"] == 2.0
-    assert entry["output_price_per_mtok"] == 10.0
-    assert "2026-12-01" in entry["name"] and "4.00/20.00" in entry["name"]
 
 
 def test_hydrogen_priced():
