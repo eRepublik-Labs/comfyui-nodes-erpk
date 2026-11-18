@@ -349,6 +349,43 @@ def test_carbon_and_hydrogen_guidance_is_in_the_text_node_tooltips():
         assert "4 Carbon" in thinking and "4 Hydrogen" in thinking
 
 
+# --- Gemini 4 Neon (aistudio.google.com/docs/models/gemini-4-neon, /docs/pricing
+# and the 2026-11-18 changelog entry, read 2026-11-18; thinking levels probed
+# 2026-11-18) -----------------------------------------------------------------
+
+NEON = "gemini-4-neon"
+
+
+def test_neon_offered_on_text_nodes():
+    assert NEON in TEXT_MODELS
+
+
+def test_neon_clamps_minimal_and_sends_xhigh():
+    # 400 "Thinking level MINIMAL is not supported for this model"; low and
+    # xhigh returned 200 (probed 2026-11-18).
+    from erpk.gemini.nodes import _build_thinking_config
+    assert _build_thinking_config("minimal", NEON).thinking_level == "LOW"
+    assert _build_thinking_config("xhigh", NEON).model_dump(
+        mode="json", exclude_none=True) == {"thinking_level": "XHIGH"}
+
+
+def test_neon_priced():
+    # Pricing page, standard tier: $3.00 / $15.00 per 1M.
+    entry = _pricing()[NEON]
+    assert entry["input_price_per_mtok"] == 3.00
+    assert entry["output_price_per_mtok"] == 15.00
+
+
+def test_neon_is_named_in_the_text_node_tooltips():
+    from erpk.gemini.nodes import GeminiChat, GeminiTextGeneration, GeminiVision
+    for node_cls in (GeminiTextGeneration, GeminiChat, GeminiVision):
+        for name in ("temperature", "top_p", "top_k"):
+            assert "Ignored by Gemini 4 Argon, 4 Carbon, 4 Hydrogen and 4 Neon." in _text_input(
+                node_cls, name).tooltip, name
+        assert "xhigh is sent only to 4 Hydrogen and 4 Neon; other models get high." in _text_input(
+            node_cls, "thinking_level").tooltip
+
+
 # --- Nano Banana 2.1 (ai.google.dev/gemini-api/docs/models/gemini-nano-banana-2.1
 # and /docs/image-generation, read 2026-10-14) --------------------------------
 

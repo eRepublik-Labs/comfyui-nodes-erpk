@@ -69,6 +69,7 @@ class GeminiClient:
 
     # Available models
     MODELS = {
+        "gemini-4-neon": "Gemini 4 Neon (Frontier model for software engineering, knowledge work and science; low/medium/high/xhigh thinking; ignores temperature/top_p/top_k)",
         "gemini-4-carbon": "Gemini 4 Carbon (Strongest reasoning; low/medium/high thinking; ignores temperature/top_p/top_k)",
         "gemini-4-hydrogen": "Gemini 4 Hydrogen (Fast coding and agentic model; low/medium/high/xhigh thinking; ignores temperature/top_p/top_k)",
         "gemini-4-argon": "Gemini 4 Argon (Flagship reasoning; low/medium/high thinking; ignores temperature/top_p/top_k)",

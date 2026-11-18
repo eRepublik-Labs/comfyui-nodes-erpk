@@ -98,7 +98,7 @@ class TestBuildThinkingConfig:
         assert _build_thinking_config("none", "gemini-3.1-pro-preview") is None
 
 
-# Probed 2026-11-18 with generateContent: xhigh returned 200 on gemini-4-hydrogen
+# Probed 2026-11-18 with generateContent: xhigh returned 200 on gemini-4-hydrogen and gemini-4-neon
 # and 400 "Thinking level XHIGH is not supported for this model" on each of these.
 XHIGH_REJECTED = ["gemini-4-carbon", "gemini-4-argon", "gemini-3.1-pro-preview",
                   "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash",
