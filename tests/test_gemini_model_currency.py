@@ -65,14 +65,25 @@ def test_3_7_and_3_8_flash_clamp_minimal_thinking_to_low():
     assert _build_thinking_config("minimal", FLASH_3_6).thinking_level == "MINIMAL"
 
 
-def test_gemini_3_6_through_3_8_flash_priced_at_current_rate():
-    # https://ai.google.dev/gemini-api/docs/pricing (read 2026-09-16): 3.6, 3.7
-    # and 3.8 Flash are "$0.75 [in] / $3.75 [out] through December 31, 2026.
-    # $1.50 / $7.50 starting January 1, 2027." Cost estimates use today's rate.
-    for model in (FLASH_3_6, FLASH_3_7, FLASH_3_8):
-        entry = _pricing()[model]
-        assert entry["input_price_per_mtok"] == 0.75, model
-        assert entry["output_price_per_mtok"] == 3.75, model
+@pytest.mark.parametrize("model", [FLASH_3_6, FLASH_3_7, FLASH_3_8])
+@pytest.mark.parametrize("day, expected_input, expected_output", [
+    (date(2026, 12, 31), 0.75, 3.75),
+    (date(2027, 1, 1), 1.50, 7.50),
+])
+def test_flash_3_6_through_3_8_price_doubles_on_2027_01_01(model, day, expected_input, expected_output):
+    """Standard-tier text prices per 1M tokens.
+
+    3.6 and 3.8 Flash, from https://aistudio.google.com/docs/pricing, READ 2026-11-18:
+    - input: "$0.75 through December 31, 2026." then "$1.50 starting January 1, 2027." (READ)
+    - output: "$3.75 through December 31, 2026." then "$7.50 starting January 1, 2027." (READ)
+
+    3.7 Flash was deprecated on 2026-10-08 and is served by 3.8 Flash; the page no
+    longer lists it. Its figures are the same two rows as READ on
+    ai.google.dev/gemini-api/docs/pricing on 2026-09-16, when the page listed 3.6,
+    3.7 and 3.8 Flash together.
+    """
+    assert price(model, 1_000_000, 0, on=day) == expected_input
+    assert price(model, 0, 1_000_000, on=day) == expected_output
 
 
 def test_gemini_3_5_flash_lite_priced():

@@ -31,19 +31,28 @@
       "output_price_per_mtok": 12.0
     },
     "gemini-3.8-flash": {
-      "name": "Gemini 3.8 Flash (current rate through 2026-12-31; 1.50/7.50 from 2027-01-01)",
+      "name": "Gemini 3.8 Flash",
       "input_price_per_mtok": 0.75,
-      "output_price_per_mtok": 3.75
+      "output_price_per_mtok": 3.75,
+      "price_changes": [
+        {"effective_from": "2027-01-01", "input_price_per_mtok": 1.5, "output_price_per_mtok": 7.5}
+      ]
     },
     "gemini-3.7-flash": {
-      "name": "Gemini 3.7 Flash (current rate through 2026-12-31; 1.50/7.50 from 2027-01-01)",
+      "name": "Gemini 3.7 Flash (deprecated 2026-10-08, served by 3.8 Flash; the pricing page no longer lists it)",
       "input_price_per_mtok": 0.75,
-      "output_price_per_mtok": 3.75
+      "output_price_per_mtok": 3.75,
+      "price_changes": [
+        {"effective_from": "2027-01-01", "input_price_per_mtok": 1.5, "output_price_per_mtok": 7.5}
+      ]
     },
     "gemini-3.6-flash": {
-      "name": "Gemini 3.6 Flash (current rate through 2026-12-31; 1.50/7.50 from 2027-01-01)",
+      "name": "Gemini 3.6 Flash",
       "input_price_per_mtok": 0.75,
-      "output_price_per_mtok": 3.75
+      "output_price_per_mtok": 3.75,
+      "price_changes": [
+        {"effective_from": "2027-01-01", "input_price_per_mtok": 1.5, "output_price_per_mtok": 7.5}
+      ]
     },
     "gemini-3.5-flash-lite": {
       "name": "Gemini 3.5 Flash-Lite",

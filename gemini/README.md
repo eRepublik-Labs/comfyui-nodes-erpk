@@ -425,7 +425,7 @@ Gemini API Config → Gemini Image Generation → Gemini Omni Video Generation �
 Gemini API offers generous free tier quotas. For current pricing, see:
 https://ai.google.dev/pricing
 
-The Regional Prompt Builder's scan cost readout reads its rates from `gemini/pricing.json`. A model whose price changes on a known date lists the later rate under `price_changes`, and the estimate uses the rate in effect on the request's UTC date. Gemini 4 Argon and 4 Carbon switch from $2/$10 to $4/$20 per 1M tokens on 2026-12-01.
+The Regional Prompt Builder's scan cost readout reads its rates from `gemini/pricing.json`. A model whose price changes on a known date lists the later rate under `price_changes`, and the estimate uses the rate in effect on the request's UTC date. Gemini 4 Argon and 4 Carbon switch from $2/$10 to $4/$20 per 1M tokens on 2026-12-01, and 3.6, 3.7 and 3.8 Flash from $0.75/$3.75 to $1.50/$7.50 on 2027-01-01.
 
 ## Troubleshooting
 
