@@ -7,9 +7,9 @@ Complete OpenAI API integration providing text generation, vision analysis, mult
 
 ## Features
 
-- **Text Generation** - GPT-6.1 Sol (default) and GPT-6.1 Terra, the GPT-6 Astra/Sol/Luna and GPT-5.6 Sol/Terra/Luna tiers, and chat-latest
+- **Text Generation** - GPT-6.2 Sol (default) and GPT-6.2 Astra, GPT-6.1 Sol/Terra, the GPT-6 Astra/Sol/Luna and GPT-5.6 Sol/Terra/Luna tiers, and chat-latest
 - **Vision Analysis** - Analyze images with any of the text models (all accept image input)
-- **Image Generation** - Generate images with GPT Image 2.5 Flare (default) / Sunburst and GPT Image 2
+- **Image Generation** - Generate images with GPT Image 2.6 Flare (default) / Sunburst, GPT Image 2.5 Flare / Sunburst and GPT Image 2
 - **Image Generation (Responses API)** - Orchestrated image generation via a mainline reasoning model with optional web-search grounding
 - **Image Editing** - Edit and inpaint images with natural language prompts
 - **Multi-turn Conversations** - Maintain chat history across requests
