@@ -18,6 +18,7 @@ ComfyUI-Custom-Nodes/
 │   ├── seedream_v4_5*.py          # Seedream V4.5 nodes (4 variants)
 │   ├── seedream_v5_5*.py          # Seedream V5.5 nodes (3 variants)
 │   ├── seedream_v5_flash*.py      # Seedream V5.0 Flash nodes (3 variants)
+│   ├── flux_2_pro*.py             # FLUX.2 Pro nodes (2 variants)
 │   ├── qwen_image_*.py            # Qwen Image nodes
 │   └── wavespeed_api/             # API integration layer
 ├── claude/                        # Claude API integration
@@ -92,6 +93,11 @@ Custom nodes for WaveSpeed AI's image generation and editing APIs.
 - **Seedream V5.0 Flash** - Text-to-image at a flat price for every resolution tier ($0.027/image)
 - **Seedream V5.0 Flash Edit** - Image editing from up to 10 reference images ($0.027/image, however many images go in)
 - **Seedream V5.0 Flash Layers** - Splits an image into a clean base plus up to 16 layers with masks ($0.459/run)
+
+#### FLUX.2 Pro Models
+
+- **FLUX.2 Pro** - Text-to-image at 256-2048px with a seed sent to the API ($0.03/image)
+- **FLUX.2 Pro Edit** - Image editing from up to 3 reference images, with an image grid and an optional output size ($0.06/image)
 
 Every Seedream edit node, Sequential included, also has an image grid. With nothing on `images`, the node sends up to 10 grid files at their own size. It reads the URL text only when the grid is empty.
 

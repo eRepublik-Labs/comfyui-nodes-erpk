@@ -86,6 +86,8 @@ API_NODES = [
     ("erpk.wavespeed.seedream_v5_flash", "SeedreamV5FlashNode"),
     ("erpk.wavespeed.seedream_v5_flash_edit", "SeedreamV5FlashEditNode"),
     ("erpk.wavespeed.seedream_v5_flash_layers", "SeedreamV5FlashLayersNode"),
+    ("erpk.wavespeed.flux_2_pro", "Flux2ProNode"),
+    ("erpk.wavespeed.flux_2_pro_edit", "Flux2ProEditNode"),
     ("erpk.wavespeed.seedream_v5_lite_sequential", "SeedreamV5LiteSequentialNode"),
     ("erpk.wavespeed.seedream_v5_lite_edit_sequential", "SeedreamV5LiteEditSequentialNode"),
     # WaveSpeed video (Kling / LTX 2 Pro) — seed is cache-control only; these

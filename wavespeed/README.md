@@ -81,6 +81,15 @@ Sized by an aspect ratio (15 options) plus a 1k/1.5k/2k resolution tier, at one 
 | **Seedream V5.0 Flash Edit** | Image editing; aspect ratio can follow the first image | Aspect ratio or auto + 1k/1.5k/2k | Up to 10, IMAGE batch, grid or URLs | Single image | $0.027/image, however many images go in | [Link](https://wavespeed.ai/docs/docs-api/bytedance/seedream-v5.0-flash/edit) |
 | **Seedream V5.0 Flash Layers** | Splits an image into a clean base plus up to 16 layers with masks | 1k/1.5k/2k | Exactly 1, IMAGE or URL | Base image + layer and mask lists | $0.459/run | [Link](https://wavespeed.ai/docs/docs-api/bytedance/seedream-v5.0-flash/layer-decomposition) |
 
+### FLUX.2 Pro Models
+
+Sized by width and height. The endpoints take a seed, and -1 picks a random one.
+
+| Node | Description | Dimensions | Input Images | Output | Pricing | API Docs |
+|------|-------------|------------|--------------|--------|---------|----------|
+| **FLUX.2 Pro** | Text-to-image | 256-2048px (step 16)<br>Default: 1024x1024 | N/A | Single image | $0.03/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/flux-2-pro-text-to-image) |
+| **FLUX.2 Pro Edit** | Image editing; width and height at 0 let the API choose the size | 256-2048px, or 0x0 | Up to 3, IMAGE batch, grid or URLs | Single image | $0.06/image | [Link](https://wavespeed.ai/docs/docs-api/wavespeed-ai/flux-2-pro-edit) |
+
 ### Qwen Image Models
 
 | Node | Models | Description | Dimensions | Input Images | Language | Output | Pricing | API Docs |
@@ -570,7 +579,7 @@ pip install -r requirements.txt
 ```
 [ERPK] Loaded <N> V3 nodes
 ```
-The WaveSpeed module alone contributes 73 nodes.
+The WaveSpeed module alone contributes 75 nodes.
 
 ### Common Issues
 
@@ -587,7 +596,7 @@ All WaveSpeed nodes are located under the **ERPK/WaveSpeedAI** category:
 3. Navigate to: **ERPK → WaveSpeedAI**
 4. Select your desired node
 
-**Available nodes (73 total):**
+**Available nodes (75 total):**
 
 Client & I/O:
 - WaveSpeed Client
@@ -602,6 +611,9 @@ Image (ByteDance Seedream):
 - Bytedance Seedream V5.0 Pro / V5.0 Pro Edit / V5.0 Pro Layers
 - Bytedance Seedream V5.5 / V5.5 Edit / V5.5 Layers
 - Bytedance Seedream V5.0 Flash / V5.0 Flash Edit / V5.0 Flash Layers
+
+Image (FLUX):
+- FLUX.2 Pro / FLUX.2 Pro Edit
 
 Image (Qwen):
 - Qwen Image 2.0 Text-to-Image

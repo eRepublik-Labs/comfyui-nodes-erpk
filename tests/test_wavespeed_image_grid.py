@@ -161,6 +161,8 @@ NODES = [
          ["prompt", "image_url", "aspect_ratio", "resolution", "seed", "output_format", "background"]),
     Node("seedream_v5_flash_edit", "SeedreamV5FlashEditNode", "images", "image_url", 10, "Seedream",
          ["prompt", "image_url", "aspect_ratio", "resolution", "seed", "output_format"]),
+    Node("flux_2_pro_edit", "Flux2ProEditNode", "images", "image_url", 3, "FLUX.2 Pro",
+         ["prompt", "image_url", "width", "height", "seed"]),
     Node("minimax_h3_image_edit", "MinimaxH3ImageEditNode", "images", "image_urls", 9, "MiniMax H3 Image Edit",
          ["prompt", "image_urls", "aspect_ratio", "resolution", "output_format", "seed"]),
 ]
