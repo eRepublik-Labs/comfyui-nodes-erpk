@@ -36,6 +36,14 @@ API_NODES = [
     # Grok
     ("erpk.grok.nodes", "GrokTextGeneration"),
     ("erpk.grok.nodes", "GrokChat"),
+    # BytePlus ModelArk. Seed is sent on Seedance 1.0 only; elsewhere it is cache-control only.
+    ("erpk.byteplus.video_nodes", "BytePlusSeedanceTextToVideo"),
+    ("erpk.byteplus.video_nodes", "BytePlusSeedanceImageToVideo"),
+    ("erpk.byteplus.video_nodes", "BytePlusSeedanceReferenceToVideo"),
+    # A free GET, but a task's status changes under the same ID, so the seed lets it re-read on demand.
+    ("erpk.byteplus.video_nodes", "BytePlusSeedanceTaskResult"),
+    ("erpk.byteplus.nodes", "BytePlusSeedreamTextToImage"),
+    ("erpk.byteplus.nodes", "BytePlusSeedreamImageEdit"),
     # Claude
     ("claude.text_generation", "ClaudeTextGeneration"),
     ("claude.conversation", "ClaudeConversation"),
@@ -172,6 +180,7 @@ CONFIG_NODES = [
     ("erpk.openai.nodes", "OpenAIAPIConfig"),
     ("erpk.openai.nodes", "OpenAISystemInstruction"),
     ("erpk.wavespeed.minimax_h3_lora_stack", "MinimaxH3LoraStackNode"),
+    ("erpk.byteplus.nodes", "BytePlusAPIClient"),
 ]
 
 
