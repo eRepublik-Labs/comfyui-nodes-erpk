@@ -302,6 +302,22 @@ def test_token_counter_prices_a_100001_token_haiku_prompt_at_the_long_context_ra
     assert "Long context:" in summary
 
 
+def test_token_counter_counts_with_its_model_widget_when_a_client_is_connected(monkeypatch):
+    # The summary prices and sizes the count for the widget's model, so the
+    # API must count with that model too, not the client's.
+    from claude.token_counter import ClaudeTokenCounter
+    wire = Wire()
+    client = _client(monkeypatch, wire, model="claude-sonnet-5-5")
+    count, summary = asyncio.run(
+        ClaudeTokenCounter.execute(text="hello", model="claude-haiku-5-5", client=client)
+    ).args
+    request = wire.requests[-1]
+    assert request.url.path == "/v1/messages/count_tokens"
+    assert wire.bodies[-1]["model"] == "claude-haiku-5-5"
+    assert count == 42
+    assert "Model:            claude-haiku-5-5" in summary
+
+
 # --- A reply cut off at max_tokens is an error, never partial output ------------
 # Measured 2026-10-14 on claude-haiku-5-5: PromptEnhancer at max_tokens=256
 # came back with stop_reason "max_tokens" and a half-written prompt; with

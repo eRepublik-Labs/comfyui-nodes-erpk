@@ -352,10 +352,10 @@ class ClaudeClient:
             raise_if_refused(final)
             raise_if_truncated(final, params["max_tokens"])
 
-    def _count_tokens_sync(self, messages: list, system: Optional[str] = None) -> int:
+    def _count_tokens_sync(self, messages: list, system: Optional[str] = None, model: Optional[str] = None) -> int:
         try:
             params = {
-                "model": self.model,
+                "model": model or self.model,
                 "messages": messages
             }
             if system:
@@ -381,18 +381,19 @@ class ClaudeClient:
             # Rough estimate: ~4 characters per token
             return len(total_text) // 4
 
-    async def count_tokens(self, messages: list, system: Optional[str] = None) -> int:
+    async def count_tokens(self, messages: list, system: Optional[str] = None, model: Optional[str] = None) -> int:
         """
         Count tokens in a message list using Anthropic's API.
 
         Args:
             messages: List of message dicts
             system: Optional system prompt
+            model: Model to count for; None counts with the client's model
 
         Returns:
             Token count
         """
-        return await asyncio.to_thread(self._count_tokens_sync, messages, system)
+        return await asyncio.to_thread(self._count_tokens_sync, messages, system, model)
 
     def get_usage_stats(self) -> Dict[str, Any]:
         """

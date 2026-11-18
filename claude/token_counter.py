@@ -96,7 +96,7 @@ class ClaudeTokenCounter(IO.ComfyNode):
 
         try:
             if client:
-                token_count = await client.count_tokens([{"role": "user", "content": text}])
+                token_count = await client.count_tokens([{"role": "user", "content": text}], model=model)
                 counting_method = "Anthropic API (accurate)"
             else:
                 token_manager = TokenManager(model=model)
