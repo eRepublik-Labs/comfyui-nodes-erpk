@@ -9,6 +9,7 @@ claude/pricing.json schema (input_price_per_mtok / output_price_per_mtok).
 """
 
 import json
+from datetime import date
 
 import pytest
 
@@ -91,3 +92,125 @@ class TestLoadPricing:
         for model_id, md in data["models"].items():
             assert "input_price_per_mtok" in md, model_id
             assert "output_price_per_mtok" in md, model_id
+
+
+def _write_pricing(tmp_path, models):
+    path = tmp_path / "pricing.json"
+    path.write_text(json.dumps({"_last_updated": "2026-11-18", "models": models}))
+    return str(path)
+
+
+def _scheduled(*changes):
+    return {
+        "name": "Scheduled",
+        "input_price_per_mtok": 2.0,
+        "output_price_per_mtok": 10.0,
+        "price_changes": [
+            {"effective_from": day, "input_price_per_mtok": inp, "output_price_per_mtok": out}
+            for day, inp, out in changes
+        ],
+    }
+
+
+class TestPriceChanges:
+    """A model's base rate applies until the first price_changes date, then each
+    change applies from its effective_from date (inclusive) onward."""
+
+    @pytest.fixture
+    def path(self, tmp_path):
+        return _write_pricing(tmp_path, {
+            "scheduled": _scheduled(("2026-12-01", 4.0, 20.0), ("2027-06-01", 5.0, 25.0)),
+            "plain": {"name": "Plain", "input_price_per_mtok": 1.5, "output_price_per_mtok": 7.5},
+        })
+
+    @pytest.mark.parametrize("day, expected", [
+        (date(2026, 11, 30), {"input": 2.0, "output": 10.0}),
+        (date(2026, 12, 1), {"input": 4.0, "output": 20.0}),
+        (date(2027, 5, 31), {"input": 4.0, "output": 20.0}),
+        (date(2027, 6, 1), {"input": 5.0, "output": 25.0}),
+        (date(2030, 1, 1), {"input": 5.0, "output": 25.0}),
+    ])
+    def test_rate_follows_the_date(self, path, day, expected):
+        rates, _ = load_pricing(path, on=day)
+        assert rates["scheduled"] == expected
+
+    @pytest.mark.parametrize("day", [date(2020, 1, 1), date(2026, 12, 1), date(2030, 1, 1)])
+    def test_plain_entry_ignores_the_date(self, path, day):
+        rates, _ = load_pricing(path, on=day)
+        assert rates["plain"] == {"input": 1.5, "output": 7.5}
+
+    def test_no_date_uses_todays_utc_rate(self, path, monkeypatch):
+        import utils.scan_cost as scan_cost
+        monkeypatch.setattr(scan_cost, "_today_utc", lambda: date(2026, 12, 1))
+        rates, _ = load_pricing(path)
+        assert rates["scheduled"] == {"input": 4.0, "output": 20.0}
+
+
+class TestPriceChangesValidation:
+    """A bad schedule fails loudly at load, naming the model and the bad value."""
+
+    def _load(self, tmp_path, entry):
+        load_pricing(_write_pricing(tmp_path, {"gemini-4-argon": entry}), on=date(2026, 12, 1))
+
+    @pytest.mark.parametrize("bad", ["2026-12-1", "20261201", "December 1, 2026", "2026-02-30", 20261201])
+    def test_malformed_date(self, tmp_path, bad):
+        entry = _scheduled((bad, 4.0, 20.0))
+        with pytest.raises(ValueError) as err:
+            self._load(tmp_path, entry)
+        assert str(err.value) == (
+            f"{tmp_path / 'pricing.json'}: gemini-4-argon price_changes effective_from {bad!r} "
+            "is not a YYYY-MM-DD date")
+
+    def test_unsorted_dates(self, tmp_path):
+        entry = _scheduled(("2027-06-01", 5.0, 25.0), ("2026-12-01", 4.0, 20.0))
+        with pytest.raises(ValueError) as err:
+            self._load(tmp_path, entry)
+        assert str(err.value) == (
+            f"{tmp_path / 'pricing.json'}: gemini-4-argon price_changes dates must be strictly "
+            "increasing, got '2026-12-01' after '2027-06-01'")
+
+    def test_duplicate_dates(self, tmp_path):
+        entry = _scheduled(("2026-12-01", 4.0, 20.0), ("2026-12-01", 5.0, 25.0))
+        with pytest.raises(ValueError) as err:
+            self._load(tmp_path, entry)
+        assert str(err.value) == (
+            f"{tmp_path / 'pricing.json'}: gemini-4-argon price_changes dates must be strictly "
+            "increasing, got '2026-12-01' after '2026-12-01'")
+
+    @pytest.mark.parametrize("bad", [None, "4.00", True, -1.0])
+    def test_bad_price(self, tmp_path, bad):
+        entry = _scheduled(("2026-12-01", bad, 20.0))
+        with pytest.raises(ValueError) as err:
+            self._load(tmp_path, entry)
+        assert str(err.value) == (
+            f"{tmp_path / 'pricing.json'}: gemini-4-argon price_changes entry '2026-12-01' "
+            f"input_price_per_mtok {bad!r} is not a non-negative number")
+
+    def test_missing_price(self, tmp_path):
+        entry = _scheduled(("2026-12-01", 4.0, 20.0))
+        del entry["price_changes"][0]["output_price_per_mtok"]
+        with pytest.raises(ValueError) as err:
+            self._load(tmp_path, entry)
+        assert str(err.value) == (
+            f"{tmp_path / 'pricing.json'}: gemini-4-argon price_changes entry '2026-12-01' "
+            "output_price_per_mtok None is not a non-negative number")
+
+    def test_price_changes_not_a_list(self, tmp_path):
+        entry = _scheduled()
+        entry["price_changes"] = {"effective_from": "2026-12-01"}
+        with pytest.raises(ValueError) as err:
+            self._load(tmp_path, entry)
+        assert str(err.value) == (
+            f"{tmp_path / 'pricing.json'}: gemini-4-argon price_changes must be a list of "
+            "{effective_from, input_price_per_mtok, output_price_per_mtok}, got "
+            "{'effective_from': '2026-12-01'}")
+
+    def test_change_not_an_object(self, tmp_path):
+        entry = _scheduled()
+        entry["price_changes"] = ["2026-12-01"]
+        with pytest.raises(ValueError) as err:
+            self._load(tmp_path, entry)
+        assert str(err.value) == (
+            f"{tmp_path / 'pricing.json'}: gemini-4-argon price_changes must be a list of "
+            "{effective_from, input_price_per_mtok, output_price_per_mtok}, got "
+            "['2026-12-01']")
