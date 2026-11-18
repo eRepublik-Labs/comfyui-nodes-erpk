@@ -111,3 +111,51 @@ def test_decoding_keeps_every_image_that_decodes_and_names_the_rest():
     assert images[0].size == (4, 4) and images[1:] == [None, None]
     assert errors[0] == "image 2 of 3: the data is not an image PIL can read"
     assert errors[1] == "image 3 of 3: Seedream returned an image with neither url nor b64_json: ['size']"
+
+
+@pytest.fixture
+def resolver(monkeypatch):
+    """Answers the real fetch_remote_bytes' host lookups from a script and counts them.
+    No test resolves to a public address, so no request ever leaves the machine."""
+    import socket
+
+    from erpk.byteplus.byteplus_api import media
+
+    script, lookups = [], []
+
+    def getaddrinfo(host, *_, **__):
+        lookups.append(host)
+        outcome = script.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", (outcome, 443))]
+
+    monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo)
+    monkeypatch.setattr(media, "DOWNLOAD_RETRY_DELAYS", (0, 0))
+    return script, lookups
+
+
+def test_a_result_host_that_does_not_resolve_is_retried_like_a_connection_error(resolver):
+    import socket
+
+    script, lookups = resolver
+    script += [socket.gaierror(8, "nodename nor servname provided, or not known")] * 3
+    images, errors = decode_items([{"url": "https://cdn.example.com/a.png"}])
+    assert images == [None]
+    assert errors == ["image 1 of 1: Downloading https://cdn.example.com/a.png failed after 3 attempts: "
+                      "Cannot resolve host: cdn.example.com"]
+    assert lookups == ["cdn.example.com"] * 3
+
+
+@pytest.mark.parametrize("url, script, error, lookup_count", [
+    ("https://cdn.example.com/a.png", ["127.0.0.1"],
+     "Host cdn.example.com resolves to blocked address 127.0.0.1", 1),
+    ("ftp://cdn.example.com/a.png", [], "Disallowed scheme: 'ftp'", 0),
+])
+def test_a_result_url_that_fails_validation_is_not_retried(resolver, url, script, error, lookup_count):
+    queued, lookups = resolver
+    queued += script
+    images, errors = decode_items([{"url": url}])
+    assert images == [None]
+    assert errors == [f"image 1 of 1: Downloading {url} failed: {error}"]
+    assert len(lookups) == lookup_count

@@ -5,6 +5,7 @@ import base64
 import http.client
 import io
 import os
+import socket
 import time
 import urllib.error
 from dataclasses import dataclass
@@ -113,11 +114,15 @@ def _item_image(item: dict):
 def _transient(error: Exception) -> bool:
     if isinstance(error, urllib.error.HTTPError):
         return error.code == 429 or error.code >= 500
+    if isinstance(error, ValueError):
+        # safe_fetch raises its "Cannot resolve host" ValueError while handling the lookup's gaierror;
+        # a blocked host or scheme raises with no exception in flight.
+        return isinstance(error.__context__, socket.gaierror)
     return isinstance(error, (urllib.error.URLError, ConnectionError, TimeoutError, http.client.IncompleteRead))
 
 
 def _download(url: str, fetch) -> bytes:
-    """GET a result URL, retrying connection errors, timeouts, 429 and 5xx: a download is free."""
+    """GET a result URL, retrying host lookup and connection errors, timeouts, 429 and 5xx: a download is free."""
     attempts = len(DOWNLOAD_RETRY_DELAYS) + 1
     for attempt in range(1, attempts + 1):
         try:
