@@ -164,9 +164,9 @@ async def _run(kwargs, media: seedance.VideoMedia) -> IO.NodeOutput:
     body = seedance.build_video_body(model_id, kwargs.get("prompt", ""), media, options,
                                      kwargs.get("endpoint_id", ""))
     client: BytePlusClient = make_client(kwargs.get("client"))
-    task_id = await client.create_video_task(body)
-    print(f"[BytePlus] Seedance {media.mode().value} task {task_id}: model={body['model']}, "
+    print(f"[BytePlus] Seedance {media.mode().value} request: model={body['model']}, "
           f"resolution={options.resolution}")
+    task_id = await client.create_video_task(body)
     task = await client.wait_for_video_task(task_id, options.execution_expires_after + _POLL_MARGIN_SECONDS)
 
     video_url, last_frame_url = _task_urls(task)

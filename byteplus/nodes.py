@@ -185,7 +185,7 @@ async def _generate(kwargs, images: List[str]) -> IO.NodeOutput:
     client = make_client(kwargs.get("client"))
     print(f"[BytePlus] Seedream request: model={body['model']}, size={body['size']}, "
           f"reference images={len(images)}")
-    response = await client.generate_images(body)
+    response = await asyncio.to_thread(client.generate_images, body)
 
     items = [item for item in response.get("data") or [] if isinstance(item, dict)]
     failed = [item["error"] for item in items if item.get("error")]

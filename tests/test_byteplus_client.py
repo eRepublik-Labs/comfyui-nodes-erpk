@@ -127,7 +127,7 @@ def test_image_response_errors(monkeypatch):
                                                                      "message": "boom"}})],
                         monkeypatch=monkeypatch)
     with pytest.raises(BytePlusAPIError) as excinfo:
-        asyncio.run(client.generate_images({"model": "m"}))
+        client.generate_images({"model": "m"})
     assert str(excinfo.value) == "ModelArk POST /images/generations returned InternalServiceError: boom"
 
 
@@ -195,11 +195,15 @@ IMAGES_MAY_BILL = ("The images may have been generated and billed: check your Mo
      (500, {"error": {"code": "InternalServiceError", "message": "boom"}}),
      f"ModelArk POST /contents/generations/tasks returned HTTP 500 InternalServiceError: boom. {TASK_MAY_BILL}"),
 ])
-def test_a_post_that_may_have_billed_is_sent_once_and_says_so(monkeypatch, call, path, reply, message):
+def test_a_post_that_may_have_billed_is_sent_once_and_says_so(monkeypatch, capsys, call, path, reply, message):
     client, transport = _client([reply], monkeypatch=monkeypatch)
+    capsys.readouterr()
     with pytest.raises(BytePlusAPIError) as excinfo:
-        asyncio.run(getattr(client, call)({"model": "m"}))
+        result = getattr(client, call)({"model": "m"})
+        if asyncio.iscoroutine(result):
+            asyncio.run(result)
     assert str(excinfo.value) == message
+    assert capsys.readouterr().out == f"[BytePlus] {message}\n"
     assert transport.calls == [("POST", f"{BASE}{path}", {"model": "m"})]
 
 

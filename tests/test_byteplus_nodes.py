@@ -295,3 +295,71 @@ def test_task_result_with_wait_on_raises_the_vendor_reason_for_a_failed_task(tra
     with pytest.raises(BytePlusTaskFailed) as excinfo:
         asyncio.run(BytePlusSeedanceTaskResult.execute(client=CLIENT, task_id="cgt-9"))
     assert str(excinfo.value) == "Seedance task cgt-9 failed: OutputVideoSensitiveContentDetected: blocked"
+
+
+class BlockingTransport:
+    """Holds the first request in flight until released, then answers it; later requests answer at once."""
+
+    def __init__(self, first_reply, later_replies=()):
+        import threading
+
+        self.in_flight = threading.Event()
+        self.release = threading.Event()
+        self.replies = [first_reply, *later_replies]
+        self.sent = []
+
+    def __call__(self, method, url, headers, data, timeout):
+        self.sent.append((method, url))
+        if len(self.sent) == 1:
+            self.in_flight.set()
+            assert self.release.wait(5), "the test never released the request"
+        status, body = self.replies.pop(0)
+        return status, json.dumps(body)
+
+
+def _cancel_while_in_flight(monkeypatch, fake, coroutine):
+    """Cancel the node as ComfyUI's loop teardown does while the first request is in flight,
+    then let the vendor answer. asyncio.run returns only after the worker thread has finished."""
+    monkeypatch.setattr(client_module, "_requests_transport", lambda session: fake)
+
+    async def scenario():
+        task = asyncio.create_task(coroutine)
+        assert await asyncio.to_thread(fake.in_flight.wait, 5)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        fake.release.set()
+
+    asyncio.run(scenario())
+
+
+SEEDANCE_KWARGS = dict(client=CLIENT, first_frame=torch.zeros((1, 320, 480, 3)), model=MINI, resolution="480p")
+CREATED_LINE = ("[BytePlus] Created Seedance task cgt-9. If this run stops before the video is returned, fetch it "
+                "with the BytePlus Seedance Task Result node.")
+
+
+def test_a_seedance_task_created_after_its_node_was_cancelled_still_prints_its_id(monkeypatch, capsys):
+    fake = BlockingTransport((200, {"id": "cgt-9"}))
+    _cancel_while_in_flight(monkeypatch, fake, BytePlusSeedanceImageToVideo.execute(**SEEDANCE_KWARGS))
+    assert capsys.readouterr().out.splitlines()[-1] == CREATED_LINE
+    assert fake.sent == [("POST", "https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks")]
+
+
+def test_a_seedance_node_cancelled_while_waiting_prints_that_the_task_may_still_bill(transport, capsys):
+    sent, replies = transport
+    replies += [(200, {"id": "cgt-9"}), (200, {"id": "cgt-9", "status": "running"})]
+
+    async def scenario():
+        task = asyncio.create_task(BytePlusSeedanceImageToVideo.execute(**SEEDANCE_KWARGS))
+        while len(sent) < 2:
+            await asyncio.sleep(0.01)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(scenario())
+    lines = capsys.readouterr().out.splitlines()
+    assert CREATED_LINE in lines
+    assert lines[-1] == ("[BytePlus] Stopped waiting for Seedance task cgt-9 when the ComfyUI run ended. It may "
+                         "still finish and bill; fetch it with the BytePlus Seedance Task Result node.")
+    assert [method for method, _, _ in sent] == ["POST", "GET"]

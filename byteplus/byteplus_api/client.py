@@ -158,25 +158,35 @@ class BytePlusClient:
                     allow_empty: bool = False) -> dict:
         return await asyncio.to_thread(self._call_sync, method, path, payload, timeout, allow_empty)
 
-    async def _post_once(self, path: str, body: dict, timeout: float, may_bill: str) -> dict:
-        """POST once, never retried: a retry could start a second billed generation."""
+    def _post_once_sync(self, path: str, body: dict, timeout: float, may_bill: str) -> dict:
+        """POST once, never retried: a retry could start a second billed generation.
+
+        Blocking, so the caller's worker thread finishes it even after the node is cancelled;
+        a possibly billed outcome is printed because nobody may be left to receive the error.
+        """
         try:
-            return await self._call("POST", path, body, timeout=timeout)
+            return self._call_sync("POST", path, body, timeout=timeout)
         except requests.RequestException as e:
-            raise BytePlusAPIError(f"ModelArk POST {path} got no reply ({e}). {may_bill}") from e
+            raise _may_have_billed(f"ModelArk POST {path} got no reply ({e}). {may_bill}") from e
         except BytePlusUnreadableReply as e:
-            raise BytePlusAPIError(f"{e}. {may_bill}", e.status) from e
+            raise _may_have_billed(f"{e}. {may_bill}", e.status) from e
         except BytePlusAPIError as e:
             # A 5xx can arrive after the generation started; a 4xx is a rejection.
             if e.status is not None and e.status >= 500:
-                raise BytePlusAPIError(f"{e}. {may_bill}", e.status) from e
+                raise _may_have_billed(f"{e}. {may_bill}", e.status) from e
             raise
 
     async def create_video_task(self, body: dict) -> str:
-        response = await self._post_once(VIDEO_TASKS_PATH, body, 300, _TASK_MAY_BILL)
+        return await asyncio.to_thread(self._create_video_task_sync, body)
+
+    def _create_video_task_sync(self, body: dict) -> str:
+        response = self._post_once_sync(VIDEO_TASKS_PATH, body, 300, _TASK_MAY_BILL)
         task_id = response.get("id")
         if not task_id:
             raise BytePlusAPIError(f"ModelArk created a video task without an id: {str(response)[:_ERROR_TEXT_LIMIT]}")
+        # Printed here, in the worker thread, so the ID survives a node cancelled during the POST.
+        print(f"[BytePlus] Created Seedance task {task_id}. If this run stops before the video is returned, "
+              "fetch it with the BytePlus Seedance Task Result node.")
         return task_id
 
     async def get_video_task(self, task_id: str) -> dict:
@@ -186,9 +196,9 @@ class BytePlusClient:
         # DELETE has no response parameters, so an empty body is a valid answer.
         await self._call("DELETE", f"{VIDEO_TASKS_PATH}/{task_id}", timeout=30, allow_empty=True)
 
-    async def generate_images(self, body: dict) -> dict:
-        """The response carries the images; there is no task to poll."""
-        response = await self._post_once(IMAGES_PATH, body, 600, _IMAGES_MAY_BILL)
+    def generate_images(self, body: dict) -> dict:
+        """Blocking: call it from a worker thread. The response carries the images; there is no task to poll."""
+        response = self._post_once_sync(IMAGES_PATH, body, 600, _IMAGES_MAY_BILL)
         error = response.get("error")
         if isinstance(error, dict) and error.get("code"):
             raise BytePlusAPIError(f"ModelArk POST {IMAGES_PATH} returned {error['code']}: {error.get('message', '')}")
@@ -200,6 +210,15 @@ class BytePlusClient:
         Connection errors, unreadable replies, 429 and 5xx keep polling; other HTTP errors raise.
         On Cancel, a queued task is deleted unless cancel_on_interrupt is False.
         """
+        try:
+            return await self._poll(task_id, timeout, cancel_on_interrupt)
+        except asyncio.CancelledError:
+            # ComfyUI cancels every pending node when another node fails or is interrupted.
+            print(f"[BytePlus] Stopped waiting for Seedance task {task_id} when the ComfyUI run ended. It may "
+                  "still finish and bill; fetch it with the BytePlus Seedance Task Result node.")
+            raise
+
+    async def _poll(self, task_id: str, timeout: float, cancel_on_interrupt: bool) -> dict:
         is_interrupted = _resolve_interrupt_checker()
         on_interrupt = self._cancel_on_interrupt if cancel_on_interrupt else _leave_on_interrupt
         deadline = time.monotonic() + timeout
@@ -265,6 +284,11 @@ class BytePlusClient:
 async def _leave_on_interrupt(task_id: str) -> None:
     raise _interrupted(f"Stopped waiting for Seedance task {task_id}. The Task Result node only reads a task, "
                        "so the task is untouched.")
+
+
+def _may_have_billed(message: str, status: Optional[int] = None) -> BytePlusAPIError:
+    print(f"[BytePlus] {message}")
+    return BytePlusAPIError(message, status)
 
 
 def _interrupted(message: str) -> BytePlusInterrupted:
