@@ -22,7 +22,7 @@ Complete Claude API integration providing text generation, prompt enhancement, v
 
 - ComfyUI installed and running
 - Python 3.10 or higher
-- `anthropic>=1.11.0` (installed by `claude/requirements.txt`; an existing install on an older SDK must upgrade with `pip install -U -r claude/requirements.txt`)
+- `anthropic>=2.4.0` (installed by `claude/requirements.txt`; an existing install on an older SDK must upgrade with `pip install -U -r claude/requirements.txt`)
 - Anthropic API key ([get one here](https://console.anthropic.com/settings/keys))
 
 ### Steps

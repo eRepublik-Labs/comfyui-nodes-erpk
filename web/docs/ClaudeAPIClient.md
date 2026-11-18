@@ -27,4 +27,4 @@ Initializes a Claude API client for use by other nodes. Optional if your API key
 - Every offered model uses adaptive thinking and rejects temperature/top_p/top_k, so the client never sends them
 - Fable 5, Fable 5.1 and Fable 5.2 need an organization with data retention enabled; other organizations get a 404 or a "data retention" 400
 - Prompt caching is enabled by default; Usage Stats shows the cache reads and writes it produced
-- Requires anthropic>=1.11.0
+- Requires anthropic>=2.4.0
