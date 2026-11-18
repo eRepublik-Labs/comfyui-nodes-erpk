@@ -167,7 +167,7 @@ Claude API integration for text generation, prompt enhancement, vision analysis,
 
 **Key Benefits:**
 - 51 artistic styles for prompt enhancement (photorealistic, cinematic, fantasy, anime, oil painting, impressionist, cyberpunk, and more)
-- Claude 5-generation models only: 1M context, up to 128K output, adaptive thinking, and an `effort` widget on every generation node
+- Claude 5-generation models only: 1M context, up to 128K output, adaptive thinking, and `effort` and `thinking` (adaptive or off) widgets on every generation node
 - Automatic prompt caching (cache reads at 0.1x input on most models)
 - Usage Stats priced per answering model, including cache reads and writes
 - Streaming support for real-time responses

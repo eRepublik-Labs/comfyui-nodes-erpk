@@ -97,6 +97,7 @@ Initializes the Claude API client. Optional if API key is configured in ComfyUI 
 - `use_streaming`: Enable streaming
 - `model`: Model override for this call, or inherit the client's model (default)
 - `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
+- `thinking`: adaptive (default) or off (see [Thinking](#thinking))
 
 **Outputs:**
 - `enhanced_prompt`: Detailed, styled prompt
@@ -120,6 +121,7 @@ Analyzes images using Claude's multimodal capabilities.
 - `max_tokens`: 256-128000 (default 8192; thinking counts toward it)
 - `model`: Model override for this call, or inherit the client's model (default)
 - `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
+- `thinking`: adaptive (default) or off (see [Thinking](#thinking))
 
 **Outputs:**
 - `analysis`: Detailed image analysis text
@@ -144,6 +146,7 @@ General-purpose text generation.
 - `use_streaming`: Enable streaming
 - `model`: Model override for this call, or inherit the client's model (default)
 - `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
+- `thinking`: adaptive (default) or off (see [Thinking](#thinking))
 
 **Outputs:**
 - `response`: Generated text
@@ -164,6 +167,7 @@ Multi-turn conversations with message history.
 - `max_tokens`: 256-128000 (default 8192; thinking counts toward it)
 - `model`: Model override for this call, or inherit the client's model (default)
 - `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
+- `thinking`: adaptive (default) or off (see [Thinking](#thinking))
 
 **Outputs:**
 - `response`: Claude's response
@@ -245,6 +249,7 @@ Gets JSON from Claude that matches your tool's schema. Uses Anthropic's structur
 - `temperature`: Ignored. Current Claude models reject it, so it is never sent; kept so saved workflows load
 - `max_tokens`: 256-128000 (default 4096; thinking counts toward it)
 - `effort`: (model default), low, medium, high, xhigh, max. (model default) leaves the model's own default
+- `thinking`: adaptive (default) or off (see [Thinking](#thinking))
 
 **Outputs:**
 - `json_output`: The JSON reply (pretty-printed)
@@ -311,6 +316,19 @@ Enabled by default (`enable_caching` on Claude API Client). Each request carries
 
 ### Effort
 Text Generation, Conversation, Prompt Enhancer, Vision Analysis and Structured Output have an `effort` widget (low, medium, high, xhigh, max). Lower effort spends fewer thinking and output tokens. `(model default)` sends nothing, so each model keeps its own default (high; medium on Opus 5.5 and Haiku 5.5)
+
+### Thinking
+The same five nodes have a `thinking` widget after `effort`. `adaptive` (the default) lets Claude decide when and how much to think, steered by effort. `off` answers without thinking first. Each model takes a different setting for that, and the client sends the right one:
+
+| Model | `off` sends | Effort allowed with `off` |
+|---|---|---|
+| Sonnet 5.5 | `{"type": "between_tools"}` | (model default), low, medium, high |
+| Sonnet 5 | `{"type": "disabled"}` | any |
+| Opus 5 | `{"type": "disabled"}` | (model default), low, medium, high |
+| Haiku 5.5 | `{"type": "disabled"}` | (model default), low, medium, high |
+| Opus 5.5, Fable 5.2, Fable 5.1, Fable 5 | always think | none |
+
+A choice outside this table stops the node with an error before any request, so Anthropic bills nothing and nothing runs with thinking quietly back on. Measured on the live API on 2026-11-18, except the Fable rows, which come from Anthropic's thinking troubleshooting page because this organization's key cannot reach Fable models.
 
 ### Token Management
 - Use Token Counter node to check prompt lengths before generation

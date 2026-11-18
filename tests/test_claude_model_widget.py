@@ -27,9 +27,9 @@ NODES = [
 def test_model_combo_precedes_effort_and_inherits_by_default(module, name):
     inputs = _node(module, name).define_schema().inputs
     widgets = [i for i in inputs if i.io_type in WIDGET_TYPES]
-    assert [w.id for w in widgets[-2:]] == ["model", "effort"]
-    assert widgets[-2].default == INHERIT_FROM_CLIENT
-    assert list(widgets[-2].options) == [INHERIT_FROM_CLIENT] + TEXT_MODELS
+    assert [w.id for w in widgets[-3:]] == ["model", "effort", "thinking"]
+    assert widgets[-3].default == INHERIT_FROM_CLIENT
+    assert list(widgets[-3].options) == [INHERIT_FROM_CLIENT] + TEXT_MODELS
 
 
 def _client():
