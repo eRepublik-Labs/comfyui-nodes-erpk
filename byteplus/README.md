@@ -2,7 +2,7 @@
 
 Seedance video and Seedream image generation called directly on BytePlus ModelArk with your own API key, over plain HTTPS. The nodes need no Comfy account, proxy or credits; ModelArk bills your BytePlus account.
 
-**Version:** 2026.11.8
+**Version:** 2026.11.9
 **Category in ComfyUI:** `ERPK/BytePlus` and `ERPK/BytePlus/Video`
 **Requirements:** `requests` and `Pillow`, both already required by the pack. The provider adds no SDK dependency.
 **Region:** `ap-southeast-1` (Johor), `https://ark.ap-southeast.bytepluses.com/api/v3`. Keys and model activation are per region, and Johor is the only region whose docs list both Seedance and Seedream.
