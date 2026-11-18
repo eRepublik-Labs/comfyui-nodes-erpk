@@ -12,7 +12,7 @@ Generates a video guided by reference images and a text prompt: up to 7 images o
 | client | GROK_API_CLIENT | — | Grok API client (optional if API key is in Settings) |
 | prompt | String | (empty) | Video description. May reference inputs via `<IMAGE_0>`, `<IMAGE_1>`, ... tokens (the first image is `<IMAGE_0>`) |
 | reference_images | IMAGE | — | Batched IMAGE tensor used as references: up to 7 frames on grok-imagine-video, 14 on grok-imagine-video-1.5. A larger batch is rejected before the API call |
-| model | Combo | grok-imagine-video | Video model: grok-imagine-video, grok-imagine-video-1.5. grok-imagine-video-1.5-lite takes no reference images, so it is not offered (optional) |
+| model | Combo | grok-imagine-video-1.5 | Video model: grok-imagine-video-1.5 ($0.08/s, up to 14 images and 15 s) or grok-imagine-video ($0.05/s, up to 7 images and 10 s). grok-imagine-video-1.5-lite takes no reference images, so the node does not offer it. Saved workflows keep their model (optional) |
 | aspect_ratio | Combo | 16:9 | One of: 16:9, 9:16, 1:1, 4:3, 3:4, 3:2, 2:3 (optional) |
 | resolution | Combo | 720p | 480p (faster) or 720p (HD). Reference-to-video tops out at 720p on every model (optional) |
 | duration | Int | 5 | Video length in seconds: 1–15 on grok-imagine-video-1.5, 1–10 on grok-imagine-video (longer is rejected before the API call) (optional) |

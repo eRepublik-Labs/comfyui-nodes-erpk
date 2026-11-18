@@ -106,6 +106,101 @@ def test_reply_that_stops_on_its_own_is_returned(wire, node):
 
 
 # ---------------------------------------------------------------------------
+# System prompt. Live probe 2026-11-18: grok-4.7 accepts a system message
+# (13 more prompt tokens than the same call without it).
+# ---------------------------------------------------------------------------
+
+def _sent_messages(request):
+    return [(chat_pb2.MessageRole.Name(m.role), m.content[0].text) for m in request.messages]
+
+
+@pytest.mark.parametrize("node", TEXT_NODES)
+def test_system_prompt_is_sent_before_the_user_turn(wire, node):
+    _run_text(node, system_prompt="  Answer in French.  ")
+    assert _sent_messages(wire.requests[0]) == [
+        ("ROLE_SYSTEM", "Answer in French."),
+        ("ROLE_USER", "Write about rivers."),
+    ]
+
+
+@pytest.mark.parametrize("node", TEXT_NODES)
+@pytest.mark.parametrize("blank", ["", "   \n"])
+def test_blank_system_prompt_sends_no_system_message(wire, node, blank):
+    _run_text(node, system_prompt=blank)
+    assert _sent_messages(wire.requests[0]) == [("ROLE_USER", "Write about rivers.")]
+
+
+def test_chat_session_carries_the_system_prompt_to_the_next_turn(wire):
+    first = _run_text("GrokChat", system_prompt="Answer in French.")
+    asyncio.run(nodes.GrokChat.execute(prompt="And lakes?", client=CLIENT, chat_session=first.args[1]))
+    assert _sent_messages(wire.requests[1]) == [
+        ("ROLE_SYSTEM", "Answer in French."),
+        ("ROLE_USER", "Write about rivers."),
+        ("ROLE_ASSISTANT", "Rivers carve valleys."),
+        ("ROLE_USER", "And lakes?"),
+    ]
+
+
+def test_chat_system_prompt_replaces_the_one_in_the_session(wire):
+    first = _run_text("GrokChat", system_prompt="Answer in French.")
+    asyncio.run(nodes.GrokChat.execute(
+        prompt="And lakes?", client=CLIENT, chat_session=first.args[1], system_prompt="Answer in German.",
+    ))
+    assert _sent_messages(wire.requests[1]) == [
+        ("ROLE_SYSTEM", "Answer in German."),
+        ("ROLE_USER", "Write about rivers."),
+        ("ROLE_ASSISTANT", "Rivers carve valleys."),
+        ("ROLE_USER", "And lakes?"),
+    ]
+
+
+def test_chat_system_prompt_starts_a_session_that_had_none(wire):
+    first = _run_text("GrokChat")
+    asyncio.run(nodes.GrokChat.execute(
+        prompt="And lakes?", client=CLIENT, chat_session=first.args[1], system_prompt="Answer in German.",
+    ))
+    assert _sent_messages(wire.requests[1])[0] == ("ROLE_SYSTEM", "Answer in German.")
+    assert [role for role, _ in _sent_messages(wire.requests[1])].count("ROLE_SYSTEM") == 1
+
+
+def test_chat_does_not_alter_the_upstream_session(wire):
+    first = _run_text("GrokChat")
+    upstream = first.args[1]
+    before = [dict(m) for m in upstream]
+    asyncio.run(nodes.GrokChat.execute(
+        prompt="And lakes?", client=CLIENT, chat_session=upstream, system_prompt="Answer in German.",
+    ))
+    assert upstream == before
+
+
+# ---------------------------------------------------------------------------
+# Seed. Live probe 2026-11-18 on grok-4.7, grok-4.20-0309-non-reasoning,
+# grok-4.20-multi-agent-0309 and grok-build-0.1: seed=1 answered, seed=0
+# returned INVALID_ARGUMENT "Seed must be positive but seed = 0".
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("node", TEXT_NODES)
+@pytest.mark.parametrize("seed", [1, 42, 2147483647])
+def test_positive_seed_reaches_xai(wire, node, seed):
+    _run_text(node, seed=seed)
+    assert wire.requests[0].HasField("seed")
+    assert wire.requests[0].seed == seed
+
+
+@pytest.mark.parametrize("node", TEXT_NODES)
+@pytest.mark.parametrize("seed", [0, -1])
+def test_seed_below_one_sends_no_seed(wire, node, seed):
+    _run_text(node, seed=seed)
+    assert not wire.requests[0].HasField("seed")
+
+
+@pytest.mark.parametrize("node", TEXT_NODES)
+def test_a_saved_workflow_without_a_seed_sends_none(wire, node):
+    _run_text(node)
+    assert not wire.requests[0].HasField("seed")
+
+
+# ---------------------------------------------------------------------------
 # Image edit sources. docs.x.ai multi-image editing: grok-imagine-image-2.0
 # takes up to 5 source images.
 # ---------------------------------------------------------------------------
@@ -149,9 +244,9 @@ def test_text_to_video_sends_no_reference_images(wire, model):
     assert len(wire.requests[0].reference_images) == 0
 
 
-def test_reference_to_video_defaults_to_grok_imagine_video_and_sends_its_images(wire):
+def test_reference_to_video_defaults_to_grok_imagine_video_1_5_and_sends_its_images(wire):
     asyncio.run(video_nodes.GrokRefToVideo.execute(
         prompt="<IMAGE_0> walks past <IMAGE_1>", reference_images=[SOURCE] * 2, client=CLIENT,
     ))
-    assert wire.requests[0].model == "grok-imagine-video"
+    assert wire.requests[0].model == "grok-imagine-video-1.5"
     assert [r.image_url for r in wire.requests[0].reference_images] == [SOURCE] * 2

@@ -46,6 +46,48 @@ _CLIENT_TOOLTIP = (
 )
 
 
+def _system_prompt_input(tooltip: str):
+    return IO.String.Input(
+        "system_prompt",
+        multiline=True,
+        default="",
+        optional=True,
+        tooltip=tooltip,
+    )
+
+
+def _seed_input():
+    # Optional so it sorts after the optional widgets: a required input would
+    # land ahead of them and shift every saved widgets_values slot.
+    return IO.Int.Input(
+        "seed",
+        default=-1,
+        min=-1,
+        max=2**31 - 1,
+        optional=True,
+        control_after_generate="randomize",
+        tooltip=(
+            "Randomizes by default, so every queue calls Grok again. 1 or more is sent to xAI "
+            "as the sampling seed (best-effort: the same seed can still give a different reply). "
+            "xAI rejects 0, so 0 and -1 send no seed. -1 re-runs on every queue; any other "
+            "value with the control set to fixed reuses the cached reply."
+        ),
+    )
+
+
+def _with_system_prompt(messages: List[dict], system_prompt: str) -> List[dict]:
+    """Return `messages` led by `system_prompt` as the one system message.
+
+    A blank system_prompt returns `messages` unchanged. A given one replaces a
+    system message already at the head, so a chat never carries two.
+    """
+    text = (system_prompt or "").strip()
+    if not text:
+        return messages
+    rest = messages[1:] if messages and messages[0].get("role") == "system" else messages
+    return [{"role": "system", "content": text}] + rest
+
+
 def _make_grok_client(client_dict) -> GrokClient:
     """Reconstruct a GrokClient from a client dict or create one via auto-resolution.
 
@@ -187,11 +229,20 @@ class GrokTextGeneration(IO.ComfyNode):
                     optional=True,
                     tooltip=_REASONING_EFFORT_TOOLTIP,
                 ),
+                _system_prompt_input(
+                    "Instructions sent as a system message before the prompt. Leave empty to send none."
+                ),
+                _seed_input(),
             ],
             outputs=[
                 IO.String.Output("response"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     async def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
@@ -207,7 +258,9 @@ class GrokTextGeneration(IO.ComfyNode):
             raise ValueError("Prompt cannot be empty.")
 
         grok = _make_grok_client(client_dict)
-        messages = [{"role": "user", "content": prompt.strip()}]
+        messages = _with_system_prompt(
+            [{"role": "user", "content": prompt.strip()}], kwargs.get("system_prompt", "")
+        )
 
         try:
             result = await grok.generate_text(
@@ -217,6 +270,7 @@ class GrokTextGeneration(IO.ComfyNode):
                 max_tokens=max_tokens,
                 reasoning_effort=reasoning_effort,
                 agent_count=agent_count,
+                seed=GrokClient.resolve_seed(kwargs.get("seed", -1)),
             )
             text = result.get("text", "")
             print(f"[Grok] Text generated ({len(text)} chars) via {model}")
@@ -293,12 +347,23 @@ class GrokChat(IO.ComfyNode):
                     optional=True,
                     tooltip=_REASONING_EFFORT_TOOLTIP,
                 ),
+                _system_prompt_input(
+                    "Instructions sent as a system message ahead of the conversation, and carried "
+                    "in chat_session to the next turn. Replaces the system prompt of a connected "
+                    "session; leave empty to keep that one, or to send none."
+                ),
+                _seed_input(),
             ],
             outputs=[
                 IO.String.Output("response"),
                 IO.Custom("GROK_CHAT_SESSION").Output("chat_session"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        seed = kwargs.get("seed", -1)
+        return float("NaN") if seed == -1 else seed
 
     @classmethod
     async def execute(cls, prompt, **kwargs) -> IO.NodeOutput:
@@ -323,6 +388,7 @@ class GrokChat(IO.ComfyNode):
             print(f"[Grok] Continuing conversation ({len(messages)} messages)")
 
         messages.append({"role": "user", "content": prompt.strip()})
+        messages = _with_system_prompt(messages, kwargs.get("system_prompt", ""))
 
         grok = _make_grok_client(client_dict)
         try:
@@ -333,6 +399,7 @@ class GrokChat(IO.ComfyNode):
                 max_tokens=max_tokens,
                 reasoning_effort=reasoning_effort,
                 agent_count=agent_count,
+                seed=GrokClient.resolve_seed(kwargs.get("seed", -1)),
             )
             text = result.get("text", "")
             messages.append({"role": "assistant", "content": text})

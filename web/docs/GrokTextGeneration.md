@@ -15,6 +15,8 @@ Sends a single prompt to xAI's Grok and returns the generated text. Stateless �
 | temperature | Float | 0.7 | Creativity (0.0 focused → 2.0 very creative). Range: 0.0–2.0 (optional) |
 | max_tokens | Int | 4096 | Maximum visible response tokens; reasoning tokens are not counted. Range: 256–128000. A reply cut off at this limit raises an error instead of returning partial text. grok-4.20-multi-agent-0309 does not honour it (optional) |
 | reasoning_effort | Combo | (model default) | Options: (model default), none, low, medium, high, xhigh. grok-4.7 receives it (low to xhigh; `none` is sent as `low` because grok-4.7 rejects it). On grok-4.20-multi-agent-0309 it sets `agent_count` instead: low/medium = 4 agents, high/xhigh = 16 agents (about 12x the prompt tokens of the default), `none` sends nothing. The other models reject the field, so it is not sent to them. (model default) sends nothing (optional) |
+| system_prompt | String | (empty) | Instructions sent as a system message before the prompt, without leading or trailing whitespace. An empty one sends no system message (optional) |
+| seed | Int | -1 | 1 or more goes to xAI as the sampling seed (the same seed can still give a different reply). 0 and -1 send no seed. The control after the widget starts at `randomize`, so each queue gets a new seed and a fresh reply; set it to `fixed` to keep one. Range: -1 to 2147483647 (optional) |
 
 ## Output
 
@@ -24,6 +26,6 @@ Sends a single prompt to xAI's Grok and returns the generated text. Stateless �
 
 ## Notes
 
-- Re-executes on every queue (not cached) since API responses vary.
+- Caching follows the seed. By default every queue calls Grok and bills again: -1 always re-runs, and the `randomize` control picks a new seed after each queue. With the control on `fixed` and any seed other than -1, re-queuing identical inputs reuses the cached reply and bills nothing. xAI rejects a seed of 0, so the node never sends 0 or -1.
 - For stateful conversation across multiple nodes, use **Grok Chat** which threads message history via a typed `GROK_CHAT_SESSION` output.
 - Async-enabled — multiple Grok Text Generation nodes in the same workflow execute concurrently.

@@ -2,6 +2,7 @@
 # ABOUTME: SDK-backed tests build real xai-sdk requests and skip when xai_sdk is not installed.
 
 import asyncio
+import math
 
 import pytest
 
@@ -56,6 +57,57 @@ def test_edit_aspect_options_have_no_duplicates():
 
 
 # ---------------------------------------------------------------------------
+# Text node widgets. widgets_values is positional and these nodes add no DOM
+# widget, so inputs added after release must trail every saved widget.
+# ---------------------------------------------------------------------------
+
+TEXT_WIDGETS_AT_RELEASE = {
+    "GrokTextGeneration": ["prompt", "model", "temperature", "max_tokens", "reasoning_effort"],
+    "GrokChat": ["prompt", "model", "reset_conversation", "temperature", "max_tokens", "reasoning_effort"],
+}
+
+
+@pytest.mark.parametrize("node", sorted(TEXT_WIDGETS_AT_RELEASE))
+def test_text_node_inputs_trail_every_saved_widget(node):
+    from tests.test_grok_image_edit_grid import frontend_widget_order
+    assert frontend_widget_order(_node(node).define_schema()) == TEXT_WIDGETS_AT_RELEASE[node] + [
+        "system_prompt", "seed",
+    ]
+
+
+@pytest.mark.parametrize("node", sorted(TEXT_WIDGETS_AT_RELEASE))
+def test_system_prompt_is_optional_multiline_and_starts_empty(node):
+    inp = _input(_node(node), "system_prompt")
+    assert (inp.optional, inp.multiline, inp.default) == (True, True, "")
+
+
+@pytest.mark.parametrize("node", sorted(TEXT_WIDGETS_AT_RELEASE))
+def test_default_seed_re_runs_on_every_queue_like_openai_and_gemini(node):
+    # The seed stays optional: a required one would sort ahead of the optional
+    # widgets and shift every saved widgets_values slot after it.
+    cls = _node(node)
+    inp = _input(cls, "seed")
+    assert (inp.default, inp.control_after_generate, inp.optional) == (-1, "randomize", True)
+    assert math.isnan(cls.fingerprint_inputs(seed=-1))
+    # An API-format prompt saved before the seed existed has no seed key at all.
+    assert math.isnan(cls.fingerprint_inputs())
+
+
+@pytest.mark.parametrize("node", sorted(TEXT_WIDGETS_AT_RELEASE))
+@pytest.mark.parametrize("seed", [0, 1, 2147483647])
+def test_any_other_seed_caches(node, seed):
+    assert _node(node).fingerprint_inputs(seed=seed) == seed
+
+
+@pytest.mark.parametrize("node", sorted(TEXT_WIDGETS_AT_RELEASE))
+def test_seed_range_reaches_the_largest_seed_xai_takes(node):
+    # The request field is int32; live probe 2026-11-18: grok-4.7 answered
+    # seed=2147483647.
+    inp = _input(_node(node), "seed")
+    assert (inp.min, inp.max) == (-1, 2147483647)
+
+
+# ---------------------------------------------------------------------------
 # Video edit / extend take a video input, which only grok-imagine-video has
 # ---------------------------------------------------------------------------
 
@@ -86,6 +138,13 @@ def test_text_to_video_offers_lite_last():
 def test_reference_to_video_does_not_offer_lite():
     inp = _input(_video_node("GrokRefToVideo"), "model")
     assert inp.options == ["grok-imagine-video", "grok-imagine-video-1.5"]
+
+
+def test_reference_to_video_defaults_to_newest_model():
+    # docs.x.ai video overview: grok-imagine-video-1.5 is the model for
+    # references (14 images, 15 s). Saved workflows keep their chosen model.
+    inp = _input(_video_node("GrokRefToVideo"), "model")
+    assert inp.default == "grok-imagine-video-1.5"
 
 
 def test_text_to_video_offers_1080p_last():
@@ -174,13 +233,13 @@ NO_EFFORT_MODELS = [
 
 
 @pytest.mark.parametrize("node", ["GrokTextGeneration", "GrokChat"])
-def test_reasoning_effort_widget_is_appended_last(node):
-    # widgets_values is positional: a new widget must be the last input.
-    inputs = _node(node).define_schema().inputs
-    assert inputs[-1].id == "reasoning_effort"
-    assert inputs[-1].options == EFFORT_OPTIONS
-    assert inputs[-1].default == "(model default)"
-    assert inputs[-1].optional is True
+def test_reasoning_effort_widget_options(node):
+    # Its position among the saved widgets is pinned by
+    # test_text_node_inputs_trail_every_saved_widget.
+    inp = _input(_node(node), "reasoning_effort")
+    assert inp.options == EFFORT_OPTIONS
+    assert inp.default == "(model default)"
+    assert inp.optional is True
 
 
 @pytest.mark.parametrize("effort", ["low", "medium", "high", "xhigh"])

@@ -33,6 +33,9 @@ API_NODES = [
     ("erpk.openai.image_nodes", "OpenAIImageEdit"),
     ("erpk.openai.image_nodes", "OpenAIImageResponses"),
     ("erpk.openai.image_nodes", "OpenAISVGGeneration"),
+    # Grok
+    ("erpk.grok.nodes", "GrokTextGeneration"),
+    ("erpk.grok.nodes", "GrokChat"),
     # Claude
     ("claude.text_generation", "ClaudeTextGeneration"),
     ("claude.conversation", "ClaudeConversation"),
