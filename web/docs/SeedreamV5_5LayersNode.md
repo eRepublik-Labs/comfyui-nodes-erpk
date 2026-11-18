@@ -31,3 +31,4 @@ Splits one image into layers with ByteDance's Seedream V5.5 layer decomposition.
 - **API Docs:** [Bytedance Seedream V5.5 Layer Decomposition](https://wavespeed.ai/docs/docs-api/bytedance/seedream-v5.5/layer-decomposition)
 - **Layers are lists, not a batch.** Each layer can come back at its own size, so they cannot share one IMAGE batch. A node connected to `layers` or `masks` runs once per layer
 - Layers are always requested as PNG, because JPEG would drop the transparency
+- Objects past the `max_images` limit stay in `base`. A three-object scene run with `max_images` 3 returned two layers and left the third object in the base

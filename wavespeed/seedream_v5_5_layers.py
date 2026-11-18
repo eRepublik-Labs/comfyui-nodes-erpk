@@ -36,7 +36,7 @@ class SeedreamV5_5LayersNode(IO.ComfyNode):
                 IO.Int.Input("max_images", default=10, min=2, max=100,
                              tooltip="Most images to return, counting the base plus the layers. Billed as max_images "
                                      "x the per-image price even when fewer images return: the default of 10 costs "
-                                     "$0.20 at 1k."),
+                                     "$0.20 at 1k. Objects past the limit stay in the base."),
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Input("client", optional=True,
                     tooltip="WaveSpeed API client (optional if API key is configured in Settings)"),
                 IO.Int.Input("seed", default=-1, min=-1, max=2**31 - 1,
