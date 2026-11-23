@@ -167,6 +167,20 @@ class TestCacheBusting:
             f"{class_name}.fingerprint_inputs(seed=-1) should return NaN, got {result!r}"
         )
 
+
+# Seeded nodes whose output carries the API key they resolved: a Gemini chat
+# session holds the client that started it. Their fixed-seed fingerprint is
+# the seed and the resolved key's cache token.
+SEEDED_KEY_NODES = [
+    ("erpk.gemini.nodes", "GeminiChat", "google"),
+]
+SEED_ONLY_NODES = [node for node in API_NODES if node not in [(m, c) for m, c, _ in SEEDED_KEY_NODES]]
+
+
+@pytest.mark.parametrize("module_path,class_name", SEED_ONLY_NODES,
+                         ids=[f"{m}.{c}" for m, c in SEED_ONLY_NODES])
+class TestFixedSeedIsTheFingerprint:
+
     def test_fingerprint_returns_seed_for_fixed_seed(self, module_path, class_name):
         cls = _load_class(module_path, class_name)
         result = cls.fingerprint_inputs(seed=42)
@@ -355,3 +369,38 @@ class TestKeyWidgetSetsTheFingerprint:
         users.queue_as("alice")
 
         assert cls.fingerprint_inputs(api_key=None) == cls.fingerprint_inputs(api_key="")
+
+
+@pytest.mark.parametrize("module_path,class_name,provider", SEEDED_KEY_NODES,
+                         ids=[c for _, c, _ in SEEDED_KEY_NODES])
+class TestSeededKeyNodesAreCachedPerSeedAndKey:
+    """A fixed seed reuses the cached output only for a prompt that resolves the same key."""
+
+    def test_fixed_seed_and_same_key_keep_the_same_fingerprint(self, users, module_path, class_name, provider):
+        cls = _load_class(module_path, class_name)
+        users.store_key("alice", provider, ALICE_KEY)
+        users.queue_as("alice")
+
+        first = cls.fingerprint_inputs(seed=42)
+
+        assert isinstance(first, str)
+        assert first == cls.fingerprint_inputs(seed=42)
+        assert first != cls.fingerprint_inputs(seed=43)
+
+    def test_users_with_different_keys_get_different_fingerprints(self, users, module_path, class_name, provider):
+        cls = _load_class(module_path, class_name)
+        users.store_key("alice", provider, ALICE_KEY)
+        users.store_key("bob", provider, BOB_KEY)
+
+        users.queue_as("alice")
+        alice = cls.fingerprint_inputs(seed=42)
+        users.queue_as("bob")
+
+        assert cls.fingerprint_inputs(seed=42) != alice
+
+    def test_fingerprint_shares_no_four_characters_with_the_key(self, users, module_path, class_name, provider):
+        cls = _load_class(module_path, class_name)
+        users.store_key("alice", provider, ALICE_KEY)
+        users.queue_as("alice")
+
+        assert _shared_runs(ALICE_KEY, cls.fingerprint_inputs(seed=42)) == []

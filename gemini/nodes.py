@@ -644,8 +644,13 @@ class GeminiChat(IO.ComfyNode):
 
     @classmethod
     def fingerprint_inputs(cls, **kwargs):
+        """NaN for a random seed. For a fixed seed, the seed and the cache token
+        of the key execute resolves without a client input: the chat_session
+        output holds that client, so it is reused only for the same key."""
         seed = kwargs.get("seed", -1)
-        return float("NaN") if seed == -1 else seed
+        if seed == -1:
+            return float("NaN")
+        return f"{seed}:{cache_token(lambda: GeminiClient._resolve_api_key(None))}"
 
     @classmethod
     async def execute(cls, **kwargs) -> IO.NodeOutput:
