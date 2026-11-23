@@ -10,7 +10,7 @@ Initializes a Claude API client for use by other nodes. Optional if your API key
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | model | Combo | claude-sonnet-5-5 | Claude model to use. Options: claude-sonnet-5-5, claude-sonnet-5, claude-opus-5-5, claude-opus-5, claude-fable-5-2, claude-fable-5-1, claude-fable-5, claude-haiku-5-5 |
-| api_key | String | (empty) | Anthropic API key (optional). If empty, uses Settings or config.ini |
+| api_key | String | (empty) | Anthropic API key (optional). A key saved in Settings > ERPK > API Keys stays private and takes priority; with neither, `claude/config.ini` is read. A key typed here is visible to every user of this ComfyUI: it is saved in the workflow, the queue history and image metadata. |
 | enable_streaming | Boolean | False | Enable streaming responses (optional). ComfyUI may not display streaming in real-time |
 | enable_caching | Boolean | True | Send automatic prompt caching (optional). The first call writes the prompt prefix at 1.25x the input price; repeats within 5 minutes read it at the cache-read price (0.1x input on most models). Prompts below the model's minimum cacheable length are not cached |
 

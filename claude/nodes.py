@@ -27,7 +27,10 @@ class ClaudeAPIClient(IO.ComfyNode):
                     "api_key",
                     default="",
                     optional=True,
-                    tooltip="Anthropic API key. If empty, will use ComfyUI Settings or config.ini.",
+                    tooltip=("Anthropic API key. A key saved in Settings > ERPK > API Keys stays private and takes "
+                             "priority over this field; with neither, claude/config.ini is read. "
+                             "A key typed here is visible to every user of this ComfyUI: it is saved in the workflow, "
+                             "the queue history and image metadata."),
                 ),
                 IO.Boolean.Input(
                     "enable_streaming",

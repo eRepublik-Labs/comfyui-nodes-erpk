@@ -7,6 +7,7 @@ from typing import Callable, List, Optional
 
 from comfy_api.latest import IO
 
+from ..key_store import ApiKey
 from .byteplus_api import client as client_module
 from .byteplus_api import emit, seedream
 from .byteplus_api.client import BytePlusClient
@@ -45,8 +46,10 @@ class BytePlusAPIClient(IO.ComfyNode):
             inputs=[
                 IO.String.Input(
                     "api_key", default="", optional=True,
-                    tooltip=("ModelArk API key from the ap-southeast-1 (Johor) console. ComfyUI Settings take "
-                             "priority; if empty, byteplus/config.ini is read."),
+                    tooltip=("ModelArk API key from the ap-southeast-1 (Johor) console. A key saved in "
+                             "Settings > ERPK > API Keys stays private and takes priority over this field; with "
+                             "neither, byteplus/config.ini is read. A key typed here is visible to every user of this "
+                             "ComfyUI: it is saved in the workflow, the queue history and image metadata."),
                 ),
             ],
             outputs=[IO.Custom("BYTEPLUS_API_CLIENT").Output("client")],
@@ -55,7 +58,7 @@ class BytePlusAPIClient(IO.ComfyNode):
     @classmethod
     def execute(cls, api_key: str = "", **kwargs) -> IO.NodeOutput:
         client = BytePlusClient(api_key=api_key.strip() or None)
-        return IO.NodeOutput({"api_key": client.api_key})
+        return IO.NodeOutput({"api_key": ApiKey(client.api_key)})
 
 
 def _image_option_inputs(edit: bool):

@@ -112,6 +112,23 @@ async def comfy_entrypoint() -> ERPKExtension:
     return ERPKExtension()
 
 
+# --- API key migration (before any route or node reads a key) ---
+
+# ComfyUI serves comfy.settings.json to anyone who names a user, so API keys
+# saved there by older versions move to the private key store on every start.
+try:
+    import folder_paths
+    from . import key_store
+
+    _user_dir = folder_paths.get_user_directory()
+    key_store.migrate_settings(_user_dir, key_store.store_for(_user_dir))
+except Exception as e:
+    print(
+        f"[ERPK] ERROR: API key migration failed: {e!r}. API keys in comfy.settings.json "
+        "stay readable by other users until it succeeds.",
+        flush=True,
+    )
+
 # --- API Routes (independent of V1/V3 node registration) ---
 
 # Register multi-user API route for settings resolution
@@ -343,6 +360,95 @@ try:
     print("[ERPK] Registered shared workflows routes")
 except Exception as e:
     print(f"[ERPK] Warning: Could not register shared workflows routes: {e}")
+
+# Register the API key routes. They return which keys are set and the last
+# four characters of each, never a key.
+try:
+    from server import PromptServer
+    from aiohttp import web
+    import folder_paths
+    from . import key_store
+    from .write_guard import check_write_request
+
+    def _keys_user_or_refusal(request):
+        """(user_id, None) for a known user, else (None, 403 response)."""
+        try:
+            return PromptServer.instance.user_manager.get_request_user_id(request), None
+        except KeyError as e:
+            return None, web.json_response({"error": e.args[0]}, status=403)
+
+    def _keys_store():
+        return key_store.store_for(folder_paths.get_user_directory())
+
+    @PromptServer.instance.routes.get("/erpk/keys")
+    async def erpk_key_status(request):
+        user_id, refusal = _keys_user_or_refusal(request)
+        if refusal:
+            return refusal
+        try:
+            return web.json_response(_keys_store().status(user_id))
+        except ValueError as e:
+            return web.json_response({"error": str(e)}, status=400)
+
+    @PromptServer.instance.routes.post("/erpk/keys")
+    async def erpk_save_key(request):
+        try:
+            check_write_request(request.headers)
+        except PermissionError as e:
+            return web.json_response({"error": str(e)}, status=403)
+        user_id, refusal = _keys_user_or_refusal(request)
+        if refusal:
+            return refusal
+        try:
+            body = await request.json()
+        except ValueError:
+            body = None
+        if not isinstance(body, dict):
+            return web.json_response({"error": "Body must be a JSON object"}, status=400)
+        if "key" not in body:
+            return web.json_response({"error": "Missing 'key' field"}, status=400)
+        store = _keys_store()
+        try:
+            if body["key"] is None:
+                store.clear(user_id, body.get("provider"))
+            else:
+                store.set(user_id, body.get("provider"), body["key"])
+            return web.json_response(store.status(user_id))
+        except ValueError as e:
+            return web.json_response({"error": str(e)}, status=400)
+
+    print("[ERPK] Registered API key routes")
+except Exception as e:
+    print(f"[ERPK] Warning: Could not register API key routes: {e}")
+
+# Refuse to save an API key into comfy.settings.json, which a page loaded
+# before the key store still tries. aiohttp freezes the middleware list when
+# the server starts, after ComfyUI imports this package.
+try:
+    from server import PromptServer
+    from aiohttp import web
+    from . import key_store
+
+    @web.middleware
+    async def erpk_refuse_key_settings_write(request, handler):
+        resource = request.match_info.route.resource
+        route = resource.canonical if resource else None
+        # Read the body only for these routes: reading it before a multipart
+        # handler would consume the stream that handler parses.
+        if request.method == "POST" and route in key_store.SETTINGS_WRITE_ROUTES:
+            body = await request.read()
+            if key_store.writes_key_setting(request.method, route, dict(request.match_info), body):
+                return web.json_response({"error": key_store.KEY_SETTING_REFUSAL}, status=403)
+        return await handler(request)
+
+    PromptServer.instance.app.middlewares.append(erpk_refuse_key_settings_write)
+    print("[ERPK] Registered API key settings write refusal")
+except Exception as e:
+    print(
+        f"[ERPK] ERROR: Could not register the API key settings write refusal: {e!r}. "
+        "A page loaded before this version can still save API keys into comfy.settings.json.",
+        flush=True,
+    )
 
 # Register the editor scan route (vision-based region detection)
 try:

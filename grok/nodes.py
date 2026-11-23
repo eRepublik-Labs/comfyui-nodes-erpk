@@ -7,6 +7,7 @@ from typing import List
 
 from comfy_api.latest import IO
 
+from ..key_store import ApiKey
 from .grok_api.client import GrokClient
 from ..utils.image_grid import (
     NO_GRID_IMAGE, grid_input, load_grid_images, model_grid_cap, register_grid_caps, validate_grid,
@@ -154,7 +155,10 @@ class GrokAPIClient(IO.ComfyNode):
                     "api_key",
                     optional=True,
                     default="",
-                    tooltip="xAI API key. If empty, checks ComfyUI Settings, then grok/config.ini.",
+                    tooltip=("xAI API key. A key saved in Settings > ERPK > API Keys stays private and takes "
+                             "priority over this field; with neither, grok/config.ini is read. "
+                             "A key typed here is visible to every user of this ComfyUI: it is saved in the workflow, "
+                             "the queue history and image metadata."),
                 ),
             ],
             outputs=[
@@ -167,7 +171,7 @@ class GrokAPIClient(IO.ComfyNode):
         resolved_key = api_key.strip() if api_key else None
         try:
             client = GrokClient(api_key=resolved_key)
-            return IO.NodeOutput({"api_key": client.api_key})
+            return IO.NodeOutput({"api_key": ApiKey(client.api_key)})
         except ValueError as e:
             raise ValueError(f"Grok API key resolution failed: {e}")
 

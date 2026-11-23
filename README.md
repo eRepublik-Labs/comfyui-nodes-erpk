@@ -52,12 +52,14 @@ ComfyUI-Custom-Nodes/
 │   ├── concat_strings.py          # String concatenation node
 │   ├── image_grid.py              # Image grid inputs and file loading, shared by grid nodes
 │   └── image_grid_loader.py       # Image Grid Loader node
-├── settings.py                    # ComfyUI settings reader for API keys
+├── key_store.py                   # Per-user API key store and the move out of comfy.settings.json
+├── settings.py                    # Setting reader: API keys from the key store, the rest from comfy.settings.json
 ├── shared_workflows.py            # Shared workflows CRUD for multi-user
 ├── shared_workflows/              # Legacy storage fallback (gitignored)
 └── web/                           # Frontend extensions
-    ├── erpk_settings.js           # API key settings in ComfyUI Settings UI
+    ├── erpk_settings.js           # API key rows and general toggles in the ComfyUI Settings UI
     ├── shared_workflows.js        # Browse/save/delete shared workflows UI
+    ├── write_request.js           # Sends the X-ERPK-Write-Token header on write routes
     ├── node_migration.js          # V1→V3 node type rewriting for old workflows
     ├── aspect_ratio.js            # Aspect ratio display in node titles
     ├── concat_strings.js          # Dynamic UI for concat strings node
@@ -464,14 +466,26 @@ Install directly from the [ComfyUI Registry](https://registry.comfy.org/publishe
 ### Post-Installation
 
 1. Configure API keys for the services you want to use.
-   The easiest way is via right-click on the canvas > **ERPK Settings**, or **Settings > ERPK > API Keys** in ComfyUI -- keys are stored per-user and never saved in workflows. In the ERPK Settings panel, API-key fields show a masked preview (e.g. `sk-a…kgAA`) and a small **Edit** affordance; click a key to reveal the input, blur to re-mask.
+   Open **Settings > ERPK > API Keys** in ComfyUI, or right-click the canvas > **ERPK Settings**. Each provider shows **Set ••••abcd** (the last four characters) or **Not set**, a password field for a new key, and **Save** and **Clear** buttons. The page never receives a saved key back, and keys shorter than 16 characters show only **Set**.
 
    API keys are resolved in priority order:
-   1. **ComfyUI Settings** (recommended) -- right-click canvas > ERPK Settings
-   2. **Widget input** -- api_key field on client/config nodes
+   1. **Settings > ERPK > API Keys** (recommended)
+   2. **Widget input** -- the `api_key` field on the Claude, Grok, BytePlus and WaveSpeed client nodes
    3. **Config file** -- `provider/config.ini`
 
-   **Multi-user support:** In multi-user ComfyUI installations, each user's API keys are stored separately in their own `comfy.settings.json`. The correct user's keys are resolved automatically during workflow execution. A "Current user: [name]" banner appears in the ERPK Settings panel when multi-user mode is active.
+   **A key typed into an `api_key` widget is visible to every user of this ComfyUI.** The workflow, the queue history and image metadata all store it. Use Settings > ERPK > API Keys to keep a key private.
+
+   The Grok, BytePlus and WaveSpeed client nodes pass the resolved key to downstream nodes masked. Connect a client output to a preview node, or let a downstream node fail, and the history shows `ApiKey(set)`, not the key.
+
+   **Key storage:** each ComfyUI user has one file, `erpk_keys/<user_id>.json`, next to the ComfyUI `user/` directory (for example `~/Documents/ComfyUI/erpk_keys/`). The package creates the directory with mode 0700 and each file with mode 0600. A settings value that is not a usable key goes to `erpk_keys/<user_id>.rejected.json` instead (see Moving keys out of `comfy.settings.json`), which the package never reads as a key. No ComfyUI route serves this directory. Keys are not ComfyUI settings, because ComfyUI with `--multi-user` serves a user's `comfy.settings.json` to anyone who sends that user's `comfy-user` header.
+
+   **Multi-user support:** each user's keys are separate, and during execution the package finds the user who queued the prompt. A prompt with no known user uses the keys of the `default` user only, never another user's. The ERPK Settings panel shows a "Signed in as [name]" banner.
+
+   **Moving keys out of `comfy.settings.json`:** versions before this one stored keys as `ERPK.*_API_KEY` entries in each user's `comfy.settings.json`. When ComfyUI loads this package, it moves every such key into the key store and deletes the entry from the settings file. When the store already holds a key for that user and provider, the store keeps its key and the move still deletes the settings entry. The move leaves every other entry in the file unchanged. The console prints one line per changed user with counts and provider names, never key values. The move runs at every start and changes nothing after the first successful run. It leaves the whole file untouched, and prints a `WARNING`, when the file is not a JSON object or the user directory name is not a valid user ID. The move deletes a value that is not a usable key (not a string, contains whitespace, or longer than 512 characters) from the settings file too. It saves the value unchanged in `erpk_keys/<user_id>.rejected.json` (mode 0600), keeps a value already saved there for that provider, and prints a `WARNING` that names the setting, the reason and that file, never the value. Save a valid key in Settings > ERPK > API Keys. A user ID ending in `.rejected` is not a valid user ID.
+
+   **Pages opened before the update:** when a browser tab opened before this version saves one of the old API key settings, ComfyUI answers 403 with "ERPK API keys are saved in Settings > ERPK > API Keys. Reload this page." and writes nothing to `comfy.settings.json`.
+
+   **API key routes:** `GET /erpk/keys` returns, for the requesting user, `{provider: {"set": bool, "last4": str|null}}` for `anthropic`, `google`, `openai`, `xai`, `wavespeed` and `byteplus`. `POST /erpk/keys` with `{"provider": ..., "key": "..."}` saves a key, and with `"key": null` clears it; it requires the `X-ERPK-Write-Token` header (see Shared Workflows > Write protection) and returns the new status. Neither route returns a key.
 
    - **WaveSpeed:** See [wavespeed/README.md](wavespeed/README.md#installation)
    - **Claude:** See [claude/README.md](claude/README.md#installation)

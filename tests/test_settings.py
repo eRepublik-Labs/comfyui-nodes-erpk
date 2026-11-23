@@ -2,14 +2,11 @@
 # ABOUTME: Validates get_comfy_setting() with mocked filesystem scenarios
 
 import json
-import os
 import sys
 import pytest
 from unittest.mock import patch, MagicMock
 
-# Add parent directory to path so we can import settings directly
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from settings import get_comfy_setting
+from erpk.settings import get_comfy_setting
 
 
 @pytest.fixture
@@ -32,18 +29,18 @@ class TestGetComfySetting:
 
     def test_reads_existing_setting(self, settings_dir):
         user_dir, default_dir = settings_dir
-        write_settings(default_dir, {"ERPK.ANTHROPIC_API_KEY": "sk-ant-test123"})
+        write_settings(default_dir, {"ERPK.TEST_SETTING": "sk-ant-test123"})
 
         mock_folder_paths = MagicMock()
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
 
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
-            result = get_comfy_setting("ERPK.ANTHROPIC_API_KEY")
+            result = get_comfy_setting("ERPK.TEST_SETTING")
             assert result == "sk-ant-test123"
 
     def test_returns_default_when_missing(self, settings_dir):
         user_dir, default_dir = settings_dir
-        write_settings(default_dir, {"ERPK.ANTHROPIC_API_KEY": "sk-ant-test123"})
+        write_settings(default_dir, {"ERPK.TEST_SETTING": "sk-ant-test123"})
 
         mock_folder_paths = MagicMock()
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
@@ -54,24 +51,24 @@ class TestGetComfySetting:
 
     def test_returns_default_when_empty_string(self, settings_dir):
         user_dir, default_dir = settings_dir
-        write_settings(default_dir, {"ERPK.ANTHROPIC_API_KEY": ""})
+        write_settings(default_dir, {"ERPK.TEST_SETTING": ""})
 
         mock_folder_paths = MagicMock()
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
 
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
-            result = get_comfy_setting("ERPK.ANTHROPIC_API_KEY", "fallback")
+            result = get_comfy_setting("ERPK.TEST_SETTING", "fallback")
             assert result == "fallback"
 
     def test_returns_default_when_whitespace(self, settings_dir):
         user_dir, default_dir = settings_dir
-        write_settings(default_dir, {"ERPK.ANTHROPIC_API_KEY": "   "})
+        write_settings(default_dir, {"ERPK.TEST_SETTING": "   "})
 
         mock_folder_paths = MagicMock()
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
 
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
-            result = get_comfy_setting("ERPK.ANTHROPIC_API_KEY", "fallback")
+            result = get_comfy_setting("ERPK.TEST_SETTING", "fallback")
             assert result == "fallback"
 
     def test_returns_default_when_no_file(self, settings_dir):
@@ -82,13 +79,13 @@ class TestGetComfySetting:
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
 
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
-            result = get_comfy_setting("ERPK.ANTHROPIC_API_KEY", "fallback")
+            result = get_comfy_setting("ERPK.TEST_SETTING", "fallback")
             assert result == "fallback"
 
     def test_returns_default_when_no_folder_paths(self):
         # Simulate folder_paths not being importable
         with patch.dict(sys.modules, {"folder_paths": None}):
-            result = get_comfy_setting("ERPK.ANTHROPIC_API_KEY", "fallback")
+            result = get_comfy_setting("ERPK.TEST_SETTING", "fallback")
             assert result == "fallback"
 
     def test_returns_default_when_no_user_dirs(self, tmp_path):
@@ -100,7 +97,7 @@ class TestGetComfySetting:
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
 
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
-            result = get_comfy_setting("ERPK.ANTHROPIC_API_KEY", "fallback")
+            result = get_comfy_setting("ERPK.TEST_SETTING", "fallback")
             assert result == "fallback"
 
     def test_handles_malformed_json(self, settings_dir):
@@ -112,7 +109,7 @@ class TestGetComfySetting:
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
 
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
-            result = get_comfy_setting("ERPK.ANTHROPIC_API_KEY", "fallback")
+            result = get_comfy_setting("ERPK.TEST_SETTING", "fallback")
             assert result == "fallback"
 
     def test_default_is_none_when_not_specified(self, settings_dir):
@@ -143,7 +140,7 @@ class TestGetComfySetting:
         mock_folder_paths.get_user_directory.return_value = "/nonexistent/path"
 
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
-            result = get_comfy_setting("ERPK.ANTHROPIC_API_KEY", "fallback")
+            result = get_comfy_setting("ERPK.TEST_SETTING", "fallback")
             assert result == "fallback"
 
     def test_finds_settings_when_manager_dir_exists(self, tmp_path):
@@ -154,13 +151,13 @@ class TestGetComfySetting:
         (user_dir / "__manager").mkdir()
         default_dir = user_dir / "default"
         default_dir.mkdir()
-        write_settings(default_dir, {"ERPK.ANTHROPIC_API_KEY": "sk-ant-test123"})
+        write_settings(default_dir, {"ERPK.TEST_SETTING": "sk-ant-test123"})
 
         mock_folder_paths = MagicMock()
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
 
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
-            result = get_comfy_setting("ERPK.ANTHROPIC_API_KEY")
+            result = get_comfy_setting("ERPK.TEST_SETTING")
             assert result == "sk-ant-test123"
 
 
@@ -173,13 +170,13 @@ class TestMultiUserSettings:
         user_dir.mkdir()
         alice_dir = user_dir / "alice_abc123"
         alice_dir.mkdir()
-        write_settings(alice_dir, {"ERPK.GOOGLE_API_KEY": "alice-key"})
+        write_settings(alice_dir, {"ERPK.TEST_SETTING": "alice-key"})
 
         mock_folder_paths = MagicMock()
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
 
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
-            result = get_comfy_setting("ERPK.GOOGLE_API_KEY", user_id="alice_abc123")
+            result = get_comfy_setting("ERPK.TEST_SETTING", user_id="alice_abc123")
             assert result == "alice-key"
 
     def test_different_users_get_different_keys(self, tmp_path):
@@ -188,17 +185,17 @@ class TestMultiUserSettings:
         user_dir.mkdir()
         alice_dir = user_dir / "alice_abc123"
         alice_dir.mkdir()
-        write_settings(alice_dir, {"ERPK.GOOGLE_API_KEY": "alice-key"})
+        write_settings(alice_dir, {"ERPK.TEST_SETTING": "alice-key"})
         bob_dir = user_dir / "bob_def456"
         bob_dir.mkdir()
-        write_settings(bob_dir, {"ERPK.GOOGLE_API_KEY": "bob-key"})
+        write_settings(bob_dir, {"ERPK.TEST_SETTING": "bob-key"})
 
         mock_folder_paths = MagicMock()
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
 
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
-            assert get_comfy_setting("ERPK.GOOGLE_API_KEY", user_id="alice_abc123") == "alice-key"
-            assert get_comfy_setting("ERPK.GOOGLE_API_KEY", user_id="bob_def456") == "bob-key"
+            assert get_comfy_setting("ERPK.TEST_SETTING", user_id="alice_abc123") == "alice-key"
+            assert get_comfy_setting("ERPK.TEST_SETTING", user_id="bob_def456") == "bob-key"
 
     def test_identified_user_missing_key_does_not_borrow_from_peer(self, tmp_path):
         """An identified user whose settings file exists but lacks the key
@@ -212,7 +209,7 @@ class TestMultiUserSettings:
 
         alice_dir = user_dir / "alice_abc123"
         alice_dir.mkdir()
-        write_settings(alice_dir, {"ERPK.GOOGLE_API_KEY": "alice-key"})
+        write_settings(alice_dir, {"ERPK.TEST_SETTING": "alice-key"})
 
         bob_dir = user_dir / "bob_def456"
         bob_dir.mkdir()
@@ -222,7 +219,7 @@ class TestMultiUserSettings:
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
 
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
-            result = get_comfy_setting("ERPK.GOOGLE_API_KEY", user_id="bob_def456")
+            result = get_comfy_setting("ERPK.TEST_SETTING", user_id="bob_def456")
             assert result is None
 
     def test_identified_user_empty_value_does_not_borrow_from_peer(self, tmp_path):
@@ -233,18 +230,18 @@ class TestMultiUserSettings:
 
         alice_dir = user_dir / "alice_abc123"
         alice_dir.mkdir()
-        write_settings(alice_dir, {"ERPK.GOOGLE_API_KEY": "alice-key"})
+        write_settings(alice_dir, {"ERPK.TEST_SETTING": "alice-key"})
 
         bob_dir = user_dir / "bob_def456"
         bob_dir.mkdir()
-        write_settings(bob_dir, {"ERPK.GOOGLE_API_KEY": ""})
+        write_settings(bob_dir, {"ERPK.TEST_SETTING": ""})
 
         mock_folder_paths = MagicMock()
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
 
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
             result = get_comfy_setting(
-                "ERPK.GOOGLE_API_KEY", default="missing", user_id="bob_def456"
+                "ERPK.TEST_SETTING", default="missing", user_id="bob_def456"
             )
             assert result == "missing"
 
@@ -255,14 +252,14 @@ class TestMultiUserSettings:
         user_dir.mkdir()
         default_dir = user_dir / "default"
         default_dir.mkdir()
-        write_settings(default_dir, {"ERPK.GOOGLE_API_KEY": "default-key"})
+        write_settings(default_dir, {"ERPK.TEST_SETTING": "default-key"})
 
         mock_folder_paths = MagicMock()
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
 
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
             result = get_comfy_setting(
-                "ERPK.GOOGLE_API_KEY", default="missing", user_id="nonexistent_user"
+                "ERPK.TEST_SETTING", default="missing", user_id="nonexistent_user"
             )
             assert result == "missing"
 
@@ -277,7 +274,7 @@ class TestMultiUserSettings:
 
         alice_dir = user_dir / "alice_abc123"
         alice_dir.mkdir()
-        write_settings(alice_dir, {"ERPK.GOOGLE_API_KEY": "alice-key"})
+        write_settings(alice_dir, {"ERPK.TEST_SETTING": "alice-key"})
 
         mock_folder_paths = MagicMock()
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
@@ -286,7 +283,7 @@ class TestMultiUserSettings:
             sys.modules,
             {"folder_paths": mock_folder_paths, "server": None},
         ):
-            result = get_comfy_setting("ERPK.GOOGLE_API_KEY", default="missing")
+            result = get_comfy_setting("ERPK.TEST_SETTING", default="missing")
             assert result == "missing"
 
     def test_no_user_id_uses_iteration(self, tmp_path):
@@ -295,18 +292,18 @@ class TestMultiUserSettings:
         user_dir.mkdir()
         default_dir = user_dir / "default"
         default_dir.mkdir()
-        write_settings(default_dir, {"ERPK.GOOGLE_API_KEY": "default-key"})
+        write_settings(default_dir, {"ERPK.TEST_SETTING": "default-key"})
 
         mock_folder_paths = MagicMock()
         mock_folder_paths.get_user_directory.return_value = str(user_dir)
 
         with patch.dict(sys.modules, {"folder_paths": mock_folder_paths}):
-            result = get_comfy_setting("ERPK.GOOGLE_API_KEY")
+            result = get_comfy_setting("ERPK.TEST_SETTING")
             assert result == "default-key"
 
     def test_resolve_current_user_from_server(self, tmp_path):
         """get_current_user_id() reads client_id from PromptServer and maps to user_id."""
-        from settings import get_current_user_id, _client_user_map
+        from erpk.settings import get_current_user_id, _client_user_map
 
         # Set up the mapping
         _client_user_map["ws-client-42"] = "alice_abc123"
@@ -327,7 +324,7 @@ class TestMultiUserSettings:
 
     def test_resolve_current_user_returns_none_when_no_mapping(self):
         """get_current_user_id() returns None when client_id has no mapping."""
-        from settings import get_current_user_id, _client_user_map
+        from erpk.settings import get_current_user_id, _client_user_map
         _client_user_map.clear()
 
         mock_server = MagicMock()
@@ -342,7 +339,7 @@ class TestMultiUserSettings:
 
     def test_resolve_current_user_returns_none_when_no_server(self):
         """get_current_user_id() returns None when PromptServer unavailable."""
-        from settings import get_current_user_id
+        from erpk.settings import get_current_user_id
 
         with patch.dict(sys.modules, {"server": None}):
             result = get_current_user_id()
@@ -353,22 +350,22 @@ class TestRegisterClientUser:
     """register_client_user binds client_id->user_id with anti-poisoning protection."""
 
     def setup_method(self):
-        from settings import _client_user_map
+        from erpk.settings import _client_user_map
         _client_user_map.clear()
 
     def test_valid_binding_accepted(self):
-        from settings import register_client_user, _client_user_map
+        from erpk.settings import register_client_user, _client_user_map
         assert register_client_user("abc123def456", "alice_xxx") is True
         assert _client_user_map["abc123def456"] == "alice_xxx"
 
     def test_same_user_rebind_is_idempotent(self):
-        from settings import register_client_user
+        from erpk.settings import register_client_user
         assert register_client_user("abc123def456", "alice_xxx") is True
         # Same client_id, same user_id — page reload scenario, must succeed
         assert register_client_user("abc123def456", "alice_xxx") is True
 
     def test_different_user_rebind_rejected(self):
-        from settings import register_client_user, _client_user_map
+        from erpk.settings import register_client_user, _client_user_map
         assert register_client_user("abc123def456", "alice_xxx") is True
         # Bob trying to hijack Alice's client_id binding
         assert register_client_user("abc123def456", "bob_yyy") is False
@@ -376,17 +373,17 @@ class TestRegisterClientUser:
         assert _client_user_map["abc123def456"] == "alice_xxx"
 
     def test_empty_client_id_rejected(self):
-        from settings import register_client_user
+        from erpk.settings import register_client_user
         assert register_client_user("", "alice_xxx") is False
         assert register_client_user(None, "alice_xxx") is False
 
     def test_empty_user_id_rejected(self):
-        from settings import register_client_user
+        from erpk.settings import register_client_user
         assert register_client_user("abc123def456", "") is False
         assert register_client_user("abc123def456", None) is False
 
     def test_invalid_client_id_format_rejected(self):
-        from settings import register_client_user
+        from erpk.settings import register_client_user
         # Too short
         assert register_client_user("abc", "alice_xxx") is False
         # Path traversal
@@ -395,8 +392,8 @@ class TestRegisterClientUser:
         assert register_client_user("client; DROP TABLE", "alice_xxx") is False
 
     def test_fifo_eviction_at_cap(self):
-        import settings
-        from settings import register_client_user, _client_user_map
+        import erpk.settings as settings
+        from erpk.settings import register_client_user, _client_user_map
         # Temporarily shrink the cap for testing
         original_cap = settings._MAX_CLIENT_USER_MAP_SIZE
         settings._MAX_CLIENT_USER_MAP_SIZE = 3
@@ -412,3 +409,59 @@ class TestRegisterClientUser:
             assert "client04abc" in _client_user_map
         finally:
             settings._MAX_CLIENT_USER_MAP_SIZE = original_cap
+
+
+class TestApiKeysComeFromTheKeyStore:
+    """The six ERPK.*_API_KEY ids resolve from the per-user key store next to
+    the user dir, never from comfy.settings.json."""
+
+    @pytest.fixture
+    def user_dir(self, tmp_path):
+        folder = tmp_path / "user"
+        folder.mkdir()
+        fake = MagicMock()
+        fake.get_user_directory.return_value = str(folder)
+        with patch.dict(sys.modules, {"folder_paths": fake, "server": None}):
+            yield folder
+
+    @pytest.fixture
+    def store(self, tmp_path):
+        from erpk.key_store import KeyStore
+        return KeyStore(str(tmp_path / "erpk_keys"))
+
+    def test_key_is_read_from_the_store_and_not_from_comfy_settings(self, user_dir, store):
+        alice = user_dir / "alice_abc123"
+        alice.mkdir()
+        write_settings(alice, {"ERPK.ANTHROPIC_API_KEY": "sk-ant-in-settings-file"})
+        assert get_comfy_setting("ERPK.ANTHROPIC_API_KEY", user_id="alice_abc123") is None
+
+        store.set("alice_abc123", "anthropic", "sk-ant-in-the-store")
+        assert get_comfy_setting("ERPK.ANTHROPIC_API_KEY", user_id="alice_abc123") == "sk-ant-in-the-store"
+
+    def test_each_user_gets_only_their_own_key(self, user_dir, store):
+        store.set("alice_abc123", "google", "alice-google-key")
+        store.set("bob_def456", "openai", "bob-openai-key")
+
+        assert get_comfy_setting("ERPK.GOOGLE_API_KEY", user_id="alice_abc123") == "alice-google-key"
+        assert get_comfy_setting("ERPK.GOOGLE_API_KEY", default="missing", user_id="bob_def456") == "missing"
+        assert get_comfy_setting("ERPK.OPENAI_API_KEY", user_id="alice_abc123") is None
+
+    def test_unresolved_session_gets_only_the_default_users_key(self, user_dir, store):
+        store.set("alice_abc123", "xai", "alice-xai-key")
+        assert get_comfy_setting("ERPK.XAI_API_KEY", default="missing") == "missing"
+
+        store.set("default", "xai", "default-xai-key")
+        assert get_comfy_setting("ERPK.XAI_API_KEY") == "default-xai-key"
+
+    def test_session_user_is_resolved_from_the_running_prompt(self, user_dir, store):
+        from erpk.settings import _client_user_map
+        store.set("alice_abc123", "wavespeed", "alice-wavespeed-key")
+        store.set("default", "wavespeed", "default-wavespeed-key")
+        server = MagicMock()
+        server.PromptServer.instance.client_id = "ws-client-42"
+        _client_user_map["ws-client-42"] = "alice_abc123"
+        try:
+            with patch.dict(sys.modules, {"server": server}):
+                assert get_comfy_setting("ERPK.WAVESPEED_API_KEY") == "alice-wavespeed-key"
+        finally:
+            _client_user_map.clear()

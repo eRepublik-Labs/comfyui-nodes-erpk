@@ -9,13 +9,13 @@ Provides a BytePlus ModelArk API key to the Seedance and Seedream nodes. The nod
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| api_key | String | (empty) | ModelArk API key from the ap-southeast-1 (Johor) console (optional) |
+| api_key | String | (empty) | ModelArk API key from the ap-southeast-1 (Johor) console (optional). A key typed here is visible to every user of this ComfyUI: it is saved in the workflow, the queue history and image metadata. |
 
 ## Output
 
 | Output | Type | Description |
 |--------|------|-------------|
-| client | BYTEPLUS_API_CLIENT | Connect to the `client` input of any BytePlus node |
+| client | BYTEPLUS_API_CLIENT | Connect to the `client` input of any BytePlus node. A preview node shows the key as `ApiKey(set)`. |
 
 ## Notes
 

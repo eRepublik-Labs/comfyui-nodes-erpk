@@ -1,51 +1,157 @@
-// ABOUTME: Registers ERPK settings (API keys, general toggles) in ComfyUI Settings UI
-// ABOUTME: Handles multi-user client registration and read-only api_key widgets
+// ABOUTME: Registers ERPK settings in ComfyUI Settings UI, with API keys saved to the server's key store
+// ABOUTME: Handles multi-user client registration and disables api_key widgets a stored key overrides
 
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { writeRequest } from "./write_request.js";
 
+// API keys live in the server's per-user key store behind /erpk/keys. They are
+// never ComfyUI settings: ComfyUI serves comfy.settings.json to every user.
+//
 // ComfyUI Settings UI renders these in REVERSE order of registration:
 // array[0] → bottom of the panel, array[n-1] → top. To control where a key
 // appears in the rendered list, place it accordingly in this array.
-const API_KEY_SETTINGS = [
-    {
-        id: "ERPK.BYTEPLUS_API_KEY",
-        name: "BytePlus ModelArk API Key",
-        nodes: ["BytePlusAPIClient"],
-    },
-    {
-        id: "ERPK.XAI_API_KEY",
-        name: "xAI (Grok) API Key",
-        nodes: ["GrokAPIClient"],
-    },
-    {
-        id: "ERPK.ANTHROPIC_API_KEY",
-        name: "Anthropic API Key",
-        nodes: ["ClaudeAPIClient"],
-    },
-    {
-        id: "ERPK.GOOGLE_API_KEY",
-        name: "Google API Key",
-        nodes: ["GeminiAPIConfig", "GeminiImageGeneration", "GeminiImageEdit"],
-    },
-    {
-        id: "ERPK.OPENAI_API_KEY",
-        name: "OpenAI API Key",
-        nodes: ["OpenAIAPIConfig"],
-    },
-    {
-        id: "ERPK.WAVESPEED_API_KEY",
-        name: "WaveSpeed API Key",
-        nodes: ["WaveSpeed Custom Client"],
-    },
+// tryInjectBanner anchors on the "Anthropic API Key" and "WaveSpeed API Key" names.
+const API_KEY_PROVIDERS = [
+    { provider: "byteplus", name: "BytePlus ModelArk API Key", nodes: ["BytePlusAPIClient"] },
+    { provider: "xai", name: "xAI (Grok) API Key", nodes: ["GrokAPIClient"] },
+    { provider: "anthropic", name: "Anthropic API Key", nodes: ["ClaudeAPIClient"] },
+    { provider: "google", name: "Google API Key", nodes: [] },
+    { provider: "openai", name: "OpenAI API Key", nodes: [] },
+    { provider: "wavespeed", name: "WaveSpeed API Key", nodes: ["WaveSpeedAIAPIClient"] },
 ];
 
-// Lookup: node comfyClass -> setting ID
-const NODE_TO_SETTING = {};
-for (const entry of API_KEY_SETTINGS) {
+// Lookup: node comfyClass -> provider whose stored key replaces its api_key widget
+const NODE_TO_PROVIDER = {};
+for (const entry of API_KEY_PROVIDERS) {
     for (const node of entry.nodes) {
-        NODE_TO_SETTING[node] = entry.id;
+        NODE_TO_PROVIDER[node] = entry.provider;
     }
+}
+
+// provider -> { set, last4 } for this user, from /erpk/keys. null until a fetch succeeds.
+let keyStatus = null;
+
+async function fetchKeyStatus() {
+    try {
+        const resp = await api.fetchApi("/erpk/keys");
+        if (resp.ok) {
+            keyStatus = await resp.json();
+            lockApiKeyWidgetsInGraph();
+        } else {
+            console.warn(`[ERPK] API key status request failed: ${resp.status}`);
+        }
+    } catch (e) {
+        console.warn("[ERPK] API key status request failed", e);
+    }
+}
+
+// Disable the api_key widget of a node whose provider has a stored key: the
+// stored key takes priority, so a key typed there would only be exposed.
+function lockApiKeyWidget(node) {
+    const provider = NODE_TO_PROVIDER[node.comfyClass];
+    if (!provider || !keyStatus) return null;
+    const widget = node.widgets?.find((w) => w.name === "api_key");
+    if (!widget) return null;
+    widget.disabled = keyStatus[provider]?.set === true;
+    return widget;
+}
+
+function lockApiKeyWidgetsInGraph() {
+    for (const node of app.graph?.nodes ?? []) {
+        lockApiKeyWidget(node);
+    }
+}
+
+function describeKey(status) {
+    if (!status) return "Status unavailable";
+    if (!status.set) return "Not set";
+    return status.last4 ? `Set ••••${status.last4}` : "Set";
+}
+
+const KEY_CONTROL_CSS =
+    "padding:6px 12px;border:1px solid var(--border-color,#3a3a3a);border-radius:6px;" +
+    "background:var(--comfy-input-bg,#0d0d12);color:var(--input-text,#ddd);font-size:12px;" +
+    "box-sizing:border-box;min-height:32px;";
+
+// One provider's row: status, a write-only key input, Save and Clear. The key
+// typed here goes to POST /erpk/keys and is never read back.
+function renderKeyRow(entry) {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:520px;";
+
+    const state = document.createElement("span");
+    state.setAttribute("aria-live", "polite");
+    state.style.cssText =
+        "min-width:96px;font-size:12px;" +
+        "font-family:var(--font-family-monospace,ui-monospace,Menlo,monospace);";
+
+    const input = document.createElement("input");
+    input.type = "password";
+    input.autocomplete = "new-password";
+    input.spellcheck = false;
+    input.placeholder = "Paste a new key";
+    input.setAttribute("aria-label", `New ${entry.name}`);
+    input.style.cssText = KEY_CONTROL_CSS + "flex:1 1 180px;min-width:0;font-family:var(--font-family-monospace,ui-monospace,Menlo,monospace);";
+
+    const save = document.createElement("button");
+    save.type = "button";
+    save.textContent = "Save";
+    save.style.cssText = KEY_CONTROL_CSS + "cursor:pointer;";
+
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.textContent = "Clear";
+    clear.style.cssText = KEY_CONTROL_CSS + "cursor:pointer;";
+
+    const error = document.createElement("span");
+    error.setAttribute("role", "alert");
+    error.style.cssText = "flex-basis:100%;font-size:12px;color:var(--error-text,#f87171);";
+
+    const paint = () => {
+        const status = keyStatus?.[entry.provider];
+        state.textContent = describeKey(status);
+        state.style.opacity = status?.set ? "1" : "0.6";
+        save.disabled = !input.value.trim();
+        clear.disabled = status?.set !== true;
+    };
+
+    // key: the new key, or null to clear it
+    const submit = async (key) => {
+        save.disabled = true;
+        clear.disabled = true;
+        error.textContent = "";
+        try {
+            const resp = await writeRequest("/erpk/keys", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ provider: entry.provider, key }),
+            });
+            const body = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                error.textContent = body.error ?? `Request failed: ${resp.status}`;
+                return;
+            }
+            keyStatus = body;
+            input.value = "";
+            lockApiKeyWidgetsInGraph();
+        } catch (e) {
+            error.textContent = `Request failed: ${e.message}`;
+        } finally {
+            paint();
+        }
+    };
+
+    save.addEventListener("click", () => submit(input.value.trim()));
+    clear.addEventListener("click", () => submit(null));
+    input.addEventListener("input", paint);
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && input.value.trim()) submit(input.value.trim());
+    });
+
+    row.append(state, input, save, clear, error);
+    paint();
+    return row;
 }
 
 async function registerUserContext() {
@@ -159,144 +265,14 @@ function tryInjectBanner(displayName, version) {
     container.prepend(createUserBanner(displayName, version));
 }
 
-// Mask API-key values in the settings dialog. ComfyUI's "text" setting type
-// renders a plain input showing the full value — not great for secrets. This
-// post-render pass switches our four API-key inputs to type="password" (chars
-// render as dots) and appends a small monospace preview showing the first four
-// and last four characters of the stored value so the user can tell which key
-// is configured without the full secret on screen.
-function maskApiKey(val) {
-    if (!val) return "";
-    if (val.length <= 8) return "•".repeat(val.length);
-    return `${val.slice(0, 4)}…${val.slice(-4)}`;
-}
-
-// Display names must match the `name` field of each entry in API_KEY_SETTINGS
-// exactly — the masking pass walks the DOM and matches the label text. When
-// you add a new key to API_KEY_SETTINGS above, add the same name here too.
-const API_KEY_LABELS = new Set([
-    "Anthropic API Key",
-    "BytePlus ModelArk API Key",
-    "Google API Key",
-    "OpenAI API Key",
-    "WaveSpeed API Key",
-    "xAI (Grok) API Key",
-]);
-
-function enhanceApiKeyInput(input) {
-    if (input.dataset.erpkMasked === "1") return;
-    input.dataset.erpkMasked = "1";
-    input.type = "password";
-    input.autocomplete = "off";
-    input.spellcheck = false;
-
-    // Replace the input's default display with a compact "sk-AB…xyz" preview
-    // that sits where the input used to be. Clicking the preview swaps in the
-    // real password input so the user can edit; blurring the input swaps back
-    // to the preview. Matches the AWS Console / GitHub Secrets pattern.
-    const preview = document.createElement("div");
-    preview.className = "erpk-key-preview";
-    preview.setAttribute("role", "button");
-    preview.setAttribute("tabindex", "0");
-    preview.setAttribute("aria-label", "API key — click to edit");
-    preview.style.cssText =
-        "display:flex;align-items:center;justify-content:space-between;gap:8px;" +
-        "padding:6px 12px;border:1px solid var(--border-color,#3a3a3a);" +
-        "border-radius:6px;background:var(--comfy-input-bg,transparent);" +
-        "font-family:var(--font-family-monospace,ui-monospace,Menlo,monospace);" +
-        "font-size:12px;color:var(--input-text,#ddd);cursor:text;" +
-        "min-height:32px;box-sizing:border-box;user-select:none;";
-
-    const valueSpan = document.createElement("span");
-    valueSpan.style.cssText =
-        "flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" +
-        "letter-spacing:0.02em;";
-
-    const editHint = document.createElement("span");
-    editHint.textContent = "Edit";
-    editHint.style.cssText =
-        "opacity:0.5;font-size:10px;flex:0 0 auto;" +
-        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;" +
-        "text-transform:uppercase;letter-spacing:0.08em;";
-
-    preview.appendChild(valueSpan);
-    preview.appendChild(editHint);
-
-    const updatePreview = () => {
-        const val = input.value;
-        if (!val) {
-            valueSpan.textContent = "Not set";
-            valueSpan.style.opacity = "0.5";
-        } else {
-            valueSpan.textContent = maskApiKey(val);
-            valueSpan.style.opacity = "1";
-        }
-    };
-
-    const showEditing = () => {
-        preview.style.display = "none";
-        input.style.display = "";
-        // setTimeout lets display:"" settle before focus to avoid focus loss
-        setTimeout(() => input.focus(), 0);
-    };
-    const showMasked = () => {
-        input.style.display = "none";
-        preview.style.display = "flex";
-        updatePreview();
-    };
-
-    preview.addEventListener("click", showEditing);
-    preview.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            showEditing();
-        }
-    });
-    input.addEventListener("blur", showMasked);
-    input.addEventListener("input", updatePreview);
-    input.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") input.blur();
-    });
-
-    // Insert preview where the input lives so the layout slot is identical.
-    if (input.parentElement) {
-        input.parentElement.insertBefore(preview, input);
-    }
-    updatePreview();
-    showMasked();
-}
-
-function enhanceApiKeyInputs() {
-    const labels = document.querySelectorAll(
-        ".p-dialog-content span, .p-dialog-content label, " +
-            ".comfy-modal-content span, .comfy-modal-content label"
-    );
-    for (const el of labels) {
-        const text = el.textContent?.trim();
-        if (!API_KEY_LABELS.has(text)) continue;
-        // Walk up to the row container, then find the text input inside it.
-        let container = el;
-        let input = null;
-        for (let i = 0; i < 6 && container; i++) {
-            input = container.querySelector?.(
-                "input[type='text'], input[type='password'], input:not([type])"
-            );
-            if (input) break;
-            container = container.parentElement;
-        }
-        if (input) enhanceApiKeyInput(input);
-    }
-}
-
 function observeSettingsDialog(displayName, version) {
-    // Watch for dialog open/close to inject the banner and mask API-key inputs.
+    // Watch for dialog open/close to inject the banner.
     const observer = new MutationObserver(() => {
         const dialogOpen =
             document.querySelector(".p-dialog-content") ||
             document.querySelector(".comfy-modal-content");
         if (dialogOpen) {
             tryInjectBanner(displayName, version);
-            enhanceApiKeyInputs();
         }
     });
     observer.observe(document.body, { childList: true, subtree: true });
@@ -408,13 +384,16 @@ const GENERAL_SETTINGS = [
 ];
 
 function buildSettings() {
-    const apiKeySettings = API_KEY_SETTINGS.map((entry) => ({
-        id: entry.id,
+    const apiKeySettings = API_KEY_PROVIDERS.map((entry) => ({
+        // A render function instead of "text": the frontend writes a setting to
+        // comfy.settings.json only when its setter is called, and renderKeyRow
+        // never calls it. The id holds no value.
+        id: `ERPK.ApiKeyStore.${entry.provider}`,
         name: entry.name,
-        type: "text",
+        type: () => renderKeyRow(entry),
         defaultValue: "",
         category: ["ERPK", "API Keys", entry.name],
-        tooltip: `${entry.name}. Leave empty to use config.ini.`,
+        tooltip: `${entry.name}, saved privately for your ComfyUI user on the server. Only its last four characters are ever shown. When it is not set, the key on the node or in config.ini is used.`,
     }));
     return [...apiKeySettings, ...GENERAL_SETTINGS];
 }
@@ -423,6 +402,11 @@ app.registerExtension({
     name: "ERPK.Settings",
 
     settings: buildSettings(),
+
+    // init runs before the saved workflow is restored, so nodeCreated sees the status.
+    async init() {
+        await fetchKeyStatus();
+    },
 
     async setup() {
         // Open the notification window 2s after setup. Any onChange fires
@@ -449,20 +433,14 @@ app.registerExtension({
         }
     },
 
+    afterConfigureGraph() {
+        lockApiKeyWidgetsInGraph();
+    },
+
     nodeCreated(node) {
-        const settingId = NODE_TO_SETTING[node.comfyClass];
-        if (!settingId) return;
-
-        const apiKeyWidget = node.widgets?.find((w) => w.name === "api_key");
-        if (!apiKeyWidget) return;
-
-        const settingValue = app.extensionManager.setting.get(settingId);
-        if (settingValue && settingValue.trim()) {
-            apiKeyWidget.value = "";
-            if (apiKeyWidget.inputEl) {
-                apiKeyWidget.inputEl.disabled = true;
-                apiKeyWidget.inputEl.placeholder = "Configured in Settings";
-            }
+        const widget = lockApiKeyWidget(node);
+        if (widget?.disabled) {
+            widget.value = "";
         }
     },
 });

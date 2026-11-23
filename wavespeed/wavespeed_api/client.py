@@ -15,10 +15,11 @@ import asyncio
 import time
 import io
 import requests
-from typing import Callable, Optional, Dict, Any
+from typing import Callable, Optional, Dict, Any, Union
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from ...key_store import ApiKey, reveal_key
 from .utils import BaseRequest
 
 
@@ -76,13 +77,14 @@ class WaveSpeedClient:
 
     BASE_URL = "https://api.wavespeed.ai"
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: Union[str, ApiKey]):
         """
         Initialize WaveSpeed AI API client.
 
         Args:
             api_key: WaveSpeed AI API key
         """
+        api_key = reveal_key(api_key)
         self.api_key = api_key
         self.once_timeout = 1800  # Default timeout is 30 minutes
 

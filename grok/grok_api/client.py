@@ -4,7 +4,9 @@
 import asyncio
 import configparser
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
+
+from ...key_store import ApiKey, reveal_key
 
 
 class GrokClient:
@@ -95,8 +97,8 @@ class GrokClient:
     REASONING_EFFORT_OPTIONS = ["(model default)", "none", "low", "medium", "high", "xhigh"]
     REASONING_EFFORT_MODEL_DEFAULT = "(model default)"
 
-    def __init__(self, api_key: Optional[str] = None, config_path: Optional[str] = None):
-        self.api_key = self._resolve_api_key(api_key, config_path)
+    def __init__(self, api_key: Optional[Union[str, ApiKey]] = None, config_path: Optional[str] = None):
+        self.api_key = self._resolve_api_key(reveal_key(api_key), config_path)
         # Lazily import to avoid crashing tests when xai-sdk isn't installed.
         try:
             import xai_sdk

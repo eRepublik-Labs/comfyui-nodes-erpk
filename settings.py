@@ -1,4 +1,4 @@
-# ABOUTME: Reads ComfyUI user settings from comfy.settings.json
+# ABOUTME: Reads ComfyUI user settings from comfy.settings.json, and API keys from the key store
 # ABOUTME: Supports multi-user via client_id-to-user_id mapping from PromptServer
 
 import json
@@ -6,6 +6,11 @@ import os
 import re
 import threading
 from collections import OrderedDict
+
+from .key_store import PROVIDERS, store_for
+
+# Setting id -> provider for the API keys, which live in the key store.
+_KEY_PROVIDERS = {setting_id: provider for provider, setting_id in PROVIDERS.items()}
 
 # Maps WebSocket client_id -> user_id, populated by /erpk/register_user.
 # OrderedDict + lock + size cap give thread safety and prevent unbounded growth.
@@ -83,12 +88,15 @@ def _read_settings_file(settings_path, setting_id, default):
 
 
 def get_comfy_setting(setting_id, default=None, user_id=None):
-    """Read a setting from ComfyUI's per-user settings file.
+    """Read a setting for the identified user.
+
+    The ERPK.*_API_KEY ids in key_store.PROVIDERS come from the per-user key
+    store; every other id comes from the user's comfy.settings.json.
 
     Resolves against the identified user only. If user_id is omitted,
     get_current_user_id() is consulted; if that yields nothing
     (background tasks, no WebSocket context, unmapped client_id), only
-    the shared "default" directory is read.
+    the shared "default" user is read.
 
     User isolation is strict: this function will NEVER return a setting
     belonging to another identified user, and an unresolved session
@@ -97,7 +105,7 @@ def get_comfy_setting(setting_id, default=None, user_id=None):
     Args:
         setting_id: The setting key (e.g. "ERPK.ANTHROPIC_API_KEY")
         default: Value to return if the setting is not found
-        user_id: Specific user directory to read from (for multi-user)
+        user_id: Specific user to read for (for multi-user)
 
     Returns:
         The setting value, or default if not found/empty
@@ -110,16 +118,15 @@ def get_comfy_setting(setting_id, default=None, user_id=None):
 
     if user_id is None:
         user_id = get_current_user_id()
+    if not user_id:
+        user_id = "default"
 
-    if user_id:
+    provider = _KEY_PROVIDERS.get(setting_id)
+    if provider is not None:
+        result = store_for(user_dir).get(user_id, provider)
+    else:
         settings_path = os.path.join(user_dir, user_id, "comfy.settings.json")
         result = _read_settings_file(settings_path, setting_id, default)
-        if result is not None:
-            return result
-        return default
-
-    settings_path = os.path.join(user_dir, "default", "comfy.settings.json")
-    result = _read_settings_file(settings_path, setting_id, default)
     if result is not None:
         return result
     return default

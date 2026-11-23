@@ -6,10 +6,11 @@ import configparser
 import json
 import os
 import time
-from typing import Awaitable, Callable, Optional, Tuple
+from typing import Awaitable, Callable, Optional, Tuple, Union
 
 import requests
 
+from ...key_store import ApiKey, reveal_key
 from . import emit
 
 try:
@@ -94,9 +95,9 @@ def _error_description(status: int, text: str) -> str:
 class BytePlusClient:
     """ModelArk data-plane client. Key priority: ComfyUI Settings > argument > config.ini."""
 
-    def __init__(self, api_key: Optional[str] = None, config_path: Optional[str] = None,
+    def __init__(self, api_key: Optional[Union[str, ApiKey]] = None, config_path: Optional[str] = None,
                  transport: Optional[Transport] = None, poll_interval: float = 8.0):
-        self.api_key = self._resolve_api_key(api_key, config_path)
+        self.api_key = self._resolve_api_key(reveal_key(api_key), config_path)
         self._transport = transport or _requests_transport(requests.Session())
         self.poll_interval = poll_interval
 

@@ -7,6 +7,8 @@ import configparser
 
 from comfy_api.latest import IO
 
+from ..key_store import ApiKey
+
 # Configuration handling
 try:
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -44,7 +46,10 @@ class WaveSpeedAIAPIClient(IO.ComfyNode):
             category="ERPK/WaveSpeedAI",
             inputs=[
                 IO.String.Input("api_key", optional=True, default="",
-                                tooltip="WaveSpeed AI API key. If empty, checks ComfyUI Settings, then config.ini"),
+                                tooltip=("WaveSpeed AI API key. A key saved in Settings > ERPK > API Keys stays private and takes "
+                                         "priority over this field; with neither, wavespeed/config.ini is read. "
+                                         "A key typed here is visible to every user of this ComfyUI: it is saved in the workflow, "
+                                         "the queue history and image metadata.")),
             ],
             outputs=[
                 IO.Custom("WAVESPEED_AI_API_CLIENT").Output("client"),
@@ -88,7 +93,7 @@ class WaveSpeedAIAPIClient(IO.ComfyNode):
                 "  3. config.ini file"
             )
 
-        return IO.NodeOutput({"api_key": wavespeed_api_key})
+        return IO.NodeOutput({"api_key": ApiKey(wavespeed_api_key)})
 
 
 class PreviewVideo(IO.ComfyNode):

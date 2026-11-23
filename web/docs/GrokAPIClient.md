@@ -9,13 +9,13 @@ Initializes an xAI Grok API client used by other Grok nodes. The `client` output
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| api_key | String | (empty) | xAI API key (optional). If empty, resolves from ComfyUI Settings > `grok/config.ini` |
+| api_key | String | (empty) | xAI API key (optional). A key saved in Settings > ERPK > API Keys stays private and takes priority; with neither, `grok/config.ini` is read. A key typed here is visible to every user of this ComfyUI: it is saved in the workflow, the queue history and image metadata. |
 
 ## Output
 
 | Output | Type | Description |
 |--------|------|-------------|
-| client | GROK_API_CLIENT | Typed handle for downstream Grok nodes |
+| client | GROK_API_CLIENT | Typed handle for downstream Grok nodes. A preview node shows the key as `ApiKey(set)`. |
 
 ## Notes
 

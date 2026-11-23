@@ -9,13 +9,13 @@ Creates a client connection to the WaveSpeed AI API. Optional if your API key is
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| api_key | String | "" | WaveSpeed AI API key (optional). If empty, checks ComfyUI Settings, then config.ini |
+| api_key | String | "" | WaveSpeed AI API key (optional). A key saved in Settings > ERPK > API Keys stays private and takes priority; with neither, `wavespeed/config.ini` is read. A key typed here is visible to every user of this ComfyUI: it is saved in the workflow, the queue history and image metadata. |
 
 ## Output
 
 | Output | Type | Description |
 |--------|------|-------------|
-| client | WAVESPEED_AI_API_CLIENT | API client connection for WaveSpeed nodes |
+| client | WAVESPEED_AI_API_CLIENT | API client connection for WaveSpeed nodes. A preview node shows the key as `ApiKey(set)`. |
 
 ## Notes
 
