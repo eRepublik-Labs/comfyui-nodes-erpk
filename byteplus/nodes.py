@@ -7,7 +7,7 @@ from typing import Callable, List, Optional
 
 from comfy_api.latest import IO
 
-from ..key_store import ApiKey
+from ..key_store import ApiKey, cache_token
 from .byteplus_api import client as client_module
 from .byteplus_api import emit, seedream
 from .byteplus_api.client import BytePlusClient
@@ -54,6 +54,12 @@ class BytePlusAPIClient(IO.ComfyNode):
             ],
             outputs=[IO.Custom("BYTEPLUS_API_CLIENT").Output("client")],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, api_key: str = "", **kwargs):
+        """The cache token of the key execute resolves: the output is reused
+        only for a prompt that resolves the same key."""
+        return cache_token(lambda: BytePlusClient._resolve_api_key(api_key))
 
     @classmethod
     def execute(cls, api_key: str = "", **kwargs) -> IO.NodeOutput:

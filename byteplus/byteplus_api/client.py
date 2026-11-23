@@ -101,7 +101,8 @@ class BytePlusClient:
         self._transport = transport or _requests_transport(requests.Session())
         self.poll_interval = poll_interval
 
-    def _resolve_api_key(self, api_key: Optional[str], config_path: Optional[str]) -> str:
+    @staticmethod
+    def _resolve_api_key(api_key: Optional[str], config_path: Optional[str] = None) -> str:
         try:
             from ...settings import get_comfy_setting
             settings_key = get_comfy_setting("ERPK.BYTEPLUS_API_KEY")

@@ -51,6 +51,15 @@ class ClaudeAPIClient(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        """The cache token of the key execute resolves: the output is reused
+        only for a prompt that resolves the same key."""
+        from ..key_store import cache_token
+        from .claude_api.client import ClaudeClient
+
+        return cache_token(lambda: ClaudeClient._resolve_api_key(kwargs.get("api_key")))
+
+    @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:
         from .claude_api.client import ClaudeClient
 

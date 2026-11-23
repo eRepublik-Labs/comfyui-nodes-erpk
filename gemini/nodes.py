@@ -9,6 +9,7 @@ import warnings
 from comfy_api.latest import IO
 
 from .gemini_api.client import GeminiClient, raise_if_cut_off, stop_reason
+from ..key_store import cache_token
 from ..utils.image_grid import (
     NO_GRID_IMAGE, grid_input, load_grid_images, model_grid_cap, register_grid_caps, validate_grid,
 )
@@ -313,6 +314,12 @@ class GeminiAPIConfig(IO.ComfyNode):
                 IO.Custom("GEMINI_API_CLIENT").Output("client"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        """The cache token of the key execute resolves: the output is reused
+        only for a prompt that resolves the same key."""
+        return cache_token(lambda: GeminiClient._resolve_api_key(None))
 
     @classmethod
     async def execute(cls, **kwargs) -> IO.NodeOutput:

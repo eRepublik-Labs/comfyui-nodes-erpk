@@ -1,10 +1,14 @@
 # ABOUTME: Per-user API key store kept outside every directory a ComfyUI route serves.
 # ABOUTME: One 0600 JSON file per user under erpk_keys/ (plus one for set-aside unusable values),
-# ABOUTME: the move out of comfy.settings.json, the refusal of key writes back into it, and ApiKey.
+# ABOUTME: the move out of comfy.settings.json, the refusal of key writes back into it, ApiKey
+# ABOUTME: and the cache token a node that outputs a key is cached under.
 
+import hashlib
+import hmac
 import json
 import os
 import re
+import secrets
 import tempfile
 import threading
 from urllib import parse
@@ -74,6 +78,27 @@ def reveal_key(key):
     """An ApiKey's key; a str or None unchanged. For API client constructors,
     which take a key from a client node (ApiKey) or from a widget or config (str)."""
     return key.reveal() if isinstance(key, ApiKey) else key
+
+
+# Keys the cache tokens, so a token says nothing about a key outside this process.
+_CACHE_TOKEN_SECRET = secrets.token_bytes(32)
+_NO_KEY_CACHE_TOKEN = "no-api-key"
+
+
+def cache_token(resolve_key):
+    """What a node that outputs a resolved key returns from fingerprint_inputs.
+
+    ComfyUI caches a node's output under its fingerprint, and resolution
+    depends on who queued the prompt, so the output is reused only for a
+    prompt that resolves the same key. resolve_key() returns the key the
+    node's execute would use, or raises ValueError when there is none. The
+    token is an HMAC of the key and holds no part of it.
+    """
+    try:
+        key = reveal_key(resolve_key())
+    except ValueError:
+        return _NO_KEY_CACHE_TOKEN
+    return hmac.new(_CACHE_TOKEN_SECRET, key.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def store_for(user_dir):

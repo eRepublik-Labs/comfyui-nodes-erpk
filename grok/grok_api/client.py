@@ -107,7 +107,8 @@ class GrokClient:
         self._xai_sdk = xai_sdk
         self._client = None
 
-    def _resolve_api_key(self, api_key: Optional[str], config_path: Optional[str]) -> str:
+    @staticmethod
+    def _resolve_api_key(api_key: Optional[str], config_path: Optional[str] = None) -> str:
         """Priority: ComfyUI Settings > arg > config.ini."""
         try:
             from ...settings import get_comfy_setting

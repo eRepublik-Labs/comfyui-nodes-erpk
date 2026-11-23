@@ -7,7 +7,7 @@ from typing import List
 
 from comfy_api.latest import IO
 
-from ..key_store import ApiKey
+from ..key_store import ApiKey, cache_token
 from .grok_api.client import GrokClient
 from ..utils.image_grid import (
     NO_GRID_IMAGE, grid_input, load_grid_images, model_grid_cap, register_grid_caps, validate_grid,
@@ -165,6 +165,12 @@ class GrokAPIClient(IO.ComfyNode):
                 IO.Custom("GROK_API_CLIENT").Output("client"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, api_key: str = "", **kwargs):
+        """The cache token of the key execute resolves: the output is reused
+        only for a prompt that resolves the same key."""
+        return cache_token(lambda: GrokClient._resolve_api_key(api_key))
 
     @classmethod
     def execute(cls, api_key: str = "", **kwargs) -> IO.NodeOutput:

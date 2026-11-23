@@ -308,3 +308,41 @@ def test_users_without_a_settings_file_are_skipped_quietly(user_dir, store, cons
 def test_a_missing_user_dir_has_nothing_to_migrate(tmp_path, store, console):
     assert migrate_settings(str(tmp_path / "user"), store) == {}
     assert console() == ""
+
+
+# No character of this key is a hex digit, so a hex token can only share a
+# substring with it by containing part of the key.
+_TOKEN_TEST_KEY = "sk-proj-KLMNOPQRSTUVWXYZ-ghijklmnopqrstuvwxyz"
+
+
+def test_cache_token_is_the_same_for_the_same_key_and_differs_for_another():
+    from erpk.key_store import cache_token
+
+    token = cache_token(lambda: _TOKEN_TEST_KEY)
+
+    assert token == cache_token(lambda: _TOKEN_TEST_KEY)
+    assert token != cache_token(lambda: _TOKEN_TEST_KEY + "X")
+    assert len(token) == 64 and set(token) <= set("0123456789abcdef")
+
+
+def test_cache_token_takes_a_masked_key():
+    from erpk.key_store import ApiKey, cache_token
+
+    assert cache_token(lambda: ApiKey(_TOKEN_TEST_KEY)) == cache_token(lambda: _TOKEN_TEST_KEY)
+
+
+def test_cache_token_shares_no_four_characters_with_the_key():
+    from erpk.key_store import cache_token
+
+    token = cache_token(lambda: _TOKEN_TEST_KEY)
+
+    assert [_TOKEN_TEST_KEY[i:i + 4] for i in range(len(_TOKEN_TEST_KEY) - 3) if _TOKEN_TEST_KEY[i:i + 4] in token] == []
+
+
+def test_cache_token_is_a_fixed_string_when_no_key_resolves():
+    from erpk.key_store import cache_token
+
+    def no_key():
+        raise ValueError("No API key found")
+
+    assert cache_token(no_key) == "no-api-key"

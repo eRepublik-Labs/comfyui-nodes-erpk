@@ -7,7 +7,7 @@ import configparser
 
 from comfy_api.latest import IO
 
-from ..key_store import ApiKey
+from ..key_store import ApiKey, cache_token
 
 # Configuration handling
 try:
@@ -57,7 +57,17 @@ class WaveSpeedAIAPIClient(IO.ComfyNode):
         )
 
     @classmethod
+    def fingerprint_inputs(cls, api_key="", **kwargs):
+        """The cache token of the key execute resolves: the output is reused
+        only for a prompt that resolves the same key."""
+        return cache_token(lambda: cls._resolve_api_key(api_key))
+
+    @classmethod
     def execute(cls, api_key="", **kwargs):
+        return IO.NodeOutput({"api_key": ApiKey(cls._resolve_api_key(api_key))})
+
+    @staticmethod
+    def _resolve_api_key(api_key):
         wavespeed_api_key = ""
 
         # Priority 1: ComfyUI Settings
@@ -93,7 +103,7 @@ class WaveSpeedAIAPIClient(IO.ComfyNode):
                 "  3. config.ini file"
             )
 
-        return IO.NodeOutput({"api_key": ApiKey(wavespeed_api_key)})
+        return wavespeed_api_key
 
 
 class PreviewVideo(IO.ComfyNode):

@@ -129,7 +129,8 @@ class GeminiClient:
         self.system_instruction = None
         self.safety_settings = None
 
-    def _resolve_api_key(self, api_key: Optional[str], config_path: Optional[str]) -> str:
+    @staticmethod
+    def _resolve_api_key(api_key: Optional[str], config_path: Optional[str] = None) -> str:
         """
         Resolve API key from multiple sources in order of priority:
         1. ComfyUI Settings (comfy.settings.json)

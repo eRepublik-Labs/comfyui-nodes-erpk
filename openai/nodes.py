@@ -5,6 +5,7 @@ import json
 
 from comfy_api.latest import IO
 from .openai_api.client import OpenAIClient
+from ..key_store import cache_token
 
 TEXT_MODELS = list(OpenAIClient.MODELS.keys())
 VISION_MODELS = [m for m in TEXT_MODELS if not m.startswith("o")]
@@ -88,6 +89,12 @@ class OpenAIAPIConfig(IO.ComfyNode):
                 IO.Custom("OPENAI_API_CLIENT").Output("client"),
             ],
         )
+
+    @classmethod
+    def fingerprint_inputs(cls, **kwargs):
+        """The cache token of the key execute resolves: the output is reused
+        only for a prompt that resolves the same key."""
+        return cache_token(lambda: OpenAIClient._resolve_api_key(None))
 
     @classmethod
     def execute(cls, **kwargs) -> IO.NodeOutput:

@@ -1,14 +1,23 @@
-# ABOUTME: Tests that all API-calling nodes have seed + fingerprint_inputs for cache-busting.
-# ABOUTME: Ensures re-queuing a prompt always re-executes generation nodes.
+# ABOUTME: Tests each node's cache fingerprint: seed-gated on API-calling nodes, per resolved
+# ABOUTME: API key on nodes that output a key, and absent on every other config node.
 
 """
 Validates that every node with not_idempotent=True has a seed input with
 control_after_generate set. The seed widget replaces the old fingerprint_inputs
 NaN hack — when set to "randomize" (default), the seed changes each queue,
 busting the cache. When "fixed", the user gets cached/reproducible results.
+
+A node that resolves an API key and outputs it is cached per resolved key
+instead: the same key keeps the cached output, another key does not get it.
 """
 
 import importlib
+import json
+import math
+import sys
+import types
+from collections import OrderedDict
+
 import pytest
 
 IO = pytest.importorskip("comfy_api.latest").IO
@@ -166,21 +175,19 @@ class TestCacheBusting:
         )
 
 
-# Config / passthrough nodes: no API call, no seed input. They must NOT define
-# fingerprint_inputs — a seedless node copies the NaN branch unconditionally
-# (kwargs.get("seed", -1) is always -1), marking itself dirty every queue. As a
-# root, that cascades cache invalidation into every downstream node, re-billing
-# the whole graph. These rely on ComfyUI's default input-based caching instead.
+# Config / passthrough nodes: no API call, no seed input, no API key resolved.
+# They must NOT define fingerprint_inputs — a seedless node copies the NaN branch
+# unconditionally (kwargs.get("seed", -1) is always -1), marking itself dirty
+# every queue. As a root, that cascades cache invalidation into every downstream
+# node, re-billing the whole graph. These rely on ComfyUI's default input-based
+# caching instead.
 CONFIG_NODES = [
-    ("erpk.gemini.nodes", "GeminiAPIConfig"),
     ("erpk.gemini.nodes", "GeminiSystemInstruction"),
     ("erpk.gemini.nodes", "GeminiSafetySettings"),
     ("utils.regional_prompt", "RegionalPromptBuilder"),
     ("utils.image_grid_loader", "ImageGridLoader"),
-    ("erpk.openai.nodes", "OpenAIAPIConfig"),
     ("erpk.openai.nodes", "OpenAISystemInstruction"),
     ("erpk.wavespeed.minimax_h3_lora_stack", "MinimaxH3LoraStackNode"),
-    ("erpk.byteplus.nodes", "BytePlusAPIClient"),
 ]
 
 
@@ -203,3 +210,148 @@ class TestConfigNodesAreCacheable:
             f"returns NaN — marking it dirty every queue and cascading cache "
             f"invalidation downstream. Remove the method; rely on default caching."
         )
+
+
+# (module_path, class_name, key store provider, has an api_key widget) for every
+# node that resolves the queuing user's API key and outputs a client carrying it.
+KEY_NODES = [
+    ("erpk.claude.nodes", "ClaudeAPIClient", "anthropic", True),
+    ("erpk.openai.nodes", "OpenAIAPIConfig", "openai", False),
+    ("erpk.gemini.nodes", "GeminiAPIConfig", "google", False),
+    ("erpk.grok.nodes", "GrokAPIClient", "xai", True),
+    ("erpk.byteplus.nodes", "BytePlusAPIClient", "byteplus", True),
+    ("erpk.wavespeed.nodes", "WaveSpeedAIAPIClient", "wavespeed", True),
+]
+
+# No character of these keys is a hex digit, so a hex fingerprint can only
+# share a substring with one by containing part of it.
+ALICE_KEY = "sk-KLMNOPQRSTUVWXYZ-ghijklmnopqrstuvwxyz"
+BOB_KEY = "sk-ZYXWVUTSRQPONMLK-zyxwvutsrqponmlkjihg"
+ROTATED_KEY = "sk-GHIJKLMNOPQRSTUV-mnopqrstuvwxyzghijkl"
+
+
+class Users:
+    """A ComfyUI user directory with a key store, and the user whose prompt is running."""
+
+    def __init__(self, tmp_path, monkeypatch):
+        from erpk import settings
+
+        self._settings = settings
+        self._keys_dir = tmp_path / "erpk_keys"
+        self._keys_dir.mkdir()
+        user_dir = tmp_path / "user"
+        user_dir.mkdir()
+        folder_paths = types.ModuleType("folder_paths")
+        folder_paths.get_user_directory = lambda: str(user_dir)
+        self._prompt_server = types.SimpleNamespace(client_id=None)
+        server = types.ModuleType("server")
+        server.PromptServer = types.SimpleNamespace(instance=self._prompt_server)
+        monkeypatch.setitem(sys.modules, "folder_paths", folder_paths)
+        monkeypatch.setitem(sys.modules, "server", server)
+        monkeypatch.setattr(settings, "_client_user_map", OrderedDict())
+
+    def store_key(self, user_id, provider, key):
+        (self._keys_dir / f"{user_id}.json").write_text(json.dumps({provider: key}), encoding="utf-8")
+
+    def queue_as(self, user_id):
+        client_id = f"client-of-{user_id}"
+        assert self._settings.register_client_user(client_id, user_id)
+        self._prompt_server.client_id = client_id
+
+
+@pytest.fixture
+def users(tmp_path, monkeypatch):
+    return Users(tmp_path, monkeypatch)
+
+
+def _shared_runs(key, text):
+    return [key[i:i + 4] for i in range(len(key) - 3) if key[i:i + 4] in text]
+
+
+@pytest.mark.parametrize("module_path,class_name,provider,has_key_widget", KEY_NODES,
+                         ids=[c for _, c, _, _ in KEY_NODES])
+class TestKeyNodesAreCachedPerResolvedKey:
+    """A node that outputs a resolved API key is reused only for the same key."""
+
+    def test_no_seed_input(self, module_path, class_name, provider, has_key_widget):
+        cls = _load_class(module_path, class_name)
+        assert not [i for i in cls.define_schema().inputs if i.id == "seed"]
+
+    def test_same_key_keeps_the_same_fingerprint(self, users, module_path, class_name, provider, has_key_widget):
+        cls = _load_class(module_path, class_name)
+        users.store_key("alice", provider, ALICE_KEY)
+        users.queue_as("alice")
+
+        first = cls.fingerprint_inputs()
+        second = cls.fingerprint_inputs()
+
+        assert isinstance(first, str)
+        assert first == second
+
+    def test_users_with_different_keys_get_different_fingerprints(
+            self, users, module_path, class_name, provider, has_key_widget):
+        cls = _load_class(module_path, class_name)
+        users.store_key("alice", provider, ALICE_KEY)
+        users.store_key("bob", provider, BOB_KEY)
+
+        users.queue_as("alice")
+        alice = cls.fingerprint_inputs()
+        users.queue_as("bob")
+        bob = cls.fingerprint_inputs()
+        users.queue_as("alice")
+
+        assert alice != bob
+        assert cls.fingerprint_inputs() == alice
+
+    def test_a_changed_key_changes_the_fingerprint(self, users, module_path, class_name, provider, has_key_widget):
+        cls = _load_class(module_path, class_name)
+        users.queue_as("alice")
+        users.store_key("alice", provider, ALICE_KEY)
+        before = cls.fingerprint_inputs()
+
+        users.store_key("alice", provider, ROTATED_KEY)
+
+        assert cls.fingerprint_inputs() != before
+
+    def test_fingerprint_shares_no_four_characters_with_the_key(
+            self, users, module_path, class_name, provider, has_key_widget):
+        cls = _load_class(module_path, class_name)
+        users.store_key("alice", provider, ALICE_KEY)
+        users.queue_as("alice")
+
+        assert _shared_runs(ALICE_KEY, cls.fingerprint_inputs()) == []
+
+KEY_WIDGET_NODES = [node for node in KEY_NODES if node[3]]
+
+
+@pytest.mark.parametrize("module_path,class_name,provider,has_key_widget", KEY_WIDGET_NODES,
+                         ids=[c for _, c, _, _ in KEY_WIDGET_NODES])
+class TestKeyWidgetSetsTheFingerprint:
+    """The api_key widget is where execute looks when the user has stored no key."""
+
+    def test_a_key_typed_in_the_widget_sets_the_fingerprint_when_none_is_stored(
+            self, users, module_path, class_name, provider, has_key_widget):
+        cls = _load_class(module_path, class_name)
+        users.queue_as("alice")
+
+        typed = cls.fingerprint_inputs(api_key=ALICE_KEY)
+
+        assert typed == cls.fingerprint_inputs(api_key=f"  {ALICE_KEY}  ")
+        assert typed != cls.fingerprint_inputs(api_key=BOB_KEY)
+        assert _shared_runs(ALICE_KEY, typed) == []
+
+    def test_a_stored_key_wins_over_the_widget(self, users, module_path, class_name, provider, has_key_widget):
+        cls = _load_class(module_path, class_name)
+        users.store_key("alice", provider, ALICE_KEY)
+        users.queue_as("alice")
+
+        assert cls.fingerprint_inputs(api_key=BOB_KEY) == cls.fingerprint_inputs(api_key="")
+
+    def test_a_linked_key_widget_does_not_raise(self, users, module_path, class_name, provider, has_key_widget):
+        """ComfyUI passes None for an input fed by a link, and turns an exception
+        here into a fingerprint that never matches."""
+        cls = _load_class(module_path, class_name)
+        users.store_key("alice", provider, ALICE_KEY)
+        users.queue_as("alice")
+
+        assert cls.fingerprint_inputs(api_key=None) == cls.fingerprint_inputs(api_key="")
